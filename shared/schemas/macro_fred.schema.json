@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/berdelis/trading-agent/shared/schemas/macro_fred.schema.json",
+  "title": "macro_fred row",
+  "type": "object",
+  "required": ["ts", "series_id", "value"],
+  "properties": {
+    "ts": { "type": "string", "format": "date-time" },
+    "series_id": { "type": "string" },
+    "value": { "type": "number" }
+  },
+  "additionalProperties": false
+}

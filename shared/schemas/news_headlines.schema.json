@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/berdelis/trading-agent/shared/schemas/news_headlines.schema.json",
+  "title": "news_headlines row",
+  "type": "object",
+  "required": ["ts", "source", "headline"],
+  "properties": {
+    "ts": { "type": "string", "format": "date-time" },
+    "id": { "type": "integer" },
+    "source": { "type": "string" },
+    "symbol": { "type": ["string", "null"] },
+    "headline": { "type": "string" },
+    "url": { "type": ["string", "null"] },
+    "sentiment": { "type": ["number", "null"] },
+    "payload": { "type": "object" }
+  },
+  "additionalProperties": false
+}

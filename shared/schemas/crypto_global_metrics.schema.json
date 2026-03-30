@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/berdelis/trading-agent/shared/schemas/crypto_global_metrics.schema.json",
+  "title": "crypto_global_metrics row",
+  "type": "object",
+  "required": ["ts", "provider", "payload"],
+  "properties": {
+    "ts": { "type": "string", "format": "date-time" },
+    "provider": { "type": "string" },
+    "payload": { "type": "object" }
+  },
+  "additionalProperties": false
+}

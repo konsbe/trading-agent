@@ -2,5 +2,6 @@
 *.exe
 dist/
 bin/
+services/data-ingestion/bin/
 coverage.out
 vendor/

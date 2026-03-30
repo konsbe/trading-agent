@@ -1,0 +1,170 @@
+
+<style>
+  .api-wrap { padding: 1rem 0; }
+  .section-label { font-size: 13px; font-weight: 500; color: var(--color-text-secondary); letter-spacing: 0.04em; text-transform: uppercase; margin: 1.5rem 0 0.5rem; }
+  .api-card { background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); margin-bottom: 10px; overflow: hidden; }
+  .api-header { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 0.5px solid var(--color-border-tertiary); flex-wrap: wrap; gap: 8px; }
+  .api-name { font-size: 15px; font-weight: 500; color: var(--color-text-primary); }
+  .badge { font-size: 11px; font-weight: 500; padding: 2px 8px; border-radius: 99px; }
+  .badge-free { background: #EAF3DE; color: #3B6D11; }
+  .badge-paid { background: #FAEEDA; color: #854F0B; }
+  .badge-both { background: #E6F1FB; color: #185FA5; }
+  .badge-go { background: #EEEDFE; color: #534AB7; }
+  .badge-py { background: #FAECE7; color: #993C1D; }
+  .badge-any { background: #F1EFE8; color: #5F5E5A; }
+  .api-body { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0; }
+  .api-cell { padding: 10px 14px; font-size: 13px; color: var(--color-text-secondary); border-right: 0.5px solid var(--color-border-tertiary); }
+  .api-cell:last-child { border-right: none; }
+  .api-cell-label { font-size: 11px; font-weight: 500; color: var(--color-text-tertiary); margin-bottom: 3px; text-transform: uppercase; letter-spacing: 0.03em; }
+  .api-cell-val { color: var(--color-text-primary); font-size: 13px; line-height: 1.5; }
+  .strategy-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+  .stag { font-size: 11px; padding: 1px 7px; border-radius: 99px; background: var(--color-background-secondary); color: var(--color-text-secondary); border: 0.5px solid var(--color-border-tertiary); }
+  .cat-divider { display: flex; align-items: center; gap: 8px; margin: 1.8rem 0 0.6rem; }
+  .cat-line { flex: 1; height: 0.5px; background: var(--color-border-tertiary); }
+  .cat-title { font-size: 12px; font-weight: 500; color: var(--color-text-tertiary); text-transform: uppercase; letter-spacing: 0.05em; white-space: nowrap; }
+  @media (max-width: 600px) { .api-body { grid-template-columns: 1fr 1fr; } .api-cell:nth-child(2) { border-right: none; } .api-cell:nth-child(3) { grid-column: 1/-1; border-top: 0.5px solid var(--color-border-tertiary); } }
+</style>
+<div class="api-wrap">
+
+  <div class="cat-divider"><div class="cat-line"></div><div class="cat-title">Crypto market data</div><div class="cat-line"></div></div>
+
+  <div class="api-card">
+    <div class="api-header">
+      <span class="api-name">CCXT</span>
+      <span class="badge badge-free">Free / Open Source</span>
+      <span class="badge badge-go">Go ✓</span>
+    </div>
+    <div class="api-body">
+      <div class="api-cell"><div class="api-cell-label">Rate limit</div><div class="api-cell-val">Exchange-dependent (Binance: 1200 req/min, others vary)</div></div>
+      <div class="api-cell"><div class="api-cell-label">Data provided</div><div class="api-cell-val">OHLCV, orderbook, trades, ticker, funding rates, 100+ exchanges unified</div></div>
+      <div class="api-cell"><div class="api-cell-label">Useful for strategies</div><div class="strategy-tags"><span class="stag">momentum</span><span class="stag">mean reversion</span><span class="stag">breakout</span><span class="stag">pairs arb</span><span class="stag">funding rate arb</span></div></div>
+    </div>
+  </div>
+
+  <div class="api-card">
+    <div class="api-header">
+      <span class="api-name">CoinGecko</span>
+      <span class="badge badge-both">Free + Paid</span>
+      <span class="badge badge-any">REST (any lang)</span>
+    </div>
+    <div class="api-body">
+      <div class="api-cell"><div class="api-cell-label">Rate limit</div><div class="api-cell-val">Free: 30 req/min · Pro: 500 req/min</div></div>
+      <div class="api-cell"><div class="api-cell-label">Data provided</div><div class="api-cell-val">Price, market cap, volume, dominance, 14,000+ tokens, DeFi, NFTs, exchange data</div></div>
+      <div class="api-cell"><div class="api-cell-label">Useful for strategies</div><div class="strategy-tags"><span class="stag">macro sentiment</span><span class="stag">dominance signals</span><span class="stag">alt season detection</span></div></div>
+    </div>
+  </div>
+
+  <div class="api-card">
+    <div class="api-header">
+      <span class="api-name">Binance WebSocket (direct)</span>
+      <span class="badge badge-free">Free</span>
+      <span class="badge badge-go">Go ✓</span>
+    </div>
+    <div class="api-body">
+      <div class="api-cell"><div class="api-cell-label">Rate limit</div><div class="api-cell-val">5 WebSocket connections per IP, 10 subscriptions per stream</div></div>
+      <div class="api-cell"><div class="api-cell-label">Data provided</div><div class="api-cell-val">Real-time trades, depth, klines, book ticker, liquidations (futures)</div></div>
+      <div class="api-cell"><div class="api-cell-label">Useful for strategies</div><div class="strategy-tags"><span class="stag">HFT signals</span><span class="stag">liquidation hunting</span><span class="stag">order flow</span></div></div>
+    </div>
+  </div>
+
+  <div class="cat-divider"><div class="cat-line"></div><div class="cat-title">Stocks, ETFs & equities</div><div class="cat-line"></div></div>
+
+  <div class="api-card">
+    <div class="api-header">
+      <span class="api-name">Alpaca Market Data</span>
+      <span class="badge badge-both">Free + Paid ($9–$99/mo)</span>
+      <span class="badge badge-go">Go ✓</span>
+    </div>
+    <div class="api-body">
+      <div class="api-cell"><div class="api-cell-label">Rate limit</div><div class="api-cell-val">Free: 200 req/min · AlgoTrader Plus: 10,000 req/min</div></div>
+      <div class="api-cell"><div class="api-cell-label">Data provided</div><div class="api-cell-val">Real-time + historical OHLCV, quotes, trades, options (US equities), WebSocket stream, 7+ years history</div></div>
+      <div class="api-cell"><div class="api-cell-label">Useful for strategies</div><div class="strategy-tags"><span class="stag">momentum</span><span class="stag">breakout</span><span class="stag">options pricing</span><span class="stag">mean reversion</span></div></div>
+    </div>
+  </div>
+
+  <div class="api-card">
+    <div class="api-header">
+      <span class="api-name">Finnhub</span>
+      <span class="badge badge-both">Free + Paid ($12–$100/mo)</span>
+      <span class="badge badge-any">REST (any lang)</span>
+    </div>
+    <div class="api-body">
+      <div class="api-cell"><div class="api-cell-label">Rate limit</div><div class="api-cell-val">Free: 60 req/min · Paid: 300+ req/min · WebSocket: 50 symbols (free)</div></div>
+      <div class="api-cell"><div class="api-cell-label">Data provided</div><div class="api-cell-val">Real-time quotes, historical candles, earnings, SEC filings, insider transactions, ESG, lobbying data, congressional trades, news sentiment</div></div>
+      <div class="api-cell"><div class="api-cell-label">Useful for strategies</div><div class="strategy-tags"><span class="stag">sentiment</span><span class="stag">event-driven</span><span class="stag">earnings plays</span><span class="stag">alternative data</span></div></div>
+    </div>
+  </div>
+
+
+  <div class="cat-divider"><div class="cat-line"></div><div class="cat-title">On-chain / blockchain data</div><div class="cat-line"></div></div>
+
+  <div class="api-card">
+    <div class="api-header">
+      <span class="api-name">Glassnode</span>
+      <span class="badge badge-both">Free (limited) + Paid ($79+/mo)</span>
+      <span class="badge badge-any">REST (any lang)</span>
+    </div>
+    <div class="api-body">
+      <div class="api-cell"><div class="api-cell-label">Rate limit</div><div class="api-cell-val">600 req/min (standard) · Metadata: 1200 req/min (isolated bucket)</div></div>
+      <div class="api-cell"><div class="api-cell-label">Data provided</div><div class="api-cell-val">Exchange flows, MVRV, SOPR, active addresses, supply in profit, miner behavior, DeFi TVL, funding rates, liquidation heatmaps, options GEX, 10-min resolution on paid</div></div>
+      <div class="api-cell"><div class="api-cell-label">Useful for strategies</div><div class="strategy-tags"><span class="stag">on-chain momentum</span><span class="stag">cycle detection</span><span class="stag">smart money tracking</span><span class="stag">liquidation risk</span></div></div>
+    </div>
+  </div>
+
+  <div class="api-card">
+    <div class="api-header">
+      <span class="api-name">Etherscan / BSCScan</span>
+      <span class="badge badge-both">Free + Paid (Pro $199/mo)</span>
+      <span class="badge badge-any">REST (any lang)</span>
+    </div>
+    <div class="api-body">
+      <div class="api-cell"><div class="api-cell-label">Rate limit</div><div class="api-cell-val">Free: 5 req/sec · Pro: 100 req/sec</div></div>
+      <div class="api-cell"><div class="api-cell-label">Data provided</div><div class="api-cell-val">Wallet balances, token transfers, smart contract events, gas prices, DEX pool data, whale wallet tracking</div></div>
+      <div class="api-cell"><div class="api-cell-label">Useful for strategies</div><div class="strategy-tags"><span class="stag">whale tracking</span><span class="stag">DEX flows</span><span class="stag">gas arbitrage</span></div></div>
+    </div>
+  </div>
+
+  <div class="cat-divider"><div class="cat-line"></div><div class="cat-title">News, sentiment & alternative data</div><div class="cat-line"></div></div>
+
+  <div class="api-card">
+    <div class="api-header">
+      <span class="api-name">FRED (Federal Reserve)</span>
+      <span class="badge badge-free">Free</span>
+      <span class="badge badge-any">REST (any lang)</span>
+    </div>
+    <div class="api-body">
+      <div class="api-cell"><div class="api-cell-label">Rate limit</div><div class="api-cell-val">120 req/min</div></div>
+      <div class="api-cell"><div class="api-cell-label">Data provided</div><div class="api-cell-val">Interest rates, CPI, unemployment, GDP, yield curve, M2 money supply — 800,000+ macro time series</div></div>
+      <div class="api-cell"><div class="api-cell-label">Useful for strategies</div><div class="strategy-tags"><span class="stag">macro regime detection</span><span class="stag">yield curve signals</span><span class="stag">inflation hedging</span></div></div>
+    </div>
+  </div>
+
+  <div class="api-card">
+    <div class="api-header">
+      <span class="api-name">LunarCrush</span>
+      <span class="badge badge-both">Free + Paid ($19–$399/mo)</span>
+      <span class="badge badge-any">REST (any lang)</span>
+    </div>
+    <div class="api-body">
+      <div class="api-cell"><div class="api-cell-label">Rate limit</div><div class="api-cell-val">Free: 10 req/min · Paid: 60–unlimited</div></div>
+      <div class="api-cell"><div class="api-cell-label">Data provided</div><div class="api-cell-val">Social volume, Twitter/Reddit mentions, Galaxy Score, AltRank, influencer activity — crypto social sentiment specialist</div></div>
+      <div class="api-cell"><div class="api-cell-label">Useful for strategies</div><div class="strategy-tags"><span class="stag">social momentum</span><span class="stag">hype detection</span><span class="stag">contrarian signals</span></div></div>
+    </div>
+  </div>
+
+  <div class="cat-divider"><div class="cat-line"></div><div class="cat-title">Signal / forecast layer</div><div class="cat-line"></div></div>
+
+  <div class="api-card">
+    <div class="api-header">
+      <span class="api-name">Synth (synthdata.co)</span>
+      <span class="badge badge-both">Free (limited) + Paid</span>
+      <span class="badge badge-any">REST (any lang)</span>
+    </div>
+    <div class="api-body">
+      <div class="api-cell"><div class="api-cell-label">Rate limit</div><div class="api-cell-val">Plan dependent — see dashboard</div></div>
+      <div class="api-cell"><div class="api-cell-label">Data provided</div><div class="api-cell-val">Probabilistic price path forecasts (μ, σ distributions) for BTC, ETH, SOL, XAU, SPY, NVDA, TSLA, APPL, GOOGL — 1h and 24h timeframes</div></div>
+      <div class="api-cell"><div class="api-cell-label">Useful for strategies</div><div class="strategy-tags"><span class="stag">ensemble signals</span><span class="stag">options pricing</span><span class="stag">liquidation risk</span><span class="stag">probabilistic exits</span></div></div>
+    </div>
+  </div>
+
+</div>
