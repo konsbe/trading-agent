@@ -1,0 +1,6 @@
+.env
+*.exe
+dist/
+bin/
+coverage.out
+vendor/
