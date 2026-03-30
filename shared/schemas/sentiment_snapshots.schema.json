@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/berdelis/trading-agent/shared/schemas/sentiment_snapshots.schema.json",
+  "title": "sentiment_snapshots row",
+  "type": "object",
+  "required": ["ts", "source", "symbol", "payload"],
+  "properties": {
+    "ts": { "type": "string", "format": "date-time" },
+    "source": { "type": "string" },
+    "symbol": { "type": "string" },
+    "score": { "type": ["number", "null"] },
+    "payload": { "type": "object" }
+  },
+  "additionalProperties": false
+}

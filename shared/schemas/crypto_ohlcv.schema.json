@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/berdelis/trading-agent/shared/schemas/crypto_ohlcv.schema.json",
+  "title": "crypto_ohlcv row",
+  "description": "Logical row for table crypto_ohlcv (see shared/databases/migrations).",
+  "type": "object",
+  "required": ["ts", "exchange", "symbol", "interval", "open", "high", "low", "close", "volume", "source"],
+  "properties": {
+    "ts": { "type": "string", "format": "date-time" },
+    "exchange": { "type": "string" },
+    "symbol": { "type": "string" },
+    "interval": { "type": "string" },
+    "open": { "type": "number" },
+    "high": { "type": "number" },
+    "low": { "type": "number" },
+    "close": { "type": "number" },
+    "volume": { "type": "number" },
+    "source": { "type": "string" }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/berdelis/trading-agent/shared/schemas/onchain_metrics.schema.json",
+  "title": "onchain_metrics row",
+  "type": "object",
+  "required": ["ts", "asset", "metric", "source"],
+  "properties": {
+    "ts": { "type": "string", "format": "date-time" },
+    "asset": { "type": "string" },
+    "metric": { "type": "string" },
+    "value": { "type": ["number", "null"] },
+    "payload": { "type": "object" },
+    "source": { "type": "string" }
+  },
+  "additionalProperties": false
+}

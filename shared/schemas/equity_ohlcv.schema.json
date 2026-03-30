@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/berdelis/trading-agent/shared/schemas/equity_ohlcv.schema.json",
+  "title": "equity_ohlcv row",
+  "description": "Logical row for table equity_ohlcv (see shared/databases/migrations).",
+  "type": "object",
+  "required": ["ts", "symbol", "interval", "open", "high", "low", "close", "volume", "source"],
+  "properties": {
+    "ts": { "type": "string", "format": "date-time" },
+    "symbol": { "type": "string" },
+    "interval": { "type": "string" },
+    "open": { "type": "number" },
+    "high": { "type": "number" },
+    "low": { "type": "number" },
+    "close": { "type": "number" },
+    "volume": { "type": "number" },
+    "source": { "type": "string" }
+  },
+  "additionalProperties": false
+}
