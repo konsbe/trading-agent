@@ -19,6 +19,7 @@ not validate JSON Schema), but can be used by downstream consumers, code generat
 | [sentiment_snapshots](#sentiment_snapshots) | `sentiment_snapshots` | `001_init.sql` | `data-sentiment` |
 | [news_headlines](#news_headlines) | `news_headlines` | `001_init.sql` | `data-sentiment` |
 | [technical_indicators](#technical_indicators) | `technical_indicators` | `002_technical.sql` | `data-technical` |
+| [equity_fundamentals](#equity_fundamentals) | `equity_fundamentals` | `003_fundamental.sql` | `data-fundamental` |
 
 ---
 
@@ -208,3 +209,91 @@ This table uses a **tall/narrow** layout: each computed number is its own row, i
 | `open_interest` | null | `available: false`, `reason` (data-gap note) |
 | `rs_vs_<benchmark>` | Price ratio | `benchmark`, `ratio`, `ratio_change_pct_1`, `asset_roc_1`, `benchmark_roc_1`, `outperformance_1`, `aligned_bars` |
 | `mtf_confluence` | Confluence score (0–1) | `primary_interval`, `primary_trend`, `layers[]`, `match_count`, `layer_count`, `confluence_score` |
+
+---
+
+## equity_fundamentals
+
+**File:** `equity_fundamentals.schema.json`  
+**Source:** Finnhub `/stock/metric`, `/stock/financials-reported`, `/stock/earnings` via `data-fundamental`.  
+**Grain:** one row per `(symbol, period, metric, source, ts)`.  
+**No new API key required** — uses the existing `FINNHUB_API_KEY`.
+
+### Top-level columns
+
+| Column | Type | Required | Notes |
+|---|---|---|---|
+| `ts` | datetime | yes | Wall-clock fetch time |
+| `symbol` | string | yes | e.g. `AAPL`, `MSFT` |
+| `period` | string | yes | `ttm`, `annual_2024`, `q_2024-09-30` |
+| `metric` | string | yes | Parameterised metric name — see table below |
+| `value` | number/null | no | Primary scalar; null for raw payload-only rows |
+| `payload` | object/null | no | Structured context; shape depends on metric |
+| `source` | string | yes | `finnhub_metric`, `finnhub_financials_reported`, or `finnhub_earnings` |
+
+### Metric catalogue — Tier 1 FA
+
+**Source: `finnhub_metric` (period = `ttm`)**
+
+| Metric | `value` meaning | Notes |
+|---|---|---|
+| `eps_ttm` | EPS trailing twelve months | Basic excl. extraordinary items |
+| `eps_annual` | EPS most recent annual | |
+| `eps_growth_3y` | 3-year EPS CAGR % | |
+| `eps_growth_5y` | 5-year EPS CAGR % | |
+| `eps_growth_ttm_yoy` | TTM EPS vs prior-year TTM % | |
+| `eps_growth_quarterly_yoy` | Latest quarter EPS YoY % | |
+| `revenue_ttm` | Total revenue TTM (absolute $) | |
+| `revenue_per_share_ttm` | Revenue / diluted shares TTM | |
+| `revenue_growth_3y` | 3-year revenue CAGR % | |
+| `revenue_growth_5y` | 5-year revenue CAGR % | |
+| `revenue_growth_ttm_yoy` | TTM revenue YoY % | |
+| `revenue_growth_quarterly_yoy` | Latest quarter revenue YoY % | |
+| `pe_ratio_ttm` | Price / TTM EPS | Trailing P/E |
+| `pe_ratio_annual` | Price / annual EPS | |
+| `pe_ratio_5y_avg` | 5-year normalised P/E average | |
+| `pe_ratio_forward` | null | Forward P/E not on free tier; payload has note |
+| `fcf_ttm` | Free cash flow TTM ($) | |
+| `fcf_per_share_ttm` | FCF / diluted shares TTM | |
+| `fcf_yield_1y` | FCF / market cap 1Y % | |
+| `fcf_yield_5y` | FCF margin 5Y avg % | |
+| `gross_margin_ttm` | Gross profit / revenue TTM % | |
+| `gross_margin_annual` | Annual gross margin % | |
+| `gross_margin_5y` | 5-year avg gross margin % | |
+| `operating_margin_ttm` | Operating income / revenue TTM % | |
+| `operating_margin_annual` | Annual operating margin % | |
+| `net_margin_ttm` | Net income / revenue TTM % | |
+| `net_margin_annual` | Annual net margin % | |
+| `net_margin_5y` | 5-year avg net margin % | |
+| `market_cap` | Market capitalisation ($M) | Used to derive FCF yield locally |
+| `shares_outstanding` | Diluted shares outstanding (M) | |
+| `metrics_raw` | null | Full `/stock/metric` JSON in payload |
+
+**Source: `finnhub_financials_reported` (period = `q_YYYY-MM-DD` or `annual_YYYY`)**
+
+| Metric | `value` meaning |
+|---|---|
+| `revenue_reported` | Top-line revenue from filing |
+| `gross_profit_reported` | Gross profit from filing |
+| `operating_income_reported` | Operating income/loss |
+| `net_income_reported` | Net income/loss |
+| `eps_diluted_reported` | Diluted EPS from filing |
+| `eps_basic_reported` | Basic EPS from filing |
+| `operating_cf_reported` | Cash from operations |
+| `capex_reported` | Capital expenditures (absolute value) |
+| `fcf_reported` | `operating_cf − abs(capex)`; payload has components |
+| `total_assets_reported` | Balance sheet total assets |
+| `total_liabilities_reported` | Balance sheet total liabilities |
+| `total_equity_reported` | Shareholders' equity |
+| `total_debt_reported` | Long-term debt |
+| `cash_reported` | Cash & equivalents |
+| `report_raw` | null | Full Finnhub report object in payload |
+
+**Source: `finnhub_earnings` (period = `q_YYYY-MM-DD`)**
+
+| Metric | `value` meaning | Notes |
+|---|---|---|
+| `eps_actual` | Reported EPS | |
+| `eps_estimate` | Consensus estimate | |
+| `eps_surprise_pct` | `(actual − estimate) / \|estimate\| × 100` | Payload has actual + estimate |
+| `earnings_raw` | Reported EPS | Full Finnhub earnings item in payload |

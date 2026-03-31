@@ -1,7 +1,13 @@
 .env
 *.exe
+# Corporate TLS inspection root CA — machine-specific, never commit
+infra/*.pem
 dist/
 bin/
 services/data-ingestion/bin/
 coverage.out
 vendor/
+# Compiled binaries that may land in the module root
+services/data-ingestion/data-*
+
+*.pem

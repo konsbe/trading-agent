@@ -95,6 +95,107 @@ func (c *Client) CryptoNews(ctx context.Context) ([]map[string]any, error) {
 	return items, nil
 }
 
+// ─── Fundamental data endpoints ───────────────────────────────────────────────
+
+// Metrics fetches Finnhub's key financial metrics snapshot for a symbol.
+// Endpoint: GET /stock/metric?symbol=<sym>&metric=all
+// Returns the raw response map; callers extract the fields they need.
+func (c *Client) Metrics(ctx context.Context, symbol string) (map[string]any, error) {
+	if !c.HasToken() {
+		return nil, fmt.Errorf("finnhub token missing")
+	}
+	if err := c.Limiter.Wait(ctx); err != nil {
+		return nil, err
+	}
+	q := url.Values{}
+	q.Set("symbol", symbol)
+	q.Set("metric", "all")
+	q.Set("token", c.Token)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, base+"/stock/metric?"+q.Encode(), nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := c.HTTP.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("finnhub metrics %s: %s", symbol, resp.Status)
+	}
+	var m map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
+// FinancialsReported fetches the most recent reported quarterly or annual financials.
+// freq: "quarterly" or "annual"
+// Endpoint: GET /stock/financials-reported?symbol=<sym>&freq=<freq>
+func (c *Client) FinancialsReported(ctx context.Context, symbol, freq string) (map[string]any, error) {
+	if !c.HasToken() {
+		return nil, fmt.Errorf("finnhub token missing")
+	}
+	if err := c.Limiter.Wait(ctx); err != nil {
+		return nil, err
+	}
+	q := url.Values{}
+	q.Set("symbol", symbol)
+	q.Set("freq", freq)
+	q.Set("token", c.Token)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, base+"/stock/financials-reported?"+q.Encode(), nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := c.HTTP.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("finnhub financials-reported %s: %s", symbol, resp.Status)
+	}
+	var m map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
+// Earnings fetches historical EPS actuals vs estimates (surprises).
+// Endpoint: GET /stock/earnings?symbol=<sym>
+func (c *Client) Earnings(ctx context.Context, symbol string) ([]map[string]any, error) {
+	if !c.HasToken() {
+		return nil, fmt.Errorf("finnhub token missing")
+	}
+	if err := c.Limiter.Wait(ctx); err != nil {
+		return nil, err
+	}
+	q := url.Values{}
+	q.Set("symbol", symbol)
+	q.Set("token", c.Token)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, base+"/stock/earnings?"+q.Encode(), nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := c.HTTP.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("finnhub earnings %s: %s", symbol, resp.Status)
+	}
+	var items []map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&items); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+// ─── Quote helpers ─────────────────────────────────────────────────────────────
+
 // StoreQuoteAsEquityBar builds a coarse bar from quote snapshot (uses current price as close).
 func StoreQuoteAsEquityBar(symbol string, q map[string]any) (store.EquityBar, bool) {
 	c, ok := toFloat(q["c"])

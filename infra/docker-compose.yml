@@ -48,6 +48,8 @@ services:
         required: false
     environment:
       DATABASE_URL: postgres://postgres:postgres@timescaledb:5432/trading?sslmode=disable
+    volumes:
+      - ${CORP_CA_PEM_PATH:-/dev/null}:/etc/ssl/extra/corp-ca.pem:ro
     depends_on:
       timescaledb:
         condition: service_healthy
@@ -80,6 +82,26 @@ services:
         required: false
     environment:
       DATABASE_URL: postgres://postgres:postgres@timescaledb:5432/trading?sslmode=disable
+    volumes:
+      - ${CORP_CA_PEM_PATH:-/dev/null}:/etc/ssl/extra/corp-ca.pem:ro
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+    profiles: [ingestion]
+    restart: on-failure
+
+  data-fundamental:
+    build:
+      context: ../services/data-ingestion
+      dockerfile: Dockerfile
+    command: ["/app/data-fundamental"]
+    env_file:
+      - path: ../.env
+        required: false
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@timescaledb:5432/trading?sslmode=disable
+    volumes:
+      - ${CORP_CA_PEM_PATH:-/dev/null}:/etc/ssl/extra/corp-ca.pem:ro
     depends_on:
       timescaledb:
         condition: service_healthy
