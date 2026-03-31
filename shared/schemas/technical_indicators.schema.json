@@ -1,0 +1,346 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/berdelis/trading-agent/shared/schemas/technical_indicators.schema.json",
+  "title": "technical_indicators row",
+  "description": "One row per (symbol, exchange, interval, indicator, ts). value holds the primary scalar; payload holds structured context. Indicator names are parameterised, e.g. sma_20, rsi_14, macd_12_26_9. See data-technical/main.go for the full set.",
+  "type": "object",
+  "required": ["ts", "symbol", "exchange", "interval", "indicator"],
+  "properties": {
+    "ts":        { "type": "string", "format": "date-time", "description": "Bar-close timestamp the indicator was anchored to." },
+    "symbol":    { "type": "string" },
+    "exchange":  { "type": "string", "examples": ["equity", "binance"] },
+    "interval":  { "type": "string", "examples": ["1Day", "1d", "1Hour"] },
+    "indicator": {
+      "type": "string",
+      "description": "Parameterised indicator name. Pattern examples follow.",
+      "examples": [
+        "sma_20", "sma_50", "sma_100", "sma_200",
+        "ema_9", "ema_21", "ema_50", "ema_200",
+        "rsi_14",
+        "vol_sma_20", "rel_vol",
+        "sr_levels",
+        "trend",
+        "candle_patterns",
+        "macd_12_26_9",
+        "obv",
+        "bb_20_2",
+        "fib_retrace_sw5",
+        "rsi_divergence_rsi14_sw5",
+        "rsi_hidden_rsi14_sw5",
+        "vol_profile_proxy_b48_typical_price",
+        "stoch_slow_14_3_3",
+        "atr_14",
+        "ichimoku_9_26_52",
+        "ad_line",
+        "adx_14",
+        "pivots_prior_bar",
+        "williams_r_14",
+        "vwap_rolling_20", "vwap_session_last_day",
+        "ma_ribbon",
+        "chart_pattern_hints",
+        "cmf_21",
+        "keltner_e20_a10_m2",
+        "donchian_20",
+        "trendline_break_sw5_p3",
+        "cci_20",
+        "roc_12",
+        "parabolic_sar_s0.02_m0.2",
+        "mfi_14",
+        "market_structure_sw5",
+        "elliott_context_hint",
+        "gann_regression_lb60",
+        "open_interest",
+        "rs_vs_spy", "rs_vs_btcusdt",
+        "mtf_confluence"
+      ]
+    },
+    "value": {
+      "type": ["number", "null"],
+      "description": "Primary scalar. Semantics depend on indicator: price for levels, ratio for RS, score for structure, histogram for MACD, null for payload-only rows."
+    },
+    "payload": {
+      "type": ["object", "null"],
+      "description": "Structured context. Shape varies by indicator; all payloads are defined in cmd/data-technical/main.go. Key payload shapes are documented in $defs.",
+      "$defs": {
+        "sr_levels_payload": {
+          "type": "object",
+          "properties": {
+            "current_price":      { "type": "number" },
+            "support":            { "type": "array", "items": { "type": "number" } },
+            "support_touches":    { "type": "array", "items": { "type": "integer" } },
+            "resistance":         { "type": "array", "items": { "type": "number" } },
+            "resistance_touches": { "type": "array", "items": { "type": "integer" } }
+          }
+        },
+        "trend_payload": {
+          "type": "object",
+          "properties": {
+            "direction":    { "type": "string", "enum": ["up", "down", "sideways"] },
+            "slope_pct":    { "type": "number" },
+            "r2":           { "type": "number" },
+            "higher_highs": { "type": "boolean" },
+            "higher_lows":  { "type": "boolean" }
+          }
+        },
+        "candle_patterns_payload": {
+          "type": "object",
+          "properties": {
+            "patterns": { "type": "array", "items": { "type": "string" } },
+            "bar": {
+              "type": "object",
+              "properties": {
+                "open": { "type": "number" }, "high": { "type": "number" },
+                "low":  { "type": "number" }, "close": { "type": "number" },
+                "volume": { "type": "number" }
+              }
+            }
+          }
+        },
+        "macd_payload": {
+          "type": "object",
+          "properties": {
+            "macd_line":   { "type": "number" },
+            "signal_line": { "type": "number" },
+            "histogram":   { "type": "number" },
+            "fast": { "type": "integer" }, "slow": { "type": "integer" }, "signal": { "type": "integer" },
+            "start_idx":   { "type": "integer" },
+            "bullish_cross_line_signal": { "type": "boolean" },
+            "bearish_cross_line_signal": { "type": "boolean" },
+            "hist_bull_zero_cross":      { "type": "boolean" },
+            "hist_bear_zero_cross":      { "type": "boolean" },
+            "prev_macd_line":   { "type": "number" },
+            "prev_signal_line": { "type": "number" },
+            "prev_histogram":   { "type": "number" }
+          }
+        },
+        "obv_payload": {
+          "type": "object",
+          "properties": {
+            "obv":            { "type": "number" },
+            "last_bar_delta": { "type": "number" }
+          }
+        },
+        "bollinger_payload": {
+          "type": "object",
+          "properties": {
+            "middle": { "type": "number" }, "upper": { "type": "number" }, "lower": { "type": "number" },
+            "bandwidth": { "type": "number" }, "pct_b": { "type": "number" },
+            "period": { "type": "integer" }, "std_mult": { "type": "number" }, "close": { "type": "number" }
+          }
+        },
+        "fib_payload": {
+          "type": "object",
+          "properties": {
+            "direction":       { "type": "string", "enum": ["up", "down"] },
+            "impulse_low":     { "type": "number" }, "impulse_high":  { "type": "number" },
+            "leg_size":        { "type": "number" },
+            "levels":          { "type": "object" }, "extensions": { "type": "object" },
+            "current_close":   { "type": "number" },
+            "nearest_level":   { "type": "number" }, "nearest_price": { "type": "number" },
+            "dist_pct_to_near":{ "type": "number" }, "swing_strength": { "type": "integer" }
+          }
+        },
+        "rsi_divergence_payload": {
+          "type": "object",
+          "properties": {
+            "kind": { "type": "string", "enum": ["none", "bearish", "bullish"] },
+            "bearish_regular": { "type": "object" },
+            "bullish_regular": { "type": "object" }
+          }
+        },
+        "rsi_hidden_payload": {
+          "type": "object",
+          "properties": {
+            "kind": { "type": "string", "enum": ["none", "bearish_hidden", "bullish_hidden"] },
+            "bearish_hidden": { "type": "object" },
+            "bullish_hidden": { "type": "object" },
+            "min_pivot_sep":       { "type": "integer" },
+            "require_trend_gate":  { "type": "boolean" }
+          }
+        },
+        "vol_profile_payload": {
+          "type": "object",
+          "properties": {
+            "method": { "type": "string" },
+            "bins": { "type": "array", "items": { "type": "object" } },
+            "poc_price": { "type": "number" }, "poc_bin": { "type": "integer" },
+            "bar_count": { "type": "integer" },
+            "value_area_pct_target": { "type": "number" },
+            "value_area_low":  { "type": "number" }, "value_area_high": { "type": "number" },
+            "value_area_volume": { "type": "number" }, "histogram_total_volume": { "type": "number" }
+          }
+        },
+        "stochastic_payload": {
+          "type": "object",
+          "properties": {
+            "k": { "type": "number" }, "d": { "type": "number" }, "raw_k": { "type": "number" }
+          }
+        },
+        "ichimoku_payload": {
+          "type": "object",
+          "properties": {
+            "tenkan": { "type": "number" }, "kijun": { "type": "number" },
+            "senkou_a": { "type": "number" }, "senkou_b": { "type": "number" },
+            "cloud_top": { "type": "number" }, "cloud_bottom": { "type": "number" },
+            "chikou_close": { "type": "number" }, "displace": { "type": "integer" },
+            "close_vs_cloud": {
+              "type": "object",
+              "properties": {
+                "above_cloud": { "type": "boolean" },
+                "below_cloud": { "type": "boolean" },
+                "in_cloud":    { "type": "boolean" }
+              }
+            }
+          }
+        },
+        "adx_payload": {
+          "type": "object",
+          "properties": {
+            "adx": { "type": "number" }, "plus_di": { "type": "number" },
+            "minus_di": { "type": "number" }, "dx": { "type": "number" }
+          }
+        },
+        "pivots_payload": {
+          "type": "object",
+          "properties": {
+            "reference_ts": { "type": "string", "format": "date-time" },
+            "classic":    { "type": "object" },
+            "camarilla":  { "type": "object" },
+            "woodie":     { "type": "object" }
+          }
+        },
+        "vwap_payload": {
+          "type": "object",
+          "properties": {
+            "vwap": { "type": "number" },
+            "mode": { "type": "string", "enum": ["rolling", "session"] },
+            "bars": { "type": "integer" },
+            "utc_day": { "type": "string" }
+          }
+        },
+        "ma_ribbon_payload": {
+          "type": "object",
+          "properties": {
+            "periods":     { "type": "array", "items": { "type": "integer" } },
+            "smas":        { "type": "object" },
+            "bull_stack":  { "type": "boolean" },
+            "bear_stack":  { "type": "boolean" },
+            "compression": { "type": "number" },
+            "golden_cross": { "type": "boolean" },
+            "death_cross":  { "type": "boolean" },
+            "cross_fast":   { "type": "number" }, "cross_slow": { "type": "number" }
+          }
+        },
+        "chart_pattern_hints_payload": {
+          "type": "object",
+          "properties": {
+            "double_top_candidate":    { "type": "boolean" },
+            "double_bottom_candidate": { "type": "boolean" },
+            "high1": { "type": "number" }, "high2": { "type": "number" },
+            "low1":  { "type": "number" }, "low2":  { "type": "number" },
+            "cluster_pct": { "type": "number" }
+          }
+        },
+        "keltner_payload": {
+          "type": "object",
+          "properties": {
+            "middle": { "type": "number" }, "upper": { "type": "number" }, "lower": { "type": "number" },
+            "close": { "type": "number" },
+            "outside_upper": { "type": "boolean" }, "outside_lower": { "type": "boolean" }
+          }
+        },
+        "donchian_payload": {
+          "type": "object",
+          "properties": {
+            "upper": { "type": "number" }, "lower": { "type": "number" },
+            "middle": { "type": "number" }, "close": { "type": "number" }
+          }
+        },
+        "trendline_break_payload": {
+          "type": "object",
+          "properties": {
+            "resistance_break": { "type": "boolean" },
+            "support_break":    { "type": "boolean" },
+            "high_line_at_end": { "type": "number" }, "low_line_at_end": { "type": "number" },
+            "prev_high_line":   { "type": "number" }, "prev_low_line":   { "type": "number" }
+          }
+        },
+        "parabolic_sar_payload": {
+          "type": "object",
+          "properties": {
+            "sar": { "type": "number" }, "bullish": { "type": "boolean" }, "trend": { "type": "number" }
+          }
+        },
+        "market_structure_payload": {
+          "type": "object",
+          "properties": {
+            "bullish_bos":      { "type": "boolean" }, "bearish_bos":  { "type": "boolean" },
+            "choch_up":         { "type": "boolean" }, "choch_down":   { "type": "boolean" },
+            "prior_swing_high": { "type": "number" },  "last_swing_high": { "type": "number" },
+            "prior_swing_low":  { "type": "number" },  "last_swing_low":  { "type": "number" }
+          }
+        },
+        "elliott_payload": {
+          "type": "object",
+          "properties": {
+            "swing_highs":   { "type": "integer" },
+            "swing_lows":    { "type": "integer" },
+            "leg_estimate":  { "type": "integer" },
+            "note":          { "type": "string" }
+          }
+        },
+        "gann_payload": {
+          "type": "object",
+          "properties": {
+            "slope_per_bar":    { "type": "number" },
+            "slope_degrees":    { "type": "number" },
+            "one_to_one_delta": { "type": "number" },
+            "disclaimer":       { "type": "string" }
+          }
+        },
+        "rs_vs_benchmark_payload": {
+          "type": "object",
+          "properties": {
+            "benchmark":         { "type": "string" },
+            "ratio":             { "type": "number" },
+            "ratio_change_pct_1":{ "type": "number" },
+            "asset_roc_1":       { "type": "number" },
+            "benchmark_roc_1":   { "type": "number" },
+            "outperformance_1":  { "type": "number" },
+            "aligned_bars":      { "type": "integer" }
+          }
+        },
+        "mtf_confluence_payload": {
+          "type": "object",
+          "properties": {
+            "primary_interval": { "type": "string" },
+            "primary_trend":    { "type": "string" },
+            "layers": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "interval":        { "type": "string" },
+                  "trend":           { "type": "string" },
+                  "aligned_primary": { "type": "boolean" }
+                }
+              }
+            },
+            "match_count":       { "type": "integer" },
+            "layer_count":       { "type": "integer" },
+            "confluence_score":  { "type": "number" },
+            "trend_lookback":    { "type": "integer" }
+          }
+        },
+        "open_interest_payload": {
+          "type": "object",
+          "properties": {
+            "available": { "type": "boolean" },
+            "reason":    { "type": "string" }
+          }
+        }
+      }
+    }
+  },
+  "additionalProperties": false
+}
