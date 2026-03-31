@@ -86,5 +86,21 @@ services:
     profiles: [ingestion]
     restart: on-failure
 
+  data-technical:
+    build:
+      context: ../services/data-ingestion
+      dockerfile: Dockerfile
+    command: ["/app/data-technical"]
+    env_file:
+      - path: ../.env
+        required: false
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@timescaledb:5432/trading?sslmode=disable
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+    profiles: [ingestion]
+    restart: on-failure
+
 volumes:
   timescale_data:

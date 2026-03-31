@@ -8,7 +8,7 @@ db-up:
 	cd $(ROOT) && $(COMPOSE) up -d timescaledb redis
 
 db-down:
-	cd $(ROOT) && $(COMPOSE) down
+	cd $(ROOT) && $(COMPOSE) --profile ingestion down
 
 # Full stack: DB, Redis, and all data-ingestion workers (optional ../.env for API keys; see .env.example)
 up:
@@ -16,15 +16,15 @@ up:
 
 # Stops every service in this compose project (same project name as up); does not remove volumes.
 down:
-	cd $(ROOT) && $(COMPOSE) down
+	cd $(ROOT) && $(COMPOSE) --profile ingestion down
 
 # Stop stack and start again; does NOT pass -v (Timescale/Redis volumes keep all DB data).
 restart:
-	cd $(ROOT) && $(COMPOSE) down && $(COMPOSE) --profile ingestion up -d --build
+	cd $(ROOT) && $(COMPOSE) --profile ingestion down && $(COMPOSE) --profile ingestion up -d --build
 
 # Stop all compose services, remove volumes (wipes Postgres/Redis data), orphans, and locally built images for this project.
 clean:
-	cd $(ROOT) && $(COMPOSE) down -v --remove-orphans --rmi local
+	cd $(ROOT) && $(COMPOSE) --profile ingestion down -v --remove-orphans --rmi local
 
 # Workers only (DB must already be running)
 up-ingestion:
