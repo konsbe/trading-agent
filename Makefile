@@ -4,7 +4,8 @@ INGEST := $(ROOT)/services/data-ingestion
 
 .PHONY: help tidy build-ingestion db-up db-down up down deploy ensure-env docker-build-timescaledb restart clean log-docker-compose check-services-logs psql \
 	db-crypto-ohlcv db-crypto-global db-equity-ohlcv db-macro-fred db-onchain db-sentiment db-news db-tables \
-	db-technical db-technical-symbol log-technical
+	db-technical db-technical-symbol log-technical \
+	db-fundamental db-fundamental-symbol log-fundamental
 
 help:
 	@echo "Run the stack"
@@ -38,9 +39,12 @@ help:
 	@echo "  db-sentiment    - sentiment_snapshots (LunarCrush)"
 	@echo "  db-news         - news_headlines (Finnhub news)"
 	@echo "  db-technical    - technical_indicators (latest computed values)"
+	@echo "  db-fundamental  - equity_fundamentals (latest TTM metrics)"
+	@echo "  db-fundamental-symbol - equity_fundamentals for one symbol (default AAPL; override SYMBOL=MSFT)"
 	@echo ""
 	@echo "Logs:"
 	@echo "  log-technical   - Follow data-technical container logs only"
+	@echo "  log-fundamental - Follow data-fundamental container logs only"
 
 ensure-env:
 	@test -f $(ROOT)/.env || cp $(ROOT)/.env.example $(ROOT)/.env
@@ -76,10 +80,13 @@ log-docker-compose:
 	docker compose -f $(ROOT)/infra/docker-compose.yml logs -f
 
 log-services:
-	docker compose -f $(ROOT)/infra/docker-compose.yml logs -f data-crypto data-equity data-onchain data-sentiment data-technical
+	docker compose -f $(ROOT)/infra/docker-compose.yml logs -f data-crypto data-equity data-fundamental data-onchain data-sentiment data-technical
 
 log-technical:
 	docker compose -f $(ROOT)/infra/docker-compose.yml logs -f data-technical
+
+log-fundamental:
+	docker compose -f $(ROOT)/infra/docker-compose.yml logs -f data-fundamental
 
 psql:
 	docker exec -it infra-timescaledb-1 psql -U postgres -d trading
@@ -98,6 +105,7 @@ db-tables:
 	UNION ALL SELECT 'sentiment_snapshots',      count(*) FROM sentiment_snapshots \
 	UNION ALL SELECT 'news_headlines',           count(*) FROM news_headlines \
 	UNION ALL SELECT 'technical_indicators',     count(*) FROM technical_indicators \
+	UNION ALL SELECT 'equity_fundamentals',      count(*) FROM equity_fundamentals \
 	ORDER BY 1;"
 
 # Binance BTC/ETH bars
@@ -144,3 +152,20 @@ db-technical-symbol:
 	WHERE symbol = '$(or $(SYMBOL),SPY)' \
 	ORDER BY indicator, ts DESC \
 	LIMIT 40;"
+
+# Latest fundamental metrics (most recent TTM snapshot per symbol/metric)
+db-fundamental:
+	$(DB) "SELECT symbol, period, metric, round(value::numeric, 4) AS value, source, ts \
+	FROM equity_fundamentals \
+	WHERE period = 'ttm' AND metric NOT IN ('metrics_raw','report_raw','earnings_raw') \
+	ORDER BY symbol, metric, ts DESC \
+	LIMIT 60;"
+
+# Fundamentals for a specific symbol (default AAPL; override with SYMBOL=MSFT)
+db-fundamental-symbol:
+	$(DB) "SELECT period, metric, round(value::numeric, 4) AS value, payload, source, ts \
+	FROM equity_fundamentals \
+	WHERE symbol = '$(or $(SYMBOL),AAPL)' \
+	AND metric NOT IN ('metrics_raw','report_raw','earnings_raw') \
+	ORDER BY period, metric, ts DESC \
+	LIMIT 60;"

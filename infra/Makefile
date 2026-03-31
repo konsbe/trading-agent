@@ -1,5 +1,7 @@
-ROOT := $(abspath ..)
-COMPOSE := docker compose -f $(ROOT)/infra/docker-compose.yml
+ROOT    := $(abspath ..)
+# --env-file ensures variable substitution in docker-compose.yml (e.g. ${CORP_CA_PEM_PATH})
+# reads from the root .env, same file that env_file: ../.env injects into containers.
+COMPOSE := docker compose -f $(ROOT)/infra/docker-compose.yml --env-file $(ROOT)/.env
 
 .PHONY: db-up db-down up down up-ingestion build-timescaledb restart clean
 

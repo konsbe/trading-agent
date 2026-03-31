@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/berdelis/trading-agent/shared/schemas/equity_fundamentals.schema.json",
+  "title": "equity_fundamentals row",
+  "description": "One row per (symbol, period, metric, source, ts). Tall/narrow layout: each fundamental datum is its own row. value holds the primary scalar; payload holds structured context or raw API response.",
+  "type": "object",
+  "required": ["ts", "symbol", "period", "metric", "source"],
+  "properties": {
+    "ts":     { "type": "string", "format": "date-time", "description": "Wall-clock time when the data was fetched." },
+    "symbol": { "type": "string", "examples": ["AAPL", "MSFT", "SPY"] },
+    "period": {
+      "type": "string",
+      "description": "Fiscal or calculation period. 'ttm' = trailing twelve months; 'annual_YYYY' = fiscal year; 'q_YYYY-MM-DD' = quarterly report date; 'point_in_time' = live snapshot.",
+      "examples": ["ttm", "annual_2024", "q_2024-09-30", "point_in_time"]
+    },
+    "metric": {
+      "type": "string",
+      "description": "Metric name. See catalogue below.",
+      "examples": [
+        "eps_ttm", "eps_annual", "eps_growth_3y", "eps_growth_5y",
+        "eps_growth_ttm_yoy", "eps_growth_quarterly_yoy",
+        "revenue_ttm", "revenue_per_share_ttm", "revenue_growth_3y",
+        "revenue_growth_5y", "revenue_growth_ttm_yoy", "revenue_growth_quarterly_yoy",
+        "pe_ratio_ttm", "pe_ratio_annual", "pe_ratio_5y_avg", "pe_ratio_forward",
+        "fcf_ttm", "fcf_per_share_ttm", "fcf_yield_1y", "fcf_yield_5y",
+        "gross_margin_ttm", "gross_margin_annual", "gross_margin_5y",
+        "operating_margin_ttm", "operating_margin_annual",
+        "net_margin_ttm", "net_margin_annual", "net_margin_5y",
+        "market_cap", "shares_outstanding",
+        "metrics_raw",
+        "revenue_reported", "gross_profit_reported", "operating_income_reported",
+        "net_income_reported", "eps_diluted_reported", "eps_basic_reported",
+        "operating_cf_reported", "capex_reported", "fcf_reported",
+        "total_assets_reported", "total_liabilities_reported", "total_equity_reported",
+        "total_debt_reported", "cash_reported", "report_raw",
+        "eps_actual", "eps_estimate", "eps_surprise_pct", "earnings_raw"
+      ]
+    },
+    "value": {
+      "type": ["number", "null"],
+      "description": "Primary scalar. Units depend on metric: currency for EPS/revenue/FCF, % for margins/growth/yield, ratio for P/E, null for raw payload-only rows."
+    },
+    "payload": {
+      "type": ["object", "null"],
+      "description": "Structured context. Shape varies by metric; key shapes documented in $defs.",
+      "$defs": {
+        "pe_ratio_forward_payload": {
+          "type": "object",
+          "properties": {
+            "note": { "type": "string" }
+          }
+        },
+        "fcf_reported_payload": {
+          "type": "object",
+          "properties": {
+            "operating_cf": { "type": "number" },
+            "capex":        { "type": "number" },
+            "note":         { "type": "string" }
+          }
+        },
+        "eps_surprise_pct_payload": {
+          "type": "object",
+          "properties": {
+            "actual":   { "type": ["number", "null"] },
+            "estimate": { "type": ["number", "null"] }
+          }
+        },
+        "metrics_raw_payload": {
+          "type": "object",
+          "description": "Full Finnhub /stock/metric?metric=all response map for forward-compat access."
+        },
+        "report_raw_payload": {
+          "type": "object",
+          "description": "Full Finnhub /stock/financials-reported report object including ic/cf/bs sub-objects."
+        },
+        "earnings_raw_payload": {
+          "type": "object",
+          "description": "One Finnhub /stock/earnings item: period, actual, estimate, surprise, surprisePercent.",
+          "properties": {
+            "period":          { "type": "string" },
+            "actual":          { "type": ["number", "null"] },
+            "estimate":        { "type": ["number", "null"] },
+            "surprise":        { "type": ["number", "null"] },
+            "surprisePercent": { "type": ["number", "null"] }
+          }
+        }
+      }
+    },
+    "source": {
+      "type": "string",
+      "enum": ["finnhub_metric", "finnhub_financials_reported", "finnhub_earnings"],
+      "description": "API endpoint that produced this row."
+    }
+  },
+  "additionalProperties": false
+}
