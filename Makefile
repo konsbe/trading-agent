@@ -3,7 +3,8 @@ INFRA := $(ROOT)/infra
 INGEST := $(ROOT)/services/data-ingestion
 
 .PHONY: help tidy build-ingestion db-up db-down up down deploy ensure-env docker-build-timescaledb restart clean log-docker-compose check-services-logs psql \
-	db-crypto-ohlcv db-crypto-global db-equity-ohlcv db-macro-fred db-onchain db-sentiment db-news db-tables
+	db-crypto-ohlcv db-crypto-global db-equity-ohlcv db-macro-fred db-onchain db-sentiment db-news db-tables \
+	db-technical db-technical-symbol log-technical
 
 help:
 	@echo "Run the stack"
@@ -36,6 +37,10 @@ help:
 	@echo "  db-onchain      - onchain_metrics (Etherscan/Glassnode)"
 	@echo "  db-sentiment    - sentiment_snapshots (LunarCrush)"
 	@echo "  db-news         - news_headlines (Finnhub news)"
+	@echo "  db-technical    - technical_indicators (latest computed values)"
+	@echo ""
+	@echo "Logs:"
+	@echo "  log-technical   - Follow data-technical container logs only"
 
 ensure-env:
 	@test -f $(ROOT)/.env || cp $(ROOT)/.env.example $(ROOT)/.env
@@ -70,8 +75,11 @@ docker-build-timescaledb:
 log-docker-compose:
 	docker compose -f $(ROOT)/infra/docker-compose.yml logs -f
 
-check-services-logs:
-	docker compose -f $(ROOT)/infra/docker-compose.yml logs -f data-crypto data-equity data-onchain data-sentiment
+log-services:
+	docker compose -f $(ROOT)/infra/docker-compose.yml logs -f data-crypto data-equity data-onchain data-sentiment data-technical
+
+log-technical:
+	docker compose -f $(ROOT)/infra/docker-compose.yml logs -f data-technical
 
 psql:
 	docker exec -it infra-timescaledb-1 psql -U postgres -d trading
@@ -79,16 +87,17 @@ psql:
 # --- DB table inspection targets ---
 DB := docker exec infra-timescaledb-1 psql -U postgres -d trading -x -c
 
-# row counts for all 7 tables at once
+# row counts for all tables at once
 db-tables:
 	$(DB) "SET max_parallel_workers_per_gather = 0; \
-	SELECT 'crypto_ohlcv'        AS \"table\", count(*) AS rows FROM crypto_ohlcv \
-	UNION ALL SELECT 'crypto_global_metrics',  count(*) FROM crypto_global_metrics \
-	UNION ALL SELECT 'equity_ohlcv',           count(*) FROM equity_ohlcv \
-	UNION ALL SELECT 'macro_fred',             count(*) FROM macro_fred \
-	UNION ALL SELECT 'onchain_metrics',        count(*) FROM onchain_metrics \
-	UNION ALL SELECT 'sentiment_snapshots',    count(*) FROM sentiment_snapshots \
-	UNION ALL SELECT 'news_headlines',         count(*) FROM news_headlines \
+	SELECT 'crypto_ohlcv'          AS \"table\", count(*) AS rows FROM crypto_ohlcv \
+	UNION ALL SELECT 'crypto_global_metrics',    count(*) FROM crypto_global_metrics \
+	UNION ALL SELECT 'equity_ohlcv',             count(*) FROM equity_ohlcv \
+	UNION ALL SELECT 'macro_fred',               count(*) FROM macro_fred \
+	UNION ALL SELECT 'onchain_metrics',          count(*) FROM onchain_metrics \
+	UNION ALL SELECT 'sentiment_snapshots',      count(*) FROM sentiment_snapshots \
+	UNION ALL SELECT 'news_headlines',           count(*) FROM news_headlines \
+	UNION ALL SELECT 'technical_indicators',     count(*) FROM technical_indicators \
 	ORDER BY 1;"
 
 # Binance BTC/ETH bars
@@ -120,3 +129,18 @@ db-sentiment:
 # Finnhub news (empty until TLS fixed)
 db-news:
 	$(DB) "SELECT ts, source, symbol, headline, url FROM news_headlines ORDER BY ts DESC LIMIT 20;"
+
+# Latest computed technical indicators (most recent value per symbol/exchange/interval/indicator)
+db-technical:
+	$(DB) "SELECT symbol, exchange, interval, indicator, round(value::numeric, 4) AS value, ts \
+	FROM technical_indicators \
+	ORDER BY symbol, exchange, interval, indicator, ts DESC \
+	LIMIT 60;"
+
+# Detailed view: latest indicators for a specific symbol (default SPY; override with SYMBOL=BTCUSDT)
+db-technical-symbol:
+	$(DB) "SELECT indicator, round(value::numeric, 4) AS value, payload, ts \
+	FROM technical_indicators \
+	WHERE symbol = '$(or $(SYMBOL),SPY)' \
+	ORDER BY indicator, ts DESC \
+	LIMIT 40;"

@@ -1,0 +1,1062 @@
+<style>
+    :root {
+        --col-fa: #1D9E75;
+        --col-ta: #185FA5;
+        --col-other: #BA7517;
+    }
+
+    * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+    }
+
+    body {
+        font-family: var(--font-sans, sans-serif);
+        font-size: 14px;
+        color: var(--color-text-primary);
+    }
+
+    .tabs {
+        display: flex;
+        gap: 4px;
+        padding: 12px 16px 0;
+        border-bottom: 1px solid var(--color-border-tertiary);
+        flex-wrap: wrap;
+    }
+
+    .tab {
+        padding: 7px 14px;
+        border-radius: 8px 8px 0 0;
+        cursor: pointer;
+        font-size: 13px;
+        font-weight: 500;
+        border: 1px solid transparent;
+        border-bottom: none;
+        color: var(--color-text-secondary);
+        transition: all .15s;
+    }
+
+    .tab.active {
+        border-color: var(--color-border-tertiary);
+        background: var(--color-background-secondary);
+        color: var(--color-text-primary);
+    }
+
+    .tab:hover:not(.active) {
+        color: var(--color-text-primary);
+    }
+
+    .panel {
+        display: none;
+        padding: 16px;
+    }
+
+    .panel.active {
+        display: block;
+    }
+
+    .section-label {
+        font-size: 11px;
+        font-weight: 500;
+        letter-spacing: .05em;
+        text-transform: uppercase;
+        color: var(--color-text-tertiary);
+        margin: 18px 0 8px;
+    }
+
+    .section-label:first-child {
+        margin-top: 4px;
+    }
+
+    .item {
+        display: flex;
+        gap: 10px;
+        align-items: flex-start;
+        padding: 8px 10px;
+        border-radius: 8px;
+        border: 1px solid var(--color-border-tertiary);
+        margin-bottom: 6px;
+        background: var(--color-background-secondary);
+        cursor: pointer;
+        transition: border-color .15s;
+    }
+
+    .item:hover {
+        border-color: var(--color-border-secondary);
+    }
+
+    .rank {
+        font-size: 11px;
+        font-weight: 500;
+        color: var(--color-text-tertiary);
+        min-width: 20px;
+        padding-top: 1px;
+    }
+
+    .item-body {
+        flex: 1;
+    }
+
+    .item-name {
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--color-text-primary);
+    }
+
+    .item-desc {
+        font-size: 12px;
+        color: var(--color-text-secondary);
+        line-height: 1.5;
+        margin-top: 2px;
+        display: none;
+    }
+
+    .item.open .item-desc {
+        display: block;
+    }
+
+    .item-tag {
+        display: inline-block;
+        font-size: 10px;
+        font-weight: 500;
+        padding: 1px 6px;
+        border-radius: 4px;
+        margin-left: 6px;
+        vertical-align: middle;
+    }
+
+    .tag-fa {
+        background: #E1F5EE;
+        color: #0F6E56;
+    }
+
+    .tag-ta {
+        background: #E6F1FB;
+        color: #185FA5;
+    }
+
+    .tag-mom {
+        background: #EEEDFE;
+        color: #534AB7;
+    }
+
+    .tag-vol {
+        background: #FAEEDA;
+        color: #854F0B;
+    }
+
+    .tag-trend {
+        background: #EAF3DE;
+        color: #3B6D11;
+    }
+
+    .tag-osc {
+        background: #FAECE7;
+        color: #993C1D;
+    }
+
+    .tag-other {
+        background: #F1EFE8;
+        color: #5F5E5A;
+    }
+
+    .corr-group {
+        border: 1px solid var(--color-border-tertiary);
+        border-radius: 10px;
+        margin-bottom: 10px;
+        overflow: hidden;
+    }
+
+    .corr-header {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        padding: 10px 12px;
+        cursor: pointer;
+        background: var(--color-background-secondary);
+        font-weight: 500;
+        font-size: 13px;
+    }
+
+    .corr-header:hover {
+        background: var(--color-background-tertiary);
+    }
+
+    .corr-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        flex-shrink: 0;
+    }
+
+    .corr-body {
+        display: none;
+        padding: 10px 12px 12px;
+        border-top: 1px solid var(--color-border-tertiary);
+    }
+
+    .corr-group.open .corr-body {
+        display: block;
+    }
+
+    .corr-pill {
+        display: inline-block;
+        font-size: 12px;
+        padding: 3px 9px;
+        border-radius: 20px;
+        margin: 3px;
+        border: 1px solid var(--color-border-tertiary);
+    }
+
+    .corr-note {
+        font-size: 12px;
+        color: var(--color-text-secondary);
+        margin-top: 8px;
+        line-height: 1.5;
+    }
+
+    .chevron {
+        margin-left: auto;
+        color: var(--color-text-tertiary);
+        font-size: 12px;
+    }
+
+    .search-bar {
+        width: 100%;
+        padding: 7px 10px;
+        border-radius: 8px;
+        border: 1px solid var(--color-border-tertiary);
+        background: var(--color-background-secondary);
+        color: var(--color-text-primary);
+        font-size: 13px;
+        margin-bottom: 14px;
+        outline: none;
+    }
+
+    .search-bar:focus {
+        border-color: var(--color-border-secondary);
+    }
+
+    .filter-row {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+        margin-bottom: 12px;
+    }
+
+    .filter-btn {
+        font-size: 11px;
+        padding: 3px 9px;
+        border-radius: 20px;
+        border: 1px solid var(--color-border-tertiary);
+        cursor: pointer;
+        background: var(--color-background-secondary);
+        color: var(--color-text-secondary);
+    }
+
+    .filter-btn.on {
+        border-color: var(--color-border-primary);
+        color: var(--color-text-primary);
+        background: var(--color-background-tertiary);
+    }
+
+    .hidden {
+        display: none !important;
+    }
+</style>
+
+<div class="tabs">
+    <div class="tab active" onclick="switchTab('fa')">Fundamental Analysis</div>
+    <div class="tab" onclick="switchTab('ta')">Technical Analysis</div>
+    <div class="tab" onclick="switchTab('corr')">Correlation Groups</div>
+    <div class="tab" onclick="switchTab('other')">Beyond the Charts</div>
+</div>
+
+<!-- FUNDAMENTAL ANALYSIS -->
+<div class="panel active" id="panel-fa">
+    <div class="section-label">Tier 1 — Core Valuation</div>
+    <div class="item" onclick="toggle(this)"><span class="rank">1</span>
+        <div class="item-body">
+            <div class="item-name">Earnings Per Share (EPS) & Earnings Growth<span class="item-tag tag-fa">FA</span>
+            </div>
+            <div class="item-desc">The single most watched metric. Trailing EPS, forward EPS estimates, and
+                year-over-year growth rate. Drives price-to-earnings multiples. Earnings surprises cause the largest
+                single-session moves.</div>
+        </div>
+    </div>
+    <div class="item" onclick="toggle(this)"><span class="rank">2</span>
+        <div class="item-body">
+            <div class="item-name">Revenue & Revenue Growth<span class="item-tag tag-fa">FA</span></div>
+            <div class="item-desc">Top-line growth indicates business health and market share expansion. Revenue quality
+                (recurring vs. one-time) matters as much as quantity. Declining revenue with improving margins is a
+                warning sign.</div>
+        </div>
+    </div>
+    <div class="item" onclick="toggle(this)"><span class="rank">3</span>
+        <div class="item-body">
+            <div class="item-name">Price-to-Earnings Ratio (P/E)<span class="item-tag tag-fa">FA</span></div>
+            <div class="item-desc">The market's valuation of each dollar of earnings. Compare to sector average,
+                historical mean, and forward P/E. A high P/E means growth expectations are priced in — disappointment is
+                punished hard.</div>
+        </div>
+    </div>
+    <div class="item" onclick="toggle(this)"><span class="rank">4</span>
+        <div class="item-body">
+            <div class="item-name">Free Cash Flow (FCF) & FCF Yield<span class="item-tag tag-fa">FA</span></div>
+            <div class="item-desc">Cash generated after capex — cannot be faked like earnings. FCF funds dividends,
+                buybacks, and debt repayment. FCF yield = FCF / market cap; above 5% is generally attractive.</div>
+        </div>
+    </div>
+    <div class="item" onclick="toggle(this)"><span class="rank">5</span>
+        <div class="item-body">
+            <div class="item-name">Profit Margins (Gross, Operating, Net)<span class="item-tag tag-fa">FA</span></div>
+            <div class="item-desc">Gross margin shows pricing power. Operating margin shows cost efficiency. Net margin
+                is the bottom line. Trend direction over 8–12 quarters is more valuable than a single snapshot.</div>
+        </div>
+    </div>
+
+    <div class="section-label">Tier 2 — Balance Sheet & Structure</div>
+    <div class="item" onclick="toggle(this)"><span class="rank">6</span>
+        <div class="item-body">
+            <div class="item-name">Debt-to-Equity (D/E) & Net Debt / EBITDA<span class="item-tag tag-fa">FA</span></div>
+            <div class="item-desc">Leverage amplifies both gains and losses. Net Debt/EBITDA above 4× is a red flag in
+                most sectors. Rising interest rates make high-debt companies especially vulnerable.</div>
+        </div>
+    </div>
+    <div class="item" onclick="toggle(this)"><span class="rank">7</span>
+        <div class="item-body">
+            <div class="item-name">Return on Equity (ROE) & Return on Invested Capital (ROIC)<span
+                    class="item-tag tag-fa">FA</span></div>
+            <div class="item-desc">ROIC > WACC means the company creates value. ROE above 15% sustained for 5+ years is
+                a Buffett-style quality signal. Improves understanding of capital allocation decisions.</div>
+        </div>
+    </div>
+    <div class="item" onclick="toggle(this)"><span class="rank">8</span>
+        <div class="item-body">
+            <div class="item-name">Cash & Liquidity Position<span class="item-tag tag-fa">FA</span></div>
+            <div class="item-desc">Current ratio and quick ratio reveal short-term solvency. Large cash hoards allow
+                buybacks and acquisitions; cash burn rate determines runway for growth companies.</div>
+        </div>
+    </div>
+    <div class="item" onclick="toggle(this)"><span class="rank">9</span>
+        <div class="item-body">
+            <div class="item-name">Book Value & Price-to-Book (P/B)<span class="item-tag tag-fa">FA</span></div>
+            <div class="item-desc">Most relevant for banks, insurers, and asset-heavy industrials. P/B < 1 can signal
+                    deep value or fundamental distress. Tangible book value strips intangibles for a harder
+                    measure.</div>
+            </div>
+        </div>
+        <div class="item" onclick="toggle(this)"><span class="rank">10</span>
+            <div class="item-body">
+                <div class="item-name">Dividend Yield, Payout Ratio & Growth<span class="item-tag tag-fa">FA</span>
+                </div>
+                <div class="item-desc">High yield with a sustainable low payout ratio is ideal. Dividend growth history
+                    (Dividend Aristocrats) signals financial strength. Cuts are a serious negative catalyst.</div>
+            </div>
+        </div>
+
+        <div class="section-label">Tier 3 — Valuation Multiples & Macro</div>
+        <div class="item" onclick="toggle(this)"><span class="rank">11</span>
+            <div class="item-body">
+                <div class="item-name">EV/EBITDA<span class="item-tag tag-fa">FA</span></div>
+                <div class="item-desc">Enterprise value relative to operating earnings. Capital-structure neutral —
+                    better for M&A comparisons than P/E. Sector medians vary widely: tech trades higher than utilities.
+                </div>
+            </div>
+        </div>
+        <div class="item" onclick="toggle(this)"><span class="rank">12</span>
+            <div class="item-body">
+                <div class="item-name">PEG Ratio (P/E ÷ Growth)<span class="item-tag tag-fa">FA</span></div>
+                <div class="item-desc">Adjusts P/E for expected growth. PEG < 1 is classically undervalued. Sensitive to
+                        growth rate estimates which can be wildly wrong.</div>
+                </div>
+            </div>
+            <div class="item" onclick="toggle(this)"><span class="rank">13</span>
+                <div class="item-body">
+                    <div class="item-name">Interest Rates & Central Bank Policy<span class="item-tag tag-fa">FA</span>
+                    </div>
+                    <div class="item-desc">The discount rate used in DCF models. Rising rates compress growth stock
+                        valuations most. Fed decisions are the single most market-moving macro event.</div>
+                </div>
+            </div>
+            <div class="item" onclick="toggle(this)"><span class="rank">14</span>
+                <div class="item-body">
+                    <div class="item-name">GDP Growth, Inflation (CPI/PPI) & Employment Data<span
+                            class="item-tag tag-fa">FA</span></div>
+                    <div class="item-desc">Macro backdrop for all equities. CPI above target delays rate cuts. Strong
+                        employment sustains consumer spending. Leading indicators (PMI, ISM) predict these with a lag.
+                    </div>
+                </div>
+            </div>
+            <div class="item" onclick="toggle(this)"><span class="rank">15</span>
+                <div class="item-body">
+                    <div class="item-name">Sector & Industry Dynamics<span class="item-tag tag-fa">FA</span></div>
+                    <div class="item-desc">Porter's Five Forces, competitive moat, market share trends, regulatory
+                        environment, and disruption risk. A great company in a dying industry is a bad investment.</div>
+                </div>
+            </div>
+            <div class="item" onclick="toggle(this)"><span class="rank">16</span>
+                <div class="item-body">
+                    <div class="item-name">Management Quality & Capital Allocation<span
+                            class="item-tag tag-fa">FA</span></div>
+                    <div class="item-desc">Insider ownership, compensation alignment, share buyback vs. dilution
+                        history, acquisition track record, and candor in shareholder communications.</div>
+                </div>
+            </div>
+            <div class="item" onclick="toggle(this)"><span class="rank">17</span>
+                <div class="item-body">
+                    <div class="item-name">Discounted Cash Flow (DCF) Valuation<span class="item-tag tag-fa">FA</span>
+                    </div>
+                    <div class="item-desc">Intrinsic value from projected future cash flows discounted to present.
+                        Extremely sensitive to growth rate and discount rate assumptions. Powerful but requires
+                        disciplined input hygiene.</div>
+                </div>
+            </div>
+            <div class="item" onclick="toggle(this)"><span class="rank">18</span>
+                <div class="item-body">
+                    <div class="item-name">Guidance & Analyst Estimates (Consensus)<span
+                            class="item-tag tag-fa">FA</span></div>
+                    <div class="item-desc">Management guidance sets the bar the market prices in. Earnings beats/misses
+                        vs. consensus drive sharp moves. Whisper numbers and revision trends matter more than the
+                        published estimate.</div>
+                </div>
+            </div>
+            <div class="item" onclick="toggle(this)"><span class="rank">19</span>
+                <div class="item-body">
+                    <div class="item-name">Share Buybacks & Dilution<span class="item-tag tag-fa">FA</span></div>
+                    <div class="item-desc">Net buybacks boost EPS per share mechanically. Heavy dilution (SBC,
+                        convertibles, secondary offerings) destroys per-share value. Track share count trend over 5
+                        years.</div>
+                </div>
+            </div>
+            <div class="item" onclick="toggle(this)"><span class="rank">20</span>
+                <div class="item-body">
+                    <div class="item-name">Currency Risk & Geographic Revenue Mix<span class="item-tag tag-fa">FA</span>
+                    </div>
+                    <div class="item-desc">A strong USD hurts multinationals reporting in USD. Emerging market revenue
+                        adds political, currency, and demand risk. Revenue geographic breakdown is in the 10-K segment
+                        reporting.</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TECHNICAL ANALYSIS -->
+        <div class="panel" id="panel-ta">
+            <div class="filter-row">
+                <span style="font-size:12px;color:var(--color-text-secondary);align-self:center;">Filter:</span>
+                <button class="filter-btn on" onclick="filterTA('all',this)">All</button>
+                <button class="filter-btn" onclick="filterTA('trend',this)">Trend</button>
+                <button class="filter-btn" onclick="filterTA('momentum',this)">Momentum</button>
+                <button class="filter-btn" onclick="filterTA('volume',this)">Volume</button>
+                <button class="filter-btn" onclick="filterTA('oscillator',this)">Oscillators</button>
+                <button class="filter-btn" onclick="filterTA('structure',this)">Structure</button>
+            </div>
+
+            <div class="section-label">Tier 1 — Primary Indicators</div>
+            <div class="item" data-cat="trend" onclick="toggle(this)"><span class="rank">1</span>
+                <div class="item-body">
+                    <div class="item-name">Price Action & Candlestick Patterns<span
+                            class="item-tag tag-trend">Trend</span></div>
+                    <div class="item-desc">The raw foundation. Close relative to open and prior close reveals
+                        buyer/seller dominance. Key patterns: engulfing candles, hammers, doji, inside bars, pin bars.
+                        Context (support/resistance, trend) is everything.</div>
+                </div>
+            </div>
+            <div class="item" data-cat="trend" onclick="toggle(this)"><span class="rank">2</span>
+                <div class="item-body">
+                    <div class="item-name">Support & Resistance Levels<span class="item-tag tag-trend">Structure</span>
+                    </div>
+                    <div class="item-desc">Price memory. Prior highs become resistance, prior lows become support. Round
+                        numbers, weekly/monthly pivots, and all-time highs/lows carry extra significance. The more times
+                        a level is tested without breaking, the stronger it is.</div>
+                </div>
+            </div>
+            <div class="item" data-cat="trend" onclick="toggle(this)"><span class="rank">3</span>
+                <div class="item-body">
+                    <div class="item-name">Trend & Trend Lines<span class="item-tag tag-trend">Trend</span></div>
+                    <div class="item-desc">Higher highs + higher lows = uptrend. Trend line connects swing lows in an
+                        uptrend, swing highs in a downtrend. A broken trend line is a primary reversal signal. The trend
+                        on the higher timeframe dominates.</div>
+                </div>
+            </div>
+            <div class="item" data-cat="volume" onclick="toggle(this)"><span class="rank">4</span>
+                <div class="item-body">
+                    <div class="item-name">Volume<span class="item-tag tag-vol">Volume</span></div>
+                    <div class="item-desc">Confirms price moves. A breakout on low volume is suspect; on high volume it
+                        has conviction. Volume climaxes (extremely high volume reversals) often mark turning points.
+                        Volume precedes price.</div>
+                </div>
+            </div>
+            <div class="item" data-cat="trend" onclick="toggle(this)"><span class="rank">5</span>
+                <div class="item-body">
+                    <div class="item-name">Moving Averages (SMA & EMA)<span class="item-tag tag-trend">Trend</span>
+                    </div>
+                    <div class="item-desc">20, 50, 100, 200-period are the most watched. Price above the 200 MA =
+                        long-term uptrend. The 50/200 crossover (Golden/Death Cross) is widely followed. EMAs react
+                        faster; SMAs give cleaner levels.</div>
+                </div>
+            </div>
+
+            <div class="section-label">Tier 2 — Momentum & Oscillators</div>
+            <div class="item" data-cat="momentum" onclick="toggle(this)"><span class="rank">6</span>
+                <div class="item-body">
+                    <div class="item-name">Relative Strength Index (RSI)<span class="item-tag tag-osc">Oscillator</span>
+                    </div>
+                    <div class="item-desc">14-period default. Above 70 = overbought; below 30 = oversold. RSI divergence
+                        (price makes new high but RSI doesn't) is one of the most reliable reversal signals in all of
+                        technical analysis.</div>
+                </div>
+            </div>
+            <div class="item" data-cat="momentum" onclick="toggle(this)"><span class="rank">7</span>
+                <div class="item-body">
+                    <div class="item-name">MACD (Moving Average Convergence Divergence)<span
+                            class="item-tag tag-mom">Momentum</span></div>
+                    <div class="item-desc">12/26/9 default. MACD line crossing signal line = entry signal. Histogram
+                        shrinking = fading momentum. Zero-line crosses confirm trend change. Best in trending markets;
+                        choppy markets produce false signals.</div>
+                </div>
+            </div>
+            <div class="item" data-cat="volume" onclick="toggle(this)"><span class="rank">8</span>
+                <div class="item-body">
+                    <div class="item-name">On-Balance Volume (OBV) & Volume Profile<span
+                            class="item-tag tag-vol">Volume</span></div>
+                    <div class="item-desc">OBV adds volume on up days, subtracts on down days — divergence from price
+                        signals smart money accumulation or distribution. Volume Profile shows where the most trading
+                        occurred at each price level (high-volume nodes = strong S/R).</div>
+                </div>
+            </div>
+            <div class="item" data-cat="trend" onclick="toggle(this)"><span class="rank">9</span>
+                <div class="item-body">
+                    <div class="item-name">Bollinger Bands<span class="item-tag tag-trend">Volatility</span></div>
+                    <div class="item-desc">20-SMA ± 2 standard deviations. Price at the upper band is relatively
+                        extended; lower band oversold. Band squeeze (contraction) precedes expansion/breakout moves. The
+                        "Bollinger Bounce" is a mean-reversion strategy.</div>
+                </div>
+            </div>
+            <div class="item" data-cat="structure" onclick="toggle(this)"><span class="rank">10</span>
+                <div class="item-body">
+                    <div class="item-name">Fibonacci Retracements & Extensions<span
+                            class="item-tag tag-trend">Structure</span></div>
+                    <div class="item-desc">Key levels: 23.6%, 38.2%, 50%, 61.8%, 78.6%. The 61.8% level (Golden Ratio)
+                        is the most powerful. Price often bounces or stalls here during a pullback. Extensions project
+                        price targets after a breakout.</div>
+                </div>
+            </div>
+
+            <div class="section-label">Tier 3 — Secondary Indicators</div>
+            <div class="item" data-cat="momentum" onclick="toggle(this)"><span class="rank">11</span>
+                <div class="item-body">
+                    <div class="item-name">Stochastic Oscillator<span class="item-tag tag-osc">Oscillator</span></div>
+                    <div class="item-desc">14,3,3 default. Compares closing price to range over N periods. %K crossing
+                        %D above 20 or below 80 gives signals. Better in ranging markets than RSI. Often used with RSI
+                        for confirmation.</div>
+                </div>
+            </div>
+            <div class="item" data-cat="momentum" onclick="toggle(this)"><span class="rank">12</span>
+                <div class="item-body">
+                    <div class="item-name">Average True Range (ATR)<span class="item-tag tag-vol">Volatility</span>
+                    </div>
+                    <div class="item-desc">Measures volatility, not direction. Critical for position sizing (stop =
+                        1.5–2× ATR from entry) and for assessing whether a move is significant or just noise within
+                        normal daily range.</div>
+                </div>
+            </div>
+            <div class="item" data-cat="trend" onclick="toggle(this)"><span class="rank">13</span>
+                <div class="item-body">
+                    <div class="item-name">Ichimoku Cloud<span class="item-tag tag-trend">Trend</span></div>
+                    <div class="item-desc">All-in-one system: Tenkan/Kijun crossover, price vs. cloud (Kumo), Chikou
+                        span. Price above a bullish cloud = strong uptrend. The cloud itself acts as dynamic
+                        support/resistance and projects forward 26 periods.</div>
+                </div>
+            </div>
+            <div class="item" data-cat="structure" onclick="toggle(this)"><span class="rank">14</span>
+                <div class="item-body">
+                    <div class="item-name">Chart Patterns<span class="item-tag tag-trend">Structure</span></div>
+                    <div class="item-desc">Continuation: flags, pennants, triangles, wedges, cup-and-handle. Reversal:
+                        head & shoulders (most reliable), double/triple tops and bottoms, inverse H&S. Measure the
+                        pattern height to project the target move.</div>
+                </div>
+            </div>
+            <div class="item" data-cat="trend" onclick="toggle(this)"><span class="rank">15</span>
+                <div class="item-body">
+                    <div class="item-name">Moving Average Ribbons & MA Crosses<span
+                            class="item-tag tag-trend">Trend</span></div>
+                    <div class="item-desc">Multiple MAs fanning in order (e.g. 10 > 20 > 50 > 200) = strong trend.
+                        Compression of the ribbon signals consolidation. The 50/200 Golden/Death Cross is watched by
+                        institutional systems.</div>
+                </div>
+            </div>
+            <div class="item" data-cat="volume" onclick="toggle(this)"><span class="rank">16</span>
+                <div class="item-body">
+                    <div class="item-name">Accumulation/Distribution (A/D) Line<span
+                            class="item-tag tag-vol">Volume</span></div>
+                    <div class="item-desc">Weights volume by where price closes in its range. Rising A/D with falling
+                        price = bullish divergence (smart money accumulating). Created by Marc Chaikin; basis of the
+                        Chaikin Money Flow indicator.</div>
+                </div>
+            </div>
+            <div class="item" data-cat="momentum" onclick="toggle(this)"><span class="rank">17</span>
+                <div class="item-body">
+                    <div class="item-name">ADX (Average Directional Index)<span class="item-tag tag-mom">Momentum</span>
+                    </div>
+                    <div class="item-desc">Measures trend strength, not direction. ADX > 25 = trending; < 20=ranging.
+                            Use +DI / -DI for direction. Critical for choosing the right strategy: trend-following vs.
+                            mean-reversion systems perform opposite in trending vs. choppy markets.</div>
+                    </div>
+                </div>
+                <div class="item" data-cat="structure" onclick="toggle(this)"><span class="rank">18</span>
+                    <div class="item-body">
+                        <div class="item-name">Pivot Points (Classic, Camarilla, Woodie's)<span
+                                class="item-tag tag-trend">Structure</span></div>
+                        <div class="item-desc">Calculated from prior session's H/L/Close. Give PP, R1-R3, S1-S3.
+                            Intraday traders use these as daily roadmaps. The classic pivot is heavily used by market
+                            makers and floor traders.</div>
+                    </div>
+                </div>
+                <div class="item" data-cat="momentum" onclick="toggle(this)"><span class="rank">19</span>
+                    <div class="item-body">
+                        <div class="item-name">Williams %R<span class="item-tag tag-osc">Oscillator</span></div>
+                        <div class="item-desc">Inverse of Stochastic. Range 0 to -100. Below -80 = oversold; above -20 =
+                            overbought. Fast-moving, works well on daily and weekly charts for spotting extreme
+                            readings. Developed by Larry Williams.</div>
+                    </div>
+                </div>
+                <div class="item" data-cat="volume" onclick="toggle(this)"><span class="rank">20</span>
+                    <div class="item-body">
+                        <div class="item-name">VWAP (Volume-Weighted Average Price)<span
+                                class="item-tag tag-vol">Volume</span></div>
+                        <div class="item-desc">The institutional benchmark for the day. Price above VWAP = bullish
+                            intraday bias. Institutions use it to evaluate execution quality. Resets each session;
+                            heavily used in intraday and algorithmic trading.</div>
+                    </div>
+                </div>
+
+                <div class="section-label">Tier 4 — Advanced & Supplementary</div>
+                <div class="item" data-cat="structure" onclick="toggle(this)"><span class="rank">21</span>
+                    <div class="item-body">
+                        <div class="item-name">Elliott Wave Theory<span class="item-tag tag-trend">Structure</span>
+                        </div>
+                        <div class="item-desc">5-wave impulse + 3-wave correction. Fractal at all timeframes. Powerful
+                            when correctly identified, notoriously subjective. Best used to frame probabilistic
+                            scenarios, not as a standalone signal.</div>
+                    </div>
+                </div>
+                <div class="item" data-cat="momentum" onclick="toggle(this)"><span class="rank">22</span>
+                    <div class="item-body">
+                        <div class="item-name">CCI (Commodity Channel Index)<span
+                                class="item-tag tag-osc">Oscillator</span></div>
+                        <div class="item-desc">Measures deviation from statistical mean. ±100 thresholds for extremes.
+                            Originally for commodities but widely applied. Zero-line crossovers used as trend signals in
+                            some systems.</div>
+                    </div>
+                </div>
+                <div class="item" data-cat="momentum" onclick="toggle(this)"><span class="rank">23</span>
+                    <div class="item-body">
+                        <div class="item-name">Rate of Change (ROC) / Momentum Oscillator<span
+                                class="item-tag tag-mom">Momentum</span></div>
+                        <div class="item-desc">Simple percentage change over N periods. Zero-line crossovers signal
+                            trend change. Useful for comparing relative momentum across assets. Basis for many more
+                            sophisticated momentum strategies.</div>
+                    </div>
+                </div>
+                <div class="item" data-cat="trend" onclick="toggle(this)"><span class="rank">24</span>
+                    <div class="item-body">
+                        <div class="item-name">Parabolic SAR<span class="item-tag tag-trend">Trend</span></div>
+                        <div class="item-desc">Trailing stop-and-reverse system. Dots below price = buy; above = sell.
+                            Good for trailing stops in strong trends. In choppy markets it whipsaws badly. Often
+                            combined with ADX to filter out ranging periods.</div>
+                    </div>
+                </div>
+                <div class="item" data-cat="structure" onclick="toggle(this)"><span class="rank">25</span>
+                    <div class="item-body">
+                        <div class="item-name">Gann Angles & Time Cycles<span
+                                class="item-tag tag-trend">Structure</span></div>
+                        <div class="item-desc">W.D. Gann's geometric angles (especially 1×1 = 45°) and time-based
+                            turning point analysis. Highly subjective and complex. Used by a small group of specialists;
+                            not mainstream but has dedicated practitioners.</div>
+                    </div>
+                </div>
+                <div class="item" data-cat="volume" onclick="toggle(this)"><span class="rank">26</span>
+                    <div class="item-body">
+                        <div class="item-name">Money Flow Index (MFI)<span class="item-tag tag-vol">Volume</span></div>
+                        <div class="item-desc">RSI incorporating volume — "volume-weighted RSI." Above 80 = overbought;
+                            below 20 = oversold. Divergences are highly meaningful because they incorporate both price
+                            and volume pressure.</div>
+                    </div>
+                </div>
+                <div class="item" data-cat="structure" onclick="toggle(this)"><span class="rank">27</span>
+                    <div class="item-body">
+                        <div class="item-name">Market Structure (Higher Highs/Lows, Break of Structure)<span
+                                class="item-tag tag-trend">Structure</span></div>
+                        <div class="item-desc">The foundation of Smart Money Concepts. A Break of Structure (BOS)
+                            signals trend continuation; a Change of Character (CHoCH) signals reversal. Identifies order
+                            blocks, fair value gaps, and liquidity pools.</div>
+                    </div>
+                </div>
+                <div class="item" data-cat="volume" onclick="toggle(this)"><span class="rank">28</span>
+                    <div class="item-body">
+                        <div class="item-name">Open Interest (Futures & Options)<span
+                                class="item-tag tag-vol">Volume</span></div>
+                        <div class="item-desc">Number of open contracts. Rising price + rising OI = strong trend. Rising
+                            price + falling OI = weak rally, short covering. Options OI at strikes reveals key dealer
+                            hedging levels (gamma walls, max pain).</div>
+                    </div>
+                </div>
+                <div class="item" data-cat="momentum" onclick="toggle(this)"><span class="rank">29</span>
+                    <div class="item-body">
+                        <div class="item-name">Relative Strength vs. Benchmark<span
+                                class="item-tag tag-mom">Momentum</span></div>
+                        <div class="item-desc">Price of asset / price of benchmark (S&P 500, sector ETF). Rising
+                            relative strength = outperforming; declining = lagging. The best stocks in bull markets
+                            consistently lead their sector on this measure.</div>
+                    </div>
+                </div>
+                <div class="item" data-cat="structure" onclick="toggle(this)"><span class="rank">30</span>
+                    <div class="item-body">
+                        <div class="item-name">Timeframe Analysis (Multi-Timeframe Confluence)<span
+                                class="item-tag tag-trend">Structure</span></div>
+                        <div class="item-desc">Higher timeframe sets the trend direction; lower timeframe provides the
+                            entry trigger. A buy signal on the daily that aligns with a weekly uptrend and a monthly
+                            support level carries far more weight than an isolated signal.</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CORRELATION GROUPS -->
+            <div class="panel" id="panel-corr">
+                <p style="font-size:13px;color:var(--color-text-secondary);margin-bottom:14px;">Click any group to see
+                    its members and how they interact.</p>
+
+                <div class="corr-group" onclick="toggleCorr(this)">
+                    <div class="corr-header">
+                        <div class="corr-dot" style="background:#1D9E75"></div>Trend & Moving Average Group<div
+                            class="chevron">▼</div>
+                    </div>
+                    <div class="corr-body">
+                        <div><span class="corr-pill">Price Action</span><span class="corr-pill">Trend Lines</span><span
+                                class="corr-pill">SMA/EMA</span><span class="corr-pill">MA Ribbons</span><span
+                                class="corr-pill">Ichimoku Cloud</span><span class="corr-pill">Parabolic SAR</span><span
+                                class="corr-pill">ADX</span></div>
+                        <div class="corr-note">All measure directional bias and trend strength. Use ADX to determine if
+                            a trend-following tool is appropriate (ADX > 25). Moving averages lag — Ichimoku and
+                            Parabolic SAR adapt faster. They agree when a trend is strong and diverge at turning points.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="corr-group" onclick="toggleCorr(this)">
+                    <div class="corr-header">
+                        <div class="corr-dot" style="background:#534AB7"></div>Momentum Oscillator Group<div
+                            class="chevron">▼</div>
+                    </div>
+                    <div class="corr-body">
+                        <div><span class="corr-pill">RSI</span><span class="corr-pill">MACD</span><span
+                                class="corr-pill">Stochastic</span><span class="corr-pill">Williams %R</span><span
+                                class="corr-pill">CCI</span><span class="corr-pill">ROC</span><span
+                                class="corr-pill">MFI</span></div>
+                        <div class="corr-note">All measure overbought/oversold conditions and momentum velocity. RSI and
+                            Stochastic are highly correlated; using both is redundant. MACD is trend-sensitive while
+                            Stochastic is range-sensitive — together they cover both regimes. MFI adds volume, giving
+                            signals extra conviction.</div>
+                    </div>
+                </div>
+
+                <div class="corr-group" onclick="toggleCorr(this)">
+                    <div class="corr-header">
+                        <div class="corr-dot" style="background:#BA7517"></div>Volume & Flow Group<div class="chevron">▼
+                        </div>
+                    </div>
+                    <div class="corr-body">
+                        <div><span class="corr-pill">Raw Volume</span><span class="corr-pill">OBV</span><span
+                                class="corr-pill">A/D Line</span><span class="corr-pill">VWAP</span><span
+                                class="corr-pill">Volume Profile</span><span class="corr-pill">Open Interest</span><span
+                                class="corr-pill">MFI</span></div>
+                        <div class="corr-note">All track the flow of money into or out of an asset. OBV and A/D Line are
+                            closely related — A/D is more nuanced (uses position within range, not just up/down). VWAP
+                            is the intraday version. Open Interest is the futures/options equivalent. Volume Profile
+                            identifies where institutions have placed large orders.</div>
+                    </div>
+                </div>
+
+                <div class="corr-group" onclick="toggleCorr(this)">
+                    <div class="corr-header">
+                        <div class="corr-dot" style="background:#993C1D"></div>Volatility Group<div class="chevron">▼
+                        </div>
+                    </div>
+                    <div class="corr-body">
+                        <div><span class="corr-pill">Bollinger Bands</span><span class="corr-pill">ATR</span><span
+                                class="corr-pill">VIX (market)</span><span class="corr-pill">IV (options)</span><span
+                                class="corr-pill">Keltner Channels</span></div>
+                        <div class="corr-note">ATR is the raw volatility measure; Bollinger Bands and Keltner Channels
+                            apply it visually as channel envelopes. VIX is the market-wide fear gauge; individual stock
+                            IV reflects options-priced expectation. Low volatility periods compress into high volatility
+                            breakouts — the squeeze setup.</div>
+                    </div>
+                </div>
+
+                <div class="corr-group" onclick="toggleCorr(this)">
+                    <div class="corr-header">
+                        <div class="corr-dot" style="background:#185FA5"></div>Price Structure Group<div
+                            class="chevron">▼</div>
+                    </div>
+                    <div class="corr-body">
+                        <div><span class="corr-pill">Support/Resistance</span><span class="corr-pill">Fibonacci
+                                Levels</span><span class="corr-pill">Pivot Points</span><span class="corr-pill">Chart
+                                Patterns</span><span class="corr-pill">Elliott Wave</span><span class="corr-pill">Market
+                                Structure (SMC)</span><span class="corr-pill">Gann Angles</span></div>
+                        <div class="corr-note">All identify key price zones where supply and demand are likely to
+                            interact. Fibonacci retracements and S/R levels often coincide at the same price —
+                            "confluence" makes that level far stronger. Pivot Points give structure daily;
+                            Fibonacci/Elliott give structure over weeks to months.</div>
+                    </div>
+                </div>
+
+                <div class="corr-group" onclick="toggleCorr(this)">
+                    <div class="corr-header">
+                        <div class="corr-dot" style="background:#639922"></div>Valuation Multiples Group (FA)<div
+                            class="chevron">▼</div>
+                    </div>
+                    <div class="corr-body">
+                        <div><span class="corr-pill">P/E</span><span class="corr-pill">PEG</span><span
+                                class="corr-pill">EV/EBITDA</span><span class="corr-pill">P/B</span><span
+                                class="corr-pill">P/S</span><span class="corr-pill">EV/Revenue</span><span
+                                class="corr-pill">DCF</span></div>
+                        <div class="corr-note">All measure what the market is paying relative to some financial metric.
+                            They move together — a compressed P/E generally means compressed EV/EBITDA. DCF is the
+                            theoretical anchor; multiples are the market's shortcut. A stock screaming cheap on all of
+                            these simultaneously is a strong value signal.</div>
+                    </div>
+                </div>
+
+                <div class="corr-group" onclick="toggleCorr(this)">
+                    <div class="corr-header">
+                        <div class="corr-dot" style="background:#993556"></div>Quality & Profitability Group (FA)<div
+                            class="chevron">▼</div>
+                    </div>
+                    <div class="corr-body">
+                        <div><span class="corr-pill">Gross Margin</span><span class="corr-pill">Operating
+                                Margin</span><span class="corr-pill">Net Margin</span><span
+                                class="corr-pill">ROE</span><span class="corr-pill">ROIC</span><span
+                                class="corr-pill">FCF Margin</span><span class="corr-pill">EPS Growth</span></div>
+                        <div class="corr-note">These compound together — a company with strong gross margins tends to
+                            have strong operating margins and generates high ROIC. ROIC is the master metric that
+                            summarizes all of them. Deteriorating gross margins are the first warning sign; net margin
+                            collapse often follows.</div>
+                    </div>
+                </div>
+
+                <div class="corr-group" onclick="toggleCorr(this)">
+                    <div class="corr-header">
+                        <div class="corr-dot" style="background:#5F5E5A"></div>Macro / Inter-market Group<div
+                            class="chevron">▼</div>
+                    </div>
+                    <div class="corr-body">
+                        <div><span class="corr-pill">Interest Rates</span><span class="corr-pill">USD
+                                Strength</span><span class="corr-pill">Yield Curve</span><span class="corr-pill">Credit
+                                Spreads</span><span class="corr-pill">Commodity Prices</span><span
+                                class="corr-pill">VIX</span><span class="corr-pill">GDP / PMI</span></div>
+                        <div class="corr-note">These are deeply interconnected via the "inter-market" relationships:
+                            rising rates → stronger USD → pressure on commodities and EM stocks. Inverted yield curve →
+                            recession signal → bear market setup. Widening credit spreads → risk-off → equities
+                            typically sell off. VIX spikes coincide with equity troughs.</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- BEYOND THE CHARTS -->
+            <div class="panel" id="panel-other">
+                <div class="section-label">Risk & Position Management</div>
+                <div class="item" onclick="toggle(this)"><span class="rank">★</span>
+                    <div class="item-body">
+                        <div class="item-name">Position Sizing & Risk per Trade<span
+                                class="item-tag tag-other">Risk</span></div>
+                        <div class="item-desc">The single most important non-analytical skill. Risk 1–2% of capital per
+                            trade maximum. Kelly Criterion gives the theoretically optimal fraction but most traders use
+                            a fraction of full Kelly. Oversizing is the primary cause of blowups in technically correct
+                            traders.</div>
+                    </div>
+                </div>
+                <div class="item" onclick="toggle(this)"><span class="rank">★</span>
+                    <div class="item-body">
+                        <div class="item-name">Stop Loss Discipline & Risk-Reward Ratio<span
+                                class="item-tag tag-other">Risk</span></div>
+                        <div class="item-desc">Pre-define the exit before entry. Aim for minimum 1:2 risk-reward
+                            (risking $1 to make $2). At 1:2 R/R, you only need to be right 34% of the time to be
+                            profitable. Moving stops against the trade is the most common fatal error.</div>
+                    </div>
+                </div>
+                <div class="item" onclick="toggle(this)"><span class="rank">★</span>
+                    <div class="item-body">
+                        <div class="item-name">Portfolio Correlation & Diversification<span
+                                class="item-tag tag-other">Risk</span></div>
+                        <div class="item-desc">Holding 10 tech stocks is not diversification — they all crash together.
+                            Measure pairwise correlations. Diversification across uncorrelated assets (equities, bonds,
+                            commodities, real assets) reduces drawdown without proportionally reducing returns.</div>
+                    </div>
+                </div>
+                <div class="item" onclick="toggle(this)"><span class="rank">★</span>
+                    <div class="item-body">
+                        <div class="item-name">Drawdown Management & Maximum Loss Thresholds<span
+                                class="item-tag tag-other">Risk</span></div>
+                        <div class="item-desc">Losing 50% requires a 100% gain to recover. Protect capital above all. A
+                            -20% drawdown rule (stop trading, reassess) can save an account. Track max drawdown,
+                            drawdown duration, and recovery time as performance metrics.</div>
+                    </div>
+                </div>
+
+                <div class="section-label">Market Microstructure & Mechanics</div>
+                <div class="item" onclick="toggle(this)"><span class="rank">·</span>
+                    <div class="item-body">
+                        <div class="item-name">Market Microstructure (Order Flow & Bid-Ask)<span
+                                class="item-tag tag-other">Micro</span></div>
+                        <div class="item-desc">Level 2 quotes, order book depth, time & sales tape, bid-ask spread,
+                            slippage. Large buy orders absorbed at a level without a price move = strong support. Market
+                            makers, dark pools, and HFTs structure price formation.</div>
+                    </div>
+                </div>
+                <div class="item" onclick="toggle(this)"><span class="rank">·</span>
+                    <div class="item-body">
+                        <div class="item-name">Options Market Dynamics (Greeks, IV, Gamma Exposure)<span
+                                class="item-tag tag-other">Micro</span></div>
+                        <div class="item-desc">Delta, Gamma, Theta, Vega govern option pricing. Dealer gamma exposure
+                            (GEX) predicts whether market makers will amplify or dampen moves. Large OI at strikes
+                            creates "gravitational pull" toward max pain expiration.</div>
+                    </div>
+                </div>
+                <div class="item" onclick="toggle(this)"><span class="rank">·</span>
+                    <div class="item-body">
+                        <div class="item-name">Liquidity & Market Impact<span class="item-tag tag-other">Micro</span>
+                        </div>
+                        <div class="item-desc">A position too large for the market's daily volume cannot be exited
+                            without moving the price against you. Average daily volume, float, and short float determine
+                            liquidity. Illiquid markets amplify both gains and losses.</div>
+                    </div>
+                </div>
+                <div class="item" onclick="toggle(this)"><span class="rank">·</span>
+                    <div class="item-body">
+                        <div class="item-name">Short Interest & Short Squeeze Mechanics<span
+                                class="item-tag tag-other">Micro</span></div>
+                        <div class="item-desc">High short float (>20%) + rising price forces short covering, creating
+                            explosive moves. Days-to-cover = short interest / average daily volume. GameStop (2021) is
+                            the extreme case study. Short interest is reported twice monthly.</div>
+                    </div>
+                </div>
+
+                <div class="section-label">Psychology & Behavioral Finance</div>
+                <div class="item" onclick="toggle(this)"><span class="rank">·</span>
+                    <div class="item-body">
+                        <div class="item-name">Trading Psychology (Biases & Emotional Control)<span
+                                class="item-tag tag-other">Psychology</span></div>
+                        <div class="item-desc">Loss aversion, confirmation bias, recency bias, overconfidence,
+                            anchoring, and FOMO are the enemy. Documented in 50 years of behavioral finance research. A
+                            trading journal is the primary tool for identifying your personal blind spots.</div>
+                    </div>
+                </div>
+                <div class="item" onclick="toggle(this)"><span class="rank">·</span>
+                    <div class="item-body">
+                        <div class="item-name">Market Sentiment & Crowd Psychology<span
+                                class="item-tag tag-other">Psychology</span></div>
+                        <div class="item-desc">Greed-Fear Cycle, the Wyckoff accumulation/distribution model, Investor
+                            Sentiment surveys (AAII, CNN Fear & Greed Index). Extreme pessimism at bottoms, extreme
+                            optimism at tops — be contrarian at the extremes.</div>
+                    </div>
+                </div>
+                <div class="item" onclick="toggle(this)"><span class="rank">·</span>
+                    <div class="item-body">
+                        <div class="item-name">Process Over Outcome Thinking<span
+                                class="item-tag tag-other">Psychology</span></div>
+                        <div class="item-desc">A good process can produce a bad outcome in any single trade (variance).
+                            Judging trades by outcome rather than process quality leads to random reinforcement and poor
+                            learning. Review the quality of the decision, not just the P&L.</div>
+                    </div>
+                </div>
+
+                <div class="section-label">Information & Edge</div>
+                <div class="item" onclick="toggle(this)"><span class="rank">·</span>
+                    <div class="item-body">
+                        <div class="item-name">News, Earnings Calendars & Economic Calendars<span
+                                class="item-tag tag-other">Info</span></div>
+                        <div class="item-desc">Fed announcements (FOMC), CPI/PPI release dates, NFP, earnings dates,
+                            dividend ex-dates, stock splits. Trading through these events unhedged is speculation.
+                            Implied move (options pricing) quantifies what the market expects.</div>
+                    </div>
+                </div>
+                <div class="item" onclick="toggle(this)"><span class="rank">·</span>
+                    <div class="item-body">
+                        <div class="item-name">Institutional Positioning (COT Reports, 13F Filings)<span
+                                class="item-tag tag-other">Info</span></div>
+                        <div class="item-desc">Commitments of Traders (COT) from CFTC shows commercial vs. speculative
+                            positioning in futures. 13F filings (quarterly) reveal hedge fund and mutual fund equity
+                            holdings. Following what institutions are doing, not saying.</div>
+                    </div>
+                </div>
+                <div class="item" onclick="toggle(this)"><span class="rank">·</span>
+                    <div class="item-body">
+                        <div class="item-name">Insider Transactions & Corporate Actions<span
+                                class="item-tag tag-other">Info</span></div>
+                        <div class="item-desc">SEC Form 4 filings show insider buying/selling. Cluster buying by
+                            multiple insiders is strongly bullish. Corporate actions: mergers, acquisitions, spin-offs,
+                            stock splits, rights offerings — each has characteristic price behavior patterns.</div>
+                    </div>
+                </div>
+                <div class="item" onclick="toggle(this)"><span class="rank">·</span>
+                    <div class="item-body">
+                        <div class="item-name">Seasonality & Calendar Effects<span
+                                class="item-tag tag-other">Info</span></div>
+                        <div class="item-desc">"Sell in May," the January effect, holiday rallies, quarterly options
+                            expiration (OpEx), end-of-month rebalancing. Not deterministic but statistically significant
+                            over large samples. Useful as a tie-breaker when other signals are mixed.</div>
+                    </div>
+                </div>
+                <div class="item" onclick="toggle(this)"><span class="rank">·</span>
+                    <div class="item-body">
+                        <div class="item-name">Backtesting & Statistical Edge<span
+                                class="item-tag tag-other">Process</span></div>
+                        <div class="item-desc">Every strategy should be backtested over multiple market regimes (bull,
+                            bear, sideways). Key metrics: expectancy, win rate, average win/loss, max drawdown, Sharpe
+                            ratio, Sortino ratio, profit factor. Beware of curve-fitting and look-ahead bias.</div>
+                    </div>
+                </div>
+                <div class="item" onclick="toggle(this)"><span class="rank">·</span>
+                    <div class="item-body">
+                        <div class="item-name">Tax Efficiency & Cost Management<span
+                                class="item-tag tag-other">Process</span></div>
+                        <div class="item-desc">Short-term vs. long-term capital gains treatment, tax-loss harvesting,
+                            wash-sale rules. Commissions, spread, slippage, borrowing costs (for shorts) — transaction
+                            costs are strategy-killers at high frequency. Net return after all costs is the only real
+                            number.</div>
+                    </div>
+                </div>
+            </div>
+
+            <script>
+function switchTab(id) {
+  document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', ['fa','ta','corr','other'][i] === id));
+  document.querySelectorAll('.panel').forEach(p => p.classList.toggle('active', p.id === 'panel-'+id));
+}
+function toggle(el) {
+  el.classList.toggle('open');
+}
+function toggleCorr(el) {
+  el.classList.toggle('open');
+}
+function filterTA(cat, btn) {
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('on'));
+  btn.classList.add('on');
+  document.querySelectorAll('#panel-ta .item').forEach(item => {
+    if (cat === 'all') { item.classList.remove('hidden'); return; }
+    const c = item.dataset.cat || '';
+    item.classList.toggle('hidden', c !== cat);
+  });
+  document.querySelectorAll('#panel-ta .section-label').forEach(label => {
+    let next = label.nextElementSibling;
+    let hasVisible = false;
+    while (next && !next.classList.contains('section-label')) {
+      if (!next.classList.contains('hidden')) hasVisible = true;
+      next = next.nextElementSibling;
+    }
+    label.style.display = hasVisible ? '' : 'none';
+  });
+}
+            </script>

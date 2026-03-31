@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/berdelis/trading-agent/services/data-ingestion/internal/httpclient"
 	"github.com/berdelis/trading-agent/services/data-ingestion/internal/store"
 	"golang.org/x/time/rate"
 )
@@ -23,7 +24,7 @@ type Client struct {
 func New(token string) *Client {
 	return &Client{
 		Token:   token,
-		HTTP:    &http.Client{Timeout: 25 * time.Second},
+		HTTP:    httpclient.New(25 * time.Second),
 		Limiter: rate.NewLimiter(rate.Every(2*time.Second), 2),
 	}
 }
