@@ -3,34 +3,39 @@ ROOT    := $(abspath ..)
 # reads from the root .env, same file that env_file: ../.env injects into containers.
 COMPOSE := docker compose -f $(ROOT)/infra/docker-compose.yml --env-file $(ROOT)/.env
 
-.PHONY: db-up db-down up down up-ingestion build-timescaledb restart clean
+.PHONY: db-up db-down up down up-ingestion up-analyzer build-timescaledb restart clean
 
 # Databases + Redis only (data volume persists across down/up without -v)
 db-up:
 	cd $(ROOT) && $(COMPOSE) up -d timescaledb redis
 
 db-down:
-	cd $(ROOT) && $(COMPOSE) --profile ingestion down
+	cd $(ROOT) && $(COMPOSE) --profile ingestion --profile analyzer down
 
-# Full stack: DB, Redis, and all data-ingestion workers (optional ../.env for API keys; see .env.example)
+# Full stack: DB, Redis, ingestion workers, and analyzer workers.
 up:
-	cd $(ROOT) && $(COMPOSE) --profile ingestion up -d --build
+	cd $(ROOT) && $(COMPOSE) --profile ingestion --profile analyzer up -d --build
 
-# Stops every service in this compose project (same project name as up); does not remove volumes.
+# Stops every service; does not remove volumes.
 down:
-	cd $(ROOT) && $(COMPOSE) --profile ingestion down
+	cd $(ROOT) && $(COMPOSE) --profile ingestion --profile analyzer down
 
-# Stop stack and start again; does NOT pass -v (Timescale/Redis volumes keep all DB data).
+# Stop and restart everything; data volumes are preserved.
 restart:
-	cd $(ROOT) && $(COMPOSE) --profile ingestion down && $(COMPOSE) --profile ingestion up -d --build
+	cd $(ROOT) && $(COMPOSE) --profile ingestion --profile analyzer down \
+	  && $(COMPOSE) --profile ingestion --profile analyzer up -d --build
 
-# Stop all compose services, remove volumes (wipes Postgres/Redis data), orphans, and locally built images for this project.
+# Stop all services, remove volumes (wipes all DB data), orphans, and local images.
 clean:
-	cd $(ROOT) && $(COMPOSE) --profile ingestion down -v --remove-orphans --rmi local
+	cd $(ROOT) && $(COMPOSE) --profile ingestion --profile analyzer down -v --remove-orphans --rmi local
 
-# Workers only (DB must already be running)
+# Ingestion workers only (DB must already be running).
 up-ingestion:
 	cd $(ROOT) && $(COMPOSE) --profile ingestion up -d --build
+
+# Analyzer workers only (DB + ingestion must already be running and populated).
+up-analyzer:
+	cd $(ROOT) && $(COMPOSE) --profile analyzer up -d --build
 
 # Optional: Timescale image with migrations copied in (context = repo root)
 build-timescaledb:

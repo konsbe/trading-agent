@@ -1,59 +1,66 @@
-ROOT := $(abspath .)
-INFRA := $(ROOT)/infra
-INGEST := $(ROOT)/services/data-ingestion
+ROOT    := $(abspath .)
+INFRA   := $(ROOT)/infra
+INGEST  := $(ROOT)/services/data-ingestion
+ANALYZER := $(ROOT)/services/data-analyzer
 
-.PHONY: help tidy build-ingestion db-up db-down up down deploy ensure-env docker-build-timescaledb restart clean log-docker-compose check-services-logs psql \
+.PHONY: help tidy build-ingestion build-analyzer db-up db-down up down deploy ensure-env \
+	docker-build-timescaledb restart clean psql \
 	db-crypto-ohlcv db-crypto-global db-equity-ohlcv db-macro-fred db-onchain db-sentiment db-news db-tables \
-	db-technical db-technical-symbol log-technical \
-	db-fundamental db-fundamental-symbol log-fundamental
+	db-technical db-technical-symbol db-fundamental db-fundamental-symbol \
+	log-docker-compose log-services log-analyzer \
+	log-technical log-fundamental log-technical-analysis log-fundamental-analysis
 
 help:
-	@echo "Run the stack"
-	@echo "  1) make db-up     — docker compose starts TimescaleDB + Redis; first start runs SQL in shared/databases/migrations/"
-	@echo "  2) make up        — same as deploy: ensures .env exists, then builds data-ingestion images and starts"
-	@echo "     all four workers (profile ingestion) with DATABASE_URL pointing at the DB container."
-	@echo "  3) make down      — stops workers + DB + Redis (volumes kept)."
-	@echo "  4) make restart   — down then full up --build; same DB data (no -v)."
-	@echo "  5) make clean     — nuclear: removes containers, named volumes (DB wiped), local compose images."
+	@echo "━━━ Stack management ━━━"
+	@echo "  make up            Full stack: DB + Redis + all ingestion + analyzer workers (--build)"
+	@echo "  make up-ingestion  Ingestion workers only (DB must be running)"
+	@echo "  make up-analyzer   Analyzer workers only (DB + ingestion must be running)"
+	@echo "  make down          Stop everything (volumes kept)"
+	@echo "  make restart       down + up --build; database data preserved"
+	@echo "  make clean         Nuclear: remove containers, volumes (DB wiped), and local images"
+	@echo "  make db-up         TimescaleDB + Redis only"
 	@echo ""
-	@echo "Local dev (no Docker for Go): make db-up, cp .env.example .env, make build-ingestion, then e.g."
-	@echo "  cd services/data-ingestion && ./bin/data-crypto"
+	@echo "━━━ Local dev (no Docker) ━━━"
+	@echo "  make db-up && cp .env.example .env"
+	@echo "  make build-ingestion   → services/data-ingestion/bin/"
+	@echo "  make build-analyzer    → services/data-analyzer/bin/"
+	@echo "  cd services/data-ingestion && ./bin/data-technical"
+	@echo "  cd services/data-analyzer  && ./bin/technical-analysis"
 	@echo ""
-	@echo "Targets:"
-	@echo "  db-up           - TimescaleDB + Redis only"
-	@echo "  db-down         - Stop infra stack (data persists unless you use docker compose down -v)"
-	@echo "  build-ingestion - Compile all ingestion binaries under services/data-ingestion/bin/"
-	@echo "  up / deploy     - Full stack: DB + Redis + four ingestion containers (--build)"
-	@echo "  restart         - Recreate stack with --build; preserves database volumes"
-	@echo "  clean           - Remove compose stack, volumes (DB data), and built images"
-	@echo "  tidy            - go mod tidy in data-ingestion"
-	@echo "  ensure-env      - Create .env from .env.example if missing"
+	@echo "━━━ Logs ━━━"
+	@echo "  log-services            All ingestion containers"
+	@echo "  log-analyzer            Both analyzer containers (technical-analysis + fundamental-analysis)"
+	@echo "  log-technical           data-technical (OHLCV bar fetcher)"
+	@echo "  log-fundamental         data-fundamental (Finnhub fundamentals fetcher)"
+	@echo "  log-technical-analysis  technical-analysis (indicator computation)"
+	@echo "  log-fundamental-analysis fundamental-analysis (derived ratio computation)"
+	@echo "  log-docker-compose      All containers"
 	@echo ""
-	@echo "DB inspection (latest 20 rows per table):"
-	@echo "  db-tables       - Row counts for every table"
-	@echo "  db-crypto-ohlcv - crypto_ohlcv (Binance bars)"
-	@echo "  db-crypto-global- crypto_global_metrics (CoinGecko)"
-	@echo "  db-equity-ohlcv - equity_ohlcv (Alpaca/Finnhub bars)"
-	@echo "  db-macro-fred   - macro_fred (FRED series)"
-	@echo "  db-onchain      - onchain_metrics (Etherscan/Glassnode)"
-	@echo "  db-sentiment    - sentiment_snapshots (LunarCrush)"
-	@echo "  db-news         - news_headlines (Finnhub news)"
-	@echo "  db-technical    - technical_indicators (latest computed values)"
-	@echo "  db-fundamental  - equity_fundamentals (latest TTM metrics)"
-	@echo "  db-fundamental-symbol - equity_fundamentals for one symbol (default AAPL; override SYMBOL=MSFT)"
-	@echo ""
-	@echo "Logs:"
-	@echo "  log-technical   - Follow data-technical container logs only"
-	@echo "  log-fundamental - Follow data-fundamental container logs only"
+	@echo "━━━ DB inspection ━━━"
+	@echo "  db-tables              Row counts for every table"
+	@echo "  db-technical           Latest computed indicators (technical_indicators)"
+	@echo "  db-technical-symbol    Indicators for one symbol (default SPY; override SYMBOL=BTCUSDT)"
+	@echo "  db-fundamental         Latest TTM fundamental metrics"
+	@echo "  db-fundamental-symbol  Fundamentals for one symbol (default AAPL; override SYMBOL=MSFT)"
+	@echo "  db-crypto-ohlcv        crypto_ohlcv  (Binance bars)"
+	@echo "  db-equity-ohlcv        equity_ohlcv  (Yahoo/Alpaca/Finnhub bars)"
+	@echo "  db-macro-fred          macro_fred     (FRED series)"
+	@echo "  db-onchain             onchain_metrics (Etherscan/Glassnode)"
+	@echo "  db-sentiment           sentiment_snapshots (LunarCrush)"
+	@echo "  db-news                news_headlines (Finnhub news)"
 
 ensure-env:
 	@test -f $(ROOT)/.env || cp $(ROOT)/.env.example $(ROOT)/.env
 
 tidy:
 	$(MAKE) -C $(INGEST) tidy
+	$(MAKE) -C $(ANALYZER) tidy
 
 build-ingestion:
 	$(MAKE) -C $(INGEST) build
+
+build-analyzer:
+	$(MAKE) -C $(ANALYZER) build
 
 db-up:
 	$(MAKE) -C $(INFRA) db-up
@@ -63,6 +70,12 @@ db-down:
 
 up deploy: ensure-env
 	$(MAKE) -C $(INFRA) up
+
+up-ingestion: ensure-env
+	$(MAKE) -C $(INFRA) up-ingestion
+
+up-analyzer: ensure-env
+	$(MAKE) -C $(INFRA) up-analyzer
 
 down:
 	$(MAKE) -C $(INFRA) down
@@ -76,17 +89,29 @@ clean:
 docker-build-timescaledb:
 	$(MAKE) -C $(INFRA) build-timescaledb
 
+COMPOSE := docker compose -f $(ROOT)/infra/docker-compose.yml --profile ingestion --profile analyzer
+
 log-docker-compose:
-	docker compose -f $(ROOT)/infra/docker-compose.yml logs -f
+	$(COMPOSE) logs -f
 
 log-services:
-	docker compose -f $(ROOT)/infra/docker-compose.yml logs -f data-crypto data-equity data-fundamental data-onchain data-sentiment data-technical
+	$(COMPOSE) logs -f \
+	  data-crypto data-equity data-fundamental data-onchain data-sentiment data-technical
+
+log-analyzer:
+	$(COMPOSE) logs -f technical-analysis fundamental-analysis
 
 log-technical:
-	docker compose -f $(ROOT)/infra/docker-compose.yml logs -f data-technical
+	$(COMPOSE) logs -f data-technical
 
 log-fundamental:
-	docker compose -f $(ROOT)/infra/docker-compose.yml logs -f data-fundamental
+	$(COMPOSE) logs -f data-fundamental
+
+log-technical-analysis:
+	$(COMPOSE) logs -f technical-analysis
+
+log-fundamental-analysis:
+	$(COMPOSE) logs -f fundamental-analysis
 
 psql:
 	docker exec -it infra-timescaledb-1 psql -U postgres -d trading

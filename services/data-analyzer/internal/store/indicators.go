@@ -1,5 +1,8 @@
 package store
 
+// TODO: when compute package is migrated to Python, replace UpsertIndicator with
+// an asyncpg batch upsert in Python. The SQL and parameter order stay the same.
+
 import (
 	"context"
 	"encoding/json"

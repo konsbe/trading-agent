@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -42,6 +43,18 @@ func pollFor(key string, fallback time.Duration) time.Duration {
 		return fallback
 	}
 	return d
+}
+
+func intEnv(key string, def int) int {
+	s := strings.TrimSpace(os.Getenv(key))
+	if s == "" {
+		return def
+	}
+	v, err := strconv.Atoi(s)
+	if err != nil {
+		return def
+	}
+	return v
 }
 
 func splitCSV(key string) []string {

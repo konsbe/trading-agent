@@ -124,5 +124,48 @@ services:
     profiles: [ingestion]
     restart: on-failure
 
+  # ── data-analyzer ──────────────────────────────────────────────────────────
+  # Reads bars / fundamentals from TimescaleDB and writes computed indicators
+  # and derived fundamental scores. No external API calls are made here.
+  # Start with: make up-analyzer
+  # or alongside ingestion: make up
+
+  technical-analysis:
+    build:
+      context: ../services/data-analyzer
+      dockerfile: Dockerfile
+    command: ["/app/technical-analysis"]
+    env_file:
+      - path: ../.env
+        required: false
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@timescaledb:5432/trading?sslmode=disable
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+      # Start after ingestion workers have had time to populate OHLCV tables.
+      data-technical:
+        condition: service_started
+    profiles: [analyzer]
+    restart: on-failure
+
+  fundamental-analysis:
+    build:
+      context: ../services/data-analyzer
+      dockerfile: Dockerfile
+    command: ["/app/fundamental-analysis"]
+    env_file:
+      - path: ../.env
+        required: false
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@timescaledb:5432/trading?sslmode=disable
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+      data-fundamental:
+        condition: service_started
+    profiles: [analyzer]
+    restart: on-failure
+
 volumes:
   timescale_data:
