@@ -143,9 +143,9 @@ services:
     depends_on:
       timescaledb:
         condition: service_healthy
-      # Start after ingestion workers have had time to populate OHLCV tables.
-      data-technical:
-        condition: service_started
+      # Cross-profile depends_on (data-technical is in 'ingestion') is not supported
+      # when running --profile analyzer alone. Startup delay handles timing instead:
+      # ANALYZER_STARTUP_DELAY_SECS (default 180) gives ingestion time to populate OHLCV.
     profiles: [analyzer]
     restart: on-failure
 
@@ -162,8 +162,8 @@ services:
     depends_on:
       timescaledb:
         condition: service_healthy
-      data-fundamental:
-        condition: service_started
+      # Cross-profile depends_on (data-fundamental is in 'ingestion') is not supported
+      # when running --profile analyzer alone. FUNDAMENTAL_STARTUP_DELAY_SECS handles timing.
     profiles: [analyzer]
     restart: on-failure
 
