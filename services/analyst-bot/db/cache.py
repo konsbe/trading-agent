@@ -14,9 +14,19 @@ from __future__ import annotations
 
 import json
 import logging
+from datetime import date, datetime
 from typing import Any
 
 from redis.asyncio import Redis, from_url
+
+
+class _Encoder(json.JSONEncoder):
+    """Extend the default encoder to handle types asyncpg returns that stdlib
+    json cannot serialise (datetime, date)."""
+    def default(self, obj: Any) -> Any:
+        if isinstance(obj, (datetime, date)):
+            return obj.isoformat()
+        return super().default(obj)
 
 log = logging.getLogger(__name__)
 
@@ -45,7 +55,7 @@ def get() -> Redis:
 async def set(key: str, value: Any, ttl: int) -> None:
     """Serialise `value` to JSON and store with a TTL (seconds)."""
     try:
-        await get().set(key, json.dumps(value), ex=ttl)
+        await get().set(key, json.dumps(value, cls=_Encoder), ex=ttl)
     except Exception as exc:
         log.warning("cache set failed key=%s: %s", key, exc)
 
