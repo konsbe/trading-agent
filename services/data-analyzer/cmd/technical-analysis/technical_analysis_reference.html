@@ -1,0 +1,2904 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Technical Analysis — Complete Reference</title>
+    <link
+        href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Cabinet+Grotesk:wght@300;400;500;700&family=Zodiak:ital,wght@0,300;0,500;1,300&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0a0c0f;
+            --bg2: #111318;
+            --bg3: #181b21;
+            --bg4: #1f2229;
+            --bg5: #252930;
+            --border: #252930;
+            --border2: #2e333c;
+            --text: #dde2ec;
+            --text2: #8b93a6;
+            --text3: #4a5168;
+            --cyan: #38c4d4;
+            --cyan-dim: #0d2e33;
+            --cyan2: #6dd8e5;
+            --green: #3db87a;
+            --green-dim: #0d2a1c;
+            --red: #e05252;
+            --red-dim: #2a0e0e;
+            --amber: #e0a030;
+            --amber-dim: #2a1e08;
+            --blue: #5b8def;
+            --blue-dim: #0f1e3a;
+            --purple: #9b6ef0;
+            --purple-dim: #1c1038;
+            --pink: #e05a9a;
+            --pink-dim: #2a0e1e;
+            --teal: #2ec4b6;
+            --teal-dim: #0a2420;
+        }
+
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0
+        }
+
+        html {
+            scroll-behavior: smooth
+        }
+
+        body {
+            font-family: 'Cabinet Grotesk', system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        /* GRID SCANLINE BACKGROUND */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background-image:
+                linear-gradient(rgba(56, 196, 212, 0.02) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(56, 196, 212, 0.02) 1px, transparent 1px);
+            background-size: 40px 40px;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        /* HEADER */
+        .header {
+            padding: 40px 32px 30px;
+            border-bottom: 1px solid var(--border2);
+            position: relative;
+            z-index: 1;
+        }
+
+        .header-eyebrow {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 10px;
+            letter-spacing: .15em;
+            text-transform: uppercase;
+            color: var(--cyan);
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .header-eyebrow::before {
+            content: '';
+            display: inline-block;
+            width: 20px;
+            height: 1px;
+            background: var(--cyan);
+        }
+
+        .header h1 {
+            font-family: 'Cabinet Grotesk', sans-serif;
+            font-size: 36px;
+            font-weight: 700;
+            color: var(--text);
+            line-height: 1;
+            margin-bottom: 6px;
+            letter-spacing: -.02em;
+        }
+
+        .header h1 span {
+            color: var(--cyan)
+        }
+
+        .header-sub {
+            font-size: 13px;
+            color: var(--text2);
+            font-weight: 300
+        }
+
+        /* NAV */
+        .nav {
+            display: flex;
+            gap: 0;
+            padding: 0 32px;
+            border-bottom: 1px solid var(--border2);
+            overflow-x: auto;
+            position: relative;
+            z-index: 1;
+        }
+
+        .nav::-webkit-scrollbar {
+            height: 2px
+        }
+
+        .nav::-webkit-scrollbar-track {
+            background: var(--bg)
+        }
+
+        .nav::-webkit-scrollbar-thumb {
+            background: var(--border2)
+        }
+
+        .nav-tab {
+            padding: 12px 20px;
+            font-size: 11px;
+            font-family: 'IBM Plex Mono', monospace;
+            font-weight: 500;
+            letter-spacing: .06em;
+            text-transform: uppercase;
+            cursor: pointer;
+            border: none;
+            background: none;
+            color: var(--text3);
+            border-bottom: 2px solid transparent;
+            transition: all .15s;
+            white-space: nowrap;
+        }
+
+        .nav-tab:hover {
+            color: var(--text2)
+        }
+
+        .nav-tab.active {
+            color: var(--cyan);
+            border-bottom-color: var(--cyan)
+        }
+
+        /* PANELS */
+        .panel {
+            display: none;
+            padding: 24px 32px 48px;
+            position: relative;
+            z-index: 1
+        }
+
+        .panel.active {
+            display: block
+        }
+
+        /* TOOLBAR */
+        .toolbar {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap
+        }
+
+        .search-wrap {
+            flex: 1;
+            min-width: 200px;
+            position: relative
+        }
+
+        .search-wrap::before {
+            content: '//';
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 11px;
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text3);
+            pointer-events: none;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 8px 12px 8px 36px;
+            background: var(--bg3);
+            border: 1px solid var(--border2);
+            border-radius: 5px;
+            color: var(--text);
+            font-size: 12px;
+            font-family: 'IBM Plex Mono', monospace;
+            outline: none;
+            transition: border-color .15s;
+        }
+
+        .search-input:focus {
+            border-color: var(--cyan-dim);
+            box-shadow: 0 0 0 2px rgba(56, 196, 212, 0.08)
+        }
+
+        .search-input::placeholder {
+            color: var(--text3)
+        }
+
+        .chips {
+            display: flex;
+            gap: 5px;
+            flex-wrap: wrap
+        }
+
+        .chip {
+            padding: 4px 11px;
+            border-radius: 3px;
+            font-size: 10px;
+            font-family: 'IBM Plex Mono', monospace;
+            font-weight: 500;
+            letter-spacing: .04em;
+            cursor: pointer;
+            border: 1px solid var(--border2);
+            background: var(--bg3);
+            color: var(--text3);
+            transition: all .12s;
+            text-transform: uppercase;
+        }
+
+        .chip:hover {
+            color: var(--text2)
+        }
+
+        .chip.active {
+            background: var(--cyan-dim);
+            border-color: var(--cyan);
+            color: var(--cyan2)
+        }
+
+        /* TIER DIVIDER */
+        .tier {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            margin: 26px 0 10px;
+        }
+
+        .tier:first-of-type {
+            margin-top: 0
+        }
+
+        .tier-txt {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 9px;
+            letter-spacing: .12em;
+            text-transform: uppercase;
+            color: var(--text3);
+            white-space: nowrap;
+        }
+
+        .tier-line {
+            flex: 1;
+            height: 1px;
+            background: var(--border2)
+        }
+
+        /* ITEMS */
+        .item {
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            margin-bottom: 5px;
+            overflow: hidden;
+            background: var(--bg2);
+            transition: border-color .12s;
+        }
+
+        .item:hover {
+            border-color: var(--border2)
+        }
+
+        .item.open {
+            border-color: var(--cyan-dim)
+        }
+
+        .item-header {
+            display: flex;
+            gap: 12px;
+            align-items: flex-start;
+            padding: 11px 14px;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .num {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 10px;
+            color: var(--text3);
+            min-width: 26px;
+            padding-top: 2px;
+            flex-shrink: 0;
+        }
+
+        .item.open .num {
+            color: var(--cyan)
+        }
+
+        .item-meta {
+            flex: 1
+        }
+
+        .item-name {
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text);
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 6px;
+            line-height: 1.3;
+        }
+
+        .item-line {
+            font-size: 11px;
+            color: var(--text2);
+            margin-top: 2px;
+            font-weight: 300
+        }
+
+        .tag {
+            font-size: 9px;
+            font-family: 'IBM Plex Mono', monospace;
+            font-weight: 600;
+            padding: 2px 6px;
+            border-radius: 3px;
+            letter-spacing: .04em;
+            text-transform: uppercase;
+            flex-shrink: 0;
+        }
+
+        .tag-trend {
+            background: var(--blue-dim);
+            color: var(--blue)
+        }
+
+        .tag-mom {
+            background: var(--purple-dim);
+            color: var(--purple)
+        }
+
+        .tag-vol {
+            background: var(--amber-dim);
+            color: var(--amber)
+        }
+
+        .tag-osc {
+            background: var(--pink-dim);
+            color: var(--pink)
+        }
+
+        .tag-struct {
+            background: var(--teal-dim);
+            color: var(--teal)
+        }
+
+        .tag-volvol {
+            background: var(--green-dim);
+            color: var(--green)
+        }
+
+        .chev {
+            font-size: 9px;
+            color: var(--text3);
+            flex-shrink: 0;
+            margin-top: 4px;
+            transition: transform .18s;
+        }
+
+        .item.open .chev {
+            transform: rotate(180deg);
+            color: var(--cyan)
+        }
+
+        /* BODY */
+        .item-body {
+            display: none;
+            padding: 0 14px 14px;
+            border-top: 1px solid var(--border);
+        }
+
+        .item.open .item-body {
+            display: block
+        }
+
+        .desc {
+            font-size: 12px;
+            color: var(--text2);
+            line-height: 1.65;
+            padding: 10px 0 8px;
+            font-weight: 300;
+        }
+
+        .grid2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 7px;
+            margin-top: 4px
+        }
+
+        .grid3 {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 7px;
+            margin-top: 4px
+        }
+
+        .card {
+            background: var(--bg3);
+            border: 1px solid var(--border);
+            border-radius: 5px;
+            padding: 9px 11px;
+        }
+
+        .card.full {
+            grid-column: 1/-1
+        }
+
+        .card-lbl {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 8px;
+            letter-spacing: .1em;
+            text-transform: uppercase;
+            color: var(--cyan);
+            margin-bottom: 5px;
+            opacity: .7;
+        }
+
+        .card-txt {
+            font-size: 11px;
+            color: var(--text);
+            line-height: 1.5;
+            font-weight: 300
+        }
+
+        .card-txt a {
+            color: var(--cyan);
+            text-decoration: none;
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 10px
+        }
+
+        .card-txt a:hover {
+            text-decoration: underline
+        }
+
+        /* FORMULA */
+        .formula {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 10px;
+            color: var(--cyan2);
+            background: var(--bg4);
+            padding: 7px 11px;
+            border-radius: 4px;
+            border-left: 2px solid var(--cyan-dim);
+            margin-top: 7px;
+            line-height: 1.5;
+        }
+
+        /* RANGES */
+        .ranges {
+            display: flex;
+            flex-direction: column;
+            gap: 4px
+        }
+
+        .rrow {
+            display: flex;
+            align-items: flex-start;
+            gap: 7px
+        }
+
+        .rdot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            flex-shrink: 0;
+            margin-top: 4px
+        }
+
+        .dg {
+            background: var(--green)
+        }
+
+        .da {
+            background: var(--amber)
+        }
+
+        .dr {
+            background: var(--red)
+        }
+
+        .rtxt {
+            font-size: 11px;
+            color: var(--text2)
+        }
+
+        /* SOURCES */
+        .src-chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            margin-top: 4px
+        }
+
+        .src {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 9px;
+            padding: 3px 8px;
+            border-radius: 3px;
+            background: var(--bg4);
+            border: 1px solid var(--border2);
+            color: var(--text2);
+        }
+
+        .src.p {
+            border-color: var(--cyan-dim);
+            color: var(--cyan2)
+        }
+
+        /* TIMEFRAMES */
+        .tf-row {
+            display: flex;
+            gap: 5px;
+            flex-wrap: wrap;
+            margin-top: 4px
+        }
+
+        .tf {
+            font-size: 9px;
+            font-family: 'IBM Plex Mono', monospace;
+            padding: 2px 7px;
+            border-radius: 3px;
+            border: 1px solid var(--border2);
+            color: var(--text3);
+        }
+
+        .tf.best {
+            background: var(--cyan-dim);
+            border-color: var(--cyan);
+            color: var(--cyan2)
+        }
+
+        /* CORRELATIONS */
+        .corr-intro {
+            font-size: 13px;
+            color: var(--text2);
+            line-height: 1.65;
+            margin-bottom: 24px;
+            font-weight: 300;
+            max-width: 720px
+        }
+
+        .corr-cluster {
+            margin-bottom: 32px
+        }
+
+        .corr-cluster-title {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 11px;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+            color: var(--cyan);
+            margin-bottom: 6px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .corr-cluster-title::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: var(--cyan-dim)
+        }
+
+        .corr-cluster-desc {
+            font-size: 12px;
+            color: var(--text2);
+            margin-bottom: 10px;
+            font-weight: 300
+        }
+
+        table.ct {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 11px
+        }
+
+        .ct thead th {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 8px;
+            letter-spacing: .1em;
+            text-transform: uppercase;
+            color: var(--text3);
+            padding: 6px 10px;
+            border-bottom: 1px solid var(--border2);
+            text-align: left;
+            font-weight: 500;
+        }
+
+        .ct tbody td {
+            padding: 8px 10px;
+            border-bottom: 1px solid var(--border);
+            vertical-align: top;
+            color: var(--text2);
+            line-height: 1.5;
+        }
+
+        .ct tbody tr:hover td {
+            background: var(--bg3)
+        }
+
+        .ct tbody td:first-child,
+        .ct tbody td:nth-child(2) {
+            color: var(--text);
+            font-weight: 500;
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 10px
+        }
+
+        .cp {
+            color: var(--green);
+            font-weight: 600
+        }
+
+        .cn {
+            color: var(--red);
+            font-weight: 600
+        }
+
+        .cw {
+            color: var(--amber);
+            font-weight: 600
+        }
+
+        .dir {
+            display: inline-block;
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 9px;
+            padding: 2px 6px;
+            border-radius: 3px;
+            margin-right: 4px;
+        }
+
+        .dir-p {
+            background: var(--green-dim);
+            color: var(--green)
+        }
+
+        .dir-n {
+            background: var(--red-dim);
+            color: var(--red)
+        }
+
+        .dir-m {
+            background: var(--amber-dim);
+            color: var(--amber)
+        }
+
+        /* TIMEFRAME GUIDE */
+        .tf-guide {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+            margin-top: 0
+        }
+
+        .tf-card {
+            background: var(--bg3);
+            border: 1px solid var(--border2);
+            border-radius: 6px;
+            padding: 12px;
+        }
+
+        .tf-card-title {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 10px;
+            letter-spacing: .06em;
+            text-transform: uppercase;
+            color: var(--cyan);
+            margin-bottom: 8px;
+        }
+
+        .tf-card-body {
+            font-size: 11px;
+            color: var(--text2);
+            line-height: 1.6;
+            font-weight: 300
+        }
+
+        .tf-card-body b {
+            color: var(--text);
+            font-weight: 500
+        }
+
+        /* HIDDEN */
+        .hidden {
+            display: none !important
+        }
+
+        /* SCROLLBAR */
+        ::-webkit-scrollbar {
+            width: 5px;
+            height: 5px
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg)
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border2);
+            border-radius: 3px
+        }
+
+        @media(max-width:700px) {
+            .header {
+                padding: 24px 16px 20px
+            }
+
+            .nav {
+                padding: 0 16px
+            }
+
+            .panel {
+                padding: 18px 16px 32px
+            }
+
+            .grid2,
+            .grid3 {
+                grid-template-columns: 1fr
+            }
+
+            .header h1 {
+                font-size: 26px
+            }
+
+            .tf-guide {
+                grid-template-columns: 1fr 1fr
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="header">
+        <div class="header-eyebrow">Trading System · Module 2</div>
+        <h1>Technical <span>Analysis</span></h1>
+        <div class="header-sub">All indicators · Meanings · Signals · Data sources · Strategy ranges · Correlations ·
+            Timeframe guide</div>
+    </div>
+
+    <nav class="nav">
+        <button class="nav-tab active" onclick="switchTab('price')">Price &amp; Structure</button>
+        <button class="nav-tab" onclick="switchTab('trend')">Trend Indicators</button>
+        <button class="nav-tab" onclick="switchTab('momentum')">Momentum &amp; Oscillators</button>
+        <button class="nav-tab" onclick="switchTab('volume')">Volume Indicators</button>
+        <button class="nav-tab" onclick="switchTab('volatility')">Volatility</button>
+        <button class="nav-tab" onclick="switchTab('advanced')">Advanced &amp; SMC</button>
+        <button class="nav-tab" onclick="switchTab('corr')">Correlations</button>
+        <button class="nav-tab" onclick="switchTab('timeframes')">Timeframe Guide</button>
+    </nav>
+
+    <!-- ══════════════════════════════════════
+     PRICE & STRUCTURE
+══════════════════════════════════════ -->
+    <div class="panel active" id="panel-price">
+        <div class="toolbar">
+            <div class="search-wrap">
+                <input class="search-input" placeholder="Search indicators..."
+                    oninput="searchPanel('price',this.value)" />
+            </div>
+        </div>
+
+        <div class="tier">
+            <div class="tier-line"></div><span class="tier-txt">Tier 1 — Foundation layer</span>
+            <div class="tier-line"></div>
+        </div>
+
+        <div class="item" data-name="price action candlestick patterns ohlc bars">
+            <div class="item-header" onclick="toggleItem(this.parentElement)">
+                <span class="num">01</span>
+                <div class="item-meta">
+                    <div class="item-name">Price Action &amp; Candlestick Patterns <span
+                            class="tag tag-struct">Structure</span></div>
+                    <div class="item-line">The raw foundation — all other indicators are derivatives of OHLC price data
+                    </div>
+                </div><span class="chev">▼</span>
+            </div>
+            <div class="item-body">
+                <div class="desc">Price action is the study of raw OHLC (Open, High, Low, Close) data. Every other
+                    indicator is a mathematical derivative of price. The relationship between open and close, and how
+                    price moves within a candle's range, reveals buyer/seller dominance in real time. Context is
+                    everything — the same candle pattern at a major support level carries far more weight than the same
+                    pattern in the middle of a range.</div>
+                <div class="grid2">
+                    <div class="card">
+                        <div class="card-lbl">Key bullish patterns</div>
+                        <div class="card-txt">Bullish engulfing · Hammer · Morning star · Piercing line · Bullish harami
+                            · Pin bar (long lower wick) · Inside bar breakout upward</div>
+                    </div>
+                    <div class="card">
+                        <div class="card-lbl">Key bearish patterns</div>
+                        <div class="card-txt">Bearish engulfing · Shooting star · Evening star · Dark cloud cover ·
+                            Bearish harami · Doji at resistance (indecision near highs)</div>
+                    </div>
+                    <div class="card">
+                        <div class="card-lbl">Strategy ranges</div>
+                        <div class="ranges">
+                            <div class="rrow">
+                                <div class="rdot dg"></div><span class="rtxt">Pattern at key S/R + volume confirmation =
+                                    high probability</span>
+                            </div>
+                            <div class="rrow">
+                                <div class="rdot da"></div><span class="rtxt">Pattern in open space, no S/R context =
+                                    low weight</span>
+                            </div>
+                            <div class="rrow">
+                                <div class="rdot dr"></div><span class="rtxt">Pattern against higher-timeframe trend =
+                                    avoid</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-lbl">Data sources</div>
+                        <div class="src-chips">
+                            <span class="src p">TradingView (free)</span>
+                            <span class="src p">yfinance Python lib</span>
+                            <span class="src">Polygon.io API</span>
+                            <span class="src">Alpaca Markets API</span>
+                            <span class="src">IBKR TWS API</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="item" data-name="support resistance levels key zones price memory">
+            <div class="item-header" onclick="toggleItem(this.parentElement)">
+                <span class="num">02</span>
+                <div class="item-meta">
+                    <div class="item-name">Support &amp; Resistance Levels <span class="tag tag-struct">Structure</span>
+                    </div>
+                    <div class="item-line">Price memory — where supply and demand historically concentrated</div>
+                </div><span class="chev">▼</span>
+            </div>
+            <div class="item-body">
+                <div class="desc">Support is a price level where buying interest historically exceeds selling pressure,
+                    causing price to bounce. Resistance is the inverse. Prior highs become resistance; prior lows become
+                    support. Once a resistance level breaks and holds, it becomes new support (role reversal). Round
+                    numbers, 52-week highs/lows, all-time highs, and weekly/monthly pivots carry extra psychological
+                    significance. The more times a level is tested without breaking, the stronger it appears — but also
+                    the more likely it will eventually fail as sellers are exhausted.</div>
+                <div class="grid2">
+                    <div class="card">
+                        <div class="card-lbl">Types of S/R</div>
+                        <div class="card-txt">Horizontal levels · Trend line touches · Moving average confluences ·
+                            Round numbers (psychological) · Prior ATH/ATL · Weekly/monthly open · VWAP · Volume Profile
+                            nodes</div>
+                    </div>
+                    <div class="card">
+                        <div class="card-lbl">Strength scoring</div>
+                        <div class="ranges">
+                            <div class="rrow">
+                                <div class="rdot dg"></div><span class="rtxt">3+ touches + volume spike at level: very
+                                    strong</span>
+                            </div>
+                            <div class="rrow">
+                                <div class="rdot da"></div><span class="rtxt">2 touches, moderate volume:
+                                    moderate</span>
+                            </div>
+                            <div class="rrow">
+                                <div class="rdot dr"></div><span class="rtxt">1 touch, low volume: weak, treat as
+                                    tentative</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-lbl">Data sources</div>
+                        <div class="src-chips">
+                            <span class="src p">TradingView (manual markup)</span>
+                            <span class="src p">Polygon.io historical OHLCV</span>
+                            <span class="src">TA-Lib Python (peak detection)</span>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-lbl">Best timeframes</div>
+                        <div class="tf-row">
+                            <span class="tf best">Weekly</span>
+                            <span class="tf best">Daily</span>
+                            <span class="tf">4H</span>
+                            <span class="tf">1H</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="item" data-name="trend higher highs higher lows lower structure direction">
+            <div class="item-header" onclick="toggleItem(this.parentElement)">
+                <span class="num">03</span>
+                <div class="item-meta">
+                    <div class="item-name">Trend Structure (HH/HL &amp; LH/LL) <span class="tag tag-trend">Trend</span>
+                    </div>
+                    <div class="item-line">The market's directional bias — the single most important context for all
+                        other signals</div>
+                </div><span class="chev">▼</span>
+            </div>
+            <div class="item-body">
+                <div class="desc">An uptrend is defined by a series of Higher Highs (HH) and Higher Lows (HL). A
+                    downtrend by Lower Highs (LH) and Lower Lows (LL). A ranging market produces roughly equal highs and
+                    lows. All indicators should be interpreted through the lens of the prevailing trend — a bullish RSI
+                    divergence in a strong downtrend is a weak signal; the same divergence at the end of a pullback in
+                    an uptrend is a strong signal. Always identify the higher-timeframe trend before analyzing lower
+                    timeframe signals.</div>
+                <div class="grid2">
+                    <div class="card">
+                        <div class="card-lbl">Trend classification</div>
+                        <div class="ranges">
+                            <div class="rrow">
+                                <div class="rdot dg"></div><span class="rtxt">Uptrend: HH + HL pattern intact, price
+                                    above 50 MA</span>
+                            </div>
+                            <div class="rrow">
+                                <div class="rdot da"></div><span class="rtxt">Ranging: price oscillating between defined
+                                    S/R</span>
+                            </div>
+                            <div class="rrow">
+                                <div class="rdot dr"></div><span class="rtxt">Downtrend: LH + LL pattern, price below 50
+                                    MA</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-lbl">Trend line rules</div>
+                        <div class="card-txt">Uptrend line: connect 2+ swing lows. Needs 3rd touch to be valid. Break of
+                            trend line = caution. Retest of broken trend line = confirmation. Trend lines on weekly
+                            charts outweigh daily.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="item" data-name="chart patterns head and shoulders double top bottom triangle flag pennant">
+            <div class="item-header" onclick="toggleItem(this.parentElement)">
+                <span class="num">04</span>
+                <div class="item-meta">
+                    <div class="item-name">Chart Patterns <span class="tag tag-struct">Structure</span></div>
+                    <div class="item-line">Recurring price formations with statistically measurable breakout behavior
+                    </div>
+                </div><span class="chev">▼</span>
+            </div>
+            <div class="item-body">
+                <div class="desc">Chart patterns represent the visual footprint of crowd psychology playing out
+                    repeatedly. Continuation patterns occur mid-trend; reversal patterns signal trend change. The
+                    measured move (pattern height projected from breakout) gives a price target. Volume on the breakout
+                    candle is the primary confirmation signal — a breakout on low volume has a much higher failure rate.
+                </div>
+                <div class="grid3">
+                    <div class="card">
+                        <div class="card-lbl">Reversal patterns</div>
+                        <div class="card-txt">Head &amp; Shoulders (most reliable) · Inverse H&amp;S · Double Top /
+                            Bottom · Triple Top / Bottom · Rising/Falling Wedge (at trend end)</div>
+                    </div>
+                    <div class="card">
+                        <div class="card-lbl">Continuation patterns</div>
+                        <div class="card-txt">Bull/Bear Flag · Pennant · Ascending / Descending Triangle · Symmetrical
+                            Triangle · Cup &amp; Handle · Rectangle consolidation</div>
+                    </div>
+                    <div class="card">
+                        <div class="card-lbl">Measurement rule</div>
+                        <div class="card-txt">Target = Breakout level ± Pattern height. H&amp;S target = Neckline −
+                            (Head − Neckline). Always check R/R: target must be ≥2× your stop distance.</div>
+                    </div>
+                    <div class="card full">
+                        <div class="card-lbl">Data sources &amp; tools</div>
+                        <div class="src-chips">
+                            <span class="src p">TradingView pattern recognition</span>
+                            <span class="src p">TA-Lib Python (pattern functions)</span>
+                            <span class="src">Polygon.io OHLCV for backtesting</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="item" data-name="fibonacci retracement extension golden ratio levels">
+            <div class="item-header" onclick="toggleItem(this.parentElement)">
+                <span class="num">05</span>
+                <div class="item-meta">
+                    <div class="item-name">Fibonacci Retracements &amp; Extensions <span
+                            class="tag tag-struct">Structure</span></div>
+                    <div class="item-line">Natural proportion levels where price frequently reverses or stalls</div>
+                </div><span class="chev">▼</span>
+            </div>
+            <div class="item-body">
+                <div class="desc">Fibonacci ratios (23.6%, 38.2%, 50%, 61.8%, 78.6%) are drawn from a significant swing
+                    high to swing low (or vice versa) to identify likely pullback reversal zones. The 61.8% level (the
+                    Golden Ratio) is the most powerful. Extensions (127.2%, 161.8%, 261.8%) project price targets beyond
+                    the prior swing, most useful after a breakout to a new high. Power increases significantly when
+                    Fibonacci levels coincide with prior S/R, moving averages, or volume nodes — these are "confluence
+                    zones."</div>
+                <div class="grid2">
+                    <div class="card">
+                        <div class="card-lbl">Key levels &amp; their strength</div>
+                        <div class="ranges">
+                            <div class="rrow">
+                                <div class="rdot dg"></div><span class="rtxt">61.8% (Golden Ratio): highest probability
+                                    reversal</span>
+                            </div>
+                            <div class="rrow">
+                                <div class="rdot dg"></div><span class="rtxt">38.2%: common shallow pullback level in
+                                    strong trends</span>
+                            </div>
+                            <div class="rrow">
+                                <div class="rdot da"></div><span class="rtxt">50%: psychological mid-point (not a true
+                                    Fib ratio)</span>
+                            </div>
+                            <div class="rrow">
+                                <div class="rdot da"></div><span class="rtxt">78.6%: deep pullback — trend still
+                                    technically intact</span>
+                            </div>
+                            <div class="rrow">
+                                <div class="rdot dr"></div><span class="rtxt">Break of 78.6%: trend likely
+                                    reversing</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-lbl">Best use cases</div>
+                        <div class="card-txt">Identify entry zones on pullbacks in established uptrends. Combine with
+                            RSI oversold readings at the 61.8% level for highest-probability entries. Use extensions
+                            (161.8%) as profit targets after breakouts. Works on all timeframes — most reliable on daily
+                            and weekly charts.</div>
+                    </div>
+                    <div class="card">
+                        <div class="card-lbl">Data sources</div>
+                        <div class="src-chips">
+                            <span class="src p">TradingView (built-in Fib tool)</span>
+                            <span class="src">TA-Lib / pandas-ta Python</span>
+                            <span class="src">Manual calc from Polygon OHLCV</span>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-lbl">Confluence rule</div>
+                        <div class="card-txt">A Fibonacci level that overlaps with a prior S/R level, a major moving
+                            average, AND a volume node is a "triple confluence" zone — one of the highest-probability
+                            entry points in all of TA.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="item" data-name="pivot points classic camarilla weekly monthly daily levels">
+            <div class="item-header" onclick="toggleItem(this.parentElement)">
+                <span class="num">06</span>
+                <div class="item-meta">
+                    <div class="item-name">Pivot Points (Classic, Camarilla, Woodie's) <span
+                            class="tag tag-struct">Structure</span></div>
+                    <div class="item-line">Mathematically derived daily/weekly S&R levels used by institutional traders
+                    </div>
+                </div><span class="chev">▼</span>
+            </div>
+            <div class="item-body">
+                <div class="desc">Calculated from the prior period's High, Low, and Close. They give the Central Pivot
+                    (PP), three resistance levels (R1, R2, R3), and three support levels (S1, S2, S3). Heavily used by
+                    market makers and floor traders — these levels are self-fulfilling because so many participants
+                    watch them. Weekly pivots are more significant than daily. Monthly pivots are major structural
+                    levels.</div>
+                <div class="grid2">
+                    <div class="card">
+                        <div class="card-lbl">Formula (Classic)</div>
+                        <div class="card-txt"
+                            style="font-family:'IBM Plex Mono',monospace;font-size:10px;line-height:1.7">
+                            PP = (H + L + C) / 3<br>
+                            R1 = 2×PP − L &nbsp;·&nbsp; S1 = 2×PP − H<br>
+                            R2 = PP + (H−L) &nbsp;·&nbsp; S2 = PP − (H−L)<br>
+                            R3 = H + 2×(PP−L) &nbsp;·&nbsp; S3 = L − 2×(H−PP)
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-lbl">Strategy use</div>
+                        <div class="ranges">
+                            <div class="rrow">
+                                <div class="rdot dg"></div><span class="rtxt">Price above weekly PP: bullish bias for
+                                    the week</span>
+                            </div>
+                            <div class="rrow">
+                                <div class="rdot da"></div><span class="rtxt">Price at R1 or S1: first target / first
+                                    S/R</span>
+                            </div>
+                            <div class="rrow">
+                                <div class="rdot dr"></div><span class="rtxt">Price reaches R3 or S3: extreme extended
+                                    move</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-lbl">Data sources</div>
+                        <div class="src-chips">
+                            <span class="src p">TradingView (auto-plots)</span>
+                            <span class="src">pandas-ta Python library</span>
+                            <span class="src">Calculate from Polygon.io OHLCV</span>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-lbl">Best timeframes</div>
+                        <div class="tf-row">
+                            <span class="tf best">Monthly</span>
+                            <span class="tf best">Weekly</span>
+                            <span class="tf">Daily</span>
+                            <span class="tf">4H</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ══════════════════════════════════════
+     TREND INDICATORS
+══════════════════════════════════════ -->
+    <div class="panel" id="panel-trend">
+        <div class="tier">
+            <div class="tier-line"></div><span class="tier-txt">Tier 1 — Primary trend indicators</span>
+            <div class="tier-line"></div>
+        </div>
+
+        <div class="item" data-name="moving average sma ema 20 50 200 golden cross death cross">
+            <div class="item-header" onclick="toggleItem(this.parentElement)">
+                <span class="num">01</span>
+                <div class="item-meta">
+                    <div class="item-name">Moving Averages (SMA &amp; EMA) <span class="tag tag-trend">Trend</span>
+                    </div>
+                    <div class="item-line">Smoothed price series that reveal trend direction and act as dynamic S/R
+                    </div>
+                </div><span class="chev">▼</span>
+            </div>
+            <div class="item-body">
+                <div class="desc">Simple Moving Average (SMA) gives equal weight to all periods. Exponential Moving
+                    Average (EMA) weights recent prices more heavily, making it more responsive. The most watched levels
+                    are 20 (short-term momentum), 50 (medium-term trend), 100, and 200 (long-term trend). Price above
+                    the 200-day MA = long-term uptrend; below = long-term downtrend. The 50/200 Golden Cross (50 crosses
+                    above 200) is a major bullish signal; Death Cross is bearish. EMAs better for active trading; SMAs
+                    better for identifying major structural levels.</div>
+                <div class="formula">SMA(n) = (P1+P2+...+Pn) / n &nbsp;|&nbsp; EMA = P × k + EMA_prev × (1−k)
+                    &nbsp;|&nbsp; k = 2/(n+1)</div>
+                <div class="grid3">
+                    <div class="card">
+                        <div class="card-lbl">Key levels &amp; their meaning</div>
+                        <div class="card-txt">
+                            <b>20 MA</b>: short-term momentum, used for swing trade entries<br>
+                            <b>50 MA</b>: medium-term trend filter, institutional benchmark<br>
+                            <b>100 MA</b>: intermediate support in bull markets<br>
+                            <b>200 MA</b>: the master long-term trend line
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-lbl">Strategy ranges</div>
+                        <div class="ranges">
+                            <div class="rrow">
+                                <div class="rdot dg"></div><span class="rtxt">Price &gt; 200 MA + 50 &gt; 200 MA: strong
+                                    uptrend, buy dips</span>
+                            </div>
+                            <div class="rrow">
+                                <div class="rdot da"></div><span class="rtxt">Price near 200 MA: critical decision
+                                    zone</span>
+                            </div>
+                            <div class="rrow">
+                                <div class="rdot dr"></div><span class="rtxt">Price &lt; 200 MA + 50 &lt; 200 MA:
+                                    downtrend, sell rallies</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-lbl">Data sources</div>
+                        <div class="src-chips">
+                            <span class="src p">TA-Lib Python</span>
+                            <span class="src p">pandas-ta Python</span>
+                            <span class="src">TradingView alerts</span>
+                            <span class="src">Polygon.io + calculate</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="item" data-name="macd moving average convergence divergence histogram signal line">
+            <div class="item-header" onclick="toggleItem(this.parentElement)">
+                <span class="num">02</span>
+                <div class="item-meta">
+                    <div class="item-name">MACD (Moving Average Convergence Divergence) <span
+                            class="tag tag-mom">Momentum</span></div>
+                    <div class="item-line">Trend-following momentum indicator — the most versatile single indicator in
+                        TA</div>
+                </div><span class="chev">▼</span>
+            </div>
+            <div class="item-body">
+                <div class="desc">MACD = 12-period EMA minus 26-period EMA. The Signal Line is a 9-period EMA of MACD.
+                    The Histogram shows the difference between MACD and Signal. Works best in trending markets —
+                    generates many false signals in choppy ranges. Three signal types: (1) MACD crossing Signal line
+                    (entry/exit), (2) MACD crossing zero line (trend confirmation), (3) Divergence between MACD and
+                    price (reversal warning). The histogram shrinking is the earliest warning of fading momentum.</div>
+                <div class="formula">MACD Line = EMA(12) − EMA(26) &nbsp;|&nbsp; Signal = EMA(9) of MACD &nbsp;|&nbsp;
+                    Histogram = MACD − Signal</div>
+                <div class="grid2">
+                    <div class="card">
+                        <div class="card-lbl">Signal types ranked by reliability</div>
+                        <div class="ranges">
+                            <div class="rrow">
+                                <div class="rdot dg"></div><span class="rtxt">Bullish divergence (price lower low, MACD
+                                    higher low): strongest</span>
+                            </div>
+                            <div class="rrow">
+                                <div class="rdot dg"></div><span class="rtxt">Zero-line cross upward: trend
+                                    confirmation</span>
+                            </div>
+                            <div class="rrow">
+                                <div class="rdot da"></div><span class="rtxt">Signal line cross: entry signal, confirm
+                                    with price action</span>
+                            </div>
+                            <div class="rrow">
+                                <div class="rdot dr"></div><span class="rtxt">Histogram cross (earliest but most false
+                                    signals)</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-lbl">Data sources</div>
+                        <div class="src-chips">
+                            <span class="src p">TA-Lib Python (MACD function)</span>
+                            <span class="src p">pandas-ta</span>
+                            <span class="src">TradingView</span>
+                            <span class="src">Alpaca / Polygon + compute</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="item" data-name="ichimoku cloud kumo tenkan kijun chikou span">
+            <div class="item-header" onclick="toggleItem(this.parentElement)">
+                <span class="num">03</span>
+                <div class="item-meta">
+                    <div class="item-name">Ichimoku Cloud (Kumo) <span class="tag tag-trend">Trend</span></div>
+                    <div class="item-line">All-in-one system: trend, momentum, S/R, and signals in a single view</div>
+                </div><span class="chev">▼</span>
+            </div>
+            <div class="item-body">
+                <div class="desc">Five components: Tenkan-sen (9-period conversion), Kijun-sen (26-period base), Senkou
+                    Span A (leading span — avg of Tenkan+Kijun plotted 26 periods ahead), Senkou Span B (52-period
+                    midpoint plotted 26 periods ahead), Chikou Span (close plotted 26 periods back). The cloud (between
+                    Spans A and B) is dynamic support/resistance projected into the future — its twist and color
+                    indicate trend direction. Price above a bullish cloud = strong uptrend. The cloud width indicates
+                    volatility and S/R strength.</div>
+                <div class="grid2">
+                    <div class="card">
+                        <div class="card-lbl">Signal hierarchy</div>
+                        <div class="ranges">
+                            <div class="rrow">
+                                <div class="rdot dg"></div><span class="rtxt">Price above cloud + cloud bullish + Tenkan
+                                    &gt; Kijun: strongest bull</span>
+                            </div>
+                            <div class="rrow">
+                                <div class="rdot dg"></div><span class="rtxt">TK cross above cloud (Tenkan crosses
+                                    Kijun): buy signal</span>
+                            </div>
+                            <div class="rrow">
+                                <div class="rdot da"></div><span class="rtxt">Price inside cloud:
+                                    consolidation/indecision zone</span>
+                            </div>
+                            <div class="rrow">
+                                <div class="rdot dr"></div><span class="rtxt">Price below cloud + cloud bearish: strong
+                                    downtrend</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-lbl">Data sources</div>
+                        <div class="src-chips">
+                            <span class="src p">TA-Lib Python</span>
+                            <span class="src p">pandas-ta (ichimoku)</span>
+                            <span class="src">TradingView</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="item" data-name="adx average directional index trend strength di plus minus">
+            <div class="item-header" onclick="toggleItem(this.parentElement)">
+                <span class="num">04</span>
+                <div class="item-meta">
+                    <div class="item-name">ADX (Average Directional Index) <span class="tag tag-trend">Trend</span>
+                    </div>
+                    <div class="item-line">Measures trend strength — not direction. The strategy selector.</div>
+                </div><span class="chev">▼</span>
+            </div>
+            <div class="item-body">
+                <div class="desc">ADX tells you HOW STRONG the trend is, not which direction. This is critical for
+                    strategy selection: trend-following indicators work in trending markets (ADX &gt;25) and fail in
+                    ranging markets (ADX &lt;20). The +DI and −DI lines show direction. ADX rising + +DI &gt; −DI =
+                    strengthening uptrend. ADX rising + −DI &gt; +DI = strengthening downtrend. ADX falling = trend
+                    weakening. Most important use: filter out oscillator signals when ADX &lt;20 (ranging) and filter
+                    out trend-following signals when ADX peaks and rolls over.</div>
+                <div class="grid2">
+                    <div class="card">
+                        <div class="card-lbl">ADX readings &amp; meaning</div>
+                        <div class="ranges">
+                            <div class="rrow">
+                                <div class="rdot dg"></div><span class="rtxt">ADX &gt;40: very strong trend, momentum
+                                    strategies work</span>
+                            </div>
+                            <div class="rrow">
+                                <div class="rdot dg"></div><span class="rtxt">ADX 25–40: trending, use trend-following
+                                    tools</span>
+                            </div>
+                            <div class="rrow">
+                                <div class="rdot da"></div><span class="rtxt">ADX 20–25: weakening or building
+                                    trend</span>
+                            </div>
+                            <div class="rrow">
+                                <div class="rdot dr"></div><span class="rtxt">ADX &lt;20: ranging, use oscillators not
+                                    trend indicators</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-lbl">Data sources</div>
+                        <div class="src-chips">
+                            <span class="src p">TA-Lib Python (ADX function)</span>
+                            <span class="src p">pandas-ta</span>
+                            <span class="src">TradingView</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="item" data-name="parabolic sar stop and reverse trailing stop">
+            <div class="item-header" onclick="toggleItem(this.parentElement)">
+                <span class="num">05</span>
+                <div class="item-meta">
+                    <div class="item-name">Parabolic SAR <span class="tag tag-trend">Trend</span></div>
+                    <div class="item-line">Dynamic trailing stop system — dots below price = buy, above = sell</div>
+                </div><span class="chev">▼</span>
+            </div>
+            <div class="item-body">
+                <div class="desc">Dots below price indicate an uptrend; dots above indicate a downtrend. A dot flip
+                    signals stop-and-reverse. Excellent for trailing stop placement in strong trends. In choppy/ranging
+                    markets it whipsaws constantly — always combine with ADX to confirm trend strength before using.
+                    Acceleration Factor (default 0.02) controls sensitivity — lower AF = fewer signals but more lag.
+                </div>
+                <div class="grid2">
+                    <div class="card">
+                        <div class="card-lbl">Strategy use</div>
+                        <div class="ranges">
+                            <div class="rrow">
+                                <div class="rdot dg"></div><span class="rtxt">Use ONLY when ADX &gt;25 — confirmed
+                                    trending market</span>
+                            </div>
+                            <div class="rrow">
+                                <div class="rdot dg"></div><span class="rtxt">Place stop loss at SAR dot level, trail it
+                                    as trend extends</span>
+                            </div>
+                            <div class="rrow">
+                                <div class="rdot dr"></div><span class="rtxt">ADX &lt;20: SAR generates whipsaws —
+                                    disable signal</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-lbl">Data sources</div>
+                        <div class="src-chips">
+                            <span class="src p">TA-Lib Python (SAR)</span>
+                            <span class="src">pandas-ta</span>
+                            <span class="src">TradingView</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ══════════════════════════════════════
+     MOMENTUM & OSCILLATORS
+══════════════════════════════════════ -->
+    <div class="panel" id="panel-momentum">
+        <div class="tier">
+            <div class="tier-line"></div><span class="tier-txt">Tier 1 — Primary oscillators</span>
+            <div class="tier-line"></div>
+        </div>
+
+        <div class="item" data-name="rsi relative strength index overbought oversold divergence 70 30">
+            <div class="item-header" onclick="toggleItem(this.parentElement)">
+                <span class="num">01</span>
+                <div class="item-meta">
+                    <div class="item-name">RSI (Relative Strength Index) <span class="tag tag-osc">Oscillator</span>
+                    </div>
+                    <div class="item-line">The most important momentum oscillator — measures speed and magnitude of
+                        price change</div>
+                </div><span class="chev">▼</span>
+            </div>
+            <div class="item-body">
+                <div class="desc">RSI oscillates 0–100. Default 14-period. Above 70 = overbought (doesn't mean sell — in
+                    strong uptrends RSI can stay above 70 for weeks). Below 30 = oversold. The most powerful RSI signal
+                    is divergence: price makes a new high but RSI fails to confirm it (bearish divergence) — or price
+                    makes a new low but RSI holds higher (bullish divergence). Divergences on weekly charts are the
+                    strongest reversal signals in all of technical analysis. RSI failure swings (where RSI breaks its
+                    own prior swing) are also highly reliable.</div>
+                <div class="formula">RSI = 100 − (100 / (1 + RS)) &nbsp;|&nbsp; RS = Average Gain / Average Loss over N
+                    periods</div>
+                <div class="grid3">
+                    <div class="card">
+                        <div class="card-lbl">Signal types</div>
+                        <div class="ranges">
+                            <div class="rrow">
+                                <div class="rdot dg"></div><span class="rtxt">Bullish divergence on weekly: highest
+                                    conviction reversal</span>
+                            </div>
+                            <div class="rrow">
+                                <div class="rdot dg"></div><span class="rtxt">RSI &lt;30 in uptrend: high-probability
+                                    pullback entry</span>
+                            </div>
+                            <div class="rrow">
+                                <div class="rdot da"></div><span class="rtxt">RSI &gt;70 in uptrend: normal — reduce new
+                                    buys, don't sell</span>
+                            </div>
+                            <div class="rrow">
+                                <div class="rdot dr"></div><span class="rtxt">Bearish divergence + RSI &gt;70: exit /
+                                    reduce signal</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-lbl">Regime-adjusted levels</div>
+                        <div class="card-txt">
+                            <b>Bull market</b>: RSI oscillates 40–90. Use 40 as oversold.<br>
+                            <b>Bear market</b>: RSI oscillates 10–60. Use 60 as overbought.<br>
+                            <b>Ranging</b>: Classic 30/70 levels apply.
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-lbl">Data sources</div>
+                        <div class="src-chips">
+                            <span class="src p">TA-Lib Python (RSI)</span>
+                            <span class="src p">pandas-ta</span>
+                            <span class="src">TradingView</span>
+                            <span class="src">Alpaca + compute</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="item" data-name="stochastic oscillator k d line overbought oversold">
+            <div class="item-header" onclick="toggleItem(this.parentElement)">
+                <span class="num">02</span>
+                <div class="item-meta">
+                    <div class="item-name">Stochastic Oscillator <span class="tag tag-osc">Oscillator</span></div>
+                    <div class="item-line">Compares closing price to range — excels in ranging markets where RSI lags
+                    </div>
+                </div><span class="chev">▼</span>
+            </div>
+            <div class="item-body">
+                <div class="desc">%K measures where price closes within its recent range (0–100). %D is a 3-period
+                    moving average of %K. Default settings: 14,3,3. Above 80 = overbought; below 20 = oversold. The
+                    %K/%D crossover in oversold/overbought zones generates entry signals. Stochastic divergence (price
+                    vs. %D) is a reliable reversal signal. Most effective in ranging markets — combines well with RSI
+                    where Stochastic provides the entry timing and RSI provides the momentum filter.</div>
+                <div class="formula">%K = ((Close − Lowest Low) / (Highest High − Lowest Low)) × 100 &nbsp;|&nbsp; %D =
+                    3-period SMA of %K</div>
+                <div class="grid2">
+                    <div class="card">
+                        <div class="card-lbl">Strategy use</div>
+                        <div class="ranges">
+                            <div class="rrow">
+                                <div class="rdot dg"></div><span class="rtxt">%K crosses %D upward from below 20: buy
+                                    signal</span>
+                            </div>
+                            <div class="rrow">
+                                <div class="rdot dg"></div><span class="rtxt">Both lines exit oversold zone heading up:
+                                    confirmation</span>
+                            </div>
+                            <div class="rrow">
+                                <div class="rdot dr"></div><span class="rtxt">%K crosses %D downward from above 80: sell
+                                    signal</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-lbl">Data sources</div>
+                        <div class="src-chips">
+                            <span class="src p">TA-Lib Python (STOCH)</span>
+                            <span class="src p">pandas-ta</span>
+                            <span class="src">TradingView</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="item" data-name="williams percent r overbought oversold short term momentum">
+            <div class="item-header" onclick="toggleItem(this.parentElement)">
+                <span class="num">03</span>
+                <div class="item-meta">
+                    <div class="item-name">Williams %R <span class="tag tag-osc">Oscillator</span></div>
+                    <div class="item-line">Fast-moving momentum oscillator — inverse of Stochastic, great for short-term
+                        timing</div>
+                </div><span class="chev">▼</span>
+            </div>
+            <div class="item-body">
+                <div class="desc">Range −100 to 0. Readings above −20 = overbought; below −80 = oversold. More sensitive
+                    than RSI — reacts faster to price changes. Developed by Larry Williams. Works well on daily and
+                    weekly charts for spotting extreme readings before a reversal. Often produces faster signals than
+                    RSI but with more false positives — use RSI as confirmation.</div>
+                <div class="formula">%R = ((Highest High − Close) / (Highest High − Lowest Low)) × −100</div>
+                <div class="grid2">
+                    <div class="card">
+                        <div class="card-lbl">Strategy ranges</div>
+                        <div class="ranges">
+                            <div class="rrow">
+                                <div class="rdot dg"></div><span class="rtxt">%R below −80 (oversold) turning up: buy
+                                    signal</span>
+                            </div>
+                            <div class="rrow">
+                                <div class="rdot da"></div><span class="rtxt">−80 to −20: neutral zone</span>
+                            </div>
+                            <div class="rrow">
+                                <div class="rdot dr"></div><span class="rtxt">%R above −20 (overbought) turning down:
+                                    sell signal</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-lbl">Data sources</div>
+                        <div class="src-chips">
+                            <span class="src p">TA-Lib Python (WILLR)</span>
+                            <span class="src">pandas-ta</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="item" data-name="cci commodity channel index deviation mean trend">
+            <div class="item-header" onclick="toggleItem(this.parentElement)">
+                <span class="num">04</span>
+                <div class="item-meta">
+                    <div class="item-name">CCI (Commodity Channel Index) <span class="tag tag-osc">Oscillator</span>
+                    </div>
+                    <div class="item-line">Measures deviation from statistical mean — detects cyclical extremes</div>
+                </div><span class="chev">▼</span>
+            </div>
+            <div class="item-body">
+                <div class="desc">CCI measures how far price has moved from its statistical average. Originally designed
+                    for commodities but applied widely to all markets. ±100 are the primary threshold levels for
+                    overbought/oversold. ±200 represents extreme readings. Zero-line crossovers can be used as trend
+                    signals. CCI turning from extreme levels (±200) is one of the stronger reversal signals. Works on
+                    all timeframes and asset classes.</div>
+                <div class="formula">CCI = (Typical Price − SMA of TP) / (0.015 × Mean Deviation) &nbsp;|&nbsp; TP =
+                    (H+L+C)/3</div>
+                <div class="grid2">
+                    <div class="card">
+                        <div class="card-lbl">Strategy ranges</div>
+                        <div class="ranges">
+                            <div class="rrow">
+                                <div class="rdot dg"></div><span class="rtxt">CCI below −100 turning up: oversold
+                                    reversal</span>
+                            </div>
+                            <div class="rrow">
+                                <div class="rdot dg"></div><span class="rtxt">CCI cross above 0 from below: bullish
+                                    trend signal</span>
+                            </div>
+                            <div class="rrow">
+                                <div class="rdot dr"></div><span class="rtxt">CCI above +200 turning down: extreme
+                                    overbought</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-lbl">Data sources</div>
+                        <div class="src-chips">
+                            <span class="src p">TA-Lib Python (CCI)</span>
+                            <span class="src">pandas-ta</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="item" data-name="rate of change roc momentum price change percentage">
+            <div class="item-header" onclick="toggleItem(this.parentElement)">
+                <span class="num">05</span>
+                <div class="item-meta">
+                    <div class="item-name">Rate of Change (ROC) / Momentum Oscillator <span
+                            class="tag tag-mom">Momentum</span></div>
+                    <div class="item-line">Pure percentage price change over N periods — the basis of momentum
+                        strategies</div>
+                </div><span class="chev">▼</span>
+            </div>
+            <div class="item-body">
+                <div class="desc">ROC = ((Current Price − Price N periods ago) / Price N periods ago) × 100. Simplest
+                    momentum measure. Zero-line crossovers = trend change. Above zero = positive momentum, below =
+                    negative. Used in cross-sectional momentum strategies (rank assets by 12-month ROC, buy top
+                    quartile, short bottom quartile). The 12-1 momentum factor (12-month return minus most recent 1
+                    month) is one of the most robust factors in quantitative equity investing.</div>
+                <div class="grid2">
+                    <div class="card">
+                        <div class="card-lbl">Strategy use</div>
+                        <div class="ranges">
+                            <div class="rrow">
+                                <div class="rdot dg"></div><span class="rtxt">12M ROC top quartile of universe: momentum
+                                    buy signal</span>
+                            </div>
+                            <div class="rrow">
+                                <div class="rdot da"></div><span class="rtxt">ROC crossing above 0: trend turning
+                                    positive</span>
+                            </div>
+                            <div class="rrow">
+                                <div class="rdot dr"></div><span class="rtxt">ROC bottom quartile: momentum
+                                    avoidance/short signal</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-lbl">Data sources</div>
+                        <div class="src-chips">
+                            <span class="src p">TA-Lib Python (ROC)</span>
+                            <span class="src">pandas-ta</span>
+                            <span class="src">Calculate from Polygon price data</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="item" data-name="relative strength rs ratio benchmark comparison performance">
+            <div class="item-header" onclick="toggleItem(this.parentElement)">
+                <span class="num">06</span>
+                <div class="item-meta">
+                    <div class="item-name">Relative Strength vs. Benchmark <span class="tag tag-mom">Momentum</span>
+                    </div>
+                    <div class="item-line">Is this stock outperforming or underperforming its benchmark?</div>
+                </div><span class="chev">▼</span>
+            </div>
+            <div class="item-body">
+                <div class="desc">Not to be confused with RSI. This is simply: Price of Asset / Price of Benchmark
+                    (S&amp;P 500 or sector ETF). Rising RS line = outperforming. Falling RS line = underperforming. The
+                    best stocks in a bull market consistently show rising RS lines before their price breakouts. In your
+                    rotation strategy, only buy stocks where RS is in an uptrend relative to the S&amp;P 500 and their
+                    sector. RS breakout often precedes price breakout by 2–4 weeks — it's a leading indicator of
+                    institutional accumulation.</div>
+                <div class="grid2">
+                    <div class="card">
+                        <div class="card-lbl">Strategy rules</div>
+                        <div class="ranges">
+                            <div class="rrow">
+                                <div class="rdot dg"></div><span class="rtxt">RS line at new 52-week high while price
+                                    near highs: strongest bull</span>
+                            </div>
+                            <div class="rrow">
+                                <div class="rdot da"></div><span class="rtxt">RS line flat: inline with market,
+                                    neutral</span>
+                            </div>
+                            <div class="rrow">
+                                <div class="rdot dr"></div><span class="rtxt">RS line in downtrend: avoid even if price
+                                    seems cheap</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-lbl">Data sources</div>
+                        <div class="src-chips">
+                            <span class="src p">Calculate: stock price / SPY price</span>
+                            <span class="src p">TradingView (ratio chart)</span>
+                            <span class="src">Finviz RS Rating</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ══════════════════════════════════════
+     VOLUME INDICATORS
+══════════════════════════════════════ -->
+    <div class="panel" id="panel-volume">
+        <div class="tier">
+            <div class="tier-line"></div><span class="tier-txt">Tier 1 — Volume analysis</span>
+            <div class="tier-line"></div>
+        </div>
+
+        <div class="item" data-name="raw volume bars confirms breakouts trend strength">
+            <div class="item-header" onclick="toggleItem(this.parentElement)">
+                <span class="num">01</span>
+                <div class="item-meta">
+                    <div class="item-name">Raw Volume &amp; Volume Analysis <span class="tag tag-volvol">Volume</span>
+                    </div>
+                    <div class="item-line">Volume precedes price — the most important confirmation tool in all of TA
+                    </div>
+                </div><span class="chev">▼</span>
+            </div>
+            <div class="item-body">
+                <div class="desc">Volume is the number of shares or contracts traded. It confirms or denies every price
+                    signal. A breakout above resistance on 3× average daily volume is highly reliable. The same breakout
+                    on 0.5× volume is suspect and likely to fail. Volume spikes at key levels often mark turning points
+                    — climactic buying or selling volume exhausts the dominant side. Rising price with falling volume =
+                    trend losing conviction. Falling price with low volume = weak selling, likely to bounce.</div>
+                <div class="grid2">
+                    <div class="card">
+                        <div class="card-lbl">Volume confirmation rules</div>
+                        <div class="ranges">
+                            <div class="rrow">
+                                <div class="rdot dg"></div><span class="rtxt">Breakout on &gt;2× avg volume: valid, high
+                                    conviction</span>
+                            </div>
+                            <div class="rrow">
+                                <div class="rdot dg"></div><span class="rtxt">Pullback on low volume in uptrend:
+                                    healthy, buy the dip</span>
+                            </div>
+                            <div class="rrow">
+                                <div class="rdot da"></div><span class="rtxt">Breakout on avg volume: monitor for
+                                    follow-through</span>
+                            </div>
+                            <div class="rrow">
+                                <div class="rdot dr"></div><span class="rtxt">Breakout on &lt;0.75× avg volume: likely
+                                    false breakout</span>
+                            </div>
+                            <div class="rrow">
+                                <div class="rdot dr"></div><span class="rtxt">Rising price + consistently falling
+                                    volume: distribution</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-lbl">Data sources</div>
+                        <div class="src-chips">
+                            <span class="src p">Polygon.io OHLCV API</span>
+                            <span class="src p">yfinance Python</span>
+                            <span class="src">Alpaca Markets API</span>
+                            <span class="src">IBKR TWS API</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="item" data-name="vwap volume weighted average price institutional benchmark intraday">
+            <div class="item-header" onclick="toggleItem(this.parentElement)">
+                <span class="num">02</span>
+                <div class="item-meta">
+                    <div class="item-name">VWAP (Volume-Weighted Average Price) <span
+                            class="tag tag-volvol">Volume</span></div>
+                    <div class="item-line">The institutional benchmark — the most important intraday reference price
+                    </div>
+                </div><span class="chev">▼</span>
+            </div>
+            <div class="item-body">
+                <div class="desc">VWAP = (Cumulative Price × Volume) / Cumulative Volume. Resets each session.
+                    Institutions use VWAP to evaluate execution quality — buying below VWAP is "good execution," above
+                    is "bad." Price above VWAP = bullish intraday bias; below = bearish. VWAP acts as strong support in
+                    uptrends and resistance in downtrends. Anchored VWAP (anchored to a specific date, e.g., earnings
+                    release or major low) provides longer-term institutional reference levels.</div>
+                <div class="grid2">
+                    <div class="card">
+                        <div class="card-lbl">Strategy use</div>
+                        <div class="ranges">
+                            <div class="rrow">
+                                <div class="rdot dg"></div><span class="rtxt">Price above VWAP + rising: strong intraday
+                                    uptrend</span>
+                            </div>
+                            <div class="rrow">
+                                <div class="rdot dg"></div><span class="rtxt">Pullback to VWAP in uptrend: institutional
+                                    buy zone</span>
+                            </div>
+                            <div class="rrow">
+                                <div class="rdot dr"></div><span class="rtxt">Price below VWAP + declining: avoid long
+                                    entries</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-lbl">Data sources</div>
+                        <div class="src-chips">
+                            <span class="src p">Polygon.io (intraday data)</span>
+                            <span class="src p">Alpaca Markets API</span>
+                            <span class="src">Calculate from minute OHLCV data</span>
+                            <span class="src">TradingView (built-in)</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="item" data-name="obv on balance volume accumulation distribution smart money flow">
+            <div class="item-header" onclick="toggleItem(this.parentElement)">
+                <span class="num">03</span>
+                <div class="item-meta">
+                    <div class="item-name">OBV (On-Balance Volume) &amp; A/D Line <span
+                            class="tag tag-volvol">Volume</span></div>
+                    <div class="item-line">Cumulative volume flow — reveals smart money accumulation before price moves
+                    </div>
+                </div><span class="chev">▼</span>
+            </div>
+            <div class="item-body">
+                <div class="desc">OBV adds volume on up days, subtracts on down days. The A/D
+                    (Accumulation/Distribution) Line is more nuanced — it weights volume by where price closes within
+                    the day's range, not just whether it's up or down. OBV and A/D divergences from price are the most
+                    powerful volume signals: if price makes a new high but OBV fails to confirm, smart money is
+                    distributing into strength. If price makes a new low but OBV holds, institutional accumulation is
+                    occurring underneath.</div>
+                <div class="formula">OBV: if Close &gt; Prev Close, OBV = OBV + Volume; if less, OBV = OBV − Volume
+                    &nbsp;|&nbsp; A/D = CLV × Volume + Prev A/D &nbsp;|&nbsp; CLV = ((Close−Low)−(High−Close)) /
+                    (High−Low)</div>
+                <div class="grid2">
+                    <div class="card">
+                        <div class="card-lbl">Divergence signals</div>
+                        <div class="ranges">
+                            <div class="rrow">
+                                <div class="rdot dg"></div><span class="rtxt">Price lower low + OBV higher low: bullish
+                                    divergence (accumulation)</span>
+                            </div>
+                            <div class="rrow">
+                                <div class="rdot dr"></div><span class="rtxt">Price higher high + OBV lower high:
+                                    bearish divergence (distribution)</span>
+                            </div>
+                            <div class="rrow">
+                                <div class="rdot dg"></div><span class="rtxt">OBV trending up persistently =
+                                    institutional accumulation phase</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-lbl">Data sources</div>
+                        <div class="src-chips">
+                            <span class="src p">TA-Lib Python (OBV, AD)</span>
+                            <span class="src p">pandas-ta</span>
+                            <span class="src">TradingView</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="item" data-name="volume profile vpvr value area high low node price levels institutional">
+            <div class="item-header" onclick="toggleItem(this.parentElement)">
+                <span class="num">04</span>
+                <div class="item-meta">
+                    <div class="item-name">Volume Profile (VPVR) <span class="tag tag-volvol">Volume</span></div>
+                    <div class="item-line">Shows volume traded at each price level — reveals where institutions
+                        positioned</div>
+                </div><span class="chev">▼</span>
+            </div>
+            <div class="item-body">
+                <div class="desc">Unlike time-based volume bars, Volume Profile shows how much volume traded at each
+                    price level over a period. High Volume Nodes (HVN) = strong S/R (price spent a lot of time here —
+                    big institutional positions). Low Volume Nodes (LVN) = price will move quickly through these (thin
+                    trading, no institutional anchor). Point of Control (POC) = the single price with highest volume —
+                    often acts as magnet. Value Area = 70% of all volume (High VAH, Low VAL = key boundaries).</div>
+                <div class="grid2">
+                    <div class="card">
+                        <div class="card-lbl">Key levels</div>
+                        <div class="ranges">
+                            <div class="rrow">
+                                <div class="rdot dg"></div><span class="rtxt">Price above VAH: breakout from
+                                    distribution, bullish</span>
+                            </div>
+                            <div class="rrow">
+                                <div class="rdot dg"></div><span class="rtxt">Price returns to POC from above: strong
+                                    support test</span>
+                            </div>
+                            <div class="rrow">
+                                <div class="rdot da"></div><span class="rtxt">Price in Value Area: range-bound, look for
+                                    mean reversion</span>
+                            </div>
+                            <div class="rrow">
+                                <div class="rdot dr"></div><span class="rtxt">Price below VAL: breakdown, bearish</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-lbl">Data sources</div>
+                        <div class="src-chips">
+                            <span class="src p">TradingView Volume Profile</span>
+                            <span class="src p">Polygon.io intraday + custom calc</span>
+                            <span class="src">Sierra Chart</span>
+                            <span class="src">NinjaTrader</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="item" data-name="mfi money flow index volume rsi overbought oversold">
+            <div class="item-header" onclick="toggleItem(this.parentElement)">
+                <span class="num">05</span>
+                <div class="item-meta">
+                    <div class="item-name">MFI (Money Flow Index) <span class="tag tag-volvol">Volume</span></div>
+                    <div class="item-line">Volume-weighted RSI — divergences carry extra conviction because they include
+                        both price and volume</div>
+                </div><span class="chev">▼</span>
+            </div>
+            <div class="item-body">
+                <div class="desc">MFI = RSI with volume weighting. Range 0–100. Above 80 = overbought; below 20 =
+                    oversold. Because it incorporates volume, MFI divergences are considered higher conviction than pure
+                    RSI divergences. When price makes a new high but MFI falls (declining volume on higher price), it
+                    means the rally is losing institutional support — a warning to reduce exposure.</div>
+                <div class="grid2">
+                    <div class="card">
+                        <div class="card-lbl">Strategy ranges</div>
+                        <div class="ranges">
+                            <div class="rrow">
+                                <div class="rdot dg"></div><span class="rtxt">MFI &lt;20 turning up with price bounce:
+                                    strong buy</span>
+                            </div>
+                            <div class="rrow">
+                                <div class="rdot dg"></div><span class="rtxt">Bullish MFI divergence (price lower, MFI
+                                    higher): accumulation</span>
+                            </div>
+                            <div class="rrow">
+                                <div class="rdot dr"></div><span class="rtxt">MFI &gt;80 + bearish divergence:
+                                    distribution warning</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-lbl">Data sources</div>
+                        <div class="src-chips">
+                            <span class="src p">TA-Lib Python (MFI)</span>
+                            <span class="src">pandas-ta</span>
+                            <span class="src">TradingView</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="item" data-name="open interest futures options contracts outstanding derivatives">
+            <div class="item-header" onclick="toggleItem(this.parentElement)">
+                <span class="num">06</span>
+                <div class="item-meta">
+                    <div class="item-name">Open Interest (Futures &amp; Options) <span
+                            class="tag tag-volvol">Volume</span></div>
+                    <div class="item-line">Number of outstanding contracts — reveals conviction behind price moves in
+                        derivatives markets</div>
+                </div><span class="chev">▼</span>
+            </div>
+            <div class="item-body">
+                <div class="desc">OI is the total number of open derivatives contracts. Price up + OI up = new money
+                    entering, strong trend. Price up + OI down = short covering (weaker rally, longs may be taking
+                    profits). Price down + OI up = new shorts entering, strong downtrend. Price down + OI down = longs
+                    liquidating (may be nearing capitulation). Options OI at specific strikes creates "gravitational"
+                    price effects — large call/put OI at a strike causes market makers to hedge, pulling price toward
+                    that strike near expiration (max pain theory).</div>
+                <div class="grid2">
+                    <div class="card">
+                        <div class="card-lbl">OI interpretation matrix</div>
+                        <div class="card-txt"
+                            style="font-family:'IBM Plex Mono',monospace;font-size:10px;line-height:2">
+                            Price ↑ + OI ↑ = <span class="cp">Strong bull</span><br>
+                            Price ↑ + OI ↓ = <span class="cw">Weak rally</span><br>
+                            Price ↓ + OI ↑ = <span class="cn">Strong bear</span><br>
+                            Price ↓ + OI ↓ = <span class="cw">Capitulation near</span>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-lbl">Data sources</div>
+                        <div class="src-chips">
+                            <span class="src p">CFTC COT Report (cftc.gov)</span>
+                            <span class="src p">Polygon.io options chain</span>
+                            <span class="src">Barchart.com options OI</span>
+                            <span class="src">Market Chameleon</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ══════════════════════════════════════
+     VOLATILITY
+══════════════════════════════════════ -->
+    <div class="panel" id="panel-volatility">
+        <div class="tier">
+            <div class="tier-line"></div><span class="tier-txt">Tier 1 — Volatility indicators</span>
+            <div class="tier-line"></div>
+        </div>
+
+        <div class="item" data-name="bollinger bands squeeze bands width standard deviation mean reversion">
+            <div class="item-header" onclick="toggleItem(this.parentElement)">
+                <span class="num">01</span>
+                <div class="item-meta">
+                    <div class="item-name">Bollinger Bands <span class="tag tag-vol">Volatility</span></div>
+                    <div class="item-line">Price envelope based on standard deviation — squeeze precedes explosive moves
+                    </div>
+                </div><span class="chev">▼</span>
+            </div>
+            <div class="item-body">
+                <div class="desc">Three bands: 20-period SMA (middle), ±2 standard deviations (upper/lower). About 95%
+                    of price action falls within the bands. A "Bollinger Squeeze" (bands narrowing sharply) indicates
+                    low volatility compression — a high-volatility breakout move follows. The direction of the breakout
+                    is not predicted by the squeeze itself — needs directional confirmation. Band walk: price tracking
+                    along the upper band = very strong uptrend. "W bottom" inside the lower band is a strong reversal
+                    pattern.</div>
+                <div class="formula">Middle Band = 20-period SMA &nbsp;|&nbsp; Upper = SMA + (2 × StdDev) &nbsp;|&nbsp;
+                    Lower = SMA − (2 × StdDev)</div>
+                <div class="grid2">
+                    <div class="card">
+                        <div class="card-lbl">Strategy signals</div>
+                        <div class="ranges">
+                            <div class="rrow">
+                                <div class="rdot dg"></div><span class="rtxt">Squeeze + breakout above upper band with
+                                    volume: buy</span>
+                            </div>
+                            <div class="rrow">
+                                <div class="rdot dg"></div><span class="rtxt">Price tags lower band in uptrend: mean
+                                    reversion buy zone</span>
+                            </div>
+                            <div class="rrow">
+                                <div class="rdot da"></div><span class="rtxt">Price in middle: no edge, wait for band
+                                    extreme</span>
+                            </div>
+                            <div class="rrow">
+                                <div class="rdot dr"></div><span class="rtxt">Price persistently below middle band:
+                                    downtrend</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-lbl">Data sources</div>
+                        <div class="src-chips">
+                            <span class="src p">TA-Lib Python (BBANDS)</span>
+                            <span class="src p">pandas-ta</span>
+                            <span class="src">TradingView</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="item" data-name="atr average true range stop loss position sizing volatility measure">
+            <div class="item-header" onclick="toggleItem(this.parentElement)">
+                <span class="num">02</span>
+                <div class="item-meta">
+                    <div class="item-name">ATR (Average True Range) <span class="tag tag-vol">Volatility</span></div>
+                    <div class="item-line">The essential stop-loss and position-sizing tool — measures daily volatility
+                        in price terms</div>
+                </div><span class="chev">▼</span>
+            </div>
+            <div class="item-body">
+                <div class="desc">ATR measures the average range of price movement over N periods (default 14),
+                    accounting for gaps. Unlike standard deviation, it's measured in price terms not percentages, making
+                    it directly usable for stop placement. Set stops at 1.5–2.5× ATR below entry — this keeps stops
+                    outside normal noise. Position size = (Account Risk %) / (ATR multiple × ATR value). This is the
+                    single most important position sizing input in technical trading.</div>
+                <div class="formula">True Range = Max(High−Low, |High−Prev Close|, |Low−Prev Close|) &nbsp;|&nbsp; ATR =
+                    14-period EMA of TR</div>
+                <div class="grid2">
+                    <div class="card">
+                        <div class="card-lbl">Stop placement rule</div>
+                        <div class="ranges">
+                            <div class="rrow">
+                                <div class="rdot dg"></div><span class="rtxt">Low-volatility stock (ATR 1–2%): stop at
+                                    1.5× ATR</span>
+                            </div>
+                            <div class="rrow">
+                                <div class="rdot da"></div><span class="rtxt">Normal volatility (ATR 2–4%): stop at 2×
+                                    ATR</span>
+                            </div>
+                            <div class="rrow">
+                                <div class="rdot dr"></div><span class="rtxt">High volatility (ATR &gt;5%): stop at 2.5×
+                                    ATR, reduce size</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-lbl">Position sizing formula</div>
+                        <div class="card-txt"
+                            style="font-family:'IBM Plex Mono',monospace;font-size:10px;line-height:1.8">
+                            Risk $ = Account × 1% (or 2% for high-risk)<br>
+                            Stop Distance = 2 × ATR × Share Price<br>
+                            Shares = Risk $ / Stop Distance
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-lbl">Data sources</div>
+                        <div class="src-chips">
+                            <span class="src p">TA-Lib Python (ATR)</span>
+                            <span class="src p">pandas-ta</span>
+                            <span class="src">Polygon.io OHLCV + compute</span>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-lbl">Rising vs falling ATR</div>
+                        <div class="card-txt">Rising ATR = volatility expanding (trend accelerating or reversal).
+                            Falling ATR = compression (consolidation before breakout). ATR at multi-month lows =
+                            Bollinger Squeeze equivalent — major move imminent.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="item" data-name="vix fear greed index implied volatility market volatility gauge">
+            <div class="item-header" onclick="toggleItem(this.parentElement)">
+                <span class="num">03</span>
+                <div class="item-meta">
+                    <div class="item-name">VIX (CBOE Volatility Index) &amp; IV <span
+                            class="tag tag-vol">Volatility</span></div>
+                    <div class="item-line">The "fear gauge" — market-implied expectations of future volatility</div>
+                </div><span class="chev">▼</span>
+            </div>
+            <div class="item-body">
+                <div class="desc">VIX measures the 30-day implied volatility of S&amp;P 500 options — it represents what
+                    options traders are paying for protection. VIX and equity prices are strongly inversely correlated.
+                    VIX spikes above 30 correspond to fear-driven selloffs and often mark short-term market bottoms
+                    (mean-reversion buy opportunity). VIX below 15 = complacency. Individual stocks have their own IV
+                    (Implied Volatility) which drives options pricing and signals expected move size around events.
+                </div>
+                <div class="grid2">
+                    <div class="card">
+                        <div class="card-lbl">VIX regime levels</div>
+                        <div class="ranges">
+                            <div class="rrow">
+                                <div class="rdot dg"></div><span class="rtxt">VIX &gt;35: extreme fear, often a buying
+                                    opportunity</span>
+                            </div>
+                            <div class="rrow">
+                                <div class="rdot dg"></div><span class="rtxt">VIX 20–35: elevated anxiety, market
+                                    choppy</span>
+                            </div>
+                            <div class="rrow">
+                                <div class="rdot da"></div><span class="rtxt">VIX 15–20: normal, moderate hedging
+                                    activity</span>
+                            </div>
+                            <div class="rrow">
+                                <div class="rdot dr"></div><span class="rtxt">VIX &lt;12: complacency, correction risk
+                                    rising</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-lbl">Data sources</div>
+                        <div class="src-chips">
+                            <span class="src p">CBOE VIX data (cboe.com)</span>
+                            <span class="src p">Yahoo Finance (^VIX symbol)</span>
+                            <span class="src">FRED API (VIXCLS series)</span>
+                            <span class="src">Polygon.io options chain for IV</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="item" data-name="keltner channels ema bands volatility envelope atr based">
+            <div class="item-header" onclick="toggleItem(this.parentElement)">
+                <span class="num">04</span>
+                <div class="item-meta">
+                    <div class="item-name">Keltner Channels <span class="tag tag-vol">Volatility</span></div>
+                    <div class="item-line">ATR-based channel — used alongside Bollinger Bands for the squeeze setup
+                    </div>
+                </div><span class="chev">▼</span>
+            </div>
+            <div class="item-body">
+                <div class="desc">Keltner Channels use ATR instead of standard deviation for the band width. When
+                    Bollinger Bands contract inside Keltner Channels — the "Bollinger Band Squeeze" setup — it signals
+                    extremely low volatility and a high-probability explosive breakout approaching. This is one of the
+                    most reliable volatility setups in technical analysis. John Carter's TTM Squeeze indicator is based
+                    on this relationship.</div>
+                <div class="formula">Middle = EMA(20) &nbsp;|&nbsp; Upper = EMA(20) + (2 × ATR(10)) &nbsp;|&nbsp; Lower
+                    = EMA(20) − (2 × ATR(10))</div>
+                <div class="grid2">
+                    <div class="card">
+                        <div class="card-lbl">Squeeze setup rules</div>
+                        <div class="ranges">
+                            <div class="rrow">
+                                <div class="rdot dg"></div><span class="rtxt">BB inside Keltner + momentum turning up:
+                                    buy the breakout</span>
+                            </div>
+                            <div class="rrow">
+                                <div class="rdot da"></div><span class="rtxt">BB inside Keltner, direction unclear:
+                                    wait, do not enter</span>
+                            </div>
+                            <div class="rrow">
+                                <div class="rdot dr"></div><span class="rtxt">BB outside Keltner: no squeeze, normal
+                                    volatility regime</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-lbl">Data sources</div>
+                        <div class="src-chips">
+                            <span class="src p">pandas-ta (kc function)</span>
+                            <span class="src">TradingView (built-in)</span>
+                            <span class="src">TA-Lib ATR + EMA to build manually</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ══════════════════════════════════════
+     ADVANCED & SMC
+══════════════════════════════════════ -->
+    <div class="panel" id="panel-advanced">
+        <div class="tier">
+            <div class="tier-line"></div><span class="tier-txt">Advanced — Smart Money Concepts &amp; Market
+                Structure</span>
+            <div class="tier-line"></div>
+        </div>
+
+        <div class="item" data-name="smart money concepts smc order blocks fair value gap fvg bos choch">
+            <div class="item-header" onclick="toggleItem(this.parentElement)">
+                <span class="num">01</span>
+                <div class="item-meta">
+                    <div class="item-name">Smart Money Concepts (SMC) — Order Blocks &amp; FVGs <span
+                            class="tag tag-struct">Structure</span></div>
+                    <div class="item-line">Institutional footprint analysis — where large orders were placed in the
+                        market</div>
+                </div><span class="chev">▼</span>
+            </div>
+            <div class="item-body">
+                <div class="desc">SMC aims to identify where institutional orders were executed by analyzing market
+                    structure. Order Blocks are the last opposing candle before a strong impulse move — institutions
+                    often re-enter at these levels. Fair Value Gaps (FVG/Imbalance) are price gaps where the market
+                    moved so fast that one side was not fully filled — price tends to return to fill these. Break of
+                    Structure (BOS) confirms trend continuation. Change of Character (CHoCH) signals a potential
+                    reversal. Liquidity sweeps occur when price briefly breaks a swing point to trigger stop orders
+                    before reversing.</div>
+                <div class="grid2">
+                    <div class="card">
+                        <div class="card-lbl">Key SMC concepts</div>
+                        <div class="card-txt">
+                            <b>Order Block (OB)</b>: Last down candle before strong up move = bullish OB. Price often
+                            returns to test it.<br><br>
+                            <b>Fair Value Gap (FVG)</b>: 3-candle pattern where candle 1 and 3 don't overlap. Price
+                            "fills the gap" on return.<br><br>
+                            <b>Liquidity sweep</b>: Stop-hunt above prior high / below prior low before real move in
+                            opposite direction.
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-lbl">BOS vs. CHoCH</div>
+                        <div class="card-txt">
+                            <b>BOS (Break of Structure)</b>: Price breaks a swing high/low in the direction of trend =
+                            trend continues.<br><br>
+                            <b>CHoCH (Change of Character)</b>: Price breaks structure in the OPPOSITE direction =
+                            potential reversal beginning. First CHoCH is a warning; second CHoCH is confirmation.
+                        </div>
+                    </div>
+                    <div class="card full">
+                        <div class="card-lbl">Data sources</div>
+                        <div class="src-chips">
+                            <span class="src p">TradingView (manual / LuxAlgo indicator)</span>
+                            <span class="src">Polygon.io OHLCV + custom Python detection</span>
+                            <span class="src">Custom backtest: scan for 3-candle FVG patterns</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="item" data-name="elliott wave impulse correction abc fibonacci waves theory">
+            <div class="item-header" onclick="toggleItem(this.parentElement)">
+                <span class="num">02</span>
+                <div class="item-meta">
+                    <div class="item-name">Elliott Wave Theory <span class="tag tag-struct">Structure</span></div>
+                    <div class="item-line">Fractal market structure — 5-wave impulse + 3-wave correction at all
+                        timeframes</div>
+                </div><span class="chev">▼</span>
+            </div>
+            <div class="item-body">
+                <div class="desc">Markets move in 5-wave impulse sequences (waves 1–5, where 1/3/5 move in trend
+                    direction and 2/4 are corrections) followed by a 3-wave corrective sequence (ABC). The pattern is
+                    fractal — each wave subdivides into the same pattern on smaller timeframes. Wave 3 is almost always
+                    the strongest and longest impulse wave. Wave 4 almost never overlaps with Wave 1's price territory
+                    (key rule for validation). Most useful for framing probabilistic scenarios, not as a precise
+                    mechanical signal — interpretation requires experience.</div>
+                <div class="grid2">
+                    <div class="card">
+                        <div class="card-lbl">Key rules</div>
+                        <div class="card-txt">
+                            Wave 2 never retraces &gt;100% of Wave 1<br>
+                            Wave 3 is never the shortest impulse wave<br>
+                            Wave 4 never enters Wave 1's territory<br>
+                            Wave 3 typically extends to 161.8% of Wave 1<br>
+                            ABC correction often ends at 61.8% of prior impulse
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-lbl">Strategy use</div>
+                        <div class="card-txt">Best used to identify Wave 3 entries (strongest move) and Wave 5
+                            exhaustion exits. Combine with RSI divergence — Wave 5 with RSI divergence = high-conviction
+                            reversal setup. Do not trade mechanically on wave counts alone.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="item" data-name="multi timeframe analysis mtf higher timeframe top down analysis confluence">
+            <div class="item-header" onclick="toggleItem(this.parentElement)">
+                <span class="num">03</span>
+                <div class="item-meta">
+                    <div class="item-name">Multi-Timeframe Analysis (MTF) <span class="tag tag-struct">Structure</span>
+                    </div>
+                    <div class="item-line">Top-down approach — higher timeframe sets the context, lower timeframe gives
+                        the entry</div>
+                </div><span class="chev">▼</span>
+            </div>
+            <div class="item-body">
+                <div class="desc">Always analyze from the higher timeframe down. The weekly chart determines the primary
+                    trend. The daily chart gives the trade setup. The 4H or 1H gives the precise entry timing. A buy
+                    signal on the daily that aligns with a weekly uptrend and monthly support carries far more weight
+                    than an isolated daily signal against a weekly downtrend. Most beginner traders lose money because
+                    they find a setup on a 5-minute chart that is fighting a daily downtrend.</div>
+                <div class="grid2">
+                    <div class="card">
+                        <div class="card-lbl">Timeframe hierarchy</div>
+                        <div class="card-txt"
+                            style="font-family:'IBM Plex Mono',monospace;font-size:10px;line-height:2">
+                            Monthly → Macro trend direction<br>
+                            Weekly → Primary trend + major S/R<br>
+                            Daily → Setup identification<br>
+                            4H / 1H → Entry timing refinement<br>
+                            15m / 5m → Precision entry (active traders)
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-lbl">Confluence scoring rule</div>
+                        <div class="card-txt">A signal aligned on 3+ timeframes is a "high-confluence" trade. Assign a
+                            score: weekly trend aligned (+2), daily setup (+2), entry timeframe signal (+1), Fibonacci
+                            level (+1), volume confirmation (+1). Score ≥5 = high-conviction trade. Score ≤3 = pass.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ══════════════════════════════════════
+     CORRELATIONS
+══════════════════════════════════════ -->
+    <div class="panel" id="panel-corr">
+        <p class="corr-intro">These are the critical inter-indicator relationships. Understanding which indicators are
+            redundant vs. complementary prevents over-engineering your system with correlated signals that give a false
+            sense of confirmation.</p>
+
+        <div class="corr-cluster">
+            <div class="corr-cluster-title">1. Redundant pairs — avoid using both simultaneously</div>
+            <div class="corr-cluster-desc">These pairs measure essentially the same thing. Using both doesn't add
+                confirmation — it adds false confidence.</div>
+            <table class="ct">
+                <thead>
+                    <tr>
+                        <th>Indicator A</th>
+                        <th>Indicator B</th>
+                        <th>Relationship</th>
+                        <th>Which to keep</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>RSI</td>
+                        <td>Stochastic</td>
+                        <td><span class="dir dir-p">Highly correlated</span> Both measure overbought/oversold via price
+                            range</td>
+                        <td>RSI for trending markets. Stochastic for ranging markets. Never both as "confirmation."</td>
+                    </tr>
+                    <tr>
+                        <td>OBV</td>
+                        <td>A/D Line</td>
+                        <td><span class="dir dir-p">Highly correlated</span> Both are cumulative volume flow indicators
+                        </td>
+                        <td>A/D is more nuanced (uses close position within range). Use A/D as primary, OBV as secondary
+                            check.</td>
+                    </tr>
+                    <tr>
+                        <td>SMA(200)</td>
+                        <td>EMA(200)</td>
+                        <td><span class="dir dir-p">Highly correlated</span> Both track long-term trend level</td>
+                        <td>Use one consistently. SMA for structure reference; EMA for dynamic entries. Don't use both
+                            as separate signals.</td>
+                    </tr>
+                    <tr>
+                        <td>Stochastic</td>
+                        <td>Williams %R</td>
+                        <td><span class="dir dir-p">Mathematically near-identical</span></td>
+                        <td>Choose one. Williams %R is slightly faster. Stochastic more popular. No added value in using
+                            both.</td>
+                    </tr>
+                    <tr>
+                        <td>Bollinger Bands</td>
+                        <td>Standard Deviation</td>
+                        <td><span class="dir dir-p">BB is directly derived from StdDev</span></td>
+                        <td>Use BB — it visualizes the same information more clearly. Standard deviation alone adds
+                            nothing BB doesn't show.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="corr-cluster">
+            <div class="corr-cluster-title">2. Complementary pairs — genuine independent signals</div>
+            <div class="corr-cluster-desc">These pairs measure genuinely different dimensions. Alignment between them is
+                true confluence.</div>
+            <table class="ct">
+                <thead>
+                    <tr>
+                        <th>Indicator A</th>
+                        <th>Indicator B</th>
+                        <th>Why they're complementary</th>
+                        <th>Combined signal</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>RSI (momentum)</td>
+                        <td>OBV (volume flow)</td>
+                        <td>RSI measures price momentum speed. OBV measures institutional money flow. Independent
+                            inputs.</td>
+                        <td><span class="cp">Both bullish</span>: strong buy — momentum AND institutional buying
+                            aligned. <span class="cn">Diverging</span>: institutions not supporting the price move —
+                            warning.</td>
+                    </tr>
+                    <tr>
+                        <td>MACD (trend momentum)</td>
+                        <td>RSI (oscillator)</td>
+                        <td>MACD is trend-sensitive and lagging. RSI is faster and mean-reverting. Different speeds,
+                            different math.</td>
+                        <td>MACD on zero-line + RSI turning from oversold = high-conviction entry. MACD divergence
+                            confirmed by RSI divergence = strong reversal signal.</td>
+                    </tr>
+                    <tr>
+                        <td>ADX (trend strength)</td>
+                        <td>Stochastic (overbought/sold)</td>
+                        <td>ADX tells you IF trend-following works. Stochastic works in ranging markets. They are regime
+                            selectors for each other.</td>
+                        <td>ADX &gt;25: ignore Stochastic overbought/oversold, use trend tools. ADX &lt;20: ignore trend
+                            signals, use Stochastic for range reversions.</td>
+                    </tr>
+                    <tr>
+                        <td>Fibonacci (structure)</td>
+                        <td>RSI (momentum)</td>
+                        <td>Fibonacci identifies the price zone. RSI identifies the momentum condition at that zone.
+                            Price + timing combination.</td>
+                        <td>Price at 61.8% Fib retracement + RSI at 30–40 in an uptrend = one of the highest-probability
+                            long entries in all of TA.</td>
+                    </tr>
+                    <tr>
+                        <td>Volume Profile (institutional levels)</td>
+                        <td>Price Action (candlestick)</td>
+                        <td>VP shows where institutional positions exist. PA shows how price behaves when it reaches
+                            those levels.</td>
+                        <td>Bullish engulfing candle at a High Volume Node = institutional buyers defending their
+                            position. Very strong signal.</td>
+                    </tr>
+                    <tr>
+                        <td>Bollinger Bands (volatility)</td>
+                        <td>MACD (momentum)</td>
+                        <td>BB measures price relative to statistical mean. MACD measures momentum direction.</td>
+                        <td>Price at lower BB + MACD histogram turning positive = volatility extreme with momentum
+                            confirmation. High-probability mean reversion.</td>
+                    </tr>
+                    <tr>
+                        <td>ATR (volatility measure)</td>
+                        <td>ADX (trend strength)</td>
+                        <td>ATR measures how much price moves. ADX measures whether it's directional. Both needed for
+                            full volatility picture.</td>
+                        <td>High ADX + rising ATR = trending AND expanding — strong trend in progress. High ATR + low
+                            ADX = volatile but directionless — dangerous for trend strategies.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="corr-cluster">
+            <div class="corr-cluster-title">3. Price vs. indicator divergences — the highest-conviction signals</div>
+            <div class="corr-cluster-desc">When price and indicator move in opposite directions, the indicator often
+                leads price. These divergences are the most powerful signals in TA.</div>
+            <table class="ct">
+                <thead>
+                    <tr>
+                        <th>Price action</th>
+                        <th>Indicator</th>
+                        <th>Divergence type</th>
+                        <th>Implication &amp; strategy</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Price: Lower Low</td>
+                        <td>RSI: Higher Low</td>
+                        <td><span class="cp">Bullish divergence</span></td>
+                        <td>Selling pressure is weakening — fewer sellers willing to push price lower. Most reliable on
+                            weekly charts. Enter long on confirmation candle. Strongest if RSI was below 30 at the
+                            divergence low.</td>
+                    </tr>
+                    <tr>
+                        <td>Price: Higher High</td>
+                        <td>RSI: Lower High</td>
+                        <td><span class="cn">Bearish divergence</span></td>
+                        <td>Buying pressure weakening — fewer buyers willing to push price higher. Enter short/reduce
+                            longs on confirmation. Strongest if RSI was above 70 at the divergence high.</td>
+                    </tr>
+                    <tr>
+                        <td>Price: Higher High</td>
+                        <td>OBV: Lower High</td>
+                        <td><span class="cn">Volume bearish divergence</span></td>
+                        <td>Institutions are distributing into the rally — not buying the new high. Higher conviction
+                            than RSI divergence alone. Exit or reduce long exposure aggressively.</td>
+                    </tr>
+                    <tr>
+                        <td>Price: Lower Low</td>
+                        <td>MACD Histogram: Higher Low</td>
+                        <td><span class="cp">MACD bullish divergence</span></td>
+                        <td>Momentum of the downtrend is fading. Combine with price near Fibonacci support for maximum
+                            conviction. Earlier signal than price action alone.</td>
+                    </tr>
+                    <tr>
+                        <td>Price: Higher High</td>
+                        <td>MFI: Lower High</td>
+                        <td><span class="cn">Volume+momentum bearish divergence</span></td>
+                        <td>Both price momentum AND volume flow diverging — the most serious distribution warning. If
+                            all three (RSI + OBV + MFI) diverge simultaneously at a price high, it is an extremely
+                            high-conviction exit signal.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="corr-cluster">
+            <div class="corr-cluster-title">4. Regime-dependent correlations — which indicators work in which market
+                type</div>
+            <div class="corr-cluster-desc">The same indicator can be highly reliable in one regime and generate nothing
+                but noise in another. ADX is the gate-keeper.</div>
+            <table class="ct">
+                <thead>
+                    <tr>
+                        <th>Market regime</th>
+                        <th>Works well</th>
+                        <th>Avoid</th>
+                        <th>Primary identifier</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><span class="cp">Strong Uptrend</span> ADX &gt;30, price &gt; all MAs</td>
+                        <td>Moving averages, Parabolic SAR, MACD zero-line, RS ratio, Ichimoku</td>
+                        <td>RSI overbought signals (RSI stays &gt;70 — don't sell), Stochastic (continuous overbought)
+                        </td>
+                        <td>ADX &gt;30 + price &gt; 50MA &gt; 200MA + OBV rising</td>
+                    </tr>
+                    <tr>
+                        <td><span class="cw">Ranging / Choppy</span> ADX &lt;20</td>
+                        <td>RSI (30/70 levels), Stochastic, Bollinger Band mean reversion, Williams %R, S/R bounces</td>
+                        <td>MACD crossovers (constant whipsaws), Moving average crosses (noise), Parabolic SAR</td>
+                        <td>ADX &lt;20 + price oscillating between defined S/R levels</td>
+                    </tr>
+                    <tr>
+                        <td><span class="cn">Strong Downtrend</span> ADX &gt;30, price &lt; all MAs</td>
+                        <td>Bearish MAs alignment, MACD bearish zero-line, Parabolic SAR (short), RS ratio declining
+                        </td>
+                        <td>RSI oversold signals (RSI stays &lt;30 — don't buy dips), Stochastic oversold (persistent)
+                        </td>
+                        <td>ADX &gt;30 + price &lt; 50MA &lt; 200MA + OBV falling</td>
+                    </tr>
+                    <tr>
+                        <td><span class="cw">Volatility Expansion</span> ATR spike, VIX &gt;25</td>
+                        <td>ATR for stop sizing, VIX for sentiment extreme, Volume spikes for climax detection</td>
+                        <td>All trend indicators (whipsaws in fast markets), Tight stop losses (get stopped out on
+                            noise)</td>
+                        <td>ATR rising sharply + VIX spiking + volume 3× average</td>
+                    </tr>
+                    <tr>
+                        <td><span class="cp">Volatility Compression</span> BB Squeeze</td>
+                        <td>Bollinger/Keltner squeeze setup, Volume dry-up, Decreasing ATR</td>
+                        <td>Oscillators (nothing to oscillate), Trend indicators (no trend to follow)</td>
+                        <td>BB inside Keltner + volume below 30-day average + ATR at lows</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="corr-cluster">
+            <div class="corr-cluster-title">5. The optimal 3-indicator combination for your beginner strategy</div>
+            <div class="corr-cluster-desc">For the monthly-rebalanced long-only rotation strategy, this is the minimum
+                viable TA layer — independent signals, not redundant ones.</div>
+            <table class="ct">
+                <thead>
+                    <tr>
+                        <th>Role</th>
+                        <th>Indicator</th>
+                        <th>Signal it provides</th>
+                        <th>Entry threshold</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Trend filter</td>
+                        <td>200-day SMA</td>
+                        <td>Is this stock in a long-term uptrend? Hard gate: only buy stocks above 200MA.</td>
+                        <td>Price &gt; 200MA. If price &lt; 200MA: skip regardless of other signals.</td>
+                    </tr>
+                    <tr>
+                        <td>Momentum quality</td>
+                        <td>RSI (14, weekly chart)</td>
+                        <td>Is momentum in a healthy zone? Not overbought on the weekly.</td>
+                        <td>Weekly RSI between 40–70 for new entries. Below 40 = consider in strong trend. Above 75 =
+                            wait for pullback.</td>
+                    </tr>
+                    <tr>
+                        <td>Volume confirmation</td>
+                        <td>OBV trend</td>
+                        <td>Is institutional money flowing in or out? OBV should be in an uptrend.</td>
+                        <td>OBV making higher highs alongside price. If OBV diverging down while price up: reduce
+                            weighting or skip.</td>
+                    </tr>
+                    <tr>
+                        <td>Entry timing</td>
+                        <td>Fibonacci 38.2–61.8% retracement</td>
+                        <td>Is price at a good entry zone within the trend? Buy pullbacks, not breakouts.</td>
+                        <td>Price pulling back to 38.2–61.8% of prior swing up. Best when Fib level coincides with 50MA
+                            or prior S/R.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- ══════════════════════════════════════
+     TIMEFRAME GUIDE
+══════════════════════════════════════ -->
+    <div class="panel" id="panel-timeframes">
+        <p class="corr-intro">Each timeframe serves a different purpose. The strategy you're building (monthly
+            rebalanced long-only rotation) is primarily a daily/weekly chart system. Here is a complete guide to what
+            each timeframe is for, which indicators work best on it, and how they link together.</p>
+
+        <div class="tier">
+            <div class="tier-line"></div><span class="tier-txt">Timeframe hierarchy</span>
+            <div class="tier-line"></div>
+        </div>
+
+        <div class="tf-guide">
+            <div class="tf-card">
+                <div class="tf-card-title">Monthly chart</div>
+                <div class="tf-card-body">
+                    <b>Purpose:</b> Macro trend direction. Structural support/resistance that takes months or years to
+                    reach.<br><br>
+                    <b>Best indicators:</b> 200MA, major Fibonacci levels, long-term S/R zones, Elliott Wave major
+                    count.<br><br>
+                    <b>Signal weight:</b> Highest. Monthly S/R overrides all other timeframe signals.<br><br>
+                    <b>How often to check:</b> Monthly review only.
+                </div>
+            </div>
+            <div class="tf-card">
+                <div class="tf-card-title">Weekly chart</div>
+                <div class="tf-card-body">
+                    <b>Purpose:</b> Primary trend identification. Setup quality assessment. Key S/R for swing
+                    trades.<br><br>
+                    <b>Best indicators:</b> RSI divergences (highest reliability here), MACD, Ichimoku, 50MA, volume
+                    trend, RS ratio.<br><br>
+                    <b>Signal weight:</b> Very high. Weekly RSI divergences are the most reliable reversal signals in
+                    TA.<br><br>
+                    <b>How often to check:</b> Weekly review (your primary analysis session).
+                </div>
+            </div>
+            <div class="tf-card">
+                <div class="tf-card-title">Daily chart</div>
+                <div class="tf-card-body">
+                    <b>Purpose:</b> Trade setup identification and scoring. Entry/exit zone definition.<br><br>
+                    <b>Best indicators:</b> Candlestick patterns, Chart patterns, 20/50MA, Bollinger Bands, ATR, Volume,
+                    OBV, Pivot Points, Fibonacci retracements.<br><br>
+                    <b>Signal weight:</b> High. Primary setup timeframe for your strategy.<br><br>
+                    <b>How often to check:</b> Daily (after market close).
+                </div>
+            </div>
+            <div class="tf-card">
+                <div class="tf-card-title">4-Hour chart</div>
+                <div class="tf-card-body">
+                    <b>Purpose:</b> Entry timing refinement. Better price for entries identified on daily chart.<br><br>
+                    <b>Best indicators:</b> MACD, RSI, Stochastic, VWAP, smaller Fibonacci retracements within daily
+                    setup.<br><br>
+                    <b>Signal weight:</b> Medium. Used to refine entry point, not to identify the trade.<br><br>
+                    <b>How often to check:</b> When entering a position identified on daily chart.
+                </div>
+            </div>
+        </div>
+
+        <div class="tier" style="margin-top:24px">
+            <div class="tier-line"></div><span class="tier-txt">Indicator-to-timeframe suitability</span>
+            <div class="tier-line"></div>
+        </div>
+        <table class="ct" style="margin-top:0">
+            <thead>
+                <tr>
+                    <th>Indicator</th>
+                    <th>Best TF</th>
+                    <th>Works on</th>
+                    <th>Avoid on</th>
+                    <th>Notes</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>200-day SMA</td>
+                    <td>Daily/Weekly</td>
+                    <td>Daily, Weekly</td>
+                    <td>&lt;1H</td>
+                    <td>The anchor of your strategy — check daily but interpret on weekly context</td>
+                </tr>
+                <tr>
+                    <td>RSI (14)</td>
+                    <td>Weekly</td>
+                    <td>All</td>
+                    <td>1m,5m (noisy)</td>
+                    <td>Weekly RSI divergences are the most reliable setup in TA</td>
+                </tr>
+                <tr>
+                    <td>MACD (12,26,9)</td>
+                    <td>Daily</td>
+                    <td>4H, Daily, Weekly</td>
+                    <td>&lt;1H</td>
+                    <td>Too slow for intraday. Excellent for daily trend confirmation.</td>
+                </tr>
+                <tr>
+                    <td>Bollinger Bands</td>
+                    <td>Daily</td>
+                    <td>All</td>
+                    <td>–</td>
+                    <td>Squeeze setup works on all timeframes; daily is primary</td>
+                </tr>
+                <tr>
+                    <td>ATR (14)</td>
+                    <td>Daily</td>
+                    <td>All</td>
+                    <td>–</td>
+                    <td>Use daily ATR for stop-loss sizing regardless of entry TF</td>
+                </tr>
+                <tr>
+                    <td>VWAP</td>
+                    <td>Intraday</td>
+                    <td>1m to Daily</td>
+                    <td>Weekly+</td>
+                    <td>Resets each session — meaningless on weekly/monthly charts</td>
+                </tr>
+                <tr>
+                    <td>Fibonacci</td>
+                    <td>Weekly/Daily</td>
+                    <td>All</td>
+                    <td>–</td>
+                    <td>Weekly Fib levels are most significant; daily for entry zones</td>
+                </tr>
+                <tr>
+                    <td>Volume Profile</td>
+                    <td>Daily/Weekly</td>
+                    <td>Intraday to Monthly</td>
+                    <td>–</td>
+                    <td>Longer the profile period, stronger the levels</td>
+                </tr>
+                <tr>
+                    <td>Ichimoku</td>
+                    <td>Daily/Weekly</td>
+                    <td>4H, Daily, Weekly</td>
+                    <td>&lt;1H</td>
+                    <td>Default settings (9,26,52) designed for daily charts</td>
+                </tr>
+                <tr>
+                    <td>Stochastic</td>
+                    <td>Daily</td>
+                    <td>All</td>
+                    <td>–</td>
+                    <td>Best in ranging markets. Use daily chart for your rotation strategy.</td>
+                </tr>
+                <tr>
+                    <td>ADX</td>
+                    <td>Daily</td>
+                    <td>All</td>
+                    <td>1m,5m</td>
+                    <td>Use as regime filter before applying any other indicator</td>
+                </tr>
+                <tr>
+                    <td>Pivot Points</td>
+                    <td>Daily (classic), Weekly</td>
+                    <td>All</td>
+                    <td>–</td>
+                    <td>Daily pivots for intraday; weekly pivots for swing trades</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="tier" style="margin-top:24px">
+            <div class="tier-line"></div><span class="tier-txt">All TA data sources — master list</span>
+            <div class="tier-line"></div>
+        </div>
+        <div class="grid2" style="margin-top:8px">
+            <div class="card">
+                <div class="card-lbl">Price &amp; OHLCV data (free tier available)</div>
+                <div class="card-txt">
+                    <a href="https://polygon.io" target="_blank">Polygon.io</a> — best free/paid API for US equities,
+                    options, forex<br>
+                    <a href="https://finance.yahoo.com" target="_blank">Yahoo Finance</a> via yfinance Python — free,
+                    reliable, widely used<br>
+                    <a href="https://alpaca.markets" target="_blank">Alpaca Markets</a> — free market data + paper
+                    trading API<br>
+                    <a href="https://www.interactivebrokers.com" target="_blank">IBKR TWS API</a> — live data when
+                    executing trades<br>
+                    <a href="https://www.alphavantage.co" target="_blank">Alpha Vantage</a> — free API, 500 calls/day
+                    limit
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-lbl">Python TA libraries</div>
+                <div class="card-txt">
+                    <a href="https://ta-lib.org" target="_blank">TA-Lib</a> — 150+ indicators, fastest, industry
+                    standard<br>
+                    <a href="https://github.com/twopirllc/pandas-ta" target="_blank">pandas-ta</a> — 130+ indicators,
+                    pandas-native, easier install<br>
+                    <a href="https://github.com/bukosabino/ta" target="_blank">ta (Python)</a> — clean API, good for
+                    beginners<br>
+                    <a href="https://github.com/matplotlib/mplfinance" target="_blank">mplfinance</a> — candlestick
+                    charting in Python<br>
+                    <a href="https://github.com/ranaroussi/quantstats" target="_blank">QuantStats</a> — performance
+                    metrics + tearsheets
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-lbl">Charting &amp; analysis platforms</div>
+                <div class="card-txt">
+                    <a href="https://www.tradingview.com" target="_blank">TradingView</a> — free tier very capable,
+                    alerts, screener<br>
+                    <a href="https://finviz.com" target="_blank">Finviz</a> — free stock screener with TA filters<br>
+                    <a href="https://www.barchart.com" target="_blank">Barchart.com</a> — options data + technical
+                    ratings<br>
+                    <a href="https://stockcharts.com" target="_blank">StockCharts.com</a> — advanced charting, sector RS
+                    analysis
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-lbl">Backtesting frameworks</div>
+                <div class="card-txt">
+                    <a href="https://github.com/mementum/backtrader" target="_blank">Backtrader</a> — most popular
+                    Python backtesting framework<br>
+                    <a href="https://github.com/kernc/backtesting.py" target="_blank">Backtesting.py</a> — lightweight,
+                    fast, visual<br>
+                    <a href="https://www.zipline.io" target="_blank">Zipline</a> — quantopian-era, research-grade<br>
+                    <a href="https://github.com/quantconnect/Lean" target="_blank">QuantConnect LEAN</a> —
+                    institutional-grade, multi-asset
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+function switchTab(id) {
+  const ids = ['price','trend','momentum','volume','volatility','advanced','corr','timeframes'];
+  document.querySelectorAll('.nav-tab').forEach((t,i) => t.classList.toggle('active', ids[i] === id));
+  document.querySelectorAll('.panel').forEach(p => p.classList.toggle('active', p.id === 'panel-'+id));
+}
+function toggleItem(el) { el.classList.toggle('open'); }
+function searchPanel(panel, val) {
+  const q = val.toLowerCase();
+  document.querySelectorAll('#panel-'+panel+' .item').forEach(item => {
+    const n = (item.dataset.name||'').toLowerCase();
+    item.classList.toggle('hidden', q.length > 0 && !n.includes(q));
+  });
+}
+    </script>
+</body>
+
+</html>

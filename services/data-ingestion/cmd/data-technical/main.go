@@ -23,13 +23,13 @@ import (
 
 	"github.com/joho/godotenv"
 
-	"github.com/berdelis/trading-agent/services/data-ingestion/internal/config"
-	"github.com/berdelis/trading-agent/services/data-ingestion/internal/db"
-	"github.com/berdelis/trading-agent/services/data-ingestion/internal/fetch/alpacadata"
-	"github.com/berdelis/trading-agent/services/data-ingestion/internal/fetch/binance"
-	"github.com/berdelis/trading-agent/services/data-ingestion/internal/fetch/yahoo"
-	"github.com/berdelis/trading-agent/services/data-ingestion/internal/logx"
-	"github.com/berdelis/trading-agent/services/data-ingestion/internal/store"
+	"github.com/konsbe/trading-agent/services/data-ingestion/internal/config"
+	"github.com/konsbe/trading-agent/services/data-ingestion/internal/db"
+	"github.com/konsbe/trading-agent/services/data-ingestion/internal/fetch/alpacadata"
+	"github.com/konsbe/trading-agent/services/data-ingestion/internal/fetch/binance"
+	"github.com/konsbe/trading-agent/services/data-ingestion/internal/fetch/yahoo"
+	"github.com/konsbe/trading-agent/services/data-ingestion/internal/logx"
+	"github.com/konsbe/trading-agent/services/data-ingestion/internal/store"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 

@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/berdelis/trading-agent/shared/schemas/equity_ohlcv.schema.json",
+  "$id": "https://github.com/konsbe/trading-agent/shared/schemas/equity_ohlcv.schema.json",
   "title": "equity_ohlcv row",
   "description": "Logical row for table equity_ohlcv (see shared/databases/migrations).",
   "type": "object",

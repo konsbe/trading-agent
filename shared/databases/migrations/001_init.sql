@@ -69,13 +69,12 @@ SELECT public.create_hypertable('sentiment_snapshots', 'ts', if_not_exists => TR
 
 CREATE TABLE IF NOT EXISTS news_headlines (
     ts TIMESTAMPTZ NOT NULL,
-    id BIGSERIAL,
     source TEXT NOT NULL,
     symbol TEXT,
     headline TEXT NOT NULL,
     url TEXT,
     sentiment NUMERIC,
     payload JSONB,
-    PRIMARY KEY (ts, id)
+    PRIMARY KEY (ts, source, headline)
 );
 SELECT public.create_hypertable('news_headlines', 'ts', if_not_exists => TRUE);

@@ -1,0 +1,2431 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fundamental Analysis — Complete Reference</title>
+    <link
+        href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Fraunces:ital,wght@0,300;0,500;0,700;1,300&family=DM+Sans:wght@300;400;500&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0f0f0d;
+            --bg2: #161614;
+            --bg3: #1e1e1b;
+            --bg4: #252522;
+            --border: #2a2a26;
+            --border2: #333330;
+            --text: #e8e4d8;
+            --text2: #a09d92;
+            --text3: #5a574f;
+            --gold: #c9a84c;
+            --gold2: #e8c96a;
+            --gold-dim: #6b5520;
+            --teal: #4db896;
+            --teal-dim: #1a4035;
+            --red: #d4614a;
+            --red-dim: #3d1a14;
+            --amber: #d4974a;
+            --amber-dim: #3d2814;
+            --blue: #5a9fd4;
+            --blue-dim: #162535;
+            --green: #6ab87a;
+            --green-dim: #1a3020;
+            --purple: #9b7dd4;
+            --purple-dim: #251a3d;
+        }
+
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'DM Sans', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            font-size: 14px;
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+
+        /* HEADER */
+        .header {
+            padding: 40px 32px 28px;
+            border-bottom: 1px solid var(--border);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            top: -60px;
+            right: -60px;
+            width: 300px;
+            height: 300px;
+            background: radial-gradient(circle, rgba(201, 168, 76, 0.08) 0%, transparent 70%);
+            pointer-events: none;
+        }
+
+        .header-eyebrow {
+            font-family: 'DM Mono', monospace;
+            font-size: 11px;
+            letter-spacing: .12em;
+            text-transform: uppercase;
+            color: var(--gold);
+            margin-bottom: 8px;
+        }
+
+        .header h1 {
+            font-family: 'Fraunces', serif;
+            font-size: 32px;
+            font-weight: 300;
+            color: var(--text);
+            line-height: 1.1;
+            margin-bottom: 8px;
+        }
+
+        .header h1 em {
+            font-style: italic;
+            color: var(--gold);
+        }
+
+        .header-sub {
+            font-size: 13px;
+            color: var(--text2);
+            font-weight: 300;
+        }
+
+        /* NAV TABS */
+        .nav {
+            display: flex;
+            gap: 2px;
+            padding: 12px 32px 0;
+            border-bottom: 1px solid var(--border);
+            overflow-x: auto;
+        }
+
+        .nav::-webkit-scrollbar {
+            height: 3px;
+        }
+
+        .nav::-webkit-scrollbar-track {
+            background: var(--bg);
+        }
+
+        .nav::-webkit-scrollbar-thumb {
+            background: var(--border2);
+            border-radius: 2px;
+        }
+
+        .nav-tab {
+            padding: 8px 18px;
+            font-size: 12px;
+            font-weight: 500;
+            font-family: 'DM Mono', monospace;
+            letter-spacing: .03em;
+            cursor: pointer;
+            border: none;
+            background: none;
+            color: var(--text3);
+            border-bottom: 2px solid transparent;
+            transition: all .15s;
+            white-space: nowrap;
+            text-transform: uppercase;
+        }
+
+        .nav-tab:hover {
+            color: var(--text2);
+        }
+
+        .nav-tab.active {
+            color: var(--gold);
+            border-bottom-color: var(--gold);
+        }
+
+        /* PANELS */
+        .panel {
+            display: none;
+            padding: 24px 32px 40px;
+        }
+
+        .panel.active {
+            display: block;
+        }
+
+        /* SEARCH + FILTER */
+        .toolbar {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 18px;
+            flex-wrap: wrap;
+        }
+
+        .search-wrap {
+            flex: 1;
+            min-width: 200px;
+            position: relative;
+        }
+
+        .search-wrap::before {
+            content: '⌕';
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text3);
+            font-size: 16px;
+            pointer-events: none;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 8px 12px 8px 34px;
+            background: var(--bg3);
+            border: 1px solid var(--border2);
+            border-radius: 6px;
+            color: var(--text);
+            font-size: 13px;
+            font-family: 'DM Sans', sans-serif;
+            outline: none;
+            transition: border-color .15s;
+        }
+
+        .search-input:focus {
+            border-color: var(--gold-dim);
+        }
+
+        .search-input::placeholder {
+            color: var(--text3);
+        }
+
+        .filter-chips {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+
+        .chip {
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-family: 'DM Mono', monospace;
+            font-weight: 500;
+            letter-spacing: .03em;
+            cursor: pointer;
+            border: 1px solid var(--border2);
+            background: var(--bg3);
+            color: var(--text3);
+            transition: all .15s;
+            text-transform: uppercase;
+        }
+
+        .chip:hover {
+            color: var(--text2);
+            border-color: var(--border2);
+        }
+
+        .chip.active {
+            background: var(--gold-dim);
+            border-color: var(--gold);
+            color: var(--gold2);
+        }
+
+        /* SECTION DIVIDER */
+        .tier-label {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin: 24px 0 10px;
+        }
+
+        .tier-label:first-of-type {
+            margin-top: 0;
+        }
+
+        .tier-text {
+            font-family: 'DM Mono', monospace;
+            font-size: 10px;
+            letter-spacing: .1em;
+            text-transform: uppercase;
+            color: var(--text3);
+            white-space: nowrap;
+        }
+
+        .tier-line {
+            flex: 1;
+            height: 1px;
+            background: var(--border);
+        }
+
+        /* ITEM CARDS */
+        .item {
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            margin-bottom: 6px;
+            overflow: hidden;
+            background: var(--bg2);
+            transition: border-color .15s;
+        }
+
+        .item:hover {
+            border-color: var(--border2);
+        }
+
+        .item.open {
+            border-color: var(--gold-dim);
+        }
+
+        .item-header {
+            display: flex;
+            gap: 12px;
+            align-items: flex-start;
+            padding: 12px 16px;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .rank-badge {
+            width: 24px;
+            height: 24px;
+            border-radius: 6px;
+            background: var(--bg4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'DM Mono', monospace;
+            font-size: 10px;
+            color: var(--text3);
+            flex-shrink: 0;
+            margin-top: 1px;
+        }
+
+        .item.open .rank-badge {
+            background: var(--gold-dim);
+            color: var(--gold2);
+        }
+
+        .item-meta {
+            flex: 1;
+        }
+
+        .item-name {
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text);
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 6px;
+            line-height: 1.3;
+        }
+
+        .item-tagline {
+            font-size: 12px;
+            color: var(--text2);
+            margin-top: 2px;
+            font-weight: 300;
+        }
+
+        .tags {
+            display: flex;
+            gap: 4px;
+            flex-wrap: wrap;
+            margin-top: 0;
+        }
+
+        .tag {
+            font-size: 9px;
+            font-family: 'DM Mono', monospace;
+            font-weight: 500;
+            padding: 2px 7px;
+            border-radius: 4px;
+            letter-spacing: .04em;
+            text-transform: uppercase;
+        }
+
+        .tag-quant {
+            background: var(--blue-dim);
+            color: var(--blue);
+        }
+
+        .tag-val {
+            background: var(--purple-dim);
+            color: var(--purple);
+        }
+
+        .tag-prof {
+            background: var(--teal-dim);
+            color: var(--teal);
+        }
+
+        .tag-growth {
+            background: var(--green-dim);
+            color: var(--green);
+        }
+
+        .tag-bal {
+            background: var(--amber-dim);
+            color: var(--amber);
+        }
+
+        .tag-cf {
+            background: var(--gold-dim);
+            color: var(--gold2);
+        }
+
+        .tag-qual {
+            background: var(--purple-dim);
+            color: var(--purple);
+        }
+
+        .chevron-icon {
+            color: var(--text3);
+            font-size: 10px;
+            flex-shrink: 0;
+            margin-top: 4px;
+            transition: transform .2s;
+        }
+
+        .item.open .chevron-icon {
+            transform: rotate(180deg);
+            color: var(--gold);
+        }
+
+        /* ITEM BODY */
+        .item-body {
+            display: none;
+            padding: 0 16px 16px;
+            border-top: 1px solid var(--border);
+        }
+
+        .item.open .item-body {
+            display: block;
+        }
+
+        .body-desc {
+            font-size: 12px;
+            color: var(--text2);
+            line-height: 1.65;
+            padding: 12px 0 10px;
+            font-weight: 300;
+        }
+
+        .detail-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-top: 4px;
+        }
+
+        .detail-card {
+            background: var(--bg3);
+            border-radius: 8px;
+            padding: 10px 12px;
+            border: 1px solid var(--border);
+        }
+
+        .detail-card-full {
+            grid-column: 1 / -1;
+        }
+
+        .detail-card-label {
+            font-family: 'DM Mono', monospace;
+            font-size: 9px;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+            color: var(--text3);
+            margin-bottom: 5px;
+        }
+
+        .detail-card-text {
+            font-size: 12px;
+            color: var(--text);
+            line-height: 1.5;
+            font-weight: 300;
+        }
+
+        .detail-card-text a {
+            color: var(--gold);
+            text-decoration: none;
+            font-family: 'DM Mono', monospace;
+            font-size: 11px;
+        }
+
+        .detail-card-text a:hover {
+            text-decoration: underline;
+        }
+
+        /* ZONE RANGES */
+        .ranges {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            margin-top: 0;
+        }
+
+        .range-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .range-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        .dot-green {
+            background: var(--green);
+        }
+
+        .dot-amber {
+            background: var(--amber);
+        }
+
+        .dot-red {
+            background: var(--red);
+        }
+
+        .range-text {
+            font-size: 11px;
+            color: var(--text2);
+        }
+
+        /* FORMULA */
+        .formula {
+            font-family: 'DM Mono', monospace;
+            font-size: 11px;
+            color: var(--gold);
+            background: var(--bg4);
+            padding: 8px 12px;
+            border-radius: 6px;
+            border-left: 2px solid var(--gold-dim);
+            margin-top: 8px;
+        }
+
+        /* QUALITATIVE SECTIONS */
+        .qual-card {
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            margin-bottom: 8px;
+            background: var(--bg2);
+            overflow: hidden;
+        }
+
+        .qual-card-header {
+            display: flex;
+            gap: 12px;
+            align-items: flex-start;
+            padding: 12px 16px;
+            cursor: pointer;
+        }
+
+        .qual-card.open .item-body {
+            display: block;
+        }
+
+        .qual-icon {
+            width: 28px;
+            height: 28px;
+            border-radius: 7px;
+            background: var(--purple-dim);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 13px;
+            flex-shrink: 0;
+        }
+
+        .source-chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            margin-top: 6px;
+        }
+
+        .source-chip {
+            font-family: 'DM Mono', monospace;
+            font-size: 10px;
+            padding: 3px 9px;
+            border-radius: 4px;
+            background: var(--bg4);
+            border: 1px solid var(--border2);
+            color: var(--text2);
+        }
+
+        .source-chip.primary {
+            border-color: var(--gold-dim);
+            color: var(--gold);
+        }
+
+        /* CORRELATION TABLE */
+        .corr-intro {
+            font-size: 13px;
+            color: var(--text2);
+            line-height: 1.6;
+            margin-bottom: 20px;
+            font-weight: 300;
+            max-width: 700px;
+        }
+
+        .corr-group {
+            margin-bottom: 28px;
+        }
+
+        .corr-group-title {
+            font-family: 'Fraunces', serif;
+            font-size: 16px;
+            font-weight: 300;
+            color: var(--gold);
+            margin-bottom: 4px;
+        }
+
+        .corr-group-desc {
+            font-size: 12px;
+            color: var(--text2);
+            margin-bottom: 10px;
+            font-weight: 300;
+        }
+
+        table.corr-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+        }
+
+        .corr-table thead th {
+            font-family: 'DM Mono', monospace;
+            font-size: 9px;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+            color: var(--text3);
+            padding: 7px 12px;
+            border-bottom: 1px solid var(--border2);
+            text-align: left;
+            font-weight: 500;
+        }
+
+        .corr-table tbody td {
+            padding: 9px 12px;
+            border-bottom: 1px solid var(--border);
+            vertical-align: top;
+            color: var(--text2);
+            line-height: 1.5;
+        }
+
+        .corr-table tbody tr:hover td {
+            background: var(--bg3);
+        }
+
+        .corr-table tbody td:first-child {
+            color: var(--text);
+            font-weight: 500;
+        }
+
+        .c-pos {
+            color: var(--green);
+            font-weight: 500;
+        }
+
+        .c-neg {
+            color: var(--red);
+            font-weight: 500;
+        }
+
+        .c-warn {
+            color: var(--amber);
+            font-weight: 500;
+        }
+
+        .corr-direction {
+            display: inline-block;
+            font-family: 'DM Mono', monospace;
+            font-size: 10px;
+            padding: 2px 7px;
+            border-radius: 4px;
+            margin-right: 4px;
+        }
+
+        .dir-pos {
+            background: var(--green-dim);
+            color: var(--green);
+        }
+
+        .dir-neg {
+            background: var(--red-dim);
+            color: var(--red);
+        }
+
+        .dir-mix {
+            background: var(--amber-dim);
+            color: var(--amber);
+        }
+
+        /* HIDDEN */
+        .hidden {
+            display: none !important;
+        }
+
+        /* SCROLLBAR */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border2);
+            border-radius: 3px;
+        }
+
+        @media (max-width: 640px) {
+            .header {
+                padding: 24px 16px 20px;
+            }
+
+            .nav {
+                padding: 10px 16px 0;
+            }
+
+            .panel {
+                padding: 20px 16px 32px;
+            }
+
+            .detail-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .header h1 {
+                font-size: 24px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="header">
+        <div class="header-eyebrow">Trading System · Module 1</div>
+        <h1>Fundamental <em>Analysis</em></h1>
+        <div class="header-sub">Complete reference · Quantitative &amp; Qualitative · Data sources · Strategy ranges ·
+            Correlations</div>
+    </div>
+
+    <nav class="nav">
+        <button class="nav-tab active" onclick="switchTab('quant')">Quantitative FA</button>
+        <button class="nav-tab" onclick="switchTab('qual')">Qualitative FA</button>
+        <button class="nav-tab" onclick="switchTab('corr')">Correlations</button>
+    </nav>
+
+    <!-- ═══════════════════════════════════════════════
+     QUANTITATIVE FA
+═══════════════════════════════════════════════ -->
+    <div class="panel active" id="panel-quant">
+        <div class="toolbar">
+            <div class="search-wrap">
+                <input class="search-input" placeholder="Search metrics..."
+                    oninput="searchPanel('quant', this.value)" />
+            </div>
+            <div class="filter-chips">
+                <button class="chip active" onclick="filterPanel('quant','all',this)">All</button>
+                <button class="chip" onclick="filterPanel('quant','val',this)">Valuation</button>
+                <button class="chip" onclick="filterPanel('quant','prof',this)">Profitability</button>
+                <button class="chip" onclick="filterPanel('quant','growth',this)">Growth</button>
+                <button class="chip" onclick="filterPanel('quant','bal',this)">Balance Sheet</button>
+                <button class="chip" onclick="filterPanel('quant','cf',this)">Cash Flow</button>
+            </div>
+        </div>
+
+        <!-- TIER 1 -->
+        <div class="tier-label"><span class="tier-text">Tier 1 — Highest impact</span>
+            <div class="tier-line"></div>
+        </div>
+
+        <div class="item" data-cat="growth" data-name="earnings per share eps growth rate">
+            <div class="item-header" onclick="toggleItem(this.parentElement)">
+                <div class="rank-badge">01</div>
+                <div class="item-meta">
+                    <div class="item-name">Earnings Per Share (EPS) &amp; EPS Growth Rate <span
+                            class="tag tag-growth">Growth</span></div>
+                    <div class="item-tagline">Net profit attributable to each share — the most watched earnings metric
+                    </div>
+                </div>
+                <span class="chevron-icon">▼</span>
+            </div>
+            <div class="item-body">
+                <div class="body-desc">EPS is the single most watched earnings metric. Markets price expectations — so
+                    the direction and rate of EPS revision matters as much as the level itself. Year-over-year EPS
+                    growth above 15% is considered strong for most sectors. Earnings surprise (actual vs. analyst
+                    consensus) drives the largest single-session price moves of any scheduled event. Always compare
+                    trailing EPS to forward EPS estimates to understand momentum direction.</div>
+                <div class="formula">EPS = (Net Income − Preferred Dividends) ÷ Weighted Average Shares Outstanding
+                </div>
+                <div class="detail-grid">
+                    <div class="detail-card">
+                        <div class="detail-card-label">Strategy ranges</div>
+                        <div class="ranges">
+                            <div class="range-row">
+                                <div class="range-dot dot-green"></div><span class="range-text">Strong: YoY growth
+                                    &gt;15%</span>
+                            </div>
+                            <div class="range-row">
+                                <div class="range-dot dot-amber"></div><span class="range-text">Neutral: 5–15%
+                                    growth</span>
+                            </div>
+                            <div class="range-row">
+                                <div class="range-dot dot-red"></div><span class="range-text">Weak: &lt;5% or
+                                    declining</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="detail-card">
+                        <div class="detail-card-label">Data sources</div>
+                        <div class="detail-card-text">
+                            <a href="https://www.sec.gov/cgi-bin/browse-edgar" target="_blank">SEC EDGAR</a> (10-K/10-Q
+                            free) ·
+                            <a href="https://simfin.com" target="_blank">Simfin API</a> ·
+                            <a href="https://finance.yahoo.com" target="_blank">Yahoo Finance</a> (yfinance Python lib)
+                            ·
+                            <a href="https://www.macrotrends.net" target="_blank">Macrotrends.net</a>
+                        </div>
+                    </div>
+                    <div class="detail-card detail-card-full">
+                        <div class="detail-card-label">Watch for</div>
+                        <div class="detail-card-text">Share buybacks artificially inflate EPS by reducing share count
+                            without improving underlying profit. Always cross-check EPS growth with Free Cash Flow
+                            growth — if they diverge sharply, the earnings quality is suspect. Also check dilution from
+                            stock-based compensation, especially in tech companies.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="item" data-cat="growth" data-name="revenue revenue growth rate top line">
+            <div class="item-header" onclick="toggleItem(this.parentElement)">
+                <div class="rank-badge">02</div>
+                <div class="item-meta">
+                    <div class="item-name">Revenue &amp; Revenue Growth Rate <span class="tag tag-growth">Growth</span>
+                    </div>
+                    <div class="item-tagline">Total income before expenses — top-line health and market share indicator
+                    </div>
+                </div>
+                <span class="chevron-icon">▼</span>
+            </div>
+            <div class="item-body">
+                <div class="body-desc">Revenue growth reveals whether a company is taking market share or losing it.
+                    Revenue quality matters enormously — recurring subscription revenue (SaaS, insurance) is far more
+                    valuable than lumpy one-time project revenue. Organic growth (excluding acquisitions) is the purest
+                    signal of business momentum. Declining revenue with improving margins is a warning sign: the company
+                    is shrinking profitably, which is not sustainable.</div>
+                <div class="detail-grid">
+                    <div class="detail-card">
+                        <div class="detail-card-label">Strategy ranges</div>
+                        <div class="ranges">
+                            <div class="range-row">
+                                <div class="range-dot dot-green"></div><span class="range-text">Strong: &gt;10% YoY
+                                    (growth co.), &gt;5% (mature)</span>
+                            </div>
+                            <div class="range-row">
+                                <div class="range-dot dot-amber"></div><span class="range-text">Neutral: 2–10%</span>
+                            </div>
+                            <div class="range-row">
+                                <div class="range-dot dot-red"></div><span class="range-text">Weak: &lt;2% or
+                                    negative</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="detail-card">
+                        <div class="detail-card-label">Data sources</div>
+                        <div class="detail-card-text">
+                            <a href="https://www.sec.gov/cgi-bin/browse-edgar" target="_blank">SEC EDGAR</a> ·
+                            <a href="https://simfin.com" target="_blank">Simfin</a> ·
+                            <a href="https://stockanalysis.com" target="_blank">Stockanalysis.com</a> ·
+                            <a href="https://www.macrotrends.net" target="_blank">Macrotrends</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="item" data-cat="val" data-name="price to earnings pe ratio valuation multiple">
+            <div class="item-header" onclick="toggleItem(this.parentElement)">
+                <div class="rank-badge">03</div>
+                <div class="item-meta">
+                    <div class="item-name">Price-to-Earnings Ratio (P/E) <span class="tag tag-val">Valuation</span>
+                    </div>
+                    <div class="item-tagline">What the market pays for each dollar of earnings</div>
+                </div>
+                <span class="chevron-icon">▼</span>
+            </div>
+            <div class="item-body">
+                <div class="body-desc">The most universally used valuation multiple. Always compare P/E to: (1) the
+                    sector average, (2) the stock's own 5-year historical mean, and (3) the forward P/E using next
+                    year's EPS estimates. A high P/E means growth expectations are fully priced in — any disappointment
+                    triggers disproportionate drops. Cyclical companies look expensive at cycle troughs (low earnings)
+                    and cheap at peaks — use normalized earnings for these.</div>
+                <div class="formula">Trailing P/E = Price ÷ TTM EPS &nbsp;|&nbsp; Forward P/E = Price ÷ Next 12M EPS
+                    estimate</div>
+                <div class="detail-grid">
+                    <div class="detail-card">
+                        <div class="detail-card-label">Strategy ranges (S&amp;P 500 context)</div>
+                        <div class="ranges">
+                            <div class="range-row">
+                                <div class="range-dot dot-green"></div><span class="range-text">Value stocks: P/E &lt;15
+                                    · Growth stocks: &lt;25</span>
+                            </div>
+                            <div class="range-row">
+                                <div class="range-dot dot-amber"></div><span class="range-text">Value: 15–20 · Growth:
+                                    25–40</span>
+                            </div>
+                            <div class="range-row">
+                                <div class="range-dot dot-red"></div><span class="range-text">Value: &gt;20 · Growth:
+                                    &gt;40 (needs justification)</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="detail-card">
+                        <div class="detail-card-label">Data sources</div>
+                        <div class="detail-card-text">
+                            <a href="https://finviz.com/screener.ashx" target="_blank">Finviz screener</a> ·
+                            <a href="https://finance.yahoo.com" target="_blank">Yahoo Finance</a> ·
+                            <a href="https://www.macrotrends.net" target="_blank">Macrotrends</a> ·
+                            <a href="https://simfin.com" target="_blank">Simfin API</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="item" data-cat="cf" data-name="free cash flow fcf yield cash generation">
+            <div class="item-header" onclick="toggleItem(this.parentElement)">
+                <div class="rank-badge">04</div>
+                <div class="item-meta">
+                    <div class="item-name">Free Cash Flow (FCF) &amp; FCF Yield <span class="tag tag-cf">Cash
+                            Flow</span></div>
+                    <div class="item-tagline">Real cash generated after capex — the hardest earnings metric to
+                        manipulate</div>
+                </div>
+                <span class="chevron-icon">▼</span>
+            </div>
+            <div class="item-body">
+                <div class="body-desc">FCF is what actually funds dividends, buybacks, debt repayment, and acquisitions.
+                    Unlike net income, it cannot easily be manipulated through accounting choices. FCF Yield puts it in
+                    market price context. Divergence between rising reported earnings and falling FCF is one of the most
+                    important red flags in fundamental analysis — always check this cross-reference.</div>
+                <div class="formula">FCF = Operating Cash Flow − Capital Expenditures &nbsp;|&nbsp; FCF Yield = FCF ÷
+                    Market Cap × 100</div>
+                <div class="detail-grid">
+                    <div class="detail-card">
+                        <div class="detail-card-label">Strategy ranges</div>
+                        <div class="ranges">
+                            <div class="range-row">
+                                <div class="range-dot dot-green"></div><span class="range-text">FCF Yield &gt;5%:
+                                    attractive</span>
+                            </div>
+                            <div class="range-row">
+                                <div class="range-dot dot-amber"></div><span class="range-text">FCF Yield 2–5%:
+                                    fair</span>
+                            </div>
+                            <div class="range-row">
+                                <div class="range-dot dot-red"></div><span class="range-text">FCF Yield &lt;2% or
+                                    negative: avoid</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="detail-card">
+                        <div class="detail-card-label">Data sources</div>
+                        <div class="detail-card-text">
+                            <a href="https://www.sec.gov/cgi-bin/browse-edgar" target="_blank">SEC EDGAR</a> (Cash Flow
+                            Statement) ·
+                            <a href="https://simfin.com" target="_blank">Simfin</a> ·
+                            <a href="https://www.macrotrends.net" target="_blank">Macrotrends</a> ·
+                            <a href="https://finance.yahoo.com" target="_blank">Yahoo Finance</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="item" data-cat="prof" data-name="gross margin operating margin net margin profit margins">
+            <div class="item-header" onclick="toggleItem(this.parentElement)">
+                <div class="rank-badge">05</div>
+                <div class="item-meta">
+                    <div class="item-name">Profit Margins (Gross / Operating / Net) <span
+                            class="tag tag-prof">Profitability</span></div>
+                    <div class="item-tagline">What percentage of revenue survives at each stage of the income statement
+                    </div>
+                </div>
+                <span class="chevron-icon">▼</span>
+            </div>
+            <div class="item-body">
+                <div class="body-desc">Gross Margin shows pricing power and production efficiency. Operating Margin adds
+                    overhead and SG&amp;A — reveals operational efficiency. Net Margin is the final bottom line. The
+                    trend direction over 8 consecutive quarters is more important than any single snapshot. Gross margin
+                    expansion is typically the earliest signal of improving competitive position. Net margin collapsing
+                    while revenue grows = cost structure is broken.</div>
+                <div class="formula">Gross Margin = (Revenue − COGS) ÷ Revenue &nbsp;|&nbsp; Operating Margin =
+                    Operating Income ÷ Revenue &nbsp;|&nbsp; Net Margin = Net Income ÷ Revenue</div>
+                <div class="detail-grid">
+                    <div class="detail-card">
+                        <div class="detail-card-label">Strategy ranges (sector-dependent)</div>
+                        <div class="ranges">
+                            <div class="range-row">
+                                <div class="range-dot dot-green"></div><span class="range-text">Gross &gt;40%, Net
+                                    &gt;15%: strong moat</span>
+                            </div>
+                            <div class="range-row">
+                                <div class="range-dot dot-amber"></div><span class="range-text">Gross 20–40%, Net 5–15%:
+                                    average</span>
+                            </div>
+                            <div class="range-row">
+                                <div class="range-dot dot-red"></div><span class="range-text">Gross &lt;20%, Net &lt;5%:
+                                    margin pressure</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="detail-card">
+                        <div class="detail-card-label">Data sources</div>
+                        <div class="detail-card-text">
+                            <a href="https://www.sec.gov/cgi-bin/browse-edgar" target="_blank">SEC EDGAR</a> ·
+                            <a href="https://simfin.com" target="_blank">Simfin</a> ·
+                            <a href="https://www.macrotrends.net" target="_blank">Macrotrends</a> ·
+                            <a href="https://wisesheets.io" target="_blank">Wisesheets</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TIER 2 -->
+        <div class="tier-label"><span class="tier-text">Tier 2 — High importance</span>
+            <div class="tier-line"></div>
+        </div>
+
+        <div class="item" data-cat="prof" data-name="return on invested capital roic roe return on equity">
+            <div class="item-header" onclick="toggleItem(this.parentElement)">
+                <div class="rank-badge">06</div>
+                <div class="item-meta">
+                    <div class="item-name">ROIC &amp; ROE (Return on Invested Capital / Equity) <span
+                            class="tag tag-prof">Profitability</span></div>
+                    <div class="item-tagline">How efficiently does the company generate profit from capital?</div>
+                </div>
+                <span class="chevron-icon">▼</span>
+            </div>
+            <div class="item-body">
+                <div class="body-desc">ROIC is the master profitability metric. ROIC above WACC (typically 8–10%) means
+                    the company creates value with every dollar invested. ROE measures returns on shareholders' equity —
+                    but can be inflated by taking on debt, so always check alongside D/E ratio. Sustained ROIC &gt;15%
+                    for 5+ consecutive years is the classic Buffett-style quality signal indicating a durable
+                    competitive moat.</div>
+                <div class="formula">ROIC = NOPAT ÷ Invested Capital &nbsp;|&nbsp; ROE = Net Income ÷ Shareholders'
+                    Equity</div>
+                <div class="detail-grid">
+                    <div class="detail-card">
+                        <div class="detail-card-label">Strategy ranges</div>
+                        <div class="ranges">
+                            <div class="range-row">
+                                <div class="range-dot dot-green"></div><span class="range-text">ROIC &gt;15%: excellent
+                                    / moat indicator</span>
+                            </div>
+                            <div class="range-row">
+                                <div class="range-dot dot-amber"></div><span class="range-text">ROIC 8–15%:
+                                    adequate</span>
+                            </div>
+                            <div class="range-row">
+                                <div class="range-dot dot-red"></div><span class="range-text">ROIC &lt;8%: destroying
+                                    capital value</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="detail-card">
+                        <div class="detail-card-label">Data sources</div>
+                        <div class="detail-card-text">
+                            <a href="https://simfin.com" target="_blank">Simfin</a> ·
+                            <a href="https://www.macrotrends.net" target="_blank">Macrotrends</a> ·
+                            <a href="https://tikr.com" target="_blank">TIKR.com</a> ·
+                            Manual calc from SEC EDGAR
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="item" data-cat="bal" data-name="debt to equity leverage net debt ebitda balance sheet">
+            <div class="item-header" onclick="toggleItem(this.parentElement)">
+                <div class="rank-badge">07</div>
+                <div class="item-meta">
+                    <div class="item-name">Debt-to-Equity (D/E) &amp; Net Debt / EBITDA <span
+                            class="tag tag-bal">Balance Sheet</span></div>
+                    <div class="item-tagline">Leverage — how much debt finances the business vs. equity</div>
+                </div>
+                <span class="chevron-icon">▼</span>
+            </div>
+            <div class="item-body">
+                <div class="body-desc">Leverage amplifies returns in good times and losses in bad times. Net Debt/EBITDA
+                    is the cleaner metric as it accounts for cash holdings. Rising interest rates make high-debt
+                    companies immediately more vulnerable — each refinancing cycle hits earnings harder. D/E above 2×
+                    demands scrutiny of debt maturity schedules and interest coverage ratio. Industry context essential:
+                    utilities routinely operate at D/E of 3–4× safely.</div>
+                <div class="formula">D/E = Total Debt ÷ Shareholders' Equity &nbsp;|&nbsp; Net Debt/EBITDA = (Total Debt
+                    − Cash) ÷ EBITDA</div>
+                <div class="detail-grid">
+                    <div class="detail-card">
+                        <div class="detail-card-label">Strategy ranges</div>
+                        <div class="ranges">
+                            <div class="range-row">
+                                <div class="range-dot dot-green"></div><span class="range-text">Net Debt/EBITDA &lt;2×:
+                                    conservative</span>
+                            </div>
+                            <div class="range-row">
+                                <div class="range-dot dot-amber"></div><span class="range-text">2–4×: manageable,
+                                    monitor</span>
+                            </div>
+                            <div class="range-row">
+                                <div class="range-dot dot-red"></div><span class="range-text">&gt;4×: high risk in rate
+                                    rise environment</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="detail-card">
+                        <div class="detail-card-label">Data sources</div>
+                        <div class="detail-card-text">
+                            <a href="https://www.sec.gov/cgi-bin/browse-edgar" target="_blank">SEC EDGAR</a> ·
+                            <a href="https://simfin.com" target="_blank">Simfin</a> ·
+                            <a href="https://finviz.com/screener.ashx" target="_blank">Finviz</a> ·
+                            <a href="https://finance.yahoo.com" target="_blank">Yahoo Finance</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="item" data-cat="val" data-name="ev ebitda enterprise value multiple">
+            <div class="item-header" onclick="toggleItem(this.parentElement)">
+                <div class="rank-badge">08</div>
+                <div class="item-meta">
+                    <div class="item-name">EV / EBITDA <span class="tag tag-val">Valuation</span></div>
+                    <div class="item-tagline">Capital-structure neutral valuation — better than P/E for comparing
+                        companies</div>
+                </div>
+                <span class="chevron-icon">▼</span>
+            </div>
+            <div class="item-body">
+                <div class="body-desc">EV (Enterprise Value) = Market Cap + Debt − Cash. Dividing by EBITDA removes the
+                    effect of different capital structures, tax rates, and accounting depreciation choices, making it
+                    ideal for cross-company comparison and M&amp;A analysis. Industry medians vary widely: tech 20–30×,
+                    industrials 10–15×, utilities 8–12×. Always compare within sector, never cross-sector.</div>
+                <div class="formula">EV = Market Cap + Total Debt − Cash &nbsp;|&nbsp; EV/EBITDA = EV ÷ (Operating
+                    Income + D&amp;A)</div>
+                <div class="detail-grid">
+                    <div class="detail-card">
+                        <div class="detail-card-label">Strategy ranges (broad market)</div>
+                        <div class="ranges">
+                            <div class="range-row">
+                                <div class="range-dot dot-green"></div><span class="range-text">&lt;10×: value
+                                    territory</span>
+                            </div>
+                            <div class="range-row">
+                                <div class="range-dot dot-amber"></div><span class="range-text">10–20×: fairly
+                                    valued</span>
+                            </div>
+                            <div class="range-row">
+                                <div class="range-dot dot-red"></div><span class="range-text">&gt;20×: requires strong
+                                    growth justification</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="detail-card">
+                        <div class="detail-card-label">Data sources</div>
+                        <div class="detail-card-text">
+                            <a href="https://finviz.com" target="_blank">Finviz</a> ·
+                            <a href="https://www.macrotrends.net" target="_blank">Macrotrends</a> ·
+                            <a href="https://tikr.com" target="_blank">TIKR</a> ·
+                            Calc from Simfin data
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="item" data-cat="val" data-name="peg ratio price earnings growth">
+            <div class="item-header" onclick="toggleItem(this.parentElement)">
+                <div class="rank-badge">09</div>
+                <div class="item-meta">
+                    <div class="item-name">PEG Ratio <span class="tag tag-val">Valuation</span></div>
+                    <div class="item-tagline">P/E adjusted for expected earnings growth rate</div>
+                </div>
+                <span class="chevron-icon">▼</span>
+            </div>
+            <div class="item-body">
+                <div class="body-desc">PEG adjusts P/E for the company's expected growth, making expensive-looking
+                    companies fairly valued or cheap once growth is factored in. A P/E of 30 looks expensive until
+                    earnings are growing at 40% — PEG of 0.75 is actually attractive. Highly sensitive to the growth
+                    rate estimate used — always use 3–5 year analyst consensus, not single-year estimates. Most useful
+                    for growth companies where pure P/E misleads.</div>
+                <div class="formula">PEG = P/E Ratio ÷ EPS Annual Growth Rate (%)</div>
+                <div class="detail-grid">
+                    <div class="detail-card">
+                        <div class="detail-card-label">Strategy ranges</div>
+                        <div class="ranges">
+                            <div class="range-row">
+                                <div class="range-dot dot-green"></div><span class="range-text">PEG &lt;1.0: undervalued
+                                    relative to growth</span>
+                            </div>
+                            <div class="range-row">
+                                <div class="range-dot dot-amber"></div><span class="range-text">1.0–2.0: fairly
+                                    valued</span>
+                            </div>
+                            <div class="range-row">
+                                <div class="range-dot dot-red"></div><span class="range-text">&gt;2.0: growth
+                                    expectations fully priced</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="detail-card">
+                        <div class="detail-card-label">Data sources</div>
+                        <div class="detail-card-text">
+                            <a href="https://finance.yahoo.com" target="_blank">Yahoo Finance</a> (statistics tab) ·
+                            <a href="https://finviz.com" target="_blank">Finviz</a> ·
+                            <a href="https://www.macrotrends.net" target="_blank">Macrotrends</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="item" data-cat="bal" data-name="current ratio quick ratio liquidity short term">
+            <div class="item-header" onclick="toggleItem(this.parentElement)">
+                <div class="rank-badge">10</div>
+                <div class="item-meta">
+                    <div class="item-name">Current Ratio &amp; Quick Ratio <span class="tag tag-bal">Balance
+                            Sheet</span></div>
+                    <div class="item-tagline">Short-term liquidity — can the company meet near-term obligations?</div>
+                </div>
+                <span class="chevron-icon">▼</span>
+            </div>
+            <div class="item-body">
+                <div class="body-desc">Current Ratio includes all current assets including inventory. Quick Ratio
+                    excludes inventory (which may not be quickly convertible to cash), making it a stricter solvency
+                    test. Below 1.0 means short-term liabilities exceed liquid short-term assets — not always fatal but
+                    demands explanation. Critical to check when a company has significant debt maturities approaching or
+                    operates in a cyclical industry.</div>
+                <div class="formula">Current Ratio = Current Assets ÷ Current Liabilities &nbsp;|&nbsp; Quick Ratio =
+                    (Cash + Receivables) ÷ Current Liabilities</div>
+                <div class="detail-grid">
+                    <div class="detail-card">
+                        <div class="detail-card-label">Strategy ranges</div>
+                        <div class="ranges">
+                            <div class="range-row">
+                                <div class="range-dot dot-green"></div><span class="range-text">Current &gt;1.5 · Quick
+                                    &gt;1.0: safe</span>
+                            </div>
+                            <div class="range-row">
+                                <div class="range-dot dot-amber"></div><span class="range-text">Current 1.0–1.5 · Quick
+                                    0.7–1.0: monitor</span>
+                            </div>
+                            <div class="range-row">
+                                <div class="range-dot dot-red"></div><span class="range-text">Current &lt;1.0 · Quick
+                                    &lt;0.7: liquidity risk</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="detail-card">
+                        <div class="detail-card-label">Data sources</div>
+                        <div class="detail-card-text">
+                            <a href="https://www.sec.gov/cgi-bin/browse-edgar" target="_blank">SEC EDGAR</a> ·
+                            <a href="https://simfin.com" target="_blank">Simfin</a> ·
+                            <a href="https://stockanalysis.com" target="_blank">Stockanalysis.com</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TIER 3 -->
+        <div class="tier-label"><span class="tier-text">Tier 3 — Important context</span>
+            <div class="tier-line"></div>
+        </div>
+
+        <div class="item" data-cat="val" data-name="price to book pb tangible book value">
+            <div class="item-header" onclick="toggleItem(this.parentElement)">
+                <div class="rank-badge">11</div>
+                <div class="item-meta">
+                    <div class="item-name">Price-to-Book (P/B) &amp; Tangible Book Value <span
+                            class="tag tag-val">Valuation</span></div>
+                    <div class="item-tagline">Market price vs. net asset value on the balance sheet</div>
+                </div>
+                <span class="chevron-icon">▼</span>
+            </div>
+            <div class="item-body">
+                <div class="body-desc">Most relevant for banks, insurers, and asset-heavy industries. P/B below 1.0
+                    means the market values the company at less than its book value — signals deep value or structural
+                    problems. Tangible Book Value strips out intangibles (goodwill, patents) for a harder measure of
+                    real asset value. Technology companies with heavy intangible assets make P/B less meaningful — use
+                    EV/EBITDA or P/FCF instead.</div>
+                <div class="formula">P/B = Share Price ÷ Book Value Per Share &nbsp;|&nbsp; Book Value = Total Assets −
+                    Total Liabilities</div>
+                <div class="detail-grid">
+                    <div class="detail-card">
+                        <div class="detail-card-label">Strategy ranges</div>
+                        <div class="ranges">
+                            <div class="range-row">
+                                <div class="range-dot dot-green"></div><span class="range-text">P/B &lt;1.5 (asset-heavy
+                                    sectors): value signal</span>
+                            </div>
+                            <div class="range-row">
+                                <div class="range-dot dot-amber"></div><span class="range-text">1.5–3.0: fair for most
+                                    industries</span>
+                            </div>
+                            <div class="range-row">
+                                <div class="range-dot dot-red"></div><span class="range-text">&gt;5×: limited margin of
+                                    safety</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="detail-card">
+                        <div class="detail-card-label">Data sources</div>
+                        <div class="detail-card-text">
+                            <a href="https://finviz.com" target="_blank">Finviz</a> ·
+                            <a href="https://www.macrotrends.net" target="_blank">Macrotrends</a> ·
+                            <a href="https://simfin.com" target="_blank">Simfin API</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="item" data-cat="cf" data-name="dividend yield payout ratio dividend growth income">
+            <div class="item-header" onclick="toggleItem(this.parentElement)">
+                <div class="rank-badge">12</div>
+                <div class="item-meta">
+                    <div class="item-name">Dividend Yield &amp; Payout Ratio <span class="tag tag-cf">Cash Flow</span>
+                    </div>
+                    <div class="item-tagline">Income return on investment and dividend sustainability</div>
+                </div>
+                <span class="chevron-icon">▼</span>
+            </div>
+            <div class="item-body">
+                <div class="body-desc">Dividend Yield = Annual Dividend ÷ Share Price. Payout Ratio = Dividends ÷ Net
+                    Income (or FCF for better accuracy). A high yield with a low payout ratio is the ideal — it signals
+                    generous income that is sustainable. Payout above 80% leaves little room for dividend maintenance
+                    during earnings dips. Dividend cuts are one of the most negative catalysts a stock can experience —
+                    the market punishes them severely.</div>
+                <div class="formula">Dividend Yield = (Annual DPS ÷ Price) × 100 &nbsp;|&nbsp; Payout Ratio = DPS ÷ EPS
+                    × 100</div>
+                <div class="detail-grid">
+                    <div class="detail-card">
+                        <div class="detail-card-label">Strategy ranges</div>
+                        <div class="ranges">
+                            <div class="range-row">
+                                <div class="range-dot dot-green"></div><span class="range-text">Yield 3–6%, Payout
+                                    &lt;60%: sustainable income</span>
+                            </div>
+                            <div class="range-row">
+                                <div class="range-dot dot-amber"></div><span class="range-text">Yield &gt;6% — verify
+                                    payout ratio sustainability</span>
+                            </div>
+                            <div class="range-row">
+                                <div class="range-dot dot-red"></div><span class="range-text">Payout &gt;80%: dividend
+                                    cut risk</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="detail-card">
+                        <div class="detail-card-label">Data sources</div>
+                        <div class="detail-card-text">
+                            <a href="https://finance.yahoo.com" target="_blank">Yahoo Finance</a> ·
+                            <a href="https://seekingalpha.com" target="_blank">Seeking Alpha</a> ·
+                            <a href="https://www.macrotrends.net" target="_blank">Macrotrends</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="item" data-cat="growth" data-name="shares outstanding buyback dilution share count">
+            <div class="item-header" onclick="toggleItem(this.parentElement)">
+                <div class="rank-badge">13</div>
+                <div class="item-meta">
+                    <div class="item-name">Share Count Trend (Buybacks vs. Dilution) <span
+                            class="tag tag-growth">Growth</span></div>
+                    <div class="item-tagline">Is the company shrinking or growing its share count over time?</div>
+                </div>
+                <span class="chevron-icon">▼</span>
+            </div>
+            <div class="item-body">
+                <div class="body-desc">Net buybacks reduce share count, boosting EPS per share without improving
+                    underlying earnings — a form of financial engineering. Heavy stock-based compensation (SBC) in tech
+                    companies dilutes shareholders even when the company appears profitable. Track the 5-year change in
+                    shares outstanding. Declining share count is generally bullish; rising share count demands scrutiny
+                    of why capital is being raised.</div>
+                <div class="detail-grid">
+                    <div class="detail-card">
+                        <div class="detail-card-label">Strategy ranges</div>
+                        <div class="ranges">
+                            <div class="range-row">
+                                <div class="range-dot dot-green"></div><span class="range-text">Share count declining
+                                    &gt;2% annually: buyback program</span>
+                            </div>
+                            <div class="range-row">
+                                <div class="range-dot dot-amber"></div><span class="range-text">Flat ±2%: neutral</span>
+                            </div>
+                            <div class="range-row">
+                                <div class="range-dot dot-red"></div><span class="range-text">Growing &gt;3% annually:
+                                    dilution risk</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="detail-card">
+                        <div class="detail-card-label">Data sources</div>
+                        <div class="detail-card-text">
+                            <a href="https://www.sec.gov/cgi-bin/browse-edgar" target="_blank">SEC EDGAR</a> ·
+                            <a href="https://www.macrotrends.net" target="_blank">Macrotrends</a> ·
+                            <a href="https://simfin.com" target="_blank">Simfin</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="item" data-cat="val" data-name="discounted cash flow dcf intrinsic value">
+            <div class="item-header" onclick="toggleItem(this.parentElement)">
+                <div class="rank-badge">14</div>
+                <div class="item-meta">
+                    <div class="item-name">Discounted Cash Flow (DCF) Intrinsic Value <span
+                            class="tag tag-val">Valuation</span></div>
+                    <div class="item-tagline">The theoretical anchor — what a business is worth based on future cash
+                        flows</div>
+                </div>
+                <span class="chevron-icon">▼</span>
+            </div>
+            <div class="item-body">
+                <div class="body-desc">DCF calculates the present value of all future free cash flows, discounted at the
+                    company's cost of capital (WACC). The most theoretically correct valuation method. Extremely
+                    sensitive to input assumptions — a 1% change in growth rate or discount rate can move the output by
+                    30–50%. Use DCF as a range and sanity check, not a precise number. Best used alongside
+                    multiples-based valuation.</div>
+                <div class="formula">DCF Value = Σ [FCFt ÷ (1 + WACC)^t] + Terminal Value &nbsp;|&nbsp; WACC typically
+                    8–12%</div>
+                <div class="detail-grid">
+                    <div class="detail-card">
+                        <div class="detail-card-label">Strategy use</div>
+                        <div class="ranges">
+                            <div class="range-row">
+                                <div class="range-dot dot-green"></div><span class="range-text">Price &lt;70% of DCF
+                                    intrinsic: strong margin of safety</span>
+                            </div>
+                            <div class="range-row">
+                                <div class="range-dot dot-amber"></div><span class="range-text">Price 70–100% of DCF:
+                                    fairly valued</span>
+                            </div>
+                            <div class="range-row">
+                                <div class="range-dot dot-red"></div><span class="range-text">Price &gt;110% of DCF:
+                                    downside risk</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="detail-card">
+                        <div class="detail-card-label">Data sources</div>
+                        <div class="detail-card-text">
+                            Build from Simfin FCF data + FRED risk-free rate ·
+                            <a href="https://valueinvesting.io/dcf-calculator" target="_blank">valueinvesting.io</a>
+                            (calculator) ·
+                            <a href="https://finbox.com" target="_blank">Finbox.com</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="item" data-cat="prof" data-name="interest coverage ratio ebit earnings before interest tax">
+            <div class="item-header" onclick="toggleItem(this.parentElement)">
+                <div class="rank-badge">15</div>
+                <div class="item-meta">
+                    <div class="item-name">Interest Coverage Ratio <span class="tag tag-prof">Profitability</span></div>
+                    <div class="item-tagline">Can the company comfortably pay the interest on its debt?</div>
+                </div>
+                <span class="chevron-icon">▼</span>
+            </div>
+            <div class="item-body">
+                <div class="body-desc">Measures how many times over the company can pay its interest expense from
+                    operating earnings. Critical for any company carrying significant debt. In a rising rate
+                    environment, refinancing at higher rates can quickly erode coverage. Below 2× means interest
+                    payments consume more than half of operating earnings — very dangerous in an economic slowdown.
+                </div>
+                <div class="formula">Interest Coverage = EBIT ÷ Interest Expense</div>
+                <div class="detail-grid">
+                    <div class="detail-card">
+                        <div class="detail-card-label">Strategy ranges</div>
+                        <div class="ranges">
+                            <div class="range-row">
+                                <div class="range-dot dot-green"></div><span class="range-text">&gt;5×: very safe</span>
+                            </div>
+                            <div class="range-row">
+                                <div class="range-dot dot-amber"></div><span class="range-text">2–5×: adequate, monitor
+                                    debt maturity</span>
+                            </div>
+                            <div class="range-row">
+                                <div class="range-dot dot-red"></div><span class="range-text">&lt;2×: high risk,
+                                    especially in rising rate env.</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="detail-card">
+                        <div class="detail-card-label">Data sources</div>
+                        <div class="detail-card-text">
+                            <a href="https://simfin.com" target="_blank">Simfin</a> ·
+                            <a href="https://www.macrotrends.net" target="_blank">Macrotrends</a> ·
+                            Manual calc from SEC EDGAR income statement
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="item" data-cat="prof" data-name="asset turnover inventory turnover efficiency ratios">
+            <div class="item-header" onclick="toggleItem(this.parentElement)">
+                <div class="rank-badge">16</div>
+                <div class="item-meta">
+                    <div class="item-name">Asset Turnover &amp; Inventory Turnover <span
+                            class="tag tag-prof">Profitability</span></div>
+                    <div class="item-tagline">Operational efficiency — how productively does the company use its assets?
+                    </div>
+                </div>
+                <span class="chevron-icon">▼</span>
+            </div>
+            <div class="item-body">
+                <div class="body-desc">Asset Turnover measures revenue generated per dollar of assets — high turnover
+                    means the company extracts maximum output from its asset base. Inventory Turnover reveals how
+                    quickly goods move — slowing turnover signals weakening demand or poor inventory management, often
+                    before it appears in revenue numbers. Both are most useful for comparing companies within the same
+                    industry.</div>
+                <div class="formula">Asset Turnover = Revenue ÷ Average Total Assets &nbsp;|&nbsp; Inventory Turnover =
+                    COGS ÷ Average Inventory</div>
+                <div class="detail-grid">
+                    <div class="detail-card">
+                        <div class="detail-card-label">Strategy use</div>
+                        <div class="detail-card-text">Compare to sector peers over time. Declining inventory turnover is
+                            an early warning for consumer and industrial companies. Rising asset turnover indicates
+                            improving capital efficiency.</div>
+                    </div>
+                    <div class="detail-card">
+                        <div class="detail-card-label">Data sources</div>
+                        <div class="detail-card-text">
+                            <a href="https://simfin.com" target="_blank">Simfin</a> ·
+                            <a href="https://stockanalysis.com" target="_blank">Stockanalysis.com</a> ·
+                            <a href="https://www.macrotrends.net" target="_blank">Macrotrends</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="item" data-cat="growth" data-name="analyst estimates earnings revisions consensus forward guidance">
+            <div class="item-header" onclick="toggleItem(this.parentElement)">
+                <div class="rank-badge">17</div>
+                <div class="item-meta">
+                    <div class="item-name">Analyst Consensus Estimates &amp; Revision Trend <span
+                            class="tag tag-growth">Growth</span></div>
+                    <div class="item-tagline">Where professional analysts expect the business to go — and whether
+                        they're upgrading or downgrading</div>
+                </div>
+                <span class="chevron-icon">▼</span>
+            </div>
+            <div class="item-body">
+                <div class="body-desc">Consensus EPS and revenue estimates set the bar the market prices in. The
+                    revision trend (are estimates rising or falling over the past 90 days?) is often a stronger signal
+                    than the estimate itself. Rising estimates attract institutional buying before the actual earnings
+                    event. The ratio of upward to downward revisions is tracked as the "Earnings Revision Ratio" — above
+                    1.0 is bullish, below is bearish.</div>
+                <div class="detail-grid">
+                    <div class="detail-card">
+                        <div class="detail-card-label">Data sources</div>
+                        <div class="detail-card-text">
+                            <a href="https://finance.yahoo.com" target="_blank">Yahoo Finance</a> (analysis tab) ·
+                            <a href="https://seekingalpha.com" target="_blank">Seeking Alpha</a> ·
+                            <a href="https://finviz.com" target="_blank">Finviz</a> ·
+                            <a href="https://www.wsj.com/market-data" target="_blank">WSJ Markets</a>
+                        </div>
+                    </div>
+                    <div class="detail-card">
+                        <div class="detail-card-label">Strategy use</div>
+                        <div class="detail-card-text">Upward revision trend + improving fundamentals = high-conviction
+                            buy signal. Downward revisions + deteriorating margins = exit or avoid signal. Track 30, 60,
+                            90-day revision trend.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="item" data-cat="bal" data-name="goodwill intangibles book value assets">
+            <div class="item-header" onclick="toggleItem(this.parentElement)">
+                <div class="rank-badge">18</div>
+                <div class="item-meta">
+                    <div class="item-name">Goodwill &amp; Intangible Assets as % of Total Assets <span
+                            class="tag tag-bal">Balance Sheet</span></div>
+                    <div class="item-tagline">Hidden balance sheet risk from past acquisitions</div>
+                </div>
+                <span class="chevron-icon">▼</span>
+            </div>
+            <div class="item-body">
+                <div class="body-desc">Goodwill arises when a company acquires another for more than book value. It sits
+                    on the balance sheet until written down (impaired). Serial acquirers can accumulate enormous
+                    goodwill that inflates total assets. A goodwill impairment charge is a non-cash but significant
+                    negative signal — it means the acquisition did not deliver expected returns. Check goodwill as a %
+                    of total assets and track it over time.</div>
+                <div class="detail-grid">
+                    <div class="detail-card">
+                        <div class="detail-card-label">Strategy ranges</div>
+                        <div class="ranges">
+                            <div class="range-row">
+                                <div class="range-dot dot-green"></div><span class="range-text">Goodwill &lt;20% of
+                                    total assets: low risk</span>
+                            </div>
+                            <div class="range-row">
+                                <div class="range-dot dot-amber"></div><span class="range-text">20–40%: monitor
+                                    acquisition discipline</span>
+                            </div>
+                            <div class="range-row">
+                                <div class="range-dot dot-red"></div><span class="range-text">&gt;40%: significant
+                                    impairment risk</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="detail-card">
+                        <div class="detail-card-label">Data sources</div>
+                        <div class="detail-card-text">SEC EDGAR 10-K Balance Sheet · <a href="https://simfin.com"
+                                target="_blank">Simfin</a></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="item" data-cat="val" data-name="price to sales ps ratio revenue valuation">
+            <div class="item-header" onclick="toggleItem(this.parentElement)">
+                <div class="rank-badge">19</div>
+                <div class="item-meta">
+                    <div class="item-name">Price-to-Sales (P/S) Ratio <span class="tag tag-val">Valuation</span></div>
+                    <div class="item-tagline">Valuation when earnings are zero or negative — useful for early-stage
+                        growth companies</div>
+                </div>
+                <span class="chevron-icon">▼</span>
+            </div>
+            <div class="item-body">
+                <div class="body-desc">P/S = Market Cap ÷ Annual Revenue. Relevant for companies not yet profitable or
+                    with highly variable earnings. It requires an assumption that margins will eventually normalize to
+                    industry levels. P/S reached extreme levels during 2020–2021 tech bubble (20–50× for SaaS) before
+                    collapsing in 2022. Most useful for comparing within a sector where margin profiles are similar.
+                </div>
+                <div class="formula">P/S = Market Cap ÷ TTM Revenue &nbsp;|&nbsp; EV/Revenue = EV ÷ TTM Revenue
+                    (preferred for comparisons)</div>
+                <div class="detail-grid">
+                    <div class="detail-card">
+                        <div class="detail-card-label">Strategy ranges (SaaS/tech context)</div>
+                        <div class="ranges">
+                            <div class="range-row">
+                                <div class="range-dot dot-green"></div><span class="range-text">P/S &lt;5× with &gt;20%
+                                    revenue growth: reasonable</span>
+                            </div>
+                            <div class="range-row">
+                                <div class="range-dot dot-amber"></div><span class="range-text">5–10×: growth premium
+                                    required</span>
+                            </div>
+                            <div class="range-row">
+                                <div class="range-dot dot-red"></div><span class="range-text">&gt;15×: speculative, very
+                                    high risk</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="detail-card">
+                        <div class="detail-card-label">Data sources</div>
+                        <div class="detail-card-text">
+                            <a href="https://finviz.com" target="_blank">Finviz</a> ·
+                            <a href="https://simfin.com" target="_blank">Simfin</a> ·
+                            <a href="https://stockanalysis.com" target="_blank">Stockanalysis.com</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="item" data-cat="cf" data-name="capex capital expenditures reinvestment rate growth investment">
+            <div class="item-header" onclick="toggleItem(this.parentElement)">
+                <div class="rank-badge">20</div>
+                <div class="item-meta">
+                    <div class="item-name">CapEx as % of Revenue &amp; Reinvestment Rate <span class="tag tag-cf">Cash
+                            Flow</span></div>
+                    <div class="item-tagline">How much of revenue must be reinvested to maintain and grow the business?
+                    </div>
+                </div>
+                <span class="chevron-icon">▼</span>
+            </div>
+            <div class="item-body">
+                <div class="body-desc">Low CapEx relative to revenue = asset-light business model = high FCF conversion.
+                    Asset-light businesses (software, insurance, consumer brands) can grow with minimal reinvestment —
+                    this is a core quality characteristic. Capital-intensive industries (semiconductors, airlines,
+                    mining) must constantly reinvest large portions of revenue just to maintain capacity, leaving less
+                    for shareholder returns.</div>
+                <div class="formula">CapEx Intensity = CapEx ÷ Revenue × 100 &nbsp;|&nbsp; FCF Conversion = FCF ÷ Net
+                    Income × 100</div>
+                <div class="detail-grid">
+                    <div class="detail-card">
+                        <div class="detail-card-label">Strategy ranges</div>
+                        <div class="ranges">
+                            <div class="range-row">
+                                <div class="range-dot dot-green"></div><span class="range-text">CapEx &lt;5% of revenue:
+                                    asset-light, high quality</span>
+                            </div>
+                            <div class="range-row">
+                                <div class="range-dot dot-amber"></div><span class="range-text">5–15%: moderate capital
+                                    intensity</span>
+                            </div>
+                            <div class="range-row">
+                                <div class="range-dot dot-red"></div><span class="range-text">&gt;20%:
+                                    capital-intensive, FCF constrained</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="detail-card">
+                        <div class="detail-card-label">Data sources</div>
+                        <div class="detail-card-text">
+                            <a href="https://www.sec.gov/cgi-bin/browse-edgar" target="_blank">SEC EDGAR</a> Cash Flow
+                            Statement ·
+                            <a href="https://simfin.com" target="_blank">Simfin</a> ·
+                            <a href="https://www.macrotrends.net" target="_blank">Macrotrends</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════
+     QUALITATIVE FA
+═══════════════════════════════════════════════ -->
+    <div class="panel" id="panel-qual">
+        <p
+            style="font-size:13px;color:var(--text2);margin-bottom:20px;font-weight:300;line-height:1.6;max-width:680px;">
+            Qualitative analysis cannot be reduced to a number — it requires reading, judgment, and pattern recognition.
+            The LLM layer in your system handles most of this. Each factor below includes what to look for, how to score
+            it, and where the source documents live.</p>
+
+        <div class="tier-label"><span class="tier-text">Tier 1 — Most decisive qualitative factors</span>
+            <div class="tier-line"></div>
+        </div>
+
+        <div class="qual-card" id="qc1">
+            <div class="qual-card-header" onclick="toggleQual('qc1')">
+                <div class="qual-icon">🏰</div>
+                <div class="item-meta">
+                    <div class="item-name">Competitive Moat &amp; Pricing Power <span
+                            class="tag tag-qual">Qualitative</span></div>
+                    <div class="item-tagline">Can the business raise prices without losing customers?</div>
+                </div>
+                <span class="chevron-icon" id="qc1-chev">▼</span>
+            </div>
+            <div class="item-body" id="qc1-body" style="display:none">
+                <div class="body-desc">The single most important qualitative characteristic. A moat is a sustainable
+                    competitive advantage that prevents competitors from eroding profitability. The five types are:
+                    network effects (value grows with users), switching costs (expensive or painful to leave), cost
+                    advantages (permanently lower cost structure), intangible assets (brands, patents, licenses), and
+                    efficient scale (dominant in a market too small for a second player).</div>
+                <div class="detail-grid">
+                    <div class="detail-card">
+                        <div class="detail-card-label">What to look for in filings</div>
+                        <div class="detail-card-text">Sustained gross margins above 40% over 10 years. Ability to raise
+                            prices above inflation without volume loss. Customer retention / churn rates (in 10-K
+                            MD&amp;A). Revenue per customer trending up. Competitor commentary in annual reports.
+                            Barriers to entry description in 10-K Item 1 (Business).</div>
+                    </div>
+                    <div class="detail-card">
+                        <div class="detail-card-label">LLM scoring prompt</div>
+                        <div class="detail-card-text">Ask: "Identify the competitive moat type, cite specific evidence
+                            from the filing, and rate moat strength on a scale of 1–5 with justification." Input: 10-K
+                            Item 1 + last 4 earnings call transcripts.</div>
+                    </div>
+                    <div class="detail-card detail-card-full">
+                        <div class="detail-card-label">Source documents</div>
+                        <div class="source-chips">
+                            <span class="source-chip primary">SEC EDGAR 10-K Item 1</span>
+                            <span class="source-chip primary">Earnings call transcripts (Seeking Alpha)</span>
+                            <span class="source-chip">Annual report letter to shareholders</span>
+                            <span class="source-chip">Industry analyst reports (sell-side)</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="qual-card" id="qc2">
+            <div class="qual-card-header" onclick="toggleQual('qc2')">
+                <div class="qual-icon">👔</div>
+                <div class="item-meta">
+                    <div class="item-name">Management Quality &amp; Capital Allocation <span
+                            class="tag tag-qual">Qualitative</span></div>
+                    <div class="item-tagline">Are the people running the company trustworthy, capable, and aligned with
+                        shareholders?</div>
+                </div>
+                <span class="chevron-icon" id="qc2-chev">▼</span>
+            </div>
+            <div class="item-body" id="qc2-body" style="display:none">
+                <div class="body-desc">Outstanding management compounds returns over time; poor management destroys even
+                    great businesses. Assess capital allocation history: did acquisitions create or destroy value? Are
+                    buybacks done at reasonable prices or just to hit EPS targets? Insider ownership above 10% aligns
+                    incentives. Candor in shareholder letters — do they acknowledge mistakes or only celebrate wins?
+                </div>
+                <div class="detail-grid">
+                    <div class="detail-card">
+                        <div class="detail-card-label">What to look for</div>
+                        <div class="detail-card-text">Insider ownership % and purchase/sale history (SEC Form 4). CEO
+                            tenure and track record at prior companies. Compensation vs. performance alignment (proxy
+                            statement). History of M&amp;A returns (did past acquisitions generate ROIC &gt; WACC?).
+                            Guidance accuracy history.</div>
+                    </div>
+                    <div class="detail-card">
+                        <div class="detail-card-label">Data sources</div>
+                        <div class="source-chips">
+                            <span class="source-chip primary">SEC Form 4 (insider transactions)</span>
+                            <span class="source-chip primary">DEF 14A Proxy Statement</span>
+                            <span class="source-chip">Glassdoor CEO ratings</span>
+                            <span class="source-chip">Earnings call transcripts</span>
+                            <span class="source-chip">Annual shareholder letters</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="qual-card" id="qc3">
+            <div class="qual-card-header" onclick="toggleQual('qc3')">
+                <div class="qual-icon">📈</div>
+                <div class="item-meta">
+                    <div class="item-name">Earnings Call Tone &amp; Management Narrative <span
+                            class="tag tag-qual">Qualitative</span></div>
+                    <div class="item-tagline">What management says, how they say it, and what they avoid saying</div>
+                </div>
+                <span class="chevron-icon" id="qc3-chev">▼</span>
+            </div>
+            <div class="item-body" id="qc3-body" style="display:none">
+                <div class="body-desc">The LLM layer adds enormous value here. Management language changes before
+                    numbers change. Increasing use of vague language, more lawyer-drafted answers, defensive tone about
+                    a previously celebrated product, sudden emphasis on "efficiency" when they previously emphasized
+                    growth — all precede negative surprises. Conversely, increasing specificity about customers,
+                    pipeline, and metrics signals genuine confidence.</div>
+                <div class="detail-grid">
+                    <div class="detail-card">
+                        <div class="detail-card-label">LLM scoring signals</div>
+                        <div class="detail-card-text">Sentiment polarity vs. prior 4 quarters. Frequency of hedging
+                            language. Specificity of forward guidance. Changes in language around key business metrics.
+                            Q&amp;A tone vs. scripted section tone. Length of answers to challenging analyst questions.
+                        </div>
+                    </div>
+                    <div class="detail-card">
+                        <div class="detail-card-label">Data sources</div>
+                        <div class="source-chips">
+                            <span class="source-chip primary">Seeking Alpha transcripts (free)</span>
+                            <span class="source-chip primary">The Motley Fool transcripts</span>
+                            <span class="source-chip">Company IR page (audio/webcast)</span>
+                            <span class="source-chip">Rev.com (real-time transcription)</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="qual-card" id="qc4">
+            <div class="qual-card-header" onclick="toggleQual('qc4')">
+                <div class="qual-icon">⚠️</div>
+                <div class="item-meta">
+                    <div class="item-name">10-K Risk Factors &amp; MD&amp;A Analysis <span
+                            class="tag tag-qual">Qualitative</span></div>
+                    <div class="item-tagline">What the company itself discloses as its own biggest threats</div>
+                </div>
+                <span class="chevron-icon" id="qc4-chev">▼</span>
+            </div>
+            <div class="item-body" id="qc4-body" style="display:none">
+                <div class="body-desc">Item 1A (Risk Factors) in the 10-K is legally required to be complete and
+                    material. Most investors skip it. The LLM should compare this year's risk factors to last year's —
+                    new risks added, risks removed, and changes in emphasis are meaningful signals. The MD&amp;A
+                    (Management Discussion &amp; Analysis) is where management explains the numbers — changes in
+                    language here often precede financial statement changes.</div>
+                <div class="detail-grid">
+                    <div class="detail-card">
+                        <div class="detail-card-label">LLM tasks</div>
+                        <div class="detail-card-text">Year-over-year diff of risk factor section. Flag newly added
+                            material risks. Score language change in MD&amp;A — is management more or less confident
+                            than prior year? Identify any litigation risks and their potential financial materiality.
+                        </div>
+                    </div>
+                    <div class="detail-card">
+                        <div class="detail-card-label">Data sources</div>
+                        <div class="source-chips">
+                            <span class="source-chip primary">SEC EDGAR 10-K (Item 1A, Item 7)</span>
+                            <span class="source-chip primary">SEC EDGAR 10-Q (quarterly updates)</span>
+                            <span class="source-chip">SEC 8-K (material event disclosures)</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="tier-label"><span class="tier-text">Tier 2 — Important qualitative context</span>
+            <div class="tier-line"></div>
+        </div>
+
+        <div class="qual-card" id="qc5">
+            <div class="qual-card-header" onclick="toggleQual('qc5')">
+                <div class="qual-icon">🏭</div>
+                <div class="item-meta">
+                    <div class="item-name">Industry Structure &amp; Competitive Dynamics <span
+                            class="tag tag-qual">Qualitative</span></div>
+                    <div class="item-tagline">Porter's Five Forces — is the industry structure inherently profitable?
+                    </div>
+                </div>
+                <span class="chevron-icon" id="qc5-chev">▼</span>
+            </div>
+            <div class="item-body" id="qc5-body" style="display:none">
+                <div class="body-desc">Even the best company struggles in a structurally bad industry. Assess: threat of
+                    new entrants (capital requirements, regulatory barriers), supplier bargaining power, customer
+                    bargaining power, threat of substitutes, and rivalry intensity. Airlines have chronically bad
+                    industry structure despite serving billions of customers. Software has structurally excellent
+                    economics. Industry structure persists for decades.</div>
+                <div class="detail-grid">
+                    <div class="detail-card">
+                        <div class="detail-card-label">Data sources</div>
+                        <div class="source-chips">
+                            <span class="source-chip primary">IBISWorld industry reports</span>
+                            <span class="source-chip primary">10-K Item 1 (competition section)</span>
+                            <span class="source-chip">Sell-side sector initiation reports</span>
+                            <span class="source-chip">Trade association publications</span>
+                        </div>
+                    </div>
+                    <div class="detail-card">
+                        <div class="detail-card-label">LLM task</div>
+                        <div class="detail-card-text">Score each of the Five Forces on a 1–5 scale using 10-K and
+                            industry sources. Output a structured JSON with force scores and evidence citations.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="qual-card" id="qc6">
+            <div class="qual-card-header" onclick="toggleQual('qc6')">
+                <div class="qual-icon">🔬</div>
+                <div class="item-meta">
+                    <div class="item-name">R&amp;D Pipeline &amp; Innovation Trajectory <span
+                            class="tag tag-qual">Qualitative</span></div>
+                    <div class="item-tagline">Is the company investing in its future or harvesting its past?</div>
+                </div>
+                <span class="chevron-icon" id="qc6-chev">▼</span>
+            </div>
+            <div class="item-body" id="qc6-body" style="display:none">
+                <div class="body-desc">R&amp;D as a % of revenue signals reinvestment in future products. Critically,
+                    check whether R&amp;D is producing results — are new products gaining traction? Is the company
+                    losing ground to newer entrants? Patent filing trends, product pipeline descriptions in 10-K, and
+                    management commentary about upcoming product cycles all feed this assessment. Most relevant for
+                    pharma, tech, semiconductor, and industrial companies.</div>
+                <div class="detail-grid">
+                    <div class="detail-card">
+                        <div class="detail-card-label">Data sources</div>
+                        <div class="source-chips">
+                            <span class="source-chip primary">10-K (R&amp;D expense + pipeline description)</span>
+                            <span class="source-chip">USPTO patent database</span>
+                            <span class="source-chip">FDA pipeline tracker (pharma)</span>
+                            <span class="source-chip">Earnings call product discussion</span>
+                        </div>
+                    </div>
+                    <div class="detail-card">
+                        <div class="detail-card-label">Strategy range</div>
+                        <div class="detail-card-text">Tech: R&amp;D 10–20% of revenue = healthy. Pharma: 15–25%.
+                            Under-investment in R&amp;D relative to sector peers signals a company harvesting its
+                            position rather than building it.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="qual-card" id="qc7">
+            <div class="qual-card-header" onclick="toggleQual('qc7')">
+                <div class="qual-icon">⚖️</div>
+                <div class="item-meta">
+                    <div class="item-name">Regulatory Environment &amp; Legal Risk <span
+                            class="tag tag-qual">Qualitative</span></div>
+                    <div class="item-tagline">Pending litigation, regulatory changes, and compliance burdens</div>
+                </div>
+                <span class="chevron-icon" id="qc7-chev">▼</span>
+            </div>
+            <div class="item-body" id="qc7-body" style="display:none">
+                <div class="body-desc">Regulatory risk is underpriced until it is suddenly very expensive. Antitrust
+                    actions against big tech, environmental regulations for energy companies, pricing regulations for
+                    pharma — these can materially alter business models with limited warning. Track DOJ/FTC filings, EU
+                    regulatory actions, and congressional hearing schedules for specific sectors. SEC enforcement
+                    actions are also meaningful signals of governance problems.</div>
+                <div class="detail-grid">
+                    <div class="detail-card">
+                        <div class="detail-card-label">Data sources</div>
+                        <div class="source-chips">
+                            <span class="source-chip primary">SEC EDGAR 10-K Item 3 (Legal Proceedings)</span>
+                            <span class="source-chip primary">DOJ Antitrust Division (justice.gov)</span>
+                            <span class="source-chip">FTC.gov enforcement actions</span>
+                            <span class="source-chip">EU Competition (ec.europa.eu)</span>
+                            <span class="source-chip">Reuters/Bloomberg legal feeds</span>
+                        </div>
+                    </div>
+                    <div class="detail-card">
+                        <div class="detail-card-label">LLM task</div>
+                        <div class="detail-card-text">Summarize all active legal proceedings from 10-K Item 3. Flag any
+                            with potential liability &gt;5% of market cap. Track year-over-year changes in disclosed
+                            proceedings.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="qual-card" id="qc8">
+            <div class="qual-card-header" onclick="toggleQual('qc8')">
+                <div class="qual-icon">🌍</div>
+                <div class="item-meta">
+                    <div class="item-name">ESG Factors &amp; Sustainability Risk <span
+                            class="tag tag-qual">Qualitative</span></div>
+                    <div class="item-tagline">Environmental, social and governance risks that affect long-term business
+                        viability</div>
+                </div>
+                <span class="chevron-icon" id="qc8-chev">▼</span>
+            </div>
+            <div class="item-body" id="qc8-body" style="display:none">
+                <div class="body-desc">ESG is a practical risk assessment, not just ethics. Carbon-intensive businesses
+                    face stranded asset risk as regulations tighten. Companies with poor labor practices face wage
+                    pressure and reputational damage. Weak governance (concentrated voting, no board independence,
+                    related-party transactions) correlates with shareholder value destruction. Institutional ownership
+                    screening increasingly excludes poor ESG scores, creating structural selling pressure.</div>
+                <div class="detail-grid">
+                    <div class="detail-card">
+                        <div class="detail-card-label">Data sources</div>
+                        <div class="source-chips">
+                            <span class="source-chip primary">MSCI ESG Ratings (msci.com)</span>
+                            <span class="source-chip primary">Sustainalytics (morningstar)</span>
+                            <span class="source-chip">CDP climate disclosure database</span>
+                            <span class="source-chip">Company sustainability report</span>
+                        </div>
+                    </div>
+                    <div class="detail-card">
+                        <div class="detail-card-label">What matters most</div>
+                        <div class="detail-card-text">Governance (G) is the most predictive of financial outcomes.
+                            Environmental risk is most material for energy, mining, utilities. Social risk matters most
+                            for consumer-facing companies. Use as a risk flag, not a primary signal.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="qual-card" id="qc9">
+            <div class="qual-card-header" onclick="toggleQual('qc9')">
+                <div class="qual-icon">📰</div>
+                <div class="item-meta">
+                    <div class="item-name">News Sentiment &amp; Media Narrative <span
+                            class="tag tag-qual">Qualitative</span></div>
+                    <div class="item-tagline">Real-time qualitative signal from news flow and public perception</div>
+                </div>
+                <span class="chevron-icon" id="qc9-chev">▼</span>
+            </div>
+            <div class="item-body" id="qc9-body" style="display:none">
+                <div class="body-desc">News sentiment is a noisy but fast-moving signal. The LLM should score news on a
+                    rolling 7-day and 30-day basis, filtering for material events (product launches, management changes,
+                    regulatory filings, analyst upgrades/downgrades) vs. noise. Sudden shift from positive to negative
+                    narrative often precedes price weakness by 5–10 trading days. The absence of negative news during a
+                    price decline can indicate institutional selling rather than fundamental problems.</div>
+                <div class="detail-grid">
+                    <div class="detail-card">
+                        <div class="detail-card-label">Data sources</div>
+                        <div class="source-chips">
+                            <span class="source-chip primary">NewsAPI.org (free tier available)</span>
+                            <span class="source-chip primary">Alpha Vantage News API</span>
+                            <span class="source-chip">Benzinga News API</span>
+                            <span class="source-chip">Google News RSS feeds</span>
+                            <span class="source-chip">Reddit API (WSB/stocks)</span>
+                            <span class="source-chip">StockTwits API</span>
+                        </div>
+                    </div>
+                    <div class="detail-card">
+                        <div class="detail-card-label">LLM output format</div>
+                        <div class="detail-card-text">{"sentiment_7d": 0.6, "sentiment_30d": 0.3, "trend":
+                            "deteriorating", "material_events": ["CEO departure announced"], "noise_ratio": "high"}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="qual-card" id="qc10">
+            <div class="qual-card-header" onclick="toggleQual('qc10')">
+                <div class="qual-icon">🏦</div>
+                <div class="item-meta">
+                    <div class="item-name">Insider Transactions &amp; Institutional Ownership Changes <span
+                            class="tag tag-qual">Qualitative</span></div>
+                    <div class="item-tagline">What are the people with the most information actually doing with their
+                        money?</div>
+                </div>
+                <span class="chevron-icon" id="qc10-chev">▼</span>
+            </div>
+            <div class="item-body" id="qc10-body" style="display:none">
+                <div class="body-desc">Cluster buying by multiple insiders (3+ in 90 days) is one of the
+                    highest-conviction bullish signals available. Institutional 13F filings (quarterly) reveal hedge
+                    fund and mutual fund positioning. When a high-quality fund initiates or dramatically increases a
+                    position, the fundamental case is worth examining closely. Insider selling is less informative than
+                    buying — insiders sell for many reasons, but buy for only one.</div>
+                <div class="detail-grid">
+                    <div class="detail-card">
+                        <div class="detail-card-label">Data sources</div>
+                        <div class="source-chips">
+                            <span class="source-chip primary">SEC Form 4 (EDGAR insider filings)</span>
+                            <span class="source-chip primary">SEC 13F filings (quarterly)</span>
+                            <span class="source-chip">Openinsider.com (free aggregator)</span>
+                            <span class="source-chip">Dataroma.com (guru holdings)</span>
+                            <span class="source-chip">Finviz insider transactions tab</span>
+                        </div>
+                    </div>
+                    <div class="detail-card">
+                        <div class="detail-card-label">Signal thresholds</div>
+                        <div class="detail-card-text">Bullish: 3+ insiders buying within 90 days · Large fund (Ackman,
+                            Einhorn etc.) initiating position · Institutional ownership rising for 2+ consecutive
+                            quarters · CEO buying open-market shares</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════
+     CORRELATIONS
+═══════════════════════════════════════════════ -->
+    <div class="panel" id="panel-corr">
+        <p class="corr-intro">These are the critical relationships between quantitative FA metrics. Understanding how
+            they move together — and when they diverge — is more valuable than any single metric in isolation.
+            Divergences between correlated metrics are the most powerful signals.</p>
+
+        <div class="corr-group">
+            <div class="corr-group-title">1. Earnings quality cluster</div>
+            <div class="corr-group-desc">EPS, FCF, Revenue, and Net Margin should all trend in the same direction. When
+                they diverge, something is wrong.</div>
+            <table class="corr-table">
+                <thead>
+                    <tr>
+                        <th>Metric A</th>
+                        <th>Metric B</th>
+                        <th>Expected relationship</th>
+                        <th>What divergence means</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>EPS Growth</td>
+                        <td>FCF Growth</td>
+                        <td><span class="corr-direction dir-pos">Positive</span> Both should rise together</td>
+                        <td><span class="c-neg">EPS rising, FCF flat/falling</span> = earnings manipulation via
+                            accruals. Investigate receivables growth and capitalized expenses. This is one of the most
+                            important red flags in FA.</td>
+                    </tr>
+                    <tr>
+                        <td>Revenue Growth</td>
+                        <td>EPS Growth</td>
+                        <td><span class="corr-direction dir-pos">Positive</span> EPS grows faster in operating leverage
+                        </td>
+                        <td><span class="c-neg">Revenue falling, EPS rising</span> = buybacks masking deterioration.
+                            <span class="c-warn">Revenue rising, EPS falling</span> = cost structure breaking, margin
+                            compression.</td>
+                    </tr>
+                    <tr>
+                        <td>Gross Margin</td>
+                        <td>Net Margin</td>
+                        <td><span class="corr-direction dir-pos">Positive</span> Gross margin leads net margin</td>
+                        <td><span class="c-neg">Gross margin expanding, net margin falling</span> = SG&amp;A or interest
+                            costs exploding. Gross margin is the first line of defense — watch it first.</td>
+                    </tr>
+                    <tr>
+                        <td>Revenue Growth</td>
+                        <td>Gross Margin</td>
+                        <td><span class="corr-direction dir-mix">Context-dependent</span></td>
+                        <td>Fast revenue growth with falling gross margin = scaling without pricing power. Fast growth
+                            with stable/rising gross margin = the ideal quality-growth combination.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="corr-group">
+            <div class="corr-group-title">2. Valuation vs. quality cluster</div>
+            <div class="corr-group-desc">Valuation multiples should reflect underlying quality. When they don't, it
+                signals mis-pricing.</div>
+            <table class="corr-table">
+                <thead>
+                    <tr>
+                        <th>Metric A</th>
+                        <th>Metric B</th>
+                        <th>Expected relationship</th>
+                        <th>What divergence means</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>P/E Ratio</td>
+                        <td>EPS Growth Rate</td>
+                        <td><span class="corr-direction dir-pos">Positive</span> Higher growth justifies higher P/E</td>
+                        <td><span class="c-pos">Low P/E + high growth</span> = potential undervaluation (check PEG).
+                            <span class="c-neg">High P/E + low/declining growth</span> = valuation trap, avoid.</td>
+                    </tr>
+                    <tr>
+                        <td>P/E Ratio</td>
+                        <td>ROIC</td>
+                        <td><span class="corr-direction dir-pos">Positive</span> High ROIC companies deserve premium P/E
+                        </td>
+                        <td><span class="c-pos">High ROIC + low P/E</span> = rare value opportunity. <span
+                                class="c-neg">Low ROIC + high P/E</span> = unjustified premium, dangerous combination.
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>EV/EBITDA</td>
+                        <td>Net Debt/EBITDA</td>
+                        <td><span class="corr-direction dir-neg">Inverse</span> Higher debt should compress EV multiple
+                        </td>
+                        <td>Highly leveraged companies with high EV/EBITDA are doubly exposed — overvalued AND fragile.
+                            In rate rise environments this is a short candidate.</td>
+                    </tr>
+                    <tr>
+                        <td>FCF Yield</td>
+                        <td>Dividend Yield</td>
+                        <td><span class="corr-direction dir-pos">Positive</span> FCF yield should exceed dividend yield
+                        </td>
+                        <td><span class="c-neg">Dividend yield &gt; FCF yield</span> = dividend is not covered by real
+                            cash generation. Cut risk is high. This divergence is a reliable dividend cut predictor.
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>P/B Ratio</td>
+                        <td>ROE</td>
+                        <td><span class="corr-direction dir-pos">Positive</span> High ROE justifies premium to book</td>
+                        <td><span class="c-pos">Low P/B + high sustained ROE</span> = classic deep value. <span
+                                class="c-neg">High P/B + declining ROE</span> = multiple contraction risk ahead.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="corr-group">
+            <div class="corr-group-title">3. Leverage &amp; liquidity cluster</div>
+            <div class="corr-group-desc">Balance sheet metrics that interact to determine financial resilience under
+                stress.</div>
+            <table class="corr-table">
+                <thead>
+                    <tr>
+                        <th>Metric A</th>
+                        <th>Metric B</th>
+                        <th>Expected relationship</th>
+                        <th>What divergence means</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Net Debt/EBITDA</td>
+                        <td>Interest Coverage</td>
+                        <td><span class="corr-direction dir-neg">Inverse</span> High leverage = lower coverage</td>
+                        <td><span class="c-neg">High debt/EBITDA + falling interest coverage</span> = accelerating
+                            financial distress. The combination that precedes most corporate credit events.</td>
+                    </tr>
+                    <tr>
+                        <td>Current Ratio</td>
+                        <td>FCF Trend</td>
+                        <td><span class="corr-direction dir-pos">Positive</span> Strong FCF supports liquidity</td>
+                        <td><span class="c-neg">Deteriorating current ratio + negative FCF</span> = cash burn
+                            accelerating. Company may need to raise capital, diluting equity or issuing expensive debt.
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>D/E Ratio</td>
+                        <td>Net Margin</td>
+                        <td><span class="corr-direction dir-mix">Context-dependent</span></td>
+                        <td>Leverage is safe only with strong margins. <span class="c-neg">D/E &gt;3 + net margin
+                                &lt;5%</span> = dangerous combination — any revenue shortfall cascades to insolvency
+                            risk.</td>
+                    </tr>
+                    <tr>
+                        <td>Goodwill % Assets</td>
+                        <td>FCF Conversion</td>
+                        <td><span class="corr-direction dir-neg">Often inverse</span></td>
+                        <td>Serial acquirers with high goodwill often show strong reported earnings but weak FCF — the
+                            acquisitions are not generating real cash. Watch for widening gap between net income and FCF
+                            in acquisition-heavy companies.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="corr-group">
+            <div class="corr-group-title">4. Operational efficiency cluster</div>
+            <div class="corr-group-desc">How well the business converts inputs to profitable outputs.</div>
+            <table class="corr-table">
+                <thead>
+                    <tr>
+                        <th>Metric A</th>
+                        <th>Metric B</th>
+                        <th>Expected relationship</th>
+                        <th>What divergence means</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>ROIC</td>
+                        <td>Revenue Growth</td>
+                        <td><span class="corr-direction dir-pos">Positive</span> High ROIC + growth = compounding
+                            machine</td>
+                        <td><span class="c-pos">Both rising</span> = the ideal investment. <span class="c-neg">Revenue
+                                growing, ROIC declining</span> = growth is dilutive — company is investing in projects
+                            that earn less than cost of capital.</td>
+                    </tr>
+                    <tr>
+                        <td>Asset Turnover</td>
+                        <td>Net Margin</td>
+                        <td><span class="corr-direction dir-mix">DuPont tradeoff</span></td>
+                        <td>The DuPont equation: ROE = Net Margin × Asset Turnover × Leverage. High turnover / low
+                            margin (Walmart) vs. low turnover / high margin (luxury goods) are both valid models. When
+                            both decline together, ROE collapses.</td>
+                    </tr>
+                    <tr>
+                        <td>Inventory Turnover</td>
+                        <td>Gross Margin</td>
+                        <td><span class="corr-direction dir-pos">Often positive</span></td>
+                        <td><span class="c-neg">Falling inventory turnover + falling gross margin</span> = demand
+                            destruction. Products not selling → price cuts to clear inventory → margin compression.
+                            Classic early recession signal for consumer/industrial companies.</td>
+                    </tr>
+                    <tr>
+                        <td>CapEx % Revenue</td>
+                        <td>FCF Yield</td>
+                        <td><span class="corr-direction dir-neg">Inverse</span> High capex consumes FCF</td>
+                        <td>Companies with falling CapEx intensity (transitioning from growth to harvest phase) see FCF
+                            yields expand dramatically — this often signals an upcoming re-rating by the market.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="corr-group">
+            <div class="corr-group-title">5. The master divergence signals — highest conviction</div>
+            <div class="corr-group-desc">These specific divergence combinations have the highest historical predictive
+                value for either opportunity or risk.</div>
+            <table class="corr-table">
+                <thead>
+                    <tr>
+                        <th>Signal type</th>
+                        <th>Metrics involved</th>
+                        <th>Interpretation</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><span class="c-pos">★ Bullish divergence</span></td>
+                        <td>Low P/E + High ROIC + Rising FCF + Falling D/E + Insider buying</td>
+                        <td>All five pointing the same direction is a rare convergence. A quality business becoming
+                            cheaper while improving fundamentals and insiders buying = highest conviction long entry.
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><span class="c-pos">★ Hidden value signal</span></td>
+                        <td>EPS stagnant + FCF rising strongly + Low P/FCF</td>
+                        <td>Earnings held down by non-cash charges (depreciation of past capex) while real cash
+                            generation is strong. The market prices on EPS; you buy on FCF. Classic Graham-style hidden
+                            value.</td>
+                    </tr>
+                    <tr>
+                        <td><span class="c-neg">★ Deterioration warning</span></td>
+                        <td>EPS rising + FCF flat/falling + Receivables growing faster than revenue</td>
+                        <td>Earnings are being manufactured through accrual accounting — customers are buying but not
+                            paying, or revenue is being recognized before cash is collected. Restatement or earnings
+                            miss risk is elevated.</td>
+                    </tr>
+                    <tr>
+                        <td><span class="c-neg">★ Value trap signal</span></td>
+                        <td>Low P/E + declining ROIC + rising D/E + declining revenue</td>
+                        <td>Cheap for a reason. The business is structurally deteriorating. Value investors attracted by
+                            the low P/E get trapped as earnings keep declining and the multiple stays low or compresses
+                            further.</td>
+                    </tr>
+                    <tr>
+                        <td><span class="c-warn">★ Leverage cycle warning</span></td>
+                        <td>Net Debt/EBITDA rising + Interest Coverage falling + FCF declining + Current Ratio below 1
+                        </td>
+                        <td>Four leverage/liquidity metrics simultaneously deteriorating = financial distress
+                            trajectory. In a rising rate environment this combination can move to credit event within
+                            2–4 quarters.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+function switchTab(id) {
+  document.querySelectorAll('.nav-tab').forEach((t,i) => {
+    t.classList.toggle('active', ['quant','qual','corr'][i] === id);
+  });
+  document.querySelectorAll('.panel').forEach(p => {
+    p.classList.toggle('active', p.id === 'panel-' + id);
+  });
+}
+
+function toggleItem(el) {
+  el.classList.toggle('open');
+}
+
+function toggleQual(id) {
+  const body = document.getElementById(id + '-body');
+  const chev = document.getElementById(id + '-chev');
+  const card = document.getElementById(id);
+  const isOpen = body.style.display !== 'none';
+  body.style.display = isOpen ? 'none' : 'block';
+  chev.style.transform = isOpen ? '' : 'rotate(180deg)';
+  chev.style.color = isOpen ? 'var(--text3)' : 'var(--gold)';
+  card.style.borderColor = isOpen ? '' : 'var(--gold-dim)';
+}
+
+function searchPanel(panel, val) {
+  const q = val.toLowerCase();
+  document.querySelectorAll('#panel-' + panel + ' .item').forEach(item => {
+    const name = (item.dataset.name || '').toLowerCase();
+    item.classList.toggle('hidden', q.length > 0 && !name.includes(q));
+  });
+}
+
+function filterPanel(panel, cat, btn) {
+  document.querySelectorAll('#panel-' + panel + ' .filter-chips .chip').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('#panel-' + panel + ' .item[data-cat]').forEach(item => {
+    item.classList.toggle('hidden', cat !== 'all' && item.dataset.cat !== cat);
+  });
+  // handle tier labels
+  document.querySelectorAll('#panel-' + panel + ' .tier-label').forEach(label => {
+    if (cat === 'all') { label.style.display = ''; return; }
+    let next = label.nextElementSibling;
+    let vis = false;
+    while (next && !next.classList.contains('tier-label')) {
+      if (next.classList.contains('item') && !next.classList.contains('hidden')) vis = true;
+      next = next.nextElementSibling;
+    }
+    label.style.display = vis ? '' : 'none';
+  });
+}
+    </script>
+</body>
+
+</html>

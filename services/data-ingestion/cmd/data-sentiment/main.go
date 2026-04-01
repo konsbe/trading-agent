@@ -12,12 +12,12 @@ import (
 
 	"github.com/joho/godotenv"
 
-	"github.com/berdelis/trading-agent/services/data-ingestion/internal/config"
-	"github.com/berdelis/trading-agent/services/data-ingestion/internal/db"
-	"github.com/berdelis/trading-agent/services/data-ingestion/internal/fetch/finnhub"
-	"github.com/berdelis/trading-agent/services/data-ingestion/internal/fetch/lunarcrush"
-	"github.com/berdelis/trading-agent/services/data-ingestion/internal/logx"
-	"github.com/berdelis/trading-agent/services/data-ingestion/internal/store"
+	"github.com/konsbe/trading-agent/services/data-ingestion/internal/config"
+	"github.com/konsbe/trading-agent/services/data-ingestion/internal/db"
+	"github.com/konsbe/trading-agent/services/data-ingestion/internal/fetch/finnhub"
+	"github.com/konsbe/trading-agent/services/data-ingestion/internal/fetch/lunarcrush"
+	"github.com/konsbe/trading-agent/services/data-ingestion/internal/logx"
+	"github.com/konsbe/trading-agent/services/data-ingestion/internal/store"
 )
 
 func main() {

@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/berdelis/trading-agent/shared/schemas/news_headlines.schema.json",
+  "$id": "https://github.com/konsbe/trading-agent/shared/schemas/news_headlines.schema.json",
   "title": "news_headlines row",
   "type": "object",
   "required": ["ts", "source", "headline"],

@@ -10,12 +10,12 @@ import (
 
 	"github.com/joho/godotenv"
 
-	"github.com/berdelis/trading-agent/services/data-ingestion/internal/config"
-	"github.com/berdelis/trading-agent/services/data-ingestion/internal/db"
-	"github.com/berdelis/trading-agent/services/data-ingestion/internal/fetch/binance"
-	"github.com/berdelis/trading-agent/services/data-ingestion/internal/fetch/coingecko"
-	"github.com/berdelis/trading-agent/services/data-ingestion/internal/logx"
-	"github.com/berdelis/trading-agent/services/data-ingestion/internal/store"
+	"github.com/konsbe/trading-agent/services/data-ingestion/internal/config"
+	"github.com/konsbe/trading-agent/services/data-ingestion/internal/db"
+	"github.com/konsbe/trading-agent/services/data-ingestion/internal/fetch/binance"
+	"github.com/konsbe/trading-agent/services/data-ingestion/internal/fetch/coingecko"
+	"github.com/konsbe/trading-agent/services/data-ingestion/internal/logx"
+	"github.com/konsbe/trading-agent/services/data-ingestion/internal/store"
 )
 
 func main() {

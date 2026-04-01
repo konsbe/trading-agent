@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/berdelis/trading-agent/services/data-ingestion/internal/store"
+	"github.com/konsbe/trading-agent/services/data-ingestion/internal/store"
 )
 
 // StreamKlines opens a Binance combined stream for kline_1h style streams and emits closed bars on ch.

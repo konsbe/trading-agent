@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/berdelis/trading-agent/shared/schemas/onchain_metrics.schema.json",
+  "$id": "https://github.com/konsbe/trading-agent/shared/schemas/onchain_metrics.schema.json",
   "title": "onchain_metrics row",
   "type": "object",
   "required": ["ts", "asset", "metric", "source"],

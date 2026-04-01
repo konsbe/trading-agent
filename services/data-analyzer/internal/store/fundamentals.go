@@ -49,8 +49,8 @@ func UpsertFundamentalDerived(
 	return err
 }
 
-// QueryLatestMetrics returns the most recent value for each metric of a given symbol,
-// across all raw source rows (finnhub_metric, finnhub_financials_reported, finnhub_earnings).
+// QueryLatestMetrics returns the most recent value for each (metric, period) pair
+// of a given symbol, across all raw source rows.
 func QueryLatestMetrics(ctx context.Context, pool *pgxpool.Pool, symbol string) ([]FundamentalRow, error) {
 	rows, err := pool.Query(ctx, `
 		SELECT DISTINCT ON (metric, period) ts, period, metric, value, payload, source
@@ -68,6 +68,39 @@ func QueryLatestMetrics(ctx context.Context, pool *pgxpool.Pool, symbol string) 
 	for rows.Next() {
 		var r FundamentalRow
 		if err := rows.Scan(&r.TS, &r.Period, &r.Metric, &r.Value, &r.Payload, &r.Source); err != nil {
+			return nil, err
+		}
+		result = append(result, r)
+	}
+	return result, rows.Err()
+}
+
+// QueryMetricSeries returns the last `limit` distinct quarterly periods for a
+// single metric of one symbol, ordered newest-first.
+//
+// Use this for 8-quarter trend analysis: pass limit=8, metric="gross_profit_reported".
+// Only rows from finnhub_financials_reported are returned so we don't mix TTM
+// and quarterly figures.
+func QueryMetricSeries(ctx context.Context, pool *pgxpool.Pool, symbol, metric string, limit int) ([]FundamentalRow, error) {
+	rows, err := pool.Query(ctx, `
+		SELECT DISTINCT ON (period) period, ts, metric, value, payload, source
+		FROM equity_fundamentals
+		WHERE symbol = $1
+		  AND metric  = $2
+		  AND source  = 'finnhub_financials_reported'
+		  AND value IS NOT NULL
+		ORDER BY period DESC, ts DESC
+		LIMIT $3`,
+		symbol, metric, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var result []FundamentalRow
+	for rows.Next() {
+		var r FundamentalRow
+		if err := rows.Scan(&r.Period, &r.TS, &r.Metric, &r.Value, &r.Payload, &r.Source); err != nil {
 			return nil, err
 		}
 		result = append(result, r)

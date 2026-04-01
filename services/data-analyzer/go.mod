@@ -1,4 +1,4 @@
-module github.com/berdelis/trading-agent/services/data-analyzer
+module github.com/konsbe/trading-agent/services/data-analyzer
 
 go 1.25.0
 
