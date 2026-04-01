@@ -1,4 +1,4 @@
-module github.com/berdelis/trading-agent/services/data-ingestion
+module github.com/konsbe/trading-agent/services/data-ingestion
 
 go 1.25.0
 

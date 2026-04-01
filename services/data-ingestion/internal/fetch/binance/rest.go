@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/berdelis/trading-agent/services/data-ingestion/internal/store"
+	"github.com/konsbe/trading-agent/services/data-ingestion/internal/store"
 	"golang.org/x/time/rate"
 )
 

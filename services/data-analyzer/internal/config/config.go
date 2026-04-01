@@ -202,44 +202,101 @@ type TechnicalAnalysis struct {
 	MTFEquitySecondary []string
 	MTFCryptoSecondary []string
 
+	// ── SMC: Order Blocks ────────────────────────────────────────────────────
+	OBSwingStrength int
+	OBImpulseMinPct float64
+	OBLookback      int
+
+	// ── SMC: Fair Value Gaps ─────────────────────────────────────────────────
+	FVGMinGapPct float64
+	FVGLookback  int
+
+	// ── SMC: Liquidity Sweeps ────────────────────────────────────────────────
+	LiquiditySwingStrength int
+	LiquidityLookback      int
+
+	// ── VIX Regime (reads VIXCLS from macro_fred) ────────────────────────────
+	VIXFearThreshold        float64 // VIX > this → extreme fear
+	VIXElevatedThreshold    float64 // VIX > this → elevated anxiety
+	VIXComplacencyThreshold float64 // VIX < this → complacency
+
+	// ── Multi-TF Pivot Points ─────────────────────────────────────────────────
+	WeeklyPivotEquityInterval  string // e.g. "1Week"
+	WeeklyPivotCryptoInterval  string // e.g. "1w"
+	MonthlyPivotEquityInterval string // e.g. "1Month"
+	MonthlyPivotCryptoInterval string // e.g. "1M"
+	WeeklyPivotLookback        int    // how many weekly bars to query  default 10
+	MonthlyPivotLookback       int    // how many monthly bars to query default 5
+
+	// ── Candlestick Patterns ───────────────────────────────────────────────────
+	CandleWindow int // last N bars to scan for candle patterns  default 3
+
+	// ── Head & Shoulders ─────────────────────────────────────────────────────
+	HSSwingStrength  int
+	HSTolerancePct   float64
+	HSLookback       int
+
+	// ── Triangle Patterns ────────────────────────────────────────────────────
+	TriangleSwingStrength   int
+	TriangleMinPivots       int
+	TriangleFlatThresholdPct float64
+	TriangleLookback        int
+
+	// ── Flag / Pennant ───────────────────────────────────────────────────────
+	FlagPolePct          float64
+	FlagMaxRetracePct    float64
+	FlagPoleLen          int
+	FlagLen              int
+
 	// Feature toggles.
-	EnableMA              bool
-	EnableRSI             bool
-	EnableVolume          bool
-	EnableSR              bool
-	EnableTrend           bool
-	EnableCandles         bool
-	EnableMACD            bool
-	EnableOBV             bool
-	EnableBollinger       bool
-	EnableFib             bool
-	EnableRSIDivergence   bool
-	EnableVolProfileProxy bool
-	EnableRSIHidden       bool
-	EnableStochastic      bool
-	EnableATR             bool
-	EnableIchimoku        bool
-	EnableADLine          bool
-	EnableADX             bool
-	EnablePivots          bool
-	EnableWilliamsR       bool
-	EnableVWAP            bool
-	EnableMARibbon        bool
-	EnableChartPatterns   bool
-	EnableCMF             bool
-	EnableKeltner         bool
-	EnableDonchian        bool
-	EnableTrendlineBreak  bool
-	EnableCCI             bool
-	EnableROC             bool
-	EnableParabolicSAR    bool
-	EnableMFI             bool
-	EnableMarketStructure bool
-	EnableElliottHint     bool
-	EnableGannHint        bool
+	EnableMA               bool
+	EnableRSI              bool
+	EnableVolume           bool
+	EnableSR               bool
+	EnableTrend            bool
+	EnableCandles          bool
+	EnableMACD             bool
+	EnableOBV              bool
+	EnableBollinger        bool
+	EnableFib              bool
+	EnableRSIDivergence    bool
+	EnableVolProfileProxy  bool
+	EnableRSIHidden        bool
+	EnableStochastic       bool
+	EnableATR              bool
+	EnableIchimoku         bool
+	EnableADLine           bool
+	EnableADX              bool
+	EnablePivots           bool
+	EnableWilliamsR        bool
+	EnableVWAP             bool
+	EnableMARibbon         bool
+	EnableChartPatterns    bool
+	EnableCMF              bool
+	EnableKeltner          bool
+	EnableDonchian         bool
+	EnableTrendlineBreak   bool
+	EnableCCI              bool
+	EnableROC              bool
+	EnableParabolicSAR     bool
+	EnableMFI              bool
+	EnableMarketStructure  bool
+	EnableElliottHint      bool
+	EnableGannHint         bool
 	EnableOpenInterestInfo bool
-	EnableRSBenchmark     bool
-	EnableMTFConfluence   bool
+	EnableRSBenchmark      bool
+	EnableMTFConfluence    bool
+	// New SMC / pattern toggles.
+	EnableOrderBlocks     bool
+	EnableFVG             bool
+	EnableLiquiditySweep  bool
+	EnableBBSqueeze       bool
+	EnableVIXRegime       bool
+	EnableWeeklyPivots    bool
+	EnableMonthlyPivots   bool
+	EnableHSPattern       bool
+	EnableTriangle        bool
+	EnableFlag            bool
 }
 
 func LoadTechnicalAnalysis() (TechnicalAnalysis, error) {
@@ -351,43 +408,99 @@ func LoadTechnicalAnalysis() (TechnicalAnalysis, error) {
 		MTFEquitySecondary: splitCSV("TECHNICAL_MTF_EQUITY_INTERVALS"),
 		MTFCryptoSecondary: splitCSV("TECHNICAL_MTF_CRYPTO_INTERVALS"),
 
-		EnableMA:              boolEnv("TECHNICAL_ENABLE_MA", true),
-		EnableRSI:             boolEnv("TECHNICAL_ENABLE_RSI", true),
-		EnableVolume:          boolEnv("TECHNICAL_ENABLE_VOLUME", true),
-		EnableSR:              boolEnv("TECHNICAL_ENABLE_SR", true),
-		EnableTrend:           boolEnv("TECHNICAL_ENABLE_TREND", true),
-		EnableCandles:         boolEnv("TECHNICAL_ENABLE_CANDLES", true),
-		EnableMACD:            boolEnv("TECHNICAL_ENABLE_MACD", true),
-		EnableOBV:             boolEnv("TECHNICAL_ENABLE_OBV", true),
-		EnableBollinger:       boolEnv("TECHNICAL_ENABLE_BOLLINGER", true),
-		EnableFib:             boolEnv("TECHNICAL_ENABLE_FIB", true),
-		EnableRSIDivergence:   boolEnv("TECHNICAL_ENABLE_RSI_DIVERGENCE", true),
-		EnableVolProfileProxy: boolEnv("TECHNICAL_ENABLE_VOL_PROFILE_PROXY", true),
-		EnableRSIHidden:       boolEnv("TECHNICAL_ENABLE_RSI_HIDDEN", true),
-		EnableStochastic:      boolEnv("TECHNICAL_ENABLE_STOCHASTIC", true),
-		EnableATR:             boolEnv("TECHNICAL_ENABLE_ATR", true),
-		EnableIchimoku:        boolEnv("TECHNICAL_ENABLE_ICHIMOKU", true),
-		EnableADLine:          boolEnv("TECHNICAL_ENABLE_AD_LINE", true),
-		EnableADX:             boolEnv("TECHNICAL_ENABLE_ADX", true),
-		EnablePivots:          boolEnv("TECHNICAL_ENABLE_PIVOTS", true),
-		EnableWilliamsR:       boolEnv("TECHNICAL_ENABLE_WILLIAMS_R", true),
-		EnableVWAP:            boolEnv("TECHNICAL_ENABLE_VWAP", true),
-		EnableMARibbon:        boolEnv("TECHNICAL_ENABLE_MA_RIBBON", true),
-		EnableChartPatterns:   boolEnv("TECHNICAL_ENABLE_CHART_PATTERNS", true),
-		EnableCMF:             boolEnv("TECHNICAL_ENABLE_CMF", true),
-		EnableKeltner:         boolEnv("TECHNICAL_ENABLE_KELTNER", true),
-		EnableDonchian:        boolEnv("TECHNICAL_ENABLE_DONCHIAN", true),
-		EnableTrendlineBreak:  boolEnv("TECHNICAL_ENABLE_TRENDLINE_BREAK", true),
-		EnableCCI:             boolEnv("TECHNICAL_ENABLE_CCI", true),
-		EnableROC:             boolEnv("TECHNICAL_ENABLE_ROC", true),
-		EnableParabolicSAR:    boolEnv("TECHNICAL_ENABLE_PARABOLIC_SAR", true),
-		EnableMFI:             boolEnv("TECHNICAL_ENABLE_MFI", true),
-		EnableMarketStructure: boolEnv("TECHNICAL_ENABLE_MARKET_STRUCTURE", true),
-		EnableElliottHint:     boolEnv("TECHNICAL_ENABLE_ELLIOTT_HINT", true),
-		EnableGannHint:        boolEnv("TECHNICAL_ENABLE_GANN_HINT", true),
+		// SMC: Order Blocks
+		OBSwingStrength: intEnv("TECHNICAL_OB_SWING_STRENGTH", 3),
+		OBImpulseMinPct: floatEnv("TECHNICAL_OB_IMPULSE_MIN_PCT", 1.5),
+		OBLookback:      intEnv("TECHNICAL_OB_LOOKBACK", 100),
+
+		// SMC: Fair Value Gaps
+		FVGMinGapPct: floatEnv("TECHNICAL_FVG_MIN_GAP_PCT", 0.1),
+		FVGLookback:  intEnv("TECHNICAL_FVG_LOOKBACK", 50),
+
+		// SMC: Liquidity Sweeps
+		LiquiditySwingStrength: intEnv("TECHNICAL_LIQUIDITY_SWING_STRENGTH", 3),
+		LiquidityLookback:      intEnv("TECHNICAL_LIQUIDITY_LOOKBACK", 50),
+
+		// VIX Regime
+		VIXFearThreshold:        floatEnv("TECHNICAL_VIX_FEAR_THRESHOLD", 35),
+		VIXElevatedThreshold:    floatEnv("TECHNICAL_VIX_ELEVATED_THRESHOLD", 20),
+		VIXComplacencyThreshold: floatEnv("TECHNICAL_VIX_COMPLACENCY_THRESHOLD", 12),
+
+		// Multi-TF Pivots
+		WeeklyPivotEquityInterval:  env("TECHNICAL_WEEKLY_PIVOT_EQUITY_INTERVAL", "1Week"),
+		WeeklyPivotCryptoInterval:  env("TECHNICAL_WEEKLY_PIVOT_CRYPTO_INTERVAL", "1w"),
+		MonthlyPivotEquityInterval: env("TECHNICAL_MONTHLY_PIVOT_EQUITY_INTERVAL", "1Month"),
+		MonthlyPivotCryptoInterval: env("TECHNICAL_MONTHLY_PIVOT_CRYPTO_INTERVAL", "1M"),
+		WeeklyPivotLookback:        intEnv("TECHNICAL_WEEKLY_PIVOT_LOOKBACK", 10),
+		MonthlyPivotLookback:       intEnv("TECHNICAL_MONTHLY_PIVOT_LOOKBACK", 5),
+
+		CandleWindow: intEnv("TECHNICAL_CANDLE_WINDOW", 3),
+
+		// Head & Shoulders
+		HSSwingStrength: intEnv("TECHNICAL_HS_SWING_STRENGTH", 5),
+		HSTolerancePct:  floatEnv("TECHNICAL_HS_TOLERANCE_PCT", 15.0),
+		HSLookback:      intEnv("TECHNICAL_HS_LOOKBACK", 100),
+
+		// Triangle Patterns
+		TriangleSwingStrength:    intEnv("TECHNICAL_TRIANGLE_SWING_STRENGTH", 3),
+		TriangleMinPivots:        intEnv("TECHNICAL_TRIANGLE_MIN_PIVOTS", 3),
+		TriangleFlatThresholdPct: floatEnv("TECHNICAL_TRIANGLE_FLAT_THRESHOLD_PCT", 0.05),
+		TriangleLookback:         intEnv("TECHNICAL_TRIANGLE_LOOKBACK", 100),
+
+		// Flag / Pennant
+		FlagPolePct:       floatEnv("TECHNICAL_FLAG_POLE_PCT", 5.0),
+		FlagMaxRetracePct: floatEnv("TECHNICAL_FLAG_MAX_RETRACEMENT_PCT", 50.0),
+		FlagPoleLen:       intEnv("TECHNICAL_FLAG_POLE_LEN", 5),
+		FlagLen:           intEnv("TECHNICAL_FLAG_LEN", 10),
+
+		EnableMA:               boolEnv("TECHNICAL_ENABLE_MA", true),
+		EnableRSI:              boolEnv("TECHNICAL_ENABLE_RSI", true),
+		EnableVolume:           boolEnv("TECHNICAL_ENABLE_VOLUME", true),
+		EnableSR:               boolEnv("TECHNICAL_ENABLE_SR", true),
+		EnableTrend:            boolEnv("TECHNICAL_ENABLE_TREND", true),
+		EnableCandles:          boolEnv("TECHNICAL_ENABLE_CANDLES", true),
+		EnableMACD:             boolEnv("TECHNICAL_ENABLE_MACD", true),
+		EnableOBV:              boolEnv("TECHNICAL_ENABLE_OBV", true),
+		EnableBollinger:        boolEnv("TECHNICAL_ENABLE_BOLLINGER", true),
+		EnableFib:              boolEnv("TECHNICAL_ENABLE_FIB", true),
+		EnableRSIDivergence:    boolEnv("TECHNICAL_ENABLE_RSI_DIVERGENCE", true),
+		EnableVolProfileProxy:  boolEnv("TECHNICAL_ENABLE_VOL_PROFILE_PROXY", true),
+		EnableRSIHidden:        boolEnv("TECHNICAL_ENABLE_RSI_HIDDEN", true),
+		EnableStochastic:       boolEnv("TECHNICAL_ENABLE_STOCHASTIC", true),
+		EnableATR:              boolEnv("TECHNICAL_ENABLE_ATR", true),
+		EnableIchimoku:         boolEnv("TECHNICAL_ENABLE_ICHIMOKU", true),
+		EnableADLine:           boolEnv("TECHNICAL_ENABLE_AD_LINE", true),
+		EnableADX:              boolEnv("TECHNICAL_ENABLE_ADX", true),
+		EnablePivots:           boolEnv("TECHNICAL_ENABLE_PIVOTS", true),
+		EnableWilliamsR:        boolEnv("TECHNICAL_ENABLE_WILLIAMS_R", true),
+		EnableVWAP:             boolEnv("TECHNICAL_ENABLE_VWAP", true),
+		EnableMARibbon:         boolEnv("TECHNICAL_ENABLE_MA_RIBBON", true),
+		EnableChartPatterns:    boolEnv("TECHNICAL_ENABLE_CHART_PATTERNS", true),
+		EnableCMF:              boolEnv("TECHNICAL_ENABLE_CMF", true),
+		EnableKeltner:          boolEnv("TECHNICAL_ENABLE_KELTNER", true),
+		EnableDonchian:         boolEnv("TECHNICAL_ENABLE_DONCHIAN", true),
+		EnableTrendlineBreak:   boolEnv("TECHNICAL_ENABLE_TRENDLINE_BREAK", true),
+		EnableCCI:              boolEnv("TECHNICAL_ENABLE_CCI", true),
+		EnableROC:              boolEnv("TECHNICAL_ENABLE_ROC", true),
+		EnableParabolicSAR:     boolEnv("TECHNICAL_ENABLE_PARABOLIC_SAR", true),
+		EnableMFI:              boolEnv("TECHNICAL_ENABLE_MFI", true),
+		EnableMarketStructure:  boolEnv("TECHNICAL_ENABLE_MARKET_STRUCTURE", true),
+		EnableElliottHint:      boolEnv("TECHNICAL_ENABLE_ELLIOTT_HINT", true),
+		EnableGannHint:         boolEnv("TECHNICAL_ENABLE_GANN_HINT", true),
 		EnableOpenInterestInfo: boolEnv("TECHNICAL_ENABLE_OPEN_INTEREST_INFO", false),
-		EnableRSBenchmark:     boolEnv("TECHNICAL_ENABLE_RS_BENCHMARK", false),
-		EnableMTFConfluence:   boolEnv("TECHNICAL_ENABLE_MTF_CONFLUENCE", false),
+		EnableRSBenchmark:      boolEnv("TECHNICAL_ENABLE_RS_BENCHMARK", false),
+		EnableMTFConfluence:    boolEnv("TECHNICAL_ENABLE_MTF_CONFLUENCE", false),
+		// New SMC / pattern toggles.
+		EnableOrderBlocks:    boolEnv("TECHNICAL_ENABLE_ORDER_BLOCKS", true),
+		EnableFVG:            boolEnv("TECHNICAL_ENABLE_FVG", true),
+		EnableLiquiditySweep: boolEnv("TECHNICAL_ENABLE_LIQUIDITY_SWEEP", true),
+		EnableBBSqueeze:      boolEnv("TECHNICAL_ENABLE_BB_SQUEEZE", true),
+		EnableVIXRegime:      boolEnv("TECHNICAL_ENABLE_VIX_REGIME", true),
+		EnableWeeklyPivots:   boolEnv("TECHNICAL_ENABLE_WEEKLY_PIVOTS", true),
+		EnableMonthlyPivots:  boolEnv("TECHNICAL_ENABLE_MONTHLY_PIVOTS", false),
+		EnableHSPattern:      boolEnv("TECHNICAL_ENABLE_HS_PATTERN", true),
+		EnableTriangle:       boolEnv("TECHNICAL_ENABLE_TRIANGLE", true),
+		EnableFlag:           boolEnv("TECHNICAL_ENABLE_FLAG", true),
 	}, nil
 }
 
@@ -411,6 +524,10 @@ func (t TechnicalAnalysis) RSIDivSwing() int {
 
 // FundamentalAnalysis holds configuration for the fundamental-analysis worker.
 //
+// All classification thresholds are exposed as env vars so the algorithm can be
+// fine-tuned per market regime, sector, or from a future web-app control panel
+// without recompiling the binary.
+//
 // TODO: migrate fundamental scoring logic to Python. The asyncpg query and upsert
 // structure will be simpler — one pandas DataFrame per symbol, vectorised ratio math.
 type FundamentalAnalysis struct {
@@ -420,6 +537,59 @@ type FundamentalAnalysis struct {
 
 	// Minimum number of raw metrics required before scoring a symbol.
 	MinMetrics int
+
+	// ── EPS growth thresholds (%) ─────────────────────────────────────────────
+	EPSGrowthStrong float64 // >this = "strong"   default 15
+	EPSGrowthWeak   float64 // <this = "weak"      default 5
+
+	// ── Revenue growth thresholds (%) ────────────────────────────────────────
+	RevGrowthStrong float64 // >this = "strong"   default 10
+	RevGrowthWeak   float64 // <this = "weak"      default 2
+
+	// ── P/E vs own 5-year mean (% deviation) ─────────────────────────────────
+	PEVs5YCheapPct float64 // below 5Y mean by this % = cheap   default 15
+	PEVs5YExpPct   float64 // above 5Y mean by this % = expensive default 15
+
+	// ── P/E absolute fallback (when no 5Y history) ───────────────────────────
+	PEAbsValue  float64 // <this = "value"        default 15
+	PEAbsGrowth float64 // <this = "growth_fair"  default 25
+
+	// ── FCF yield thresholds (%) ──────────────────────────────────────────────
+	FCFYieldAttractive float64 // >=this = attractive   default 5
+	FCFYieldFair       float64 // >=this = fair          default 2
+
+	// ── FCF/EPS divergence detection ─────────────────────────────────────────
+	FCFDivEPSGrowth float64 // EPS growth threshold for divergence check   default 10
+	FCFDivYieldLow  float64 // FCF yield below this = suspect earnings      default 2
+	FCFDivYieldHigh float64 // FCF yield above this = high quality earnings default 5
+
+	// ── Gross margin tiers (%) ────────────────────────────────────────────────
+	GrossMarginMoat float64 // >=this = "strong_moat"  default 40
+	GrossMarginAvg  float64 // >=this = "average"       default 20
+
+	// ── Net margin tiers (%) ─────────────────────────────────────────────────
+	NetMarginStrong float64 // >=this = "strong"    default 15
+	NetMarginAvg    float64 // >=this = "average"   default 5
+
+	// ── Forward P/E compression flat band (%) ────────────────────────────────
+	PECompressionFlat float64 // within ±this % = "flat"  default 5
+
+	// ── PEG ratio tiers ───────────────────────────────────────────────────────
+	PEGUndervalued float64 // <this = undervalued  default 1
+	PEGFair        float64 // <this = fair          default 2
+
+	// ── Earnings surprise ────────────────────────────────────────────────────
+	SurpriseBeatPct  float64 // avg surprise >= this = "beat"  default 2
+	SurpriseMissPct  float64 // avg surprise <= -this = "miss" default 2
+	SurpriseQuarters int     // max quarters to average         default 4
+
+	// ── Composite score boundaries ───────────────────────────────────────────
+	CompositeStrong float64 // >=this = "strong"  default 0.5
+	CompositeWeak   float64 // <=-this = "weak"   default 0.5
+
+	// ── Margin trend (percentage-point change, 8-quarter window) ─────────────
+	MarginTrendStablePP float64 // within ±this pp = "stable"  default 2
+	MarginTrendQuarters int     // quarters to analyse          default 8
 }
 
 func LoadFundamentalAnalysis() (FundamentalAnalysis, error) {
@@ -439,5 +609,45 @@ func LoadFundamentalAnalysis() (FundamentalAnalysis, error) {
 		Symbols:      syms,
 		PollInterval: pollFor("DATA_FUNDAMENTAL_ANALYSIS_POLL_INTERVAL", 24*time.Hour),
 		MinMetrics:   intEnv("FUNDAMENTAL_ANALYSIS_MIN_METRICS", 5),
+
+		EPSGrowthStrong: floatEnv("FUNDAMENTAL_EPS_GROWTH_STRONG", 15),
+		EPSGrowthWeak:   floatEnv("FUNDAMENTAL_EPS_GROWTH_WEAK", 5),
+
+		RevGrowthStrong: floatEnv("FUNDAMENTAL_REV_GROWTH_STRONG", 10),
+		RevGrowthWeak:   floatEnv("FUNDAMENTAL_REV_GROWTH_WEAK", 2),
+
+		PEVs5YCheapPct: floatEnv("FUNDAMENTAL_PE_5Y_CHEAP_PCT", 15),
+		PEVs5YExpPct:   floatEnv("FUNDAMENTAL_PE_5Y_EXPENSIVE_PCT", 15),
+
+		PEAbsValue:  floatEnv("FUNDAMENTAL_PE_ABS_VALUE", 15),
+		PEAbsGrowth: floatEnv("FUNDAMENTAL_PE_ABS_GROWTH", 25),
+
+		FCFYieldAttractive: floatEnv("FUNDAMENTAL_FCF_YIELD_ATTRACTIVE", 5),
+		FCFYieldFair:       floatEnv("FUNDAMENTAL_FCF_YIELD_FAIR", 2),
+
+		FCFDivEPSGrowth: floatEnv("FUNDAMENTAL_FCF_DIV_EPS_GROWTH", 10),
+		FCFDivYieldLow:  floatEnv("FUNDAMENTAL_FCF_DIV_YIELD_LOW", 2),
+		FCFDivYieldHigh: floatEnv("FUNDAMENTAL_FCF_DIV_YIELD_HIGH", 5),
+
+		GrossMarginMoat: floatEnv("FUNDAMENTAL_GROSS_MARGIN_MOAT", 40),
+		GrossMarginAvg:  floatEnv("FUNDAMENTAL_GROSS_MARGIN_AVG", 20),
+
+		NetMarginStrong: floatEnv("FUNDAMENTAL_NET_MARGIN_STRONG", 15),
+		NetMarginAvg:    floatEnv("FUNDAMENTAL_NET_MARGIN_AVG", 5),
+
+		PECompressionFlat: floatEnv("FUNDAMENTAL_PE_COMPRESSION_FLAT", 5),
+
+		PEGUndervalued: floatEnv("FUNDAMENTAL_PEG_UNDERVALUED", 1),
+		PEGFair:        floatEnv("FUNDAMENTAL_PEG_FAIR", 2),
+
+		SurpriseBeatPct:  floatEnv("FUNDAMENTAL_SURPRISE_BEAT_PCT", 2),
+		SurpriseMissPct:  floatEnv("FUNDAMENTAL_SURPRISE_MISS_PCT", 2),
+		SurpriseQuarters: intEnv("FUNDAMENTAL_SURPRISE_QUARTERS", 4),
+
+		CompositeStrong: floatEnv("FUNDAMENTAL_COMPOSITE_STRONG", 0.5),
+		CompositeWeak:   floatEnv("FUNDAMENTAL_COMPOSITE_WEAK", 0.5),
+
+		MarginTrendStablePP: floatEnv("FUNDAMENTAL_MARGIN_TREND_STABLE_PP", 2),
+		MarginTrendQuarters: intEnv("FUNDAMENTAL_MARGIN_TREND_QUARTERS", 8),
 	}, nil
 }

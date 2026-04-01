@@ -26,11 +26,11 @@ import (
 
 	"github.com/joho/godotenv"
 
-	"github.com/berdelis/trading-agent/services/data-analyzer/internal/compute"
-	"github.com/berdelis/trading-agent/services/data-analyzer/internal/config"
-	"github.com/berdelis/trading-agent/services/data-analyzer/internal/db"
-	"github.com/berdelis/trading-agent/services/data-analyzer/internal/logx"
-	"github.com/berdelis/trading-agent/services/data-analyzer/internal/store"
+	"github.com/konsbe/trading-agent/services/data-analyzer/internal/compute"
+	"github.com/konsbe/trading-agent/services/data-analyzer/internal/config"
+	"github.com/konsbe/trading-agent/services/data-analyzer/internal/db"
+	"github.com/konsbe/trading-agent/services/data-analyzer/internal/logx"
+	"github.com/konsbe/trading-agent/services/data-analyzer/internal/store"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -220,9 +220,10 @@ func (w *worker) computeAndStore(ctx context.Context, bars []compute.Bar, symbol
 
 	// ── Candlestick Patterns ─────────────────────────────────────────────────
 	if w.cfg.EnableCandles {
+		// Scan only the last CandleWindow bars (TECHNICAL_CANDLE_WINDOW, default 3).
 		window := bars
-		if len(window) > 3 {
-			window = window[len(window)-3:]
+		if cw := w.cfg.CandleWindow; cw > 0 && len(window) > cw {
+			window = window[len(window)-cw:]
 		}
 		patterns := compute.DetectPatterns(window)
 		names := make([]string, len(patterns))
@@ -279,8 +280,13 @@ func (w *worker) computeAndStore(ctx context.Context, bars []compute.Bar, symbol
 	}
 
 	// ── Bollinger Bands ──────────────────────────────────────────────────────
+	// bbLower/bbUpper are captured for the Bollinger Squeeze check below.
+	var bbLower, bbUpper float64
+	var bbCaptured bool
 	if w.cfg.EnableBollinger {
 		if bb, ok := compute.BollingerLast(closes, w.cfg.BBPeriod, w.cfg.BBStd); ok {
+			bbLower, bbUpper = bb.Lower, bb.Upper
+			bbCaptured = true
 			bname := fmt.Sprintf("bb_%d_%s", w.cfg.BBPeriod, formatFloatKey(w.cfg.BBStd))
 			upsert(bname, ptr(bb.PctB), map[string]any{
 				"middle":    bb.Middle,
@@ -559,8 +565,13 @@ func (w *worker) computeAndStore(ctx context.Context, bars []compute.Bar, symbol
 	}
 
 	// ── Keltner channels ─────────────────────────────────────────────────────
+	// keltnerLower/keltnerUpper captured for the Bollinger Squeeze check below.
+	var keltnerLower, keltnerUpper float64
+	var keltnerCaptured bool
 	if w.cfg.EnableKeltner {
 		if mid, up, lo, ok := compute.KeltnerLast(highs, lows, closes, w.cfg.KeltnerEMAPeriod, w.cfg.KeltnerATRPeriod, w.cfg.KeltnerMult); ok {
+			keltnerLower, keltnerUpper = lo, up
+			keltnerCaptured = true
 			upsert(fmt.Sprintf("keltner_e%d_a%d_m%s", w.cfg.KeltnerEMAPeriod, w.cfg.KeltnerATRPeriod, formatFloatKey(w.cfg.KeltnerMult)), ptr(mid), map[string]any{
 				"middle": mid, "upper": up, "lower": lo,
 				"close":         currentPrice,
@@ -568,6 +579,25 @@ func (w *worker) computeAndStore(ctx context.Context, bars []compute.Bar, symbol
 				"outside_lower": currentPrice < lo,
 			})
 		}
+	}
+
+	// ── Bollinger Squeeze ─────────────────────────────────────────────────────
+	// Squeeze = BB bands are entirely inside Keltner channels → low volatility
+	// coil. A breakout expansion typically follows.
+	if w.cfg.EnableBBSqueeze && bbCaptured && keltnerCaptured {
+		squeeze := bbLower > keltnerLower && bbUpper < keltnerUpper
+		sq := 0.0
+		if squeeze {
+			sq = 1.0
+		}
+		upsert("bb_squeeze", ptr(sq), map[string]any{
+			"squeeze":       squeeze,
+			"bb_lower":      bbLower,
+			"bb_upper":      bbUpper,
+			"keltner_lower": keltnerLower,
+			"keltner_upper": keltnerUpper,
+			"explanation":   "BB inside Keltner = low-volatility coil. Watch for expansion breakout.",
+		})
 	}
 
 	// ── Donchian ─────────────────────────────────────────────────────────────
@@ -689,8 +719,195 @@ func (w *worker) computeAndStore(ctx context.Context, bars []compute.Bar, symbol
 		})
 	}
 
+	// ── Fair Value Gaps (SMC) ─────────────────────────────────────────────────
+	if w.cfg.EnableFVG {
+		fvgs := compute.DetectFVGs(bars, w.cfg.FVGMinGapPct, w.cfg.FVGLookback)
+		var lastBullPL, lastBearPL map[string]any
+		if fvgs.LastBullish != nil {
+			lastBullPL = map[string]any{
+				"bar_index": fvgs.LastBullish.BarIndex,
+				"gap_low":   fvgs.LastBullish.GapLow,
+				"gap_high":  fvgs.LastBullish.GapHigh,
+				"gap_pct":   fvgs.LastBullish.GapPct,
+			}
+		}
+		if fvgs.LastBearish != nil {
+			lastBearPL = map[string]any{
+				"bar_index": fvgs.LastBearish.BarIndex,
+				"gap_low":   fvgs.LastBearish.GapLow,
+				"gap_high":  fvgs.LastBearish.GapHigh,
+				"gap_pct":   fvgs.LastBearish.GapPct,
+			}
+		}
+		upsert(fmt.Sprintf("fvg_min%s_lb%d", formatFloatKey(w.cfg.FVGMinGapPct), w.cfg.FVGLookback),
+			ptr(float64(fvgs.ActiveCount)), map[string]any{
+				"active_count":  fvgs.ActiveCount,
+				"total_count":   len(fvgs.All),
+				"last_bullish":  lastBullPL,
+				"last_bearish":  lastBearPL,
+				"min_gap_pct":   w.cfg.FVGMinGapPct,
+				"lookback_bars": w.cfg.FVGLookback,
+			})
+	}
+
+	// ── Order Blocks (SMC) ────────────────────────────────────────────────────
+	if w.cfg.EnableOrderBlocks {
+		ob := compute.DetectOrderBlocks(bars, w.cfg.OBSwingStrength, w.cfg.OBImpulseMinPct, w.cfg.OBLookback)
+		active := 0
+		for _, o := range ob.All {
+			if !o.Invalidated {
+				active++
+			}
+		}
+		var lastBullOBPL, lastBearOBPL map[string]any
+		if ob.LastBullish != nil {
+			lastBullOBPL = map[string]any{
+				"bar_index": ob.LastBullish.BarIndex,
+				"high":      ob.LastBullish.High,
+				"low":       ob.LastBullish.Low,
+				"open":      ob.LastBullish.Open,
+				"close":     ob.LastBullish.Close,
+			}
+		}
+		if ob.LastBearish != nil {
+			lastBearOBPL = map[string]any{
+				"bar_index": ob.LastBearish.BarIndex,
+				"high":      ob.LastBearish.High,
+				"low":       ob.LastBearish.Low,
+				"open":      ob.LastBearish.Open,
+				"close":     ob.LastBearish.Close,
+			}
+		}
+		upsert(fmt.Sprintf("order_blocks_sw%d_imp%s", w.cfg.OBSwingStrength, formatFloatKey(w.cfg.OBImpulseMinPct)),
+			ptr(float64(active)), map[string]any{
+				"active_count":    active,
+				"total_count":     len(ob.All),
+				"last_bullish_ob": lastBullOBPL,
+				"last_bearish_ob": lastBearOBPL,
+				"swing_strength":  w.cfg.OBSwingStrength,
+				"impulse_min_pct": w.cfg.OBImpulseMinPct,
+				"lookback_bars":   w.cfg.OBLookback,
+			})
+	}
+
+	// ── Liquidity Sweeps (SMC) ────────────────────────────────────────────────
+	if w.cfg.EnableLiquiditySweep {
+		sweeps := compute.DetectLiquiditySweeps(bars, w.cfg.LiquiditySwingStrength, w.cfg.LiquidityLookback)
+		highSweeps, lowSweeps := 0, 0
+		var lastSweepPL map[string]any
+		for _, sv := range sweeps {
+			if sv.Kind == compute.SweepHigh {
+				highSweeps++
+			} else {
+				lowSweeps++
+			}
+		}
+		if len(sweeps) > 0 {
+			last := sweeps[len(sweeps)-1]
+			lastSweepPL = map[string]any{
+				"kind":        string(last.Kind),
+				"swept_level": last.SweptLevel,
+				"bar_high":    last.BarHigh,
+				"bar_low":     last.BarLow,
+				"bar_close":   last.BarClose,
+				"bar_index":   last.BarIndex,
+			}
+		}
+		upsert(fmt.Sprintf("liquidity_sweep_sw%d", w.cfg.LiquiditySwingStrength),
+			ptr(float64(len(sweeps))), map[string]any{
+				"total_sweeps":   len(sweeps),
+				"high_sweeps":    highSweeps,
+				"low_sweeps":     lowSweeps,
+				"last_sweep":     lastSweepPL,
+				"swing_strength": w.cfg.LiquiditySwingStrength,
+				"lookback_bars":  w.cfg.LiquidityLookback,
+			})
+	}
+
+	// ── Head & Shoulders ──────────────────────────────────────────────────────
+	if w.cfg.EnableHSPattern {
+		hs := compute.DetectHSPattern(bars, w.cfg.HSSwingStrength, w.cfg.HSTolerancePct, w.cfg.HSLookback)
+		score := 0.0
+		if hs.HSFound {
+			score -= 1
+			if hs.HSNecklineBreak {
+				score -= 1
+			}
+		}
+		if hs.InvHSFound {
+			score += 1
+			if hs.InvHSNecklineBreak {
+				score += 1
+			}
+		}
+		upsert(fmt.Sprintf("hs_pattern_sw%d", w.cfg.HSSwingStrength), ptr(score), map[string]any{
+			"hs_found":                hs.HSFound,
+			"hs_left_shoulder":        hs.HSLeftShoulder,
+			"hs_head":                 hs.HSHead,
+			"hs_right_shoulder":       hs.HSRightShoulder,
+			"hs_neckline":             hs.HSNeckline,
+			"hs_symmetry_pct":         hs.HSShouldersSymmetryPct,
+			"hs_neckline_break":       hs.HSNecklineBreak,
+			"inv_hs_found":            hs.InvHSFound,
+			"inv_hs_left_shoulder":    hs.InvHSLeftShoulder,
+			"inv_hs_head":             hs.InvHSHead,
+			"inv_hs_right_shoulder":   hs.InvHSRightShoulder,
+			"inv_hs_neckline":         hs.InvHSNeckline,
+			"inv_hs_symmetry_pct":     hs.InvHSShouldersSymmetryPct,
+			"inv_hs_neckline_break":   hs.InvHSNecklineBreak,
+			"swing_strength":          w.cfg.HSSwingStrength,
+			"shoulder_tolerance_pct":  w.cfg.HSTolerancePct,
+		})
+	}
+
+	// ── Triangle Patterns ─────────────────────────────────────────────────────
+	if w.cfg.EnableTriangle {
+		tri := compute.DetectTriangle(bars, w.cfg.TriangleSwingStrength, w.cfg.TriangleMinPivots,
+			w.cfg.TriangleFlatThresholdPct, w.cfg.TriangleLookback)
+		triScore := 0.0
+		switch tri.Breakout {
+		case "up":
+			triScore = 1
+		case "down":
+			triScore = -1
+		}
+		upsert(fmt.Sprintf("triangle_sw%d", w.cfg.TriangleSwingStrength), ptr(triScore), map[string]any{
+			"kind":            string(tri.Kind),
+			"high_slope_pct":  tri.HighSlopePct,
+			"low_slope_pct":   tri.LowSlopePct,
+			"apex_bars_away":  tri.ApexBarsAway,
+			"breakout":        tri.Breakout,
+			"swing_strength":  w.cfg.TriangleSwingStrength,
+			"min_pivots":      w.cfg.TriangleMinPivots,
+			"flat_thresh_pct": w.cfg.TriangleFlatThresholdPct,
+		})
+	}
+
+	// ── Flag / Pennant ────────────────────────────────────────────────────────
+	if w.cfg.EnableFlag {
+		flag := compute.DetectFlag(bars, w.cfg.FlagPolePct, w.cfg.FlagMaxRetracePct, w.cfg.FlagPoleLen, w.cfg.FlagLen)
+		flagScore := 0.0
+		if flag.BullFlag {
+			flagScore = 1
+		}
+		if flag.BearFlag {
+			flagScore = -1
+		}
+		upsert(fmt.Sprintf("flag_pole%s_len%d", formatFloatKey(w.cfg.FlagPolePct), w.cfg.FlagLen), ptr(flagScore), map[string]any{
+			"bull_flag":           flag.BullFlag,
+			"bear_flag":           flag.BearFlag,
+			"pole_pct":            flag.PolePct,
+			"pole_min_pct":        w.cfg.FlagPolePct,
+			"max_retracement_pct": w.cfg.FlagMaxRetracePct,
+			"pole_len_bars":       w.cfg.FlagPoleLen,
+			"flag_len_bars":       w.cfg.FlagLen,
+		})
+	}
+
 	w.computeRSBenchmark(ctx, ts, symbol, exchange, interval, bars)
 	w.computeMTFConfluence(ctx, ts, symbol, exchange, interval, bars)
+	w.computeVIXRegime(ctx, ts, symbol, exchange, interval)
+	w.computeMultiTFPivots(ctx, ts, symbol, exchange, interval)
 
 	w.log.Info("indicators computed",
 		"symbol", symbol,
@@ -848,6 +1065,141 @@ func (w *worker) computeMTFConfluence(ctx context.Context, ts time.Time, symbol,
 		"confluence_score": score,
 		"trend_lookback":   w.cfg.TrendLookback,
 	})
+}
+
+// computeVIXRegime reads the latest VIXCLS value from the macro_fred table and
+// classifies the current volatility regime. Stored once per symbol/interval so
+// every downstream consumer can join on (symbol, interval, indicator = "vix_regime").
+func (w *worker) computeVIXRegime(ctx context.Context, ts time.Time, symbol, exchange, interval string) {
+	if !w.cfg.EnableVIXRegime {
+		return
+	}
+	vix, ok, err := store.QueryLatestFREDValue(ctx, w.pool, "VIXCLS")
+	if err != nil {
+		w.log.Warn("vix regime: query error", "err", err)
+		return
+	}
+	if !ok {
+		w.log.Debug("vix regime: no VIXCLS data yet — ensure data-macro is running with FRED_SERIES_IDS=VIXCLS")
+		return
+	}
+
+	regime := "normal"
+	switch {
+	case vix > w.cfg.VIXFearThreshold:
+		regime = "extreme_fear"
+	case vix > w.cfg.VIXElevatedThreshold:
+		regime = "elevated"
+	case vix < w.cfg.VIXComplacencyThreshold:
+		regime = "complacency"
+	}
+
+	upsert := func(indicator string, value *float64, payload any) {
+		if err := store.UpsertIndicator(ctx, w.pool, ts, symbol, exchange, interval, indicator, value, payload); err != nil {
+			w.log.Error("upsert vix_regime", "indicator", indicator, "err", err)
+		}
+	}
+	ptr := func(v float64) *float64 { return &v }
+	upsert("vix_regime", ptr(vix), map[string]any{
+		"vix":                     vix,
+		"regime":                  regime,
+		"fear_threshold":          w.cfg.VIXFearThreshold,
+		"elevated_threshold":      w.cfg.VIXElevatedThreshold,
+		"complacency_threshold":   w.cfg.VIXComplacencyThreshold,
+		"series_id":               "VIXCLS",
+	})
+}
+
+// computeMultiTFPivots queries weekly (and optionally monthly) bars and stores
+// Classic, Camarilla, and Woodie's pivot levels derived from the prior period bar.
+// These are separate from the per-bar pivot (pivots_prior_bar) which uses the
+// prior daily bar.
+func (w *worker) computeMultiTFPivots(ctx context.Context, ts time.Time, symbol, exchange, interval string) {
+	if !w.cfg.EnableWeeklyPivots && !w.cfg.EnableMonthlyPivots {
+		return
+	}
+
+	upsert := func(indicator string, value *float64, payload any) {
+		if err := store.UpsertIndicator(ctx, w.pool, ts, symbol, exchange, interval, indicator, value, payload); err != nil {
+			w.log.Error("upsert multi_tf_pivots", "indicator", indicator, "err", err)
+		}
+	}
+	ptr := func(v float64) *float64 { return &v }
+
+	pivotUpsert := func(name, refInterval string, bars []compute.Bar) {
+		if len(bars) < 2 {
+			return
+		}
+		// Use the second-to-last bar (prior completed period).
+		prev := bars[len(bars)-2]
+		pv := compute.PivotsFromPriorBar(prev)
+		upsert(name, ptr(pv.PP), map[string]any{
+			"reference_ts": prev.TS,
+			"interval":     refInterval,
+			"classic": map[string]float64{
+				"PP": pv.PP, "R1": pv.R1, "R2": pv.R2, "R3": pv.R3,
+				"S1": pv.S1, "S2": pv.S2, "S3": pv.S3,
+			},
+			"camarilla": pv.Camarilla,
+			"woodie":    pv.Woodie,
+		})
+	}
+
+	if w.cfg.EnableWeeklyPivots {
+		weekIv := ""
+		switch exchange {
+		case "equity":
+			weekIv = w.cfg.WeeklyPivotEquityInterval
+		case "binance":
+			weekIv = w.cfg.WeeklyPivotCryptoInterval
+		}
+		if weekIv != "" {
+			var (
+				wBars []compute.Bar
+				err   error
+			)
+			// Lookback: TECHNICAL_WEEKLY_PIVOT_LOOKBACK (default 10).
+			switch exchange {
+			case "equity":
+				wBars, err = store.QueryEquityBars(ctx, w.pool, symbol, weekIv, w.cfg.WeeklyPivotLookback)
+			case "binance":
+				wBars, err = store.QueryCryptoBars(ctx, w.pool, symbol, weekIv, w.cfg.WeeklyPivotLookback)
+			}
+			if err != nil {
+				w.log.Warn("weekly pivot query", "symbol", symbol, "interval", weekIv, "err", err)
+			} else {
+				pivotUpsert("pivots_weekly", weekIv, wBars)
+			}
+		}
+	}
+
+	if w.cfg.EnableMonthlyPivots {
+		monIv := ""
+		switch exchange {
+		case "equity":
+			monIv = w.cfg.MonthlyPivotEquityInterval
+		case "binance":
+			monIv = w.cfg.MonthlyPivotCryptoInterval
+		}
+		if monIv != "" {
+			var (
+				mBars []compute.Bar
+				err   error
+			)
+			// Lookback: TECHNICAL_MONTHLY_PIVOT_LOOKBACK (default 5).
+			switch exchange {
+			case "equity":
+				mBars, err = store.QueryEquityBars(ctx, w.pool, symbol, monIv, w.cfg.MonthlyPivotLookback)
+			case "binance":
+				mBars, err = store.QueryCryptoBars(ctx, w.pool, symbol, monIv, w.cfg.MonthlyPivotLookback)
+			}
+			if err != nil {
+				w.log.Warn("monthly pivot query", "symbol", symbol, "interval", monIv, "err", err)
+			} else {
+				pivotUpsert("pivots_monthly", monIv, mBars)
+			}
+		}
+	}
 }
 
 func startupDelay() int {

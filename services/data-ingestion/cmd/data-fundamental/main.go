@@ -10,9 +10,10 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
 
-	"github.com/berdelis/trading-agent/services/data-ingestion/internal/config"
-	"github.com/berdelis/trading-agent/services/data-ingestion/internal/fetch/finnhub"
-	"github.com/berdelis/trading-agent/services/data-ingestion/internal/store"
+	"github.com/konsbe/trading-agent/services/data-ingestion/internal/config"
+	"github.com/konsbe/trading-agent/services/data-ingestion/internal/fetch/alphavantage"
+	"github.com/konsbe/trading-agent/services/data-ingestion/internal/fetch/finnhub"
+	"github.com/konsbe/trading-agent/services/data-ingestion/internal/store"
 )
 
 func main() {
@@ -48,7 +49,12 @@ func main() {
 		return
 	}
 
-	w := &worker{cfg: cfg, pool: pool, fh: fh, log: log}
+	av := alphavantage.New(cfg.AlphaVantageKey)
+	if !av.HasKey() {
+		log.Warn("ALPHA_VANTAGE_API_KEY not set; forward P/E and sector data will be missing")
+	}
+
+	w := &worker{cfg: cfg, pool: pool, fh: fh, av: av, log: log}
 
 	// Run immediately on startup, then on ticker cadence.
 	if cfg.EnableMetrics {
@@ -60,13 +66,18 @@ func main() {
 	if cfg.EnableEarnings {
 		w.runEarnings(context.Background())
 	}
+	if cfg.EnableOverview && av.HasKey() {
+		w.runOverview(context.Background())
+	}
 
 	tMetrics := time.NewTicker(cfg.PollMetrics)
 	tFinancials := time.NewTicker(cfg.PollFinancials)
 	tEarnings := time.NewTicker(cfg.PollEarnings)
+	tOverview := time.NewTicker(cfg.PollOverview)
 	defer tMetrics.Stop()
 	defer tFinancials.Stop()
 	defer tEarnings.Stop()
+	defer tOverview.Stop()
 
 	for {
 		select {
@@ -82,6 +93,10 @@ func main() {
 			if cfg.EnableEarnings {
 				w.runEarnings(context.Background())
 			}
+		case <-tOverview.C:
+			if cfg.EnableOverview && av.HasKey() {
+				w.runOverview(context.Background())
+			}
 		}
 	}
 }
@@ -90,6 +105,7 @@ type worker struct {
 	cfg  config.Fundamental
 	pool *pgxpool.Pool
 	fh   *finnhub.Client
+	av   *alphavantage.Client
 	log  *slog.Logger
 }
 
@@ -181,82 +197,147 @@ func (w *worker) runMetrics(ctx context.Context) {
 // ─── Detailed financials (income statement + cash flow) ────────────────────────
 //
 // Finnhub /stock/financials-reported returns the most recent N filed reports.
-// We store the most recent report's key income-statement and cash-flow fields
-// per-metric, plus the raw report payload for completeness.
+// We store quarterly (10-Q) and optionally annual (10-K) reports separately so
+// the analyzer can compute 8-quarter margin trends and year-over-year comparisons.
+//
+// XBRL concept names differ between 10-Q and 10-K filings. Each conceptVal call
+// lists the most common alternatives in priority order to handle company-specific
+// tags (e.g. Apple uses RevenueFromContractWithCustomerExcludingAssessedTax).
 
 func (w *worker) runFinancials(ctx context.Context) {
+	w.storeFinancials(context.Background(), w.cfg.FinancialsFreq, w.cfg.FinancialsLimit)
+	if w.cfg.EnableAnnualFinancials && w.cfg.FinancialsFreq != "annual" {
+		w.storeFinancials(context.Background(), "annual", w.cfg.AnnualFinancialsLimit)
+	}
+}
+
+func (w *worker) storeFinancials(ctx context.Context, freq string, limit int) {
 	ts := time.Now().UTC()
 	for _, sym := range w.cfg.Symbols {
-		raw, err := w.fh.FinancialsReported(ctx, sym, w.cfg.FinancialsFreq)
+		raw, err := w.fh.FinancialsReported(ctx, sym, freq)
 		if err != nil {
-			w.log.Error("finnhub financials-reported", "symbol", sym, "err", err)
+			w.log.Error("finnhub financials-reported", "symbol", sym, "freq", freq, "err", err)
 			continue
 		}
 
 		reports, _ := raw["data"].([]any)
 		if len(reports) == 0 {
-			w.log.Warn("finnhub financials-reported: no reports", "symbol", sym)
+			w.log.Warn("finnhub financials-reported: no reports", "symbol", sym, "freq", freq)
 			continue
 		}
 
-		// Use the most recent report only.
-		report, ok := reports[0].(map[string]any)
-		if !ok {
-			continue
+		if limit <= 0 || limit > len(reports) {
+			limit = len(reports)
 		}
 
-		// Determine period label from report metadata.
-		period := financialPeriodLabel(report)
 		source := "finnhub_financials_reported"
+		stored := 0
 
-		upsert := func(metric string, value *float64, payload any) {
-			if err := store.UpsertFundamental(ctx, w.pool, ts, sym, period, metric, value, payload, source); err != nil {
-				w.log.Error("upsert fundamental", "metric", metric, "symbol", sym, "err", err)
+		for i := 0; i < limit; i++ {
+			report, ok := reports[i].(map[string]any)
+			if !ok {
+				continue
 			}
+
+			period := financialPeriodLabel(report)
+
+			upsert := func(metric string, value *float64, payload any) {
+				if err := store.UpsertFundamental(ctx, w.pool, ts, sym, period, metric, value, payload, source); err != nil {
+					w.log.Error("upsert fundamental", "metric", metric, "symbol", sym, "period", period, "err", err)
+				}
+			}
+
+			reportBody, _ := report["report"].(map[string]any)
+			ic := statementMap(reportBody, "ic") // income statement
+			cf := statementMap(reportBody, "cf") // cash flow statement
+			bs := statementMap(reportBody, "bs") // balance sheet
+
+			// Income statement — concept names vary between 10-Q and 10-K filings.
+			// Apple 10-K uses RevenueFromContractWithCustomerExcludingAssessedTax.
+			upsert("revenue_reported", conceptVal(ic,
+				"RevenueFromContractWithCustomerExcludingAssessedTax",
+				"RevenueFromContractWithCustomerIncludingAssessedTax",
+				"Revenues", "Revenue", "SalesRevenueNet",
+				"SalesRevenueGoodsNet", "TotalRevenues",
+			), nil)
+			upsert("gross_profit_reported", conceptVal(ic,
+				"GrossProfit",
+			), nil)
+			upsert("operating_income_reported", conceptVal(ic,
+				"OperatingIncomeLoss", "OperatingIncome",
+				"IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest",
+			), nil)
+			upsert("net_income_reported", conceptVal(ic,
+				"NetIncomeLoss", "ProfitLoss", "NetIncome",
+				"NetIncomeLossAvailableToCommonStockholdersBasic",
+			), nil)
+			upsert("eps_diluted_reported", conceptVal(ic,
+				"EarningsPerShareDiluted", "EarningsPerShareBasic",
+				"IncomeLossFromContinuingOperationsPerDilutedShare",
+			), nil)
+			upsert("eps_basic_reported", conceptVal(ic,
+				"EarningsPerShareBasic",
+				"IncomeLossFromContinuingOperationsPerBasicShare",
+			), nil)
+
+			// Cash flow.
+			upsert("operating_cf_reported", conceptVal(cf,
+				"NetCashProvidedByUsedInOperatingActivities",
+				"NetCashProvidedByOperatingActivities",
+			), nil)
+			upsert("capex_reported", conceptVal(cf,
+				"PaymentsToAcquirePropertyPlantAndEquipment",
+				"CapitalExpenditures",
+				"AcquisitionsOfPropertyPlantAndEquipment",
+				"PurchaseOfPropertyPlantAndEquipment",
+			), nil)
+			opCF := conceptVal(cf,
+				"NetCashProvidedByUsedInOperatingActivities",
+				"NetCashProvidedByOperatingActivities",
+			)
+			capex := conceptVal(cf,
+				"PaymentsToAcquirePropertyPlantAndEquipment",
+				"CapitalExpenditures",
+				"AcquisitionsOfPropertyPlantAndEquipment",
+				"PurchaseOfPropertyPlantAndEquipment",
+			)
+			if opCF != nil && capex != nil {
+				fcf := *opCF - abs(*capex)
+				upsert("fcf_reported", &fcf, map[string]any{
+					"operating_cf": *opCF,
+					"capex":        *capex,
+					"note":         "fcf = operating_cf - abs(capex)",
+				})
+			}
+
+			// Balance sheet.
+			upsert("total_assets_reported", conceptVal(bs,
+				"Assets",
+			), nil)
+			upsert("total_liabilities_reported", conceptVal(bs,
+				"Liabilities", "LiabilitiesAndStockholdersEquity",
+			), nil)
+			upsert("total_equity_reported", conceptVal(bs,
+				"StockholdersEquity", "Equity",
+				"StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest",
+			), nil)
+			upsert("total_debt_reported", conceptVal(bs,
+				"LongTermDebt", "LongTermDebtNoncurrent",
+				"LongTermDebtAndCapitalLeaseObligations",
+				"DebtAndCapitalLeaseObligations",
+			), nil)
+			upsert("cash_reported", conceptVal(bs,
+				"CashAndCashEquivalentsAtCarryingValue",
+				"CashAndCashEquivalents", "Cash",
+				"CashCashEquivalentsAndShortTermInvestments",
+			), nil)
+
+			// Raw report payload for forward-compat access.
+			upsert("report_raw", nil, report)
+			stored++
 		}
 
-		// Dig into the nested report structure: report.report.ic (income statement)
-		// and report.report.cf (cash flow).
-		reportBody, _ := report["report"].(map[string]any)
-		ic := statementMap(reportBody, "ic") // income statement
-		cf := statementMap(reportBody, "cf") // cash flow statement
-		bs := statementMap(reportBody, "bs") // balance sheet
-
-		// Income statement scalars.
-		upsert("revenue_reported", conceptVal(ic, "Revenues", "Revenue", "SalesRevenueNet"), nil)
-		upsert("gross_profit_reported", conceptVal(ic, "GrossProfit"), nil)
-		upsert("operating_income_reported", conceptVal(ic, "OperatingIncomeLoss"), nil)
-		upsert("net_income_reported", conceptVal(ic, "NetIncomeLoss", "ProfitLoss"), nil)
-		upsert("eps_diluted_reported", conceptVal(ic, "EarningsPerShareDiluted", "EarningsPerShareBasic"), nil)
-		upsert("eps_basic_reported", conceptVal(ic, "EarningsPerShareBasic"), nil)
-
-		// Cash flow scalars.
-		upsert("operating_cf_reported", conceptVal(cf, "NetCashProvidedByUsedInOperatingActivities"), nil)
-		upsert("capex_reported", conceptVal(cf, "PaymentsToAcquirePropertyPlantAndEquipment"), nil)
-		// FCF = operating CF − capex (both should be positive; capex is usually negative in raw data).
-		opCF := conceptVal(ic, "") // placeholder
-		opCF = conceptVal(cf, "NetCashProvidedByUsedInOperatingActivities")
-		capex := conceptVal(cf, "PaymentsToAcquirePropertyPlantAndEquipment")
-		if opCF != nil && capex != nil {
-			fcf := *opCF - abs(*capex)
-			upsert("fcf_reported", &fcf, map[string]any{
-				"operating_cf": *opCF,
-				"capex":        *capex,
-				"note":         "fcf = operating_cf - abs(capex)",
-			})
-		}
-
-		// Balance sheet.
-		upsert("total_assets_reported", conceptVal(bs, "Assets"), nil)
-		upsert("total_liabilities_reported", conceptVal(bs, "Liabilities", "LiabilitiesAndStockholdersEquity"), nil)
-		upsert("total_equity_reported", conceptVal(bs, "StockholdersEquity", "Equity"), nil)
-		upsert("total_debt_reported", conceptVal(bs, "LongTermDebt", "LongTermDebtNoncurrent"), nil)
-		upsert("cash_reported", conceptVal(bs, "CashAndCashEquivalentsAtCarryingValue", "Cash"), nil)
-
-		// Raw full report for completeness.
-		upsert("report_raw", nil, report)
-
-		w.log.Info("fundamentals financials stored", "symbol", sym, "period", period)
+		w.log.Info("fundamentals financials stored", "symbol", sym, "freq", freq, "count", stored)
 	}
 }
 
@@ -315,6 +396,92 @@ func (w *worker) runEarnings(ctx context.Context) {
 		}
 
 		w.log.Info("fundamentals earnings stored", "symbol", sym, "quarters", len(items))
+	}
+}
+
+// ─── Alpha Vantage: forward estimates, sector, beta ───────────────────────────
+//
+// Alpha Vantage COMPANY_OVERVIEW returns data that Finnhub's free tier omits:
+//   - ForwardPE / forward EPS estimates
+//   - Beta (market sensitivity)
+//   - Sector & Industry (for relative P/E context in analyst-bot)
+//   - Analyst target price (consensus upside/downside)
+//   - PEG ratio (P/E ÷ growth rate — <1 is undervalued relative to growth)
+//
+// Free tier: 25 requests/day. For ≤5 symbols with a 7-day poll interval
+// (default) this uses at most 5 calls/week, well within limits.
+
+func (w *worker) runOverview(ctx context.Context) {
+	ts := time.Now().UTC()
+	source := "alphavantage_overview"
+
+	for _, sym := range w.cfg.Symbols {
+		data, err := w.av.Overview(ctx, sym)
+		if err != nil {
+			w.log.Warn("alpha vantage overview", "symbol", sym, "err", err)
+			continue
+		}
+
+		upsert := func(metric string, value *float64, payload any) {
+			if err := store.UpsertFundamental(ctx, w.pool, ts, sym, "ttm", metric, value, payload, source); err != nil {
+				w.log.Error("upsert fundamental", "metric", metric, "symbol", sym, "err", err)
+			}
+		}
+
+		// ── Forward valuation (the key Finnhub free-tier gap) ────────────────
+		upsert("forward_pe", alphavantage.FloatField(data, "ForwardPE"), map[string]any{
+			"source_field": "ForwardPE",
+			"note":         "Price ÷ next-12M EPS estimate (analyst consensus)",
+		})
+		upsert("peg_ratio", alphavantage.FloatField(data, "PEGRatio"), map[string]any{
+			"note": "P/E ÷ EPS growth rate. <1 = undervalued relative to growth.",
+		})
+		upsert("analyst_target_price", alphavantage.FloatField(data, "AnalystTargetPrice"), nil)
+
+		// ── Market / risk metrics ─────────────────────────────────────────────
+		upsert("beta", alphavantage.FloatField(data, "Beta"), map[string]any{
+			"note": ">1 = more volatile than market; <1 = defensive",
+		})
+		upsert("price_to_book", alphavantage.FloatField(data, "PriceToBookRatio"), nil)
+		upsert("ev_to_ebitda", alphavantage.FloatField(data, "EVToEBITDA"), nil)
+
+		// ── Dividend context ──────────────────────────────────────────────────
+		upsert("dividend_yield", alphavantage.FloatField(data, "DividendYield"), nil)
+		upsert("payout_ratio", alphavantage.FloatField(data, "PayoutRatio"), nil)
+
+		// ── Quarterly growth (cross-validates Finnhub) ────────────────────────
+		upsert("quarterly_earnings_growth_yoy_av", alphavantage.FloatField(data, "QuarterlyEarningsGrowthYOY"), map[string]any{
+			"note": "Alpha Vantage quarterly EPS YoY — cross-check vs Finnhub eps_growth_quarterly_yoy",
+		})
+		upsert("quarterly_revenue_growth_yoy_av", alphavantage.FloatField(data, "QuarterlyRevenueGrowthYOY"), nil)
+
+		// ── 52-week range context for P/E normalisation ───────────────────────
+		upsert("week52_high", alphavantage.FloatField(data, "52WeekHigh"), nil)
+		upsert("week52_low", alphavantage.FloatField(data, "52WeekLow"), nil)
+		upsert("ma_50d", alphavantage.FloatField(data, "50DayMovingAverage"), nil)
+		upsert("ma_200d", alphavantage.FloatField(data, "200DayMovingAverage"), nil)
+
+		// ── Sector/industry stored as payload (string, not float) ─────────────
+		sector := alphavantage.StringField(data, "Sector")
+		industry := alphavantage.StringField(data, "Industry")
+		if sector != "" {
+			if err := store.UpsertFundamental(ctx, w.pool, ts, sym, "ttm", "sector_profile", nil,
+				map[string]any{
+					"sector":       sector,
+					"industry":     industry,
+					"asset_type":   alphavantage.StringField(data, "AssetType"),
+					"fiscal_year":  alphavantage.StringField(data, "FiscalYearEnd"),
+					"latest_qtr":   alphavantage.StringField(data, "LatestQuarter"),
+				}, source); err != nil {
+				w.log.Error("upsert sector_profile", "symbol", sym, "err", err)
+			}
+		}
+
+		w.log.Info("alpha vantage overview stored",
+			"symbol", sym,
+			"sector", sector,
+			"forward_pe", alphavantage.FloatField(data, "ForwardPE"),
+		)
 	}
 }
 

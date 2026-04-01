@@ -9,5 +9,7 @@ coverage.out
 vendor/
 # Compiled binaries that may land in the module root
 services/data-ingestion/data-*
+services/data-analyzer/fundamental-analysis
+services/data-analyzer/technical-analysis
 
 *.pem

@@ -6,7 +6,7 @@ package store
 import (
 	"context"
 
-	"github.com/berdelis/trading-agent/services/data-analyzer/internal/compute"
+	"github.com/konsbe/trading-agent/services/data-analyzer/internal/compute"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 

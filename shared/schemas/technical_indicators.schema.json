@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/berdelis/trading-agent/shared/schemas/technical_indicators.schema.json",
+  "$id": "https://github.com/konsbe/trading-agent/shared/schemas/technical_indicators.schema.json",
   "title": "technical_indicators row",
   "description": "One row per (symbol, exchange, interval, indicator, ts). value holds the primary scalar; payload holds structured context. Indicator names are parameterised, e.g. sma_20, rsi_14, macd_12_26_9. See data-technical/main.go for the full set.",
   "type": "object",

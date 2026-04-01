@@ -135,6 +135,7 @@ func InsertNews(ctx context.Context, pool *pgxpool.Pool, ts time.Time, source, s
 	const q = `
 INSERT INTO news_headlines (ts, source, symbol, headline, url, sentiment, payload)
 VALUES ($1,$2,$3,$4,$5,$6,$7)
+ON CONFLICT (ts, source, headline) DO NOTHING
 `
 	_, err = pool.Exec(ctx, q, ts, source, nullable(symbol), headline, nullable(url), sentiment, jb)
 	return err

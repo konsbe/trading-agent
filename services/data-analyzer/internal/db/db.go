@@ -8,7 +8,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// TODO: extract this into a shared Go module (e.g. github.com/berdelis/trading-agent/shared/golib)
+// TODO: extract this into a shared Go module (e.g. github.com/konsbe/trading-agent/shared/golib)
 // so data-ingestion and data-analyzer do not duplicate it. For now both services carry their own copy.
 
 func Connect(ctx context.Context, databaseURL string) (*pgxpool.Pool, error) {
