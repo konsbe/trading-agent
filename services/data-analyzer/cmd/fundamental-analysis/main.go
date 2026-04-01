@@ -885,14 +885,19 @@ func (w *worker) scoreTier2(ctx context.Context, symbol string, rows []store.Fun
 	// ── T2.10 CapEx Intensity ─────────────────────────────────────────────────
 	// Rank 20 from reference. Asset-light businesses (SaaS, brands) keep CapEx <5%.
 	// Capital-intensive industries (semis, airlines, mining) >20%.
-	// Computed from: capex_reported (XBRL, most recent quarter × 4) ÷ revenue_ttm.
+	// Computed from: capex_reported (XBRL, in millions) ÷ revenue (in millions).
+	// Revenue source: revenue_ttm (Finnhub TTM) or revenue_reported (XBRL fallback).
 	// Thresholds: FUNDAMENTAL_CAPEX_INTENSITY_LOW (5) / HIGH (20).
 	if capex, okC := latest["capex_reported"]; okC {
+		t2Rev := 0.0
 		if rev, okR := latest["revenue_ttm"]; okR && rev > 0 {
-			// capex_reported is quarterly; × 4 to annualise. revenue_ttm is already annual.
-			// Capex from CF statements is typically negative; take absolute value.
+			t2Rev = rev
+		} else if rev, okR := latest["revenue_reported"]; okR && rev > 0 {
+			t2Rev = rev
+		}
+		if t2Rev > 0 {
 			annualCapex := absFloat(capex) * 4
-			intensityPct := annualCapex / rev * 100
+			intensityPct := annualCapex / t2Rev * 100
 			tier := "moderate_intensity"
 			if intensityPct < cfg.CapExIntensityLow {
 				tier = "asset_light"
@@ -902,7 +907,7 @@ func (w *worker) scoreTier2(ctx context.Context, symbol string, rows []store.Fun
 			upsert("t2_capex_intensity", ptr(intensityPct), map[string]any{
 				"capex_intensity_pct": intensityPct,
 				"annual_capex_proxy":  annualCapex,
-				"revenue_ttm":         rev,
+				"revenue_millions":    t2Rev,
 				"tier":                tier,
 				"thresholds":          fmt.Sprintf("<%.0f%% asset-light, %.0f-%.0f%% moderate, >%.0f%% capital-intensive", cfg.CapExIntensityLow, cfg.CapExIntensityLow, cfg.CapExIntensityHigh, cfg.CapExIntensityHigh),
 			})
@@ -972,15 +977,38 @@ func (w *worker) scoreTier3(ctx context.Context, symbol string, rows []store.Fun
 		}
 	}
 
+	// ── Derived inputs reused across multiple T3 metrics ─────────────────────
+	// revTTM: annual revenue in millions. Prefer Finnhub TTM metric; fall back to
+	// XBRL annual/quarterly revenue_reported (also stored in millions after the
+	// statementMap fix in data-fundamental).
+	revTTM := 0.0
+	if rev, ok := latest["revenue_ttm"]; ok && rev > 0 {
+		revTTM = rev
+	} else if rev, ok := latest["revenue_reported"]; ok && rev > 0 {
+		revTTM = rev
+	}
+
+	// fcfM: free cash flow in millions. Prefer Finnhub TTM metric; fall back to
+	// XBRL-derived FCF (operating CF − CapEx, stored in millions by data-fundamental).
+	fcfM := 0.0
+	if fcf, ok := latest["fcf_ttm"]; ok && fcf > 0 {
+		fcfM = fcf
+	} else if fcf, ok := latest["fcf_reported"]; ok && fcf > 0 {
+		fcfM = fcf
+	}
+
 	// ── T3.1 Share Count Trend — buybacks vs dilution (rank 13) ──────────────
 	// Queries the time-ordered shares_outstanding series from equity_fundamentals.
 	// Compares the oldest sampled value to the newest to derive annual % change.
-	// Sources: Finnhub shareOutstanding (period = "ttm", source = finnhub_metric).
+	// Sources: Finnhub shareOutstanding (metric), XBRL CommonStockSharesOutstanding
+	// (stored as shares_outstanding_reported). Both are in millions of shares.
 	// Thresholds: FUNDAMENTAL_SHARE_DECLINE_BUYBACK (2%) / _GROWTH_DILUTION (3%).
 	// TODO: Python — use pandas resample('A').last() on shares series for clean annual comparison.
 	shareRows, err := w.pool.Query(ctx, `
 		SELECT value, ts FROM equity_fundamentals
-		WHERE symbol = $1 AND metric = 'shares_outstanding' AND value IS NOT NULL
+		WHERE symbol = $1
+		  AND metric IN ('shares_outstanding', 'shares_outstanding_reported', 'shares_wa_reported')
+		  AND value IS NOT NULL
 		ORDER BY ts DESC LIMIT $2`,
 		symbol, cfg.ShareTrendYears*12+1) // enough rows to span the trend years
 	if err == nil {
@@ -1028,8 +1056,9 @@ func (w *worker) scoreTier3(ctx context.Context, symbol string, rows []store.Fun
 	// FCF growth assumption = min(eps_growth_5y, revenue_growth_5y, DCFMaxGrowthPct).
 	// Margin of safety = price_as_pct_of_dcf (100% = exactly at fair value).
 	// Thresholds: FUNDAMENTAL_DCF_SAFETY_MARGIN_PCT (<70% = strong buy) / _OVERVALUED_PCT (>110%).
+	// FCF source: fcf_ttm (Finnhub TTM) or fcf_reported (XBRL operating CF − CapEx).
 	// TODO: Python — add Monte Carlo scenario ranges; CAPM-derived WACC from FRED.
-	if fcf, okF := latest["fcf_ttm"]; okF && fcf > 0 {
+	if fcfM > 0 {
 		if mktCap, okM := latest["market_cap"]; okM && mktCap > 0 {
 			// Choose the most conservative FCF growth estimate available.
 			growthPct := cfg.DCFMaxGrowthPct
@@ -1051,17 +1080,17 @@ func (w *worker) scoreTier3(ctx context.Context, symbol string, rows []store.Fun
 			// Explicit FCF growth stage.
 			dcfValue := 0.0
 			for t := 1; t <= n; t++ {
-				fcfT := fcf * math.Pow(1+growthR, float64(t))
+				fcfT := fcfM * math.Pow(1+growthR, float64(t))
 				dcfValue += fcfT / math.Pow(1+wacc, float64(t))
 			}
 			// Terminal value (Gordon Growth Model) — only valid when WACC > g.
 			if wacc > g {
-				fcfN := fcf * math.Pow(1+growthR, float64(n))
+				fcfN := fcfM * math.Pow(1+growthR, float64(n))
 				terminalVal := fcfN * (1 + g) / (wacc - g)
 				dcfValue += terminalVal / math.Pow(1+wacc, float64(n))
 			}
 
-			// mktCap from Finnhub is in millions (same unit as fcf_ttm).
+			// mktCap and fcfM are both in millions → ratio is unit-clean.
 			// marginPct: 100 = priced exactly at DCF intrinsic; <100 = cheap; >100 = expensive.
 			marginPct := mktCap / dcfValue * 100
 
@@ -1076,7 +1105,7 @@ func (w *worker) scoreTier3(ctx context.Context, symbol string, rows []store.Fun
 				"market_cap_vs_dcf_pct": marginPct,
 				"dcf_value_millions":    dcfValue,
 				"market_cap_millions":   mktCap,
-				"fcf_ttm_millions":      fcf,
+				"fcf_millions":          fcfM,
 				"growth_rate_pct":       growthPct,
 				"wacc_pct":              cfg.DCFWACCPct,
 				"terminal_growth_pct":   cfg.DCFTerminalGrowth,
@@ -1118,11 +1147,12 @@ func (w *worker) scoreTier3(ctx context.Context, symbol string, rows []store.Fun
 	}
 
 	// ── T3.4 Asset Turnover — operational efficiency (rank 16) ───────────────
-	// Asset Turnover = Revenue (TTM) ÷ Total Assets.
+	// Asset Turnover = Revenue (TTM) ÷ Total Assets. Both in millions → ratio is unit-clean.
+	// Revenue source: revenue_ttm (Finnhub) or revenue_reported (XBRL, in millions).
 	// Informational — compare within sector; declining trend is an early warning.
 	// No composite scoring: cross-sector comparison is meaningless.
 	// TODO: Python — compute sector-relative z-score once sector classification feed added.
-	if revTTM, okR := latest["revenue_ttm"]; okR && revTTM > 0 {
+	if revTTM > 0 {
 		if totAssets, okA := latest["total_assets_reported"]; okA && totAssets > 0 {
 			assetTurnover := revTTM / totAssets
 			tier := "low"
@@ -1133,7 +1163,7 @@ func (w *worker) scoreTier3(ctx context.Context, symbol string, rows []store.Fun
 			}
 			upsert("t3_asset_turnover", ptr(assetTurnover), map[string]any{
 				"asset_turnover":    assetTurnover,
-				"revenue_ttm":       revTTM,
+				"revenue_millions":  revTTM,
 				"total_assets":      totAssets,
 				"tier":              tier,
 				"note":              "informational — compare to sector peers over time; >1.0 efficient, <0.5 asset-heavy",
@@ -1217,11 +1247,12 @@ func (w *worker) scoreTier3(ctx context.Context, symbol string, rows []store.Fun
 
 	// ── T3.8 Price-to-Sales (P/S) Ratio (rank 19) ─────────────────────────────
 	// P/S = Market Cap ÷ TTM Revenue. Most useful for unprofitable / early-stage growth.
-	// Both market_cap and revenue_ttm from Finnhub are in millions → ratio is unit-clean.
+	// Both market_cap and revTTM are in millions → ratio is unit-clean.
+	// Revenue source: revenue_ttm (Finnhub TTM) or revenue_reported (XBRL, in millions).
 	// Thresholds: FUNDAMENTAL_PS_VALUE (5×) / _FAIR (10×) / _SPECULATIVE (15×).
 	// Compare within sector — SaaS/tech commands higher P/S than industrials or retail.
 	if mktCap, okM := latest["market_cap"]; okM && mktCap > 0 {
-		if revTTM, okR := latest["revenue_ttm"]; okR && revTTM > 0 {
+		if revTTM > 0 {
 			ps := mktCap / revTTM
 			tier := "fairly_valued"
 			if ps < cfg.PSValue {
@@ -1232,12 +1263,12 @@ func (w *worker) scoreTier3(ctx context.Context, symbol string, rows []store.Fun
 				tier = "growth_premium_required"
 			}
 			upsert("t3_ps_ratio", ptr(ps), map[string]any{
-				"ps_ratio":       ps,
-				"market_cap_millions": mktCap,
-				"revenue_ttm_millions": revTTM,
-				"tier":           tier,
-				"thresholds":     fmt.Sprintf("<%.0f× value, %.0f-%.0f× fair, %.0f-%.0f× growth premium, >%.0f× speculative", cfg.PSValue, cfg.PSValue, cfg.PSFair, cfg.PSFair, cfg.PSSpeculative, cfg.PSSpeculative),
-				"note":           "compare within sector; SaaS 5-15× is normal, industrials >3× is expensive",
+				"ps_ratio":              ps,
+				"market_cap_millions":   mktCap,
+				"revenue_ttm_millions":  revTTM,
+				"tier":                  tier,
+				"thresholds":            fmt.Sprintf("<%.0f× value, %.0f-%.0f× fair, %.0f-%.0f× growth premium, >%.0f× speculative", cfg.PSValue, cfg.PSValue, cfg.PSFair, cfg.PSFair, cfg.PSSpeculative, cfg.PSSpeculative),
+				"note":                  "compare within sector; SaaS 5-15× is normal, industrials >3× is expensive",
 			})
 		}
 	}
