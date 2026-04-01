@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -278,118 +279,133 @@ func (w *worker) storeFinancials(ctx context.Context, freq string, limit int) {
 			cf := statementMap(reportBody, "cf") // cash flow statement
 			bs := statementMap(reportBody, "bs") // balance sheet
 
-			// Income statement — concept names vary between 10-Q and 10-K filings.
-			// Apple 10-K uses RevenueFromContractWithCustomerExcludingAssessedTax.
-			upsert("revenue_reported", conceptVal(ic,
-				"RevenueFromContractWithCustomerExcludingAssessedTax",
-				"RevenueFromContractWithCustomerIncludingAssessedTax",
-				"Revenues", "Revenue", "SalesRevenueNet",
-				"SalesRevenueGoodsNet", "TotalRevenues",
-			), nil)
-			upsert("gross_profit_reported", conceptVal(ic,
-				"GrossProfit",
-			), nil)
-			upsert("operating_income_reported", conceptVal(ic,
-				"OperatingIncomeLoss", "OperatingIncome",
-				"IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest",
-			), nil)
-			upsert("net_income_reported", conceptVal(ic,
-				"NetIncomeLoss", "ProfitLoss", "NetIncome",
-				"NetIncomeLossAvailableToCommonStockholdersBasic",
-			), nil)
-			upsert("eps_diluted_reported", conceptVal(ic,
-				"EarningsPerShareDiluted", "EarningsPerShareBasic",
-				"IncomeLossFromContinuingOperationsPerDilutedShare",
-			), nil)
-			upsert("eps_basic_reported", conceptVal(ic,
-				"EarningsPerShareBasic",
-				"IncomeLossFromContinuingOperationsPerBasicShare",
-			), nil)
+		// Income statement — concept names vary between 10-Q and 10-K filings.
+		// Apple 10-K uses RevenueFromContractWithCustomerExcludingAssessedTax.
+		// All dollar amounts are divided by 1e6 (divM) to match Finnhub metric API scale (millions).
+		upsert("revenue_reported", divM(conceptVal(ic,
+			"RevenueFromContractWithCustomerExcludingAssessedTax",
+			"RevenueFromContractWithCustomerIncludingAssessedTax",
+			"Revenues", "Revenue", "SalesRevenueNet",
+			"SalesRevenueGoodsNet", "TotalRevenues",
+		)), nil)
+		upsert("gross_profit_reported", divM(conceptVal(ic,
+			"GrossProfit",
+		)), nil)
+		upsert("operating_income_reported", divM(conceptVal(ic,
+			"OperatingIncomeLoss", "OperatingIncome",
+			"IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest",
+		)), nil)
+		upsert("net_income_reported", divM(conceptVal(ic,
+			"NetIncomeLoss", "ProfitLoss", "NetIncome",
+			"NetIncomeLossAvailableToCommonStockholdersBasic",
+		)), nil)
+		// EPS values are per-share — no unit conversion needed.
+		upsert("eps_diluted_reported", conceptVal(ic,
+			"EarningsPerShareDiluted", "EarningsPerShareBasic",
+			"IncomeLossFromContinuingOperationsPerDilutedShare",
+		), nil)
+		upsert("eps_basic_reported", conceptVal(ic,
+			"EarningsPerShareBasic",
+			"IncomeLossFromContinuingOperationsPerBasicShare",
+		), nil)
+		// Weighted-average diluted shares — divide by 1e6 to store in millions.
+		upsert("shares_wa_reported", divM(conceptVal(ic,
+			"WeightedAverageNumberOfDilutedSharesOutstanding",
+			"WeightedAverageNumberOfSharesOutstandingBasic",
+		)), nil)
 
-			// Cash flow.
-			upsert("operating_cf_reported", conceptVal(cf,
-				"NetCashProvidedByUsedInOperatingActivities",
-				"NetCashProvidedByOperatingActivities",
-			), nil)
-			upsert("capex_reported", conceptVal(cf,
-				"PaymentsToAcquirePropertyPlantAndEquipment",
-				"CapitalExpenditures",
-				"AcquisitionsOfPropertyPlantAndEquipment",
-				"PurchaseOfPropertyPlantAndEquipment",
-			), nil)
-			opCF := conceptVal(cf,
-				"NetCashProvidedByUsedInOperatingActivities",
-				"NetCashProvidedByOperatingActivities",
-			)
-			capex := conceptVal(cf,
-				"PaymentsToAcquirePropertyPlantAndEquipment",
-				"CapitalExpenditures",
-				"AcquisitionsOfPropertyPlantAndEquipment",
-				"PurchaseOfPropertyPlantAndEquipment",
-			)
-			if opCF != nil && capex != nil {
-				fcf := *opCF - abs(*capex)
-				upsert("fcf_reported", &fcf, map[string]any{
-					"operating_cf": *opCF,
-					"capex":        *capex,
-					"note":         "fcf = operating_cf - abs(capex)",
-				})
-			}
+		// Cash flow — all in raw dollars; convert to millions.
+		upsert("operating_cf_reported", divM(conceptVal(cf,
+			"NetCashProvidedByUsedInOperatingActivities",
+			"NetCashProvidedByOperatingActivities",
+		)), nil)
+		upsert("capex_reported", divM(conceptVal(cf,
+			"PaymentsToAcquirePropertyPlantAndEquipment",
+			"CapitalExpenditures",
+			"AcquisitionsOfPropertyPlantAndEquipment",
+			"PurchaseOfPropertyPlantAndEquipment",
+		)), nil)
+		opCF := conceptVal(cf,
+			"NetCashProvidedByUsedInOperatingActivities",
+			"NetCashProvidedByOperatingActivities",
+		)
+		capex := conceptVal(cf,
+			"PaymentsToAcquirePropertyPlantAndEquipment",
+			"CapitalExpenditures",
+			"AcquisitionsOfPropertyPlantAndEquipment",
+			"PurchaseOfPropertyPlantAndEquipment",
+		)
+		if opCF != nil && capex != nil {
+			// Convert raw dollars to millions before storing.
+			fcfRaw := *opCF - abs(*capex)
+			fcfMVal := fcfRaw / 1e6
+			upsert("fcf_reported", &fcfMVal, map[string]any{
+				"operating_cf_millions": *opCF / 1e6,
+				"capex_millions":        *capex / 1e6,
+				"note":                  "fcf = operating_cf - abs(capex), in millions",
+			})
+		}
 
-			// Balance sheet.
-			upsert("total_assets_reported", conceptVal(bs,
-				"Assets",
-			), nil)
-			upsert("total_liabilities_reported", conceptVal(bs,
-				"Liabilities", "LiabilitiesAndStockholdersEquity",
-			), nil)
-			upsert("total_equity_reported", conceptVal(bs,
-				"StockholdersEquity", "Equity",
-				"StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest",
-			), nil)
-			upsert("total_debt_reported", conceptVal(bs,
-				"LongTermDebt", "LongTermDebtNoncurrent",
-				"LongTermDebtAndCapitalLeaseObligations",
-				"DebtAndCapitalLeaseObligations",
-			), nil)
-			upsert("cash_reported", conceptVal(bs,
-				"CashAndCashEquivalentsAtCarryingValue",
-				"CashAndCashEquivalents", "Cash",
-				"CashCashEquivalentsAndShortTermInvestments",
-			), nil)
+		// Balance sheet — all dollar amounts converted to millions.
+		upsert("total_assets_reported", divM(conceptVal(bs,
+			"Assets",
+		)), nil)
+		upsert("total_liabilities_reported", divM(conceptVal(bs,
+			"Liabilities", "LiabilitiesAndStockholdersEquity",
+		)), nil)
+		upsert("total_equity_reported", divM(conceptVal(bs,
+			"StockholdersEquity", "Equity",
+			"StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest",
+		)), nil)
+		// Long-term debt only; does not include commercial paper or short-term notes.
+		upsert("total_debt_reported", divM(conceptVal(bs,
+			"LongTermDebt", "LongTermDebtNoncurrent",
+			"LongTermDebtAndCapitalLeaseObligations",
+			"DebtAndCapitalLeaseObligations",
+		)), nil)
+		upsert("cash_reported", divM(conceptVal(bs,
+			"CashAndCashEquivalentsAtCarryingValue",
+			"CashAndCashEquivalents", "Cash",
+			"CashCashEquivalentsAndShortTermInvestments",
+		)), nil)
+		// Shares outstanding — divide by 1e6 to store in millions (matches Finnhub metric scale).
+		upsert("shares_outstanding_reported", divM(conceptVal(bs,
+			"CommonStockSharesOutstanding",
+			"CommonStockSharesIssued",
+		)), nil)
 
-			// ── Tier 3: Goodwill & Intangible Assets (rank 18) ───────────────
-			// Goodwill arises from acquisitions paying above book value. Heavy
-			// goodwill (>40% of total assets) carries impairment risk.
-			// XBRL concept names vary by filer; list most common in priority order.
-			upsert("goodwill_reported", conceptVal(bs,
-				"Goodwill", "GoodwillNet",
-				"BusinessAcquisitionCostOfAcquiredEntityPurchasePrice",
-			), nil)
-			upsert("intangible_assets_reported", conceptVal(bs,
-				"IntangibleAssetsNetExcludingGoodwill",
-				"FiniteLivedIntangibleAssetsNet",
-				"IntangibleAssetsNet",
-				"OtherIntangibleAssetsNet",
-			), nil)
+		// ── Tier 3: Goodwill & Intangible Assets (rank 18) ───────────────
+		// Goodwill arises from acquisitions paying above book value. Heavy
+		// goodwill (>40% of total assets) carries impairment risk.
+		// XBRL concept names vary by filer; list most common in priority order.
+		upsert("goodwill_reported", divM(conceptVal(bs,
+			"Goodwill", "GoodwillNet",
+			"BusinessAcquisitionCostOfAcquiredEntityPurchasePrice",
+		)), nil)
+		upsert("intangible_assets_reported", divM(conceptVal(bs,
+			"IntangibleAssetsNetExcludingGoodwill",
+			"FiniteLivedIntangibleAssetsNet",
+			"IntangibleAssetsNet",
+			"OtherIntangibleAssetsNet",
+		)), nil)
 
-			// ── Tier 3: Inventory (rank 16 — inventory turnover) ─────────────
-			// Slowing inventory turnover signals weakening demand before revenue drops.
-			upsert("inventory_reported", conceptVal(bs,
-				"InventoryNet", "Inventories",
-				"FIFOInventoryAmount", "InventoryFinishedGoods",
-				"InventoryRawMaterialsAndSupplies",
-			), nil)
+		// ── Tier 3: Inventory (rank 16 — inventory turnover) ─────────────
+		// Slowing inventory turnover signals weakening demand before revenue drops.
+		upsert("inventory_reported", divM(conceptVal(bs,
+			"InventoryNet", "Inventories",
+			"FIFOInventoryAmount", "InventoryFinishedGoods",
+			"InventoryRawMaterialsAndSupplies",
+		)), nil)
 
-			// ── Tier 3: Interest Expense (rank 15 — interest coverage) ───────
-			// Interest coverage = EBIT / Interest Expense.
-			// Interest expense is typically negative in XBRL; we take abs() in the analyzer.
-			upsert("interest_expense_reported", conceptVal(ic,
-				"InterestExpense",
-				"InterestAndDebtExpense",
-				"InterestExpenseDebt",
-				"FinanceLeaseInterestExpense",
-			), nil)
+		// ── Tier 3: Interest Expense (rank 15 — interest coverage) ───────
+		// Interest coverage = EBIT / Interest Expense.
+		// Interest expense is typically negative in XBRL; we take abs() in the analyzer.
+		upsert("interest_expense_reported", divM(conceptVal(ic,
+			"InterestExpense",
+			"InterestAndDebtExpense",
+			"InterestExpenseDebt",
+			"FinanceLeaseInterestExpense",
+		)), nil)
 
 			// Raw report payload for forward-compat access.
 			upsert("report_raw", nil, report)
@@ -574,9 +590,24 @@ func conceptVal(m map[string]any, concepts ...string) *float64 {
 	return nil
 }
 
+// divM converts a raw XBRL dollar value to millions so it is consistent with
+// the Finnhub /stock/metric API, which already returns values in millions.
+// Per-share values (EPS, book value per share) should NOT be passed through divM.
+func divM(v *float64) *float64 {
+	if v == nil {
+		return nil
+	}
+	m := *v / 1e6
+	return &m
+}
+
 // statementMap returns the inner map for a statement type ("ic", "cf", "bs")
 // from the report body. Finnhub may return either an object or an array of
 // concept rows; we flatten arrays into a name→value map.
+//
+// Namespace normalisation: Finnhub returns concept names with an XBRL namespace
+// prefix separated by an underscore (e.g. "us-gaap_Assets"). We strip the prefix
+// so callers can look up plain concept names like "Assets".
 func statementMap(reportBody map[string]any, key string) map[string]any {
 	if reportBody == nil {
 		return map[string]any{}
@@ -589,7 +620,7 @@ func statementMap(reportBody map[string]any, key string) map[string]any {
 	if m, ok := raw.(map[string]any); ok {
 		return m
 	}
-	// Array of {concept, label, unit, value} objects.
+	// Array of {concept, label, unit, value} objects — flatten and normalise keys.
 	items, ok := raw.([]any)
 	if !ok {
 		return map[string]any{}
@@ -603,6 +634,11 @@ func statementMap(reportBody map[string]any, key string) map[string]any {
 		concept, _ := row["concept"].(string)
 		if concept == "" {
 			concept, _ = row["label"].(string)
+		}
+		// Strip XBRL namespace prefix: "us-gaap_Assets" → "Assets".
+		// Finnhub uses underscores; some legacy data may use colons.
+		if i := strings.IndexAny(concept, "_:"); i >= 0 {
+			concept = concept[i+1:]
 		}
 		if concept != "" {
 			out[concept] = row["value"]
