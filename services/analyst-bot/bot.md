@@ -50,6 +50,7 @@ These appear on the price title and the trend field.
 | `/signals symbol:AAPL asset_type:equity` | Fast one-embed snapshot of the most actionable signals |
 | `/analyze symbol:AAPL asset_type:equity` | Full deep-dive: 4 panels — price, technical, fundamentals, news |
 | `/report` | Triggers the daily market report on demand (same as the 07:00 scheduled job) |
+| `/dictionary` | Sends this glossary as Discord embeds — one section per embed, paginated |
 | `/status` | Bot health — DB, Redis, scheduler, configured symbols |
 | `/ping` | Bot latency in milliseconds |
 
