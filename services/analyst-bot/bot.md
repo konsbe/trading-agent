@@ -32,7 +32,7 @@ These appear on the price title and the trend field.
 
 `/price symbol:AAPL asset_type:equity` — Latest OHLCV bar (open, high, low, close, volume)
 `/signals symbol:AAPL asset_type:equity` — Fast one-embed snapshot of the most actionable signals
-`/analyze symbol:AAPL asset_type:equity` — Full deep-dive: price → technical → fundamentals → news
+`/analyze symbol:AAPL asset_type:equity` — Full deep-dive: price → technical → Tier 1 fundamentals → 🏦 Tier 2 balance sheet → news
 `/report` — Triggers the daily market report on demand (same as the 07:00 scheduled job)
 `/dictionary` — Sends this glossary as paginated Discord embeds
 `/status` — Bot health: DB ✅/❌, Redis ✅/❌, scheduler jobs, configured symbols
@@ -261,6 +261,107 @@ Total market value (price × shares outstanding). Formatted from Finnhub's milli
 `$3.73T` — Trillions (mega-cap: AAPL, MSFT)
 `$140B` — Billions (large-cap)
 `$8B` — Billions (mid-cap)
+
+## Balance Sheet Analysis (Tier 2)
+
+Shown as a separate **🏦 Balance Sheet** embed in `/analyze` for equity symbols. These metrics assess financial health, leverage, and capital efficiency. Not all fields appear for every symbol — they appear only once data has been computed by the analyzer.
+
+The **Balance Sheet health score** in the embed title combines ROE, D/E, and Current Ratio into a single [-1 … +1] score.
+
+`🟢 healthy` — Multiple strong balance-sheet signals
+`🟡 neutral` — Mixed signals
+`🔴 stressed` — Multiple red flags in leverage or liquidity
+
+---
+
+### ROE (Return on Equity)
+
+How efficiently the company generates profit from shareholders' equity. Sustained ROE > 15% for 5+ years is the Buffett-style moat signal.
+
+`🟢 excellent` > 15% — Strong moat. Company creates significant value per dollar of equity.
+`🟡 adequate` 8–15% — Acceptable but not exceptional capital efficiency.
+`🔴 destroying_value` < 8% — Capital allocation is eroding shareholder value.
+
+Configurable via `FUNDAMENTAL_ROE_EXCELLENT` (default 15) and `FUNDAMENTAL_ROE_ADEQUATE` (default 8).
+
+The `ROA` (Return on Assets) shown inline is informational: > 10% high efficiency, 5–10% moderate, < 5% low.
+
+### Debt/Equity (D/E Ratio)
+
+How much debt finances the business versus equity. Rising interest rates make high-debt companies more vulnerable — each refinancing hits earnings harder.
+
+`🟢 conservative` D/E < 1.0 — Low leverage. Strong financial position.
+`🟡 manageable` D/E 1–2× — Acceptable. Monitor debt maturity schedule.
+`🔴 high_leverage` D/E > 2× — Demands scrutiny. Industry context essential — utilities safely operate at 3–4×.
+
+Configurable via `FUNDAMENTAL_DE_CONSERVATIVE` (default 1.0) and `FUNDAMENTAL_DE_MANAGEABLE` (default 2.0).
+
+### Net Debt / EBITDA
+
+Cleaner leverage metric than D/E — accounts for cash holdings. Proxy computed as: (Total Debt − Cash) ÷ (Operating Income × 4).
+
+`🟢 net_cash` — Company holds more cash than total debt. Ultra-safe.
+`🟢 conservative` < 2× — Low leverage relative to earnings power.
+`🟡 manageable` 2–4× — Monitor, especially if interest rates are rising.
+`🔴 high_risk` > 4× — Vulnerable in an economic slowdown or rate-rise environment.
+
+Configurable via `FUNDAMENTAL_NET_DEBT_EBITDA_LOW` (default 2) and `FUNDAMENTAL_NET_DEBT_EBITDA_HIGH` (default 4).
+
+### EV/EBITDA
+
+Capital-structure neutral valuation — removes the effect of different debt levels, tax rates, and depreciation choices. **Always compare within sector.** Tech typically 20–30×, industrials 10–15×, utilities 8–12×.
+
+`🟢 value_territory` < 10× — Potentially undervalued relative to earnings.
+`🟡 fairly_valued` 10–20× — Standard valuation range for most industries.
+`🔴 growth_premium_required` > 20× — Requires strong, sustained earnings growth to justify.
+
+Configurable via `FUNDAMENTAL_EV_EBITDA_VALUE` (default 10) and `FUNDAMENTAL_EV_EBITDA_FAIR` (default 20).
+
+### Current Ratio
+
+Short-term liquidity — can the company pay its near-term obligations? Current Ratio = Current Assets ÷ Current Liabilities.
+
+`🟢 safe` > 1.5 — Comfortable liquidity buffer.
+`🟡 monitor` 1.0–1.5 — Adequate but watch closely if debt maturities are approaching.
+`🔴 liquidity_risk` < 1.0 — Short-term liabilities exceed liquid assets. Not always fatal but demands explanation.
+
+The `Quick` ratio shown inline is stricter — it excludes inventory. > 1.0 adequate, 0.7–1.0 monitor, < 0.7 risk.
+
+Configurable via `FUNDAMENTAL_CURRENT_RATIO_SAFE` (default 1.5) and `FUNDAMENTAL_CURRENT_RATIO_MONITOR` (default 1.0).
+
+### Price/Book (P/B)
+
+Market price vs. net asset value. Most relevant for banks, insurers, and asset-heavy industries. **Tech companies with heavy intangibles make P/B less meaningful — use EV/EBITDA instead.**
+
+`🟢 value_signal` P/B < 1.5 — Market values company near (or below) its book assets.
+`⚪ fair` P/B 1.5–5× — Standard range for most industries.
+`🔴 limited_safety_margin` P/B > 5× — Little asset-backed downside protection.
+
+Configurable via `FUNDAMENTAL_PB_VALUE` (default 1.5) and `FUNDAMENTAL_PB_EXPENSIVE` (default 5.0).
+
+### Dividend Yield
+
+Annual dividend as % of share price. Shown only if the company pays a dividend.
+
+`🟢 sustainable_income` Yield 2–6%, Payout < 60% — Generous income with room for maintenance.
+`🟡 moderate_yield` 2–6%, payout not assessed — Moderate income.
+`🟡 verify_payout` Yield > 6% — High yield; verify payout ratio before investing.
+`🔴 cut_risk` Payout > 80% — Dividend may be cut if earnings dip slightly.
+`⚪ no_dividend` < 2% or no dividend — Growth company or dividend suspended.
+
+Configurable via `FUNDAMENTAL_DIVIDEND_YIELD_MIN/HIGH` and `FUNDAMENTAL_PAYOUT_RATIO_SAFE/DANGER`.
+
+### CapEx Intensity
+
+Capital expenditure as % of revenue. Asset-light businesses (SaaS, brands) keep CapEx < 5% and convert most of their earnings into free cash. Capital-intensive industries (semiconductors, airlines, mining) must constantly reinvest.
+
+`🟢 asset_light` < 5% of revenue — High FCF conversion potential.
+`🟡 moderate_intensity` 5–20% — Typical for manufacturing, consumer.
+`🔴 capital_intensive` > 20% — Heavy reinvestment required; FCF constrained.
+
+Configurable via `FUNDAMENTAL_CAPEX_INTENSITY_LOW` (default 5) and `FUNDAMENTAL_CAPEX_INTENSITY_HIGH` (default 20).
+
+---
 
 ## Alert Types
 

@@ -590,6 +590,48 @@ type FundamentalAnalysis struct {
 	// ── Margin trend (percentage-point change, 8-quarter window) ─────────────
 	MarginTrendStablePP float64 // within ±this pp = "stable"  default 2
 	MarginTrendQuarters int     // quarters to analyse          default 8
+
+	// ── Tier 2: ROE (Return on Equity) ───────────────────────────────────────
+	// Sustained ROE >15% for 5+ years = moat. <8% = capital destruction.
+	ROEExcellent float64 // >this = "excellent"  default 15
+	ROEAdequate  float64 // >this = "adequate"   default 8
+
+	// ── Tier 2: Debt-to-Equity leverage ──────────────────────────────────────
+	// D/E <1 conservative, 1-2 manageable (monitor), >2 high risk in rate rises.
+	DEConservative float64 // <this = "conservative"  default 1.0
+	DEManageable   float64 // <this = "manageable"    default 2.0
+
+	// ── Tier 2: Net Debt / EBITDA ─────────────────────────────────────────────
+	// <2× conservative, 2–4× manageable, >4× high risk.
+	NetDebtEBITDALow  float64 // <this = "conservative"  default 2.0
+	NetDebtEBITDAHigh float64 // <this = "manageable"    default 4.0
+
+	// ── Tier 2: EV/EBITDA (rank 08) ──────────────────────────────────────────
+	// <10× value, 10–20× fair, >20× requires strong growth justification.
+	EVEBITDAValue float64 // <this = "value"  default 10
+	EVEBITDAFair  float64 // <this = "fair"   default 20
+
+	// ── Tier 2: Current Ratio (rank 10) ──────────────────────────────────────
+	// >1.5 safe, 1.0–1.5 monitor, <1.0 liquidity risk.
+	CurrentRatioSafe    float64 // >this = "safe"     default 1.5
+	CurrentRatioMonitor float64 // >this = "monitor"  default 1.0
+
+	// ── Tier 2: Price/Book (P/B) ─────────────────────────────────────────────
+	// <1.5 value (asset-heavy sectors), >5 limited margin of safety.
+	PBValue     float64 // <this = "value"     default 1.5
+	PBExpensive float64 // >this = "expensive" default 5.0
+
+	// ── Tier 2: Dividend sustainability ──────────────────────────────────────
+	// 3–6% yield + <60% payout = ideal sustainable income.
+	DividendYieldMin   float64 // below this = "none/minimal"     default 2
+	DividendYieldHigh  float64 // above this = verify payout      default 6
+	PayoutRatioSafe    float64 // <this = sustainable             default 60
+	PayoutRatioDanger  float64 // >this = cut risk                default 80
+
+	// ── Tier 2: CapEx intensity ───────────────────────────────────────────────
+	// <5% asset-light, 5–15% moderate, >20% capital-intensive / FCF constrained.
+	CapExIntensityLow  float64 // <this = "asset_light"          default 5
+	CapExIntensityHigh float64 // >this = "capital_intensive"    default 20
 }
 
 func LoadFundamentalAnalysis() (FundamentalAnalysis, error) {
@@ -649,5 +691,32 @@ func LoadFundamentalAnalysis() (FundamentalAnalysis, error) {
 
 		MarginTrendStablePP: floatEnv("FUNDAMENTAL_MARGIN_TREND_STABLE_PP", 2),
 		MarginTrendQuarters: intEnv("FUNDAMENTAL_MARGIN_TREND_QUARTERS", 8),
+
+		// Tier 2
+		ROEExcellent: floatEnv("FUNDAMENTAL_ROE_EXCELLENT", 15),
+		ROEAdequate:  floatEnv("FUNDAMENTAL_ROE_ADEQUATE", 8),
+
+		DEConservative: floatEnv("FUNDAMENTAL_DE_CONSERVATIVE", 1.0),
+		DEManageable:   floatEnv("FUNDAMENTAL_DE_MANAGEABLE", 2.0),
+
+		NetDebtEBITDALow:  floatEnv("FUNDAMENTAL_NET_DEBT_EBITDA_LOW", 2.0),
+		NetDebtEBITDAHigh: floatEnv("FUNDAMENTAL_NET_DEBT_EBITDA_HIGH", 4.0),
+
+		EVEBITDAValue: floatEnv("FUNDAMENTAL_EV_EBITDA_VALUE", 10),
+		EVEBITDAFair:  floatEnv("FUNDAMENTAL_EV_EBITDA_FAIR", 20),
+
+		CurrentRatioSafe:    floatEnv("FUNDAMENTAL_CURRENT_RATIO_SAFE", 1.5),
+		CurrentRatioMonitor: floatEnv("FUNDAMENTAL_CURRENT_RATIO_MONITOR", 1.0),
+
+		PBValue:     floatEnv("FUNDAMENTAL_PB_VALUE", 1.5),
+		PBExpensive: floatEnv("FUNDAMENTAL_PB_EXPENSIVE", 5.0),
+
+		DividendYieldMin:  floatEnv("FUNDAMENTAL_DIVIDEND_YIELD_MIN", 2),
+		DividendYieldHigh: floatEnv("FUNDAMENTAL_DIVIDEND_YIELD_HIGH", 6),
+		PayoutRatioSafe:   floatEnv("FUNDAMENTAL_PAYOUT_RATIO_SAFE", 60),
+		PayoutRatioDanger: floatEnv("FUNDAMENTAL_PAYOUT_RATIO_DANGER", 80),
+
+		CapExIntensityLow:  floatEnv("FUNDAMENTAL_CAPEX_INTENSITY_LOW", 5),
+		CapExIntensityHigh: floatEnv("FUNDAMENTAL_CAPEX_INTENSITY_HIGH", 20),
 	}, nil
 }

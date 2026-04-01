@@ -185,6 +185,32 @@ func (w *worker) runMetrics(ctx context.Context) {
 		upsert("market_cap", floatPtr(metricMap, "marketCapitalization"), nil)
 		upsert("shares_outstanding", floatPtr(metricMap, "shareOutstanding"), nil)
 
+		// ── Tier 2: Return on capital & profitability efficiency ───────────────
+		// ROIC and ROE are the master profitability metrics (Tier 2, rank 06).
+		// ROE above 15% sustained = Buffett-style quality / moat signal.
+		// TODO: Python — compute ROIC = NOPAT ÷ Invested Capital from XBRL series.
+		upsert("roe_ttm", floatPtr(metricMap, "roeTTM"), nil)
+		upsert("roa_ttm", floatPtr(metricMap, "roaTTM"), nil)
+		upsert("roic_5y", floatPtr(metricMap, "roic5Y"), nil)
+		upsert("ebitda_per_share_ttm", floatPtr(metricMap, "ebitdaPerShareTTM"), nil)
+
+		// ── Tier 2: Leverage — Debt/Equity (rank 07) ───────────────────────────
+		// D/E above 2× demands scrutiny; industry context essential.
+		// netDebtAnnual from Finnhub = Total Debt – Cash (used for Net Debt/EBITDA).
+		upsert("debt_to_equity_quarterly", floatPtr(metricMap, "totalDebtToEquityQuarterly"), nil)
+		upsert("debt_to_equity_annual", floatPtr(metricMap, "totalDebtToEquityAnnual"), nil)
+		upsert("net_debt_annual", floatPtr(metricMap, "netDebtAnnual"), nil)
+
+		// ── Tier 2: Liquidity — Current & Quick ratio (rank 10) ───────────────
+		// Current <1.0 means short-term liabilities exceed liquid assets.
+		upsert("current_ratio_quarterly", floatPtr(metricMap, "currentRatioQuarterly"), nil)
+		upsert("current_ratio_annual", floatPtr(metricMap, "currentRatioAnnual"), nil)
+		upsert("quick_ratio_quarterly", floatPtr(metricMap, "quickRatioQuarterly"), nil)
+
+		// ── Tier 2: Per-share book value (used with market_cap for local P/B) ─
+		upsert("book_value_per_share_quarterly", floatPtr(metricMap, "bookValuePerShareQuarterly"), nil)
+		upsert("book_value_per_share_annual", floatPtr(metricMap, "bookValuePerShareAnnual"), nil)
+
 		// ── Also store the full metric payload for forward-compat access ──────
 		if err := store.UpsertFundamental(ctx, w.pool, ts, sym, "ttm", "metrics_raw", nil, metricMap, "finnhub_metric"); err != nil {
 			w.log.Error("upsert metrics_raw", "symbol", sym, "err", err)

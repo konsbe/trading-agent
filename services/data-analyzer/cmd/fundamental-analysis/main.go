@@ -113,6 +113,7 @@ func (w *worker) analyzeAll(ctx context.Context) {
 		}
 		w.score(ctx, sym, rows)
 		w.analyzeMarginTrend(ctx, sym)
+		w.scoreTier2(ctx, sym, rows)
 	}
 }
 
@@ -602,6 +603,333 @@ func (w *worker) analyzeMarginTrend(ctx context.Context, symbol string) {
 	computeTrend("net_income_reported", "net_margin_trend_8q")
 
 	w.log.Info("margin trend computed", "symbol", symbol, "quarters_available", len(revRows))
+}
+
+// scoreTier2 derives Tier 2 FA signals (reference ranks 06–10) from the same
+// raw rows fetched by data-fundamental.  Results are stored with metric names
+// prefixed by "t2_" so the analyst-bot and dashboard can query them distinctly.
+//
+// Tier 2 metrics computed:
+//   t2_roe          — Return on Equity tier (rank 06)
+//   t2_roa          — Return on Assets (informational)
+//   t2_leverage     — D/E ratio tier (rank 07, composite-scored)
+//   t2_net_debt_ebitda — Net Debt / EBITDA proxy (rank 07 extended)
+//   t2_ev_ebitda    — EV/EBITDA tier (rank 08, informational — sector-dependent)
+//   t2_current_ratio — Current ratio tier (rank 10, composite-scored)
+//   t2_quick_ratio  — Quick ratio (informational supplement)
+//   t2_pb           — Price/Book tier (rank 11, informational)
+//   t2_dividend     — Dividend yield + payout sustainability (rank 12)
+//   t2_capex_intensity — CapEx as % of revenue (rank 20, informational)
+//   t2_health_score — Composite of Tier 2 balance-sheet metrics
+//
+// TODO: migrate to Python pandas — quarterly series joins and ratio math are
+// simpler with DataFrame.resample() and vectorised pct_change().
+func (w *worker) scoreTier2(ctx context.Context, symbol string, rows []store.FundamentalRow) {
+	latest := make(map[string]float64, len(rows))
+	for _, r := range rows {
+		if r.Value == nil {
+			continue
+		}
+		if _, exists := latest[r.Metric]; !exists {
+			latest[r.Metric] = *r.Value
+		}
+	}
+
+	ts := time.Now().UTC()
+	cfg := w.cfg
+	ptr := func(v float64) *float64 { return &v }
+
+	upsert := func(metric string, value *float64, payload any) {
+		if err := store.UpsertFundamentalDerived(ctx, w.pool, ts, symbol, "derived", metric, value, payload); err != nil {
+			w.log.Error("upsert tier2 metric", "symbol", symbol, "metric", metric, "err", err)
+		}
+	}
+
+	var t2Score, t2Max float64
+
+	// ── T2.1 Return on Equity (ROE) ───────────────────────────────────────────
+	// ROIC/ROE rank 06 from reference. Sustained ROE >15% = Buffett moat signal.
+	// Source: Finnhub roeTTM (upserted as roe_ttm by data-fundamental Tier 2 block).
+	// Thresholds: FUNDAMENTAL_ROE_EXCELLENT (15) / FUNDAMENTAL_ROE_ADEQUATE (8).
+	if roe, ok := latest["roe_ttm"]; ok {
+		tier := "destroying_value"
+		score := -1.0
+		if roe >= cfg.ROEExcellent {
+			tier = "excellent"
+			score = 1
+		} else if roe >= cfg.ROEAdequate {
+			tier = "adequate"
+			score = 0
+		}
+		t2Score += score
+		t2Max++
+		upsert("t2_roe", ptr(roe), map[string]any{
+			"roe_pct":    roe,
+			"tier":       tier,
+			"thresholds": fmt.Sprintf(">%.0f%% excellent (moat), %.0f-%.0f%% adequate, <%.0f%% destroying value", cfg.ROEExcellent, cfg.ROEAdequate, cfg.ROEExcellent, cfg.ROEAdequate),
+		})
+	}
+
+	// ── T2.2 Return on Assets (ROA) — informational ───────────────────────────
+	if roa, ok := latest["roa_ttm"]; ok {
+		tier := "low"
+		if roa >= 10 {
+			tier = "high"
+		} else if roa >= 5 {
+			tier = "moderate"
+		}
+		upsert("t2_roa", ptr(roa), map[string]any{
+			"roa_pct": roa,
+			"tier":    tier,
+			"note":    "informational only; >10% high efficiency, 5-10% moderate, <5% low asset utilisation",
+		})
+	}
+
+	// ── T2.3 Debt-to-Equity leverage ──────────────────────────────────────────
+	// Rank 07 from reference. D/E above 2× demands scrutiny of debt maturity.
+	// Primary: debt_to_equity_quarterly (Finnhub).
+	// Fallback: total_debt_reported / total_equity_reported (XBRL).
+	// Thresholds: FUNDAMENTAL_DE_CONSERVATIVE (1.0) / FUNDAMENTAL_DE_MANAGEABLE (2.0).
+	var de *float64
+	var deSource string
+	if v, ok := latest["debt_to_equity_quarterly"]; ok {
+		de = ptr(v)
+		deSource = "finnhub_quarterly"
+	} else if v, ok := latest["debt_to_equity_annual"]; ok {
+		de = ptr(v)
+		deSource = "finnhub_annual"
+	} else if td, okD := latest["total_debt_reported"]; okD {
+		if eq, okE := latest["total_equity_reported"]; okE && eq > 0 {
+			de = ptr(td / eq)
+			deSource = "xbrl_reported"
+		}
+	}
+	if de != nil {
+		tier := "high_leverage"
+		score := -1.0
+		if *de < cfg.DEConservative {
+			tier = "conservative"
+			score = 1
+		} else if *de < cfg.DEManageable {
+			tier = "manageable"
+			score = 0
+		}
+		t2Score += score
+		t2Max++
+		upsert("t2_leverage", de, map[string]any{
+			"debt_to_equity": *de,
+			"tier":           tier,
+			"source":         deSource,
+			"thresholds":     fmt.Sprintf("<%.1f× conservative, %.1f-%.1f× manageable, >%.1f× high risk", cfg.DEConservative, cfg.DEConservative, cfg.DEManageable, cfg.DEManageable),
+			"note":           "industry context essential — utilities/banks operate at higher D/E safely",
+		})
+	}
+
+	// ── T2.4 Net Debt / EBITDA ────────────────────────────────────────────────
+	// Cleaner leverage metric than D/E as it accounts for cash holdings.
+	// Net Debt = total_debt – cash. EBITDA proxy = operating_income (EBIT; D&A excluded).
+	// Thresholds: FUNDAMENTAL_NET_DEBT_EBITDA_LOW (2) / FUNDAMENTAL_NET_DEBT_EBITDA_HIGH (4).
+	if td, okD := latest["total_debt_reported"]; okD {
+		if cash, okC := latest["cash_reported"]; okC {
+			netDebt := td - cash
+			// Annualise operating_income_reported if available as EBITDA proxy.
+			if opInc, ok := latest["operating_income_reported"]; ok && opInc > 0 {
+				// Quarterly value × 4 = rough TTM EBITDA proxy (excludes D&A, conservative).
+				ebitdaProxy := opInc * 4
+				ratio := netDebt / ebitdaProxy
+				tier := "high_risk"
+				if ratio < 0 {
+					tier = "net_cash" // company holds more cash than debt
+				} else if ratio < cfg.NetDebtEBITDALow {
+					tier = "conservative"
+				} else if ratio < cfg.NetDebtEBITDAHigh {
+					tier = "manageable"
+				}
+				upsert("t2_net_debt_ebitda", ptr(ratio), map[string]any{
+					"net_debt":      netDebt,
+					"ebitda_proxy":  ebitdaProxy,
+					"ratio":         ratio,
+					"tier":          tier,
+					"thresholds":    fmt.Sprintf("<%.0f× conservative, %.0f-%.0f× manageable, >%.0f× high risk", cfg.NetDebtEBITDALow, cfg.NetDebtEBITDALow, cfg.NetDebtEBITDAHigh, cfg.NetDebtEBITDAHigh),
+					"note":          "EBITDA proxy = latest quarter operating income × 4 (excludes D&A — slightly conservative)",
+				})
+			}
+		}
+	}
+
+	// ── T2.5 EV / EBITDA ──────────────────────────────────────────────────────
+	// Rank 08 from reference. Capital-structure neutral — compare within sector.
+	// Source: Alpha Vantage EVToEBITDA (stored as ev_to_ebitda by data-fundamental).
+	// Informational only — sector medians vary widely (tech 20–30×, utilities 8–12×).
+	// Thresholds: FUNDAMENTAL_EV_EBITDA_VALUE (10) / FUNDAMENTAL_EV_EBITDA_FAIR (20).
+	if evEBITDA, ok := latest["ev_to_ebitda"]; ok && evEBITDA > 0 {
+		tier := "growth_premium_required"
+		if evEBITDA < cfg.EVEBITDAValue {
+			tier = "value_territory"
+		} else if evEBITDA < cfg.EVEBITDAFair {
+			tier = "fairly_valued"
+		}
+		upsert("t2_ev_ebitda", ptr(evEBITDA), map[string]any{
+			"ev_to_ebitda": evEBITDA,
+			"tier":         tier,
+			"thresholds":   fmt.Sprintf("<%.0f× value, %.0f-%.0f× fair, >%.0f× growth premium required", cfg.EVEBITDAValue, cfg.EVEBITDAValue, cfg.EVEBITDAFair, cfg.EVEBITDAFair),
+			"note":         "compare within sector only — tech 20-30×, industrials 10-15×, utilities 8-12×",
+		})
+	}
+
+	// ── T2.6 Current Ratio ────────────────────────────────────────────────────
+	// Rank 10 from reference. Can the company meet near-term obligations?
+	// Below 1.0 = short-term liabilities exceed liquid assets (not always fatal).
+	// Source: Finnhub currentRatioQuarterly → current_ratio_quarterly.
+	// Thresholds: FUNDAMENTAL_CURRENT_RATIO_SAFE (1.5) / _MONITOR (1.0).
+	var cr *float64
+	if v, ok := latest["current_ratio_quarterly"]; ok {
+		cr = ptr(v)
+	} else if v, ok := latest["current_ratio_annual"]; ok {
+		cr = ptr(v)
+	}
+	if cr != nil {
+		tier := "liquidity_risk"
+		score := -1.0
+		if *cr >= cfg.CurrentRatioSafe {
+			tier = "safe"
+			score = 1
+		} else if *cr >= cfg.CurrentRatioMonitor {
+			tier = "monitor"
+			score = 0
+		}
+		t2Score += score
+		t2Max++
+		upsert("t2_current_ratio", cr, map[string]any{
+			"current_ratio": *cr,
+			"tier":          tier,
+			"thresholds":    fmt.Sprintf(">%.1f safe, %.1f-%.1f monitor, <%.1f liquidity risk", cfg.CurrentRatioSafe, cfg.CurrentRatioMonitor, cfg.CurrentRatioSafe, cfg.CurrentRatioMonitor),
+		})
+	}
+
+	// ── T2.7 Quick Ratio — informational supplement ───────────────────────────
+	if qr, ok := latest["quick_ratio_quarterly"]; ok {
+		tier := "low"
+		if qr >= 1.0 {
+			tier = "adequate"
+		} else if qr >= 0.7 {
+			tier = "monitor"
+		}
+		upsert("t2_quick_ratio", ptr(qr), map[string]any{
+			"quick_ratio": qr,
+			"tier":        tier,
+			"note":        "stricter than current ratio — excludes inventory; >1.0 adequate, 0.7-1.0 monitor, <0.7 risk",
+		})
+	}
+
+	// ── T2.8 Price/Book (P/B) ─────────────────────────────────────────────────
+	// Rank 11 from reference. Most relevant for banks, insurers, asset-heavy sectors.
+	// Source: Alpha Vantage PriceToBookRatio (stored as price_to_book).
+	// Informational only — tech companies with heavy intangibles make P/B less meaningful.
+	// Thresholds: FUNDAMENTAL_PB_VALUE (1.5) / FUNDAMENTAL_PB_EXPENSIVE (5.0).
+	if pb, ok := latest["price_to_book"]; ok && pb > 0 {
+		tier := "fair"
+		if pb < cfg.PBValue {
+			tier = "value_signal"
+		} else if pb > cfg.PBExpensive {
+			tier = "limited_safety_margin"
+		}
+		upsert("t2_pb", ptr(pb), map[string]any{
+			"price_to_book": pb,
+			"tier":          tier,
+			"thresholds":    fmt.Sprintf("<%.1f× value signal (asset-heavy), %.1f-%.0f× fair, >%.0f× limited safety", cfg.PBValue, cfg.PBValue, cfg.PBExpensive, cfg.PBExpensive),
+			"note":          "tech/SaaS companies naturally carry high P/B due to intangibles — use EV/EBITDA instead",
+		})
+	}
+
+	// ── T2.9 Dividend Yield & Payout Ratio ───────────────────────────────────
+	// Rank 12 from reference. High yield + low payout = sustainable income.
+	// Source: Alpha Vantage DividendYield + PayoutRatio (already stored by data-fundamental).
+	// Informational only — growth companies often pay no dividend, which is not negative.
+	// Thresholds: FUNDAMENTAL_DIVIDEND_YIELD_MIN/HIGH / FUNDAMENTAL_PAYOUT_RATIO_SAFE/DANGER.
+	if divYield, ok := latest["dividend_yield"]; ok {
+		// Alpha Vantage returns as decimal (0.0148 = 1.48%)
+		yieldPct := divYield * 100
+
+		payload := map[string]any{
+			"dividend_yield_pct": yieldPct,
+			"note":               "high yield + payout <60% = sustainable income; payout >80% = cut risk",
+		}
+
+		sustainability := "no_dividend"
+		if yieldPct >= cfg.DividendYieldMin {
+			sustainability = "low_yield"
+			if yieldPct >= cfg.DividendYieldHigh {
+				sustainability = "verify_payout" // high yield — check payout ratio
+			} else {
+				sustainability = "moderate_yield"
+			}
+			// Overlay payout ratio if available.
+			if payout, ok := latest["payout_ratio"]; ok {
+				payoutPct := payout * 100
+				payload["payout_ratio_pct"] = payoutPct
+				if yieldPct >= cfg.DividendYieldMin && payoutPct < cfg.PayoutRatioSafe {
+					sustainability = "sustainable_income"
+				} else if payoutPct > cfg.PayoutRatioDanger {
+					sustainability = "cut_risk"
+				} else {
+					sustainability = "monitor_payout"
+				}
+			}
+		}
+		payload["sustainability"] = sustainability
+		upsert("t2_dividend", ptr(yieldPct), payload)
+	}
+
+	// ── T2.10 CapEx Intensity ─────────────────────────────────────────────────
+	// Rank 20 from reference. Asset-light businesses (SaaS, brands) keep CapEx <5%.
+	// Capital-intensive industries (semis, airlines, mining) >20%.
+	// Computed from: capex_reported (XBRL, most recent quarter × 4) ÷ revenue_ttm.
+	// Thresholds: FUNDAMENTAL_CAPEX_INTENSITY_LOW (5) / HIGH (20).
+	if capex, okC := latest["capex_reported"]; okC {
+		if rev, okR := latest["revenue_ttm"]; okR && rev > 0 {
+			// capex_reported is quarterly; × 4 to annualise. revenue_ttm is already annual.
+			// Capex from CF statements is typically negative; take absolute value.
+			annualCapex := absFloat(capex) * 4
+			intensityPct := annualCapex / rev * 100
+			tier := "moderate_intensity"
+			if intensityPct < cfg.CapExIntensityLow {
+				tier = "asset_light"
+			} else if intensityPct > cfg.CapExIntensityHigh {
+				tier = "capital_intensive"
+			}
+			upsert("t2_capex_intensity", ptr(intensityPct), map[string]any{
+				"capex_intensity_pct": intensityPct,
+				"annual_capex_proxy":  annualCapex,
+				"revenue_ttm":         rev,
+				"tier":                tier,
+				"thresholds":          fmt.Sprintf("<%.0f%% asset-light, %.0f-%.0f%% moderate, >%.0f%% capital-intensive", cfg.CapExIntensityLow, cfg.CapExIntensityLow, cfg.CapExIntensityHigh, cfg.CapExIntensityHigh),
+			})
+		}
+	}
+
+	// ── T2.11 Tier 2 Balance-Sheet Health Score ───────────────────────────────
+	// Composite of the 3 balance-sheet metrics that contribute to scoring:
+	// ROE (quality), D/E (leverage), Current Ratio (liquidity).
+	// Range: [-1, +1]. Separate from Tier 1 composite to preserve backward compat.
+	// TODO: merge Tier 1 + Tier 2 into a single Piotroski-style F-score in Python.
+	if t2Max > 0 {
+		healthScore := t2Score / t2Max
+		tier := "neutral"
+		if healthScore >= cfg.CompositeStrong {
+			tier = "healthy"
+		} else if healthScore <= -cfg.CompositeWeak {
+			tier = "stressed"
+		}
+		upsert("t2_health_score", ptr(healthScore), map[string]any{
+			"score":      healthScore,
+			"tier":       tier,
+			"components": []string{"t2_roe", "t2_leverage", "t2_current_ratio"},
+			"method":     "tier2_balance_sheet_v1",
+		})
+	}
+
+	w.log.Info("tier2 fundamental scores computed", "symbol", symbol, "components", t2Max)
 }
 
 // ── Classification helpers ────────────────────────────────────────────────────

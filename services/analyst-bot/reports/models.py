@@ -75,7 +75,7 @@ class TechnicalSnapshot:
 @dataclass
 class FundamentalSnapshot:
     symbol: str
-    # Derived signals from fundamental-analysis (period = "derived")
+    # ── Tier 1 derived signals (fundamental-analysis, period = "derived") ─────
     composite_score: Optional[float] = None   # -1 … +1
     composite_tier: Optional[str] = None      # "strong" | "neutral" | "weak"
     eps_strength: Optional[str] = None        # "strong" | "neutral" | "weak"
@@ -98,6 +98,37 @@ class FundamentalSnapshot:
     eps_ttm: Optional[float] = None
     pe_ratio_ttm: Optional[float] = None
     market_cap: Optional[float] = None
+
+    # ── Tier 2 derived signals (t2_* metrics, period = "derived") ────────────
+    # ROE / ROA — profitability efficiency (reference rank 06)
+    roe_pct: Optional[float] = None           # Return on Equity %
+    roe_tier: Optional[str] = None            # "excellent" | "adequate" | "destroying_value"
+    roa_pct: Optional[float] = None           # Return on Assets % (informational)
+    # Leverage — D/E ratio (reference rank 07)
+    leverage_de: Optional[float] = None       # Debt/Equity ratio
+    leverage_tier: Optional[str] = None       # "conservative" | "manageable" | "high_leverage"
+    # Net Debt / EBITDA proxy (reference rank 07 extended)
+    net_debt_ebitda: Optional[float] = None
+    net_debt_ebitda_tier: Optional[str] = None  # "net_cash" | "conservative" | "manageable" | "high_risk"
+    # EV/EBITDA — capital-structure neutral valuation (reference rank 08)
+    ev_ebitda: Optional[float] = None
+    ev_ebitda_tier: Optional[str] = None      # "value_territory" | "fairly_valued" | "growth_premium_required"
+    # Current ratio / Quick ratio — liquidity (reference rank 10)
+    current_ratio: Optional[float] = None
+    current_ratio_tier: Optional[str] = None  # "safe" | "monitor" | "liquidity_risk"
+    quick_ratio: Optional[float] = None
+    # P/B ratio (reference rank 11)
+    pb_ratio: Optional[float] = None
+    pb_tier: Optional[str] = None            # "value_signal" | "fair" | "limited_safety_margin"
+    # Dividend yield + payout sustainability (reference rank 12)
+    dividend_yield_pct: Optional[float] = None
+    dividend_sustainability: Optional[str] = None  # "sustainable_income" | "moderate_yield" | "verify_payout" | "cut_risk" | "no_dividend"
+    # CapEx intensity (reference rank 20)
+    capex_intensity_pct: Optional[float] = None
+    capex_tier: Optional[str] = None         # "asset_light" | "moderate_intensity" | "capital_intensive"
+    # Tier 2 composite health score
+    t2_health_score: Optional[float] = None  # -1 … +1 (ROE + D/E + Current Ratio)
+    t2_health_tier: Optional[str] = None     # "healthy" | "neutral" | "stressed"
 
 
 # ── Sentiment ─────────────────────────────────────────────────────────────────

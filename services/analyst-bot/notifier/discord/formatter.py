@@ -76,6 +76,7 @@ def _mktcap(v: Optional[float]) -> str:
 
 def _tier_emoji(tier: Optional[str]) -> str:
     mapping = {
+        # Tier 1 — growth / margin
         "strong": "🟢", "strong_moat": "🟢", "attractive": "🟢",
         "neutral": "🟡", "average": "🟡", "fair": "🟡",
         "weak": "🔴", "margin_pressure": "🔴", "avoid": "🔴",
@@ -84,6 +85,20 @@ def _tier_emoji(tier: Optional[str]) -> str:
         "undervalued_growth": "🟢", "fairly_valued_growth": "🟡", "expensive_growth": "🔴",
         "beat": "🟢", "inline": "🟡", "miss": "🔴",
         "expanding": "📈", "stable": "➡️", "compressing": "📉",
+        # Tier 2 — balance sheet health
+        "excellent": "🟢", "adequate": "🟡", "destroying_value": "🔴",
+        "conservative": "🟢", "manageable": "🟡",
+        "high_leverage": "🔴", "high_risk": "🔴",
+        "net_cash": "🟢",
+        "value_territory": "🟢", "fairly_valued": "🟡", "growth_premium_required": "🔴",
+        "safe": "🟢", "monitor": "🟡", "liquidity_risk": "🔴",
+        "value_signal": "🟢", "limited_safety_margin": "🔴",
+        "sustainable_income": "🟢", "moderate_yield": "🟡",
+        "verify_payout": "🟡", "cut_risk": "🔴", "no_dividend": "⚪",
+        "asset_light": "🟢", "moderate_intensity": "🟡", "capital_intensive": "🔴",
+        "healthy": "🟢", "stressed": "🔴",
+        # Tier 2 health composite re-uses Tier 1 tier names
+        "low_yield": "🟡",
     }
     return mapping.get(tier or "", "⚪")
 
@@ -269,6 +284,80 @@ def fundamental_embed(fund: FundamentalSnapshot) -> discord.Embed:
     return embed
 
 
+# ── Tier 2 fundamental panel embed ───────────────────────────────────────────
+
+def fundamental_tier2_embed(fund: FundamentalSnapshot) -> Optional[discord.Embed]:
+    """
+    Returns an embed for Tier 2 balance-sheet metrics, or None if no Tier 2
+    data has been computed yet for this symbol.
+    """
+    has_data = any([
+        fund.roe_pct is not None,
+        fund.leverage_de is not None,
+        fund.ev_ebitda is not None,
+        fund.current_ratio is not None,
+        fund.pb_ratio is not None,
+        fund.dividend_yield_pct is not None,
+        fund.capex_intensity_pct is not None,
+    ])
+    if not has_data:
+        return None
+
+    health_emoji = _tier_emoji(fund.t2_health_tier)
+    health_score = _num(fund.t2_health_score, 2) if fund.t2_health_score is not None else "—"
+    embed = discord.Embed(
+        title=f"🏦 Balance Sheet — {fund.symbol}  {health_emoji} {fund.t2_health_tier or ''}  ({health_score})",
+        color=COLOR_PURPLE,
+    )
+
+    # Return on Equity / Return on Assets
+    if fund.roe_pct is not None:
+        roe_str = f"{_tier_emoji(fund.roe_tier)} {_pct(fund.roe_pct)} ({fund.roe_tier or '—'})"
+        if fund.roa_pct is not None:
+            roe_str += f"  ROA {_pct(fund.roa_pct)}"
+        embed.add_field(name="ROE (Return on Equity)", value=roe_str, inline=False)
+
+    # Leverage — D/E ratio
+    if fund.leverage_de is not None:
+        lev_str = f"{_tier_emoji(fund.leverage_tier)} {_num(fund.leverage_de, 2)}× ({fund.leverage_tier or '—'})"
+        embed.add_field(name="Debt/Equity", value=lev_str, inline=True)
+
+    # Net Debt / EBITDA proxy
+    if fund.net_debt_ebitda is not None:
+        nde_str = f"{_tier_emoji(fund.net_debt_ebitda_tier)} {_num(fund.net_debt_ebitda, 2)}× ({fund.net_debt_ebitda_tier or '—'})"
+        embed.add_field(name="Net Debt / EBITDA", value=nde_str, inline=True)
+
+    # EV / EBITDA
+    if fund.ev_ebitda is not None:
+        ev_str = f"{_tier_emoji(fund.ev_ebitda_tier)} {_num(fund.ev_ebitda, 1)}× ({fund.ev_ebitda_tier or '—'})"
+        embed.add_field(name="EV/EBITDA", value=ev_str, inline=True)
+
+    # Current ratio / Quick ratio
+    if fund.current_ratio is not None:
+        cr_str = f"{_tier_emoji(fund.current_ratio_tier)} {_num(fund.current_ratio, 2)} ({fund.current_ratio_tier or '—'})"
+        if fund.quick_ratio is not None:
+            cr_str += f"  Quick {_num(fund.quick_ratio, 2)}"
+        embed.add_field(name="Current Ratio", value=cr_str, inline=True)
+
+    # P/B ratio
+    if fund.pb_ratio is not None:
+        pb_str = f"{_tier_emoji(fund.pb_tier)} {_num(fund.pb_ratio, 2)}× ({fund.pb_tier or '—'})"
+        embed.add_field(name="Price/Book", value=pb_str, inline=True)
+
+    # Dividend yield + sustainability
+    if fund.dividend_yield_pct is not None:
+        div_str = f"{_tier_emoji(fund.dividend_sustainability)} {_pct(fund.dividend_yield_pct)} — {fund.dividend_sustainability or '—'}"
+        embed.add_field(name="Dividend Yield", value=div_str, inline=True)
+
+    # CapEx intensity
+    if fund.capex_intensity_pct is not None:
+        capex_str = f"{_tier_emoji(fund.capex_tier)} {_pct(fund.capex_intensity_pct)} of revenue — {fund.capex_tier or '—'}"
+        embed.add_field(name="CapEx Intensity", value=capex_str, inline=True)
+
+    embed.set_footer(text="Balance sheet context · Compare D/E & EV/EBITDA within sector")
+    return embed
+
+
 # ── Sentiment + news embed ────────────────────────────────────────────────────
 
 def sentiment_news_embed(
@@ -308,6 +397,9 @@ def symbol_report_embeds(report: SymbolReport) -> list[discord.Embed]:
         ))
     if report.fundamental:
         embeds.append(fundamental_embed(report.fundamental))
+        t2 = fundamental_tier2_embed(report.fundamental)
+        if t2:
+            embeds.append(t2)
     if report.sentiment or report.news:
         embeds.append(sentiment_news_embed(report.symbol, report.sentiment, report.news))
     return embeds
@@ -386,6 +478,8 @@ def daily_report_embeds(report: DailyReport) -> list[discord.Embed]:
                 fa_parts.append(f"P/E: {f.pe_tier}")
             if f.fcf_yield_tier:
                 fa_parts.append(f"FCF: {f.fcf_yield_tier}")
+            if f.t2_health_tier and f.t2_health_tier != "neutral":
+                fa_parts.append(f"BS: {_tier_emoji(f.t2_health_tier)} {f.t2_health_tier}")
             if fa_parts:
                 embed.add_field(name="Fundamentals", value=" | ".join(fa_parts), inline=False)
 
