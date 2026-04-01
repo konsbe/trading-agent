@@ -1,8 +1,15 @@
 FROM debian:bookworm-slim AS certs
+# Inject corporate proxy CA into the system trust store.
+# corp-ca.pem is machine-specific and gitignored. An empty placeholder is committed so this
+# COPY always succeeds. The [ -s ] check skips installation when the file is empty (no proxy).
+COPY corp-ca.pem /tmp/corp-ca.pem
 RUN apt-get update \
   && apt-get install -y --no-install-recommends ca-certificates \
+  && if [ -s /tmp/corp-ca.pem ]; then \
+       cp /tmp/corp-ca.pem /usr/local/share/ca-certificates/corp-ca.crt; \
+     fi \
   && update-ca-certificates \
-  && rm -rf /var/lib/apt/lists/*
+  && rm -rf /var/lib/apt/lists/* /tmp/corp-ca.pem
 
 FROM golang:1.24-bookworm AS build
 # go.mod may require a newer Go (e.g. 1.25); download matching toolchain during build.

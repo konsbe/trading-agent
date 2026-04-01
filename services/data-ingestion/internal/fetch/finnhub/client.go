@@ -64,6 +64,42 @@ func (c *Client) Quote(ctx context.Context, symbol string) (map[string]any, erro
 	return m, nil
 }
 
+// CompanyNews fetches recent company-specific headlines for a stock symbol.
+// Endpoint: GET /company-news?symbol=<sym>&from=<date>&to=<date>
+// Uses a 30-day window to capture recent articles.
+func (c *Client) CompanyNews(ctx context.Context, symbol string) ([]map[string]any, error) {
+	if !c.HasToken() {
+		return nil, fmt.Errorf("finnhub token missing")
+	}
+	if err := c.Limiter.Wait(ctx); err != nil {
+		return nil, err
+	}
+	now := time.Now().UTC()
+	q := url.Values{}
+	q.Set("symbol", symbol)
+	q.Set("from", now.AddDate(0, 0, -30).Format("2006-01-02"))
+	q.Set("to", now.Format("2006-01-02"))
+	q.Set("token", c.Token)
+	u := base + "/company-news?" + q.Encode()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := c.HTTP.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("finnhub company-news %s: %s", symbol, resp.Status)
+	}
+	var items []map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&items); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 // CryptoNews fetches recent crypto headlines (Finnhub category=crypto).
 func (c *Client) CryptoNews(ctx context.Context) ([]map[string]any, error) {
 	if !c.HasToken() {

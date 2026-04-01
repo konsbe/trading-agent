@@ -72,26 +72,55 @@ func main() {
 			log.Debug("FINNHUB_API_KEY missing; skipping news")
 			return
 		}
+
+		// Crypto market news (no symbol tagging — broad category feed).
 		news, err := fh.CryptoNews(ctx)
 		if err != nil {
 			log.Error("finnhub crypto news", "err", err)
-			return
+		} else {
+			for _, item := range news {
+				headline, _ := item["headline"].(string)
+				if headline == "" {
+					continue
+				}
+				urlStr, _ := item["url"].(string)
+				ts := time.Now().UTC()
+				if ds, ok := item["datetime"].(float64); ok {
+					ts = time.Unix(int64(ds), 0).UTC()
+				}
+				if err := store.InsertNews(ctx, pool, ts, "finnhub_crypto", "", headline, urlStr, nil, item); err != nil {
+					log.Error("insert crypto news", "err", err)
+				}
+			}
+			log.Info("finnhub crypto news ingested", "n", len(news))
 		}
-		for _, item := range news {
-			headline, _ := item["headline"].(string)
-			if headline == "" {
+
+		// Equity company news — fetch per configured symbol so headlines are linked.
+		for _, sym := range cfg.EquityNewsSymbols {
+			compNews, err := fh.CompanyNews(ctx, sym)
+			if err != nil {
+				log.Error("finnhub company news", "symbol", sym, "err", err)
 				continue
 			}
-			urlStr, _ := item["url"].(string)
-			ts := time.Now().UTC()
-			if ds, ok := item["datetime"].(float64); ok {
-				ts = time.Unix(int64(ds), 0).UTC()
+			inserted := 0
+			for _, item := range compNews {
+				headline, _ := item["headline"].(string)
+				if headline == "" {
+					continue
+				}
+				urlStr, _ := item["url"].(string)
+				ts := time.Now().UTC()
+				if ds, ok := item["datetime"].(float64); ok {
+					ts = time.Unix(int64(ds), 0).UTC()
+				}
+				if err := store.InsertNews(ctx, pool, ts, "finnhub_company", sym, headline, urlStr, nil, item); err != nil {
+					log.Error("insert company news", "symbol", sym, "err", err)
+				} else {
+					inserted++
+				}
 			}
-			if err := store.InsertNews(ctx, pool, ts, "finnhub_crypto", "", headline, urlStr, nil, item); err != nil {
-				log.Error("insert news", "err", err)
-			}
+			log.Info("finnhub company news ingested", "symbol", sym, "n", inserted)
 		}
-		log.Info("finnhub crypto news ingested", "n", len(news))
 	}
 
 	runLunarCrush()
