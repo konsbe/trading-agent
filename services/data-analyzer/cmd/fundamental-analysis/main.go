@@ -114,6 +114,7 @@ func (w *worker) analyzeAll(ctx context.Context) {
 		w.score(ctx, sym, rows)
 		w.analyzeMarginTrend(ctx, sym)
 		w.scoreTier2(ctx, sym, rows)
+		w.scoreTier3(ctx, sym, rows)
 	}
 }
 
@@ -930,6 +931,318 @@ func (w *worker) scoreTier2(ctx context.Context, symbol string, rows []store.Fun
 	}
 
 	w.log.Info("tier2 fundamental scores computed", "symbol", symbol, "components", t2Max)
+}
+
+// scoreTier3 derives Tier 3 FA context metrics (reference ranks 13–19).
+//
+// These are "important context" signals — they supplement but do not replace
+// Tier 1/2 scoring. No composite score is produced; each metric is stored
+// individually with a tier label for the analyst-bot to display.
+//
+// Metrics computed:
+//   t3_share_trend      — rank 13: share count trend (buybacks vs dilution)
+//   t3_dcf              — rank 14: simplified DCF margin of safety
+//   t3_interest_coverage — rank 15: EBIT ÷ interest expense
+//   t3_asset_turnover   — rank 16: revenue ÷ total assets (informational)
+//   t3_inventory_turnover — rank 16: COGS ÷ inventory (when available)
+//   t3_analyst_target   — rank 17: analyst target price vs current price
+//   t3_goodwill_risk    — rank 18: (goodwill+intangibles) as % of total assets
+//   t3_ps_ratio         — rank 19: price-to-sales ratio
+//
+// TODO: Python migration — pandas rolling join for share count series;
+// scenario-range DCF with Monte Carlo; Finviz/Seeking Alpha revision trend.
+func (w *worker) scoreTier3(ctx context.Context, symbol string, rows []store.FundamentalRow) {
+	latest := make(map[string]float64, len(rows))
+	for _, r := range rows {
+		if r.Value == nil {
+			continue
+		}
+		if _, exists := latest[r.Metric]; !exists {
+			latest[r.Metric] = *r.Value
+		}
+	}
+
+	ts := time.Now().UTC()
+	cfg := w.cfg
+	ptr := func(v float64) *float64 { return &v }
+
+	upsert := func(metric string, value *float64, payload any) {
+		if err := store.UpsertFundamentalDerived(ctx, w.pool, ts, symbol, "derived", metric, value, payload); err != nil {
+			w.log.Error("upsert tier3 metric", "symbol", symbol, "metric", metric, "err", err)
+		}
+	}
+
+	// ── T3.1 Share Count Trend — buybacks vs dilution (rank 13) ──────────────
+	// Queries the time-ordered shares_outstanding series from equity_fundamentals.
+	// Compares the oldest sampled value to the newest to derive annual % change.
+	// Sources: Finnhub shareOutstanding (period = "ttm", source = finnhub_metric).
+	// Thresholds: FUNDAMENTAL_SHARE_DECLINE_BUYBACK (2%) / _GROWTH_DILUTION (3%).
+	// TODO: Python — use pandas resample('A').last() on shares series for clean annual comparison.
+	shareRows, err := w.pool.Query(ctx, `
+		SELECT value, ts FROM equity_fundamentals
+		WHERE symbol = $1 AND metric = 'shares_outstanding' AND value IS NOT NULL
+		ORDER BY ts DESC LIMIT $2`,
+		symbol, cfg.ShareTrendYears*12+1) // enough rows to span the trend years
+	if err == nil {
+		type sharePoint struct {
+			v float64
+			t time.Time
+		}
+		var pts []sharePoint
+		for shareRows.Next() {
+			var v float64
+			var t time.Time
+			if e := shareRows.Scan(&v, &t); e == nil {
+				pts = append(pts, sharePoint{v, t})
+			}
+		}
+		shareRows.Close()
+
+		if len(pts) >= 2 {
+			newest := pts[0]
+			oldest := pts[len(pts)-1]
+			years := newest.t.Sub(oldest.t).Hours() / 8766
+			if years > 0.1 {
+				annualChg := (newest.v - oldest.v) / oldest.v / years * 100
+				tier := "flat"
+				if annualChg <= -cfg.ShareDeclineBuyback {
+					tier = "buyback"
+				} else if annualChg >= cfg.ShareGrowthDilution {
+					tier = "dilution_risk"
+				}
+				upsert("t3_share_trend", ptr(annualChg), map[string]any{
+					"annual_change_pct": annualChg,
+					"newest_shares":     newest.v,
+					"oldest_shares":     oldest.v,
+					"years_observed":    years,
+					"tier":              tier,
+					"thresholds":        fmt.Sprintf("decline >%.0f%%/yr = buyback, flat ±%.0f%%, growth >%.0f%%/yr = dilution", cfg.ShareDeclineBuyback, cfg.ShareDeclineBuyback, cfg.ShareGrowthDilution),
+				})
+			}
+		}
+	}
+
+	// ── T3.2 DCF Intrinsic Value — simplified 5-year model (rank 14) ─────────
+	// Formula: Σ FCF_t / (1+WACC)^t  for t=1..N + terminal_value / (1+WACC)^N
+	// Terminal value = FCF_N × (1+g) / (WACC - g)   [Gordon Growth Model]
+	// FCF growth assumption = min(eps_growth_5y, revenue_growth_5y, DCFMaxGrowthPct).
+	// Margin of safety = price_as_pct_of_dcf (100% = exactly at fair value).
+	// Thresholds: FUNDAMENTAL_DCF_SAFETY_MARGIN_PCT (<70% = strong buy) / _OVERVALUED_PCT (>110%).
+	// TODO: Python — add Monte Carlo scenario ranges; CAPM-derived WACC from FRED.
+	if fcf, okF := latest["fcf_ttm"]; okF && fcf > 0 {
+		if mktCap, okM := latest["market_cap"]; okM && mktCap > 0 {
+			// Choose the most conservative FCF growth estimate available.
+			growthPct := cfg.DCFMaxGrowthPct
+			if eg5, ok := latest["eps_growth_5y"]; ok && eg5 < growthPct {
+				growthPct = eg5
+			}
+			if rg5, ok := latest["revenue_growth_5y"]; ok && rg5 < growthPct {
+				growthPct = rg5
+			}
+			if growthPct < 0 {
+				growthPct = 0 // no negative growth assumption for terminal FCF
+			}
+
+			wacc := cfg.DCFWACCPct / 100
+			g := cfg.DCFTerminalGrowth / 100
+			growthR := growthPct / 100
+			n := cfg.DCFGrowthYears
+
+			// Explicit FCF growth stage.
+			dcfValue := 0.0
+			for t := 1; t <= n; t++ {
+				fcfT := fcf * math.Pow(1+growthR, float64(t))
+				dcfValue += fcfT / math.Pow(1+wacc, float64(t))
+			}
+			// Terminal value (Gordon Growth Model) — only valid when WACC > g.
+			if wacc > g {
+				fcfN := fcf * math.Pow(1+growthR, float64(n))
+				terminalVal := fcfN * (1 + g) / (wacc - g)
+				dcfValue += terminalVal / math.Pow(1+wacc, float64(n))
+			}
+
+			// mktCap from Finnhub is in millions (same unit as fcf_ttm).
+			// marginPct: 100 = priced exactly at DCF intrinsic; <100 = cheap; >100 = expensive.
+			marginPct := mktCap / dcfValue * 100
+
+			tier := "fairly_valued"
+			if marginPct < cfg.DCFSafetyMargin {
+				tier = "strong_margin_of_safety"
+			} else if marginPct > cfg.DCFOvervalued {
+				tier = "downside_risk"
+			}
+
+			upsert("t3_dcf", ptr(marginPct), map[string]any{
+				"market_cap_vs_dcf_pct": marginPct,
+				"dcf_value_millions":    dcfValue,
+				"market_cap_millions":   mktCap,
+				"fcf_ttm_millions":      fcf,
+				"growth_rate_pct":       growthPct,
+				"wacc_pct":              cfg.DCFWACCPct,
+				"terminal_growth_pct":   cfg.DCFTerminalGrowth,
+				"growth_years":          n,
+				"tier":                  tier,
+				"thresholds":            fmt.Sprintf("<%.0f%% strong safety margin, %.0f-%.0f%% fairly valued, >%.0f%% downside risk", cfg.DCFSafetyMargin, cfg.DCFSafetyMargin, cfg.DCFOvervalued, cfg.DCFOvervalued),
+				"note":                  "simplified 5-year DCF — use as directional check, not precise target",
+			})
+		}
+	}
+
+	// ── T3.3 Interest Coverage Ratio (rank 15) ─────────────────────────────────
+	// Interest Coverage = EBIT ÷ Interest Expense.
+	// EBIT proxy = operating_income_reported (most recent quarter × 4 to annualise).
+	// Interest expense from XBRL is typically reported as a negative number; abs() applied.
+	// Thresholds: FUNDAMENTAL_INTEREST_COVERAGE_SAFE (5×) / _ADEQUATE (2×).
+	if opInc, okO := latest["operating_income_reported"]; okO {
+		if intExp, okI := latest["interest_expense_reported"]; okI {
+			annualEBIT := opInc * 4 // approximate annualisation from quarterly
+			absIntExp := absFloat(intExp) * 4
+			if absIntExp > 0 {
+				coverage := annualEBIT / absIntExp
+				tier := "high_risk"
+				if coverage >= cfg.InterestCoverageSafe {
+					tier = "very_safe"
+				} else if coverage >= cfg.InterestCoverageAdequate {
+					tier = "adequate"
+				}
+				upsert("t3_interest_coverage", ptr(coverage), map[string]any{
+					"coverage_ratio":  coverage,
+					"ebit_proxy":      annualEBIT,
+					"interest_annual": absIntExp,
+					"tier":            tier,
+					"thresholds":      fmt.Sprintf(">%.0f× very safe, %.0f-%.0f× adequate, <%.0f× high risk", cfg.InterestCoverageSafe, cfg.InterestCoverageAdequate, cfg.InterestCoverageSafe, cfg.InterestCoverageAdequate),
+					"note":            "EBIT = quarterly operating income × 4; interest expense abs value × 4",
+				})
+			}
+		}
+	}
+
+	// ── T3.4 Asset Turnover — operational efficiency (rank 16) ───────────────
+	// Asset Turnover = Revenue (TTM) ÷ Total Assets.
+	// Informational — compare within sector; declining trend is an early warning.
+	// No composite scoring: cross-sector comparison is meaningless.
+	// TODO: Python — compute sector-relative z-score once sector classification feed added.
+	if revTTM, okR := latest["revenue_ttm"]; okR && revTTM > 0 {
+		if totAssets, okA := latest["total_assets_reported"]; okA && totAssets > 0 {
+			assetTurnover := revTTM / totAssets
+			tier := "low"
+			if assetTurnover >= 1.0 {
+				tier = "high"
+			} else if assetTurnover >= 0.5 {
+				tier = "moderate"
+			}
+			upsert("t3_asset_turnover", ptr(assetTurnover), map[string]any{
+				"asset_turnover":    assetTurnover,
+				"revenue_ttm":       revTTM,
+				"total_assets":      totAssets,
+				"tier":              tier,
+				"note":              "informational — compare to sector peers over time; >1.0 efficient, <0.5 asset-heavy",
+			})
+		}
+	}
+
+	// ── T3.5 Inventory Turnover (rank 16) ─────────────────────────────────────
+	// Inventory Turnover = COGS ÷ Inventory.
+	// COGS proxy = revenue_reported - gross_profit_reported (both from XBRL).
+	// Slowing inventory turnover signals demand weakness before it hits revenue.
+	// Informational only — only meaningful for product companies (not SaaS/services).
+	if rev, okR := latest["revenue_reported"]; okR {
+		if gp, okG := latest["gross_profit_reported"]; okG {
+			cogsProxy := rev - gp // gross_profit = revenue - COGS → COGS = revenue - gross_profit
+			if inv, okI := latest["inventory_reported"]; okI && inv > 0 && cogsProxy > 0 {
+				inventoryTurnover := (cogsProxy * 4) / inv // annualise quarterly COGS
+				upsert("t3_inventory_turnover", ptr(inventoryTurnover), map[string]any{
+					"inventory_turnover": inventoryTurnover,
+					"cogs_proxy_annual":  cogsProxy * 4,
+					"inventory":          inv,
+					"note":               "COGS proxy = revenue_reported - gross_profit_reported; slowing turnover = demand warning",
+				})
+			}
+		}
+	}
+
+	// ── T3.6 Analyst Target Price — consensus upside/downside (rank 17) ──────
+	// Source: Alpha Vantage AnalystTargetPrice (stored as analyst_target_price).
+	// Upside % = (target - current_price) / current_price × 100.
+	// Current price is fetched from equity_ohlcv (latest daily close).
+	// Thresholds: FUNDAMENTAL_ANALYST_UPSIDE_BULLISH (15%) / _DOWNSIDE_BEARISH (-5%).
+	// TODO: Add revision trend (30/60/90-day changes) once analyst estimate history is available.
+	if target, okT := latest["analyst_target_price"]; okT && target > 0 {
+		currentPrice, hasPx, pxErr := store.QueryLatestEquityClose(ctx, w.pool, symbol, cfg.EquityInterval)
+		if pxErr == nil && hasPx && currentPrice > 0 {
+			upside := (target - currentPrice) / currentPrice * 100
+			tier := "neutral"
+			if upside >= cfg.AnalystUpsideBullish {
+				tier = "bullish_consensus"
+			} else if upside <= cfg.AnalystDownsideBearish {
+				tier = "bearish_consensus"
+			}
+			upsert("t3_analyst_target", ptr(upside), map[string]any{
+				"upside_pct":     upside,
+				"target_price":   target,
+				"current_price":  currentPrice,
+				"tier":           tier,
+				"thresholds":     fmt.Sprintf(">%.0f%% upside = bullish consensus; <%.0f%% = bearish", cfg.AnalystUpsideBullish, cfg.AnalystDownsideBearish),
+				"note":           "single analyst target; revision trend requires paid data (Seeking Alpha / Finviz)",
+			})
+		}
+	}
+
+	// ── T3.7 Goodwill & Intangibles as % of Total Assets (rank 18) ───────────
+	// Heavy goodwill (>40% of assets) carries impairment write-down risk.
+	// Source: XBRL balance sheet goodwill_reported + intangible_assets_reported.
+	// Thresholds: FUNDAMENTAL_GOODWILL_LOW_PCT (20%) / _HIGH_PCT (40%).
+	if totAssets, okA := latest["total_assets_reported"]; okA && totAssets > 0 {
+		goodwill := latest["goodwill_reported"]
+		intangibles := latest["intangible_assets_reported"]
+		combined := goodwill + intangibles
+		if combined > 0 {
+			pct := combined / totAssets * 100
+			tier := "low_risk"
+			if pct >= cfg.GoodwillHighPct {
+				tier = "impairment_risk"
+			} else if pct >= cfg.GoodwillLowPct {
+				tier = "monitor"
+			}
+			upsert("t3_goodwill_risk", ptr(pct), map[string]any{
+				"goodwill_intangibles_pct": pct,
+				"goodwill":                 goodwill,
+				"intangibles":              intangibles,
+				"total_assets":             totAssets,
+				"tier":                     tier,
+				"thresholds":               fmt.Sprintf("<%.0f%% low risk, %.0f-%.0f%% monitor, >%.0f%% impairment risk", cfg.GoodwillLowPct, cfg.GoodwillLowPct, cfg.GoodwillHighPct, cfg.GoodwillHighPct),
+			})
+		}
+	}
+
+	// ── T3.8 Price-to-Sales (P/S) Ratio (rank 19) ─────────────────────────────
+	// P/S = Market Cap ÷ TTM Revenue. Most useful for unprofitable / early-stage growth.
+	// Both market_cap and revenue_ttm from Finnhub are in millions → ratio is unit-clean.
+	// Thresholds: FUNDAMENTAL_PS_VALUE (5×) / _FAIR (10×) / _SPECULATIVE (15×).
+	// Compare within sector — SaaS/tech commands higher P/S than industrials or retail.
+	if mktCap, okM := latest["market_cap"]; okM && mktCap > 0 {
+		if revTTM, okR := latest["revenue_ttm"]; okR && revTTM > 0 {
+			ps := mktCap / revTTM
+			tier := "fairly_valued"
+			if ps < cfg.PSValue {
+				tier = "value"
+			} else if ps >= cfg.PSSpeculative {
+				tier = "speculative"
+			} else if ps >= cfg.PSFair {
+				tier = "growth_premium_required"
+			}
+			upsert("t3_ps_ratio", ptr(ps), map[string]any{
+				"ps_ratio":       ps,
+				"market_cap_millions": mktCap,
+				"revenue_ttm_millions": revTTM,
+				"tier":           tier,
+				"thresholds":     fmt.Sprintf("<%.0f× value, %.0f-%.0f× fair, %.0f-%.0f× growth premium, >%.0f× speculative", cfg.PSValue, cfg.PSValue, cfg.PSFair, cfg.PSFair, cfg.PSSpeculative, cfg.PSSpeculative),
+				"note":           "compare within sector; SaaS 5-15× is normal, industrials >3× is expensive",
+			})
+		}
+	}
+
+	w.log.Info("tier3 fundamental context computed", "symbol", symbol)
 }
 
 // ── Classification helpers ────────────────────────────────────────────────────

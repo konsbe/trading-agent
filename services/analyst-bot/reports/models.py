@@ -99,6 +99,32 @@ class FundamentalSnapshot:
     pe_ratio_ttm: Optional[float] = None
     market_cap: Optional[float] = None
 
+    # ── Tier 3 context signals (t3_* metrics, period = "derived") ───────────
+    # Share Count Trend — buybacks vs dilution (rank 13)
+    share_trend_pct: Optional[float] = None        # annual % change in shares outstanding
+    share_trend_tier: Optional[str] = None         # "buyback" | "flat" | "dilution_risk"
+    # DCF Intrinsic Value — simplified (rank 14)
+    dcf_market_vs_intrinsic_pct: Optional[float] = None  # price as % of DCF value (100=fair)
+    dcf_tier: Optional[str] = None                # "strong_margin_of_safety" | "fairly_valued" | "downside_risk"
+    dcf_growth_rate_pct: Optional[float] = None   # FCF growth rate used in the model
+    dcf_value_millions: Optional[float] = None    # computed DCF intrinsic value (millions)
+    # Interest Coverage Ratio (rank 15)
+    interest_coverage: Optional[float] = None     # EBIT / Interest Expense (×)
+    interest_coverage_tier: Optional[str] = None  # "very_safe" | "adequate" | "high_risk"
+    # Asset Turnover & Inventory Turnover (rank 16)
+    asset_turnover: Optional[float] = None        # revenue / total assets
+    inventory_turnover: Optional[float] = None   # annualised COGS / inventory
+    # Analyst Target Price — consensus upside (rank 17)
+    analyst_upside_pct: Optional[float] = None   # (target - price) / price × 100
+    analyst_target_price: Optional[float] = None
+    analyst_target_tier: Optional[str] = None    # "bullish_consensus" | "neutral" | "bearish_consensus"
+    # Goodwill & Intangibles as % of Total Assets (rank 18)
+    goodwill_pct: Optional[float] = None         # (goodwill + intangibles) / total assets × 100
+    goodwill_tier: Optional[str] = None          # "low_risk" | "monitor" | "impairment_risk"
+    # Price-to-Sales (rank 19)
+    ps_ratio: Optional[float] = None             # market cap / revenue TTM
+    ps_tier: Optional[str] = None               # "value" | "fairly_valued" | "growth_premium_required" | "speculative"
+
     # ── Tier 2 derived signals (t2_* metrics, period = "derived") ────────────
     # ROE / ROA — profitability efficiency (reference rank 06)
     roe_pct: Optional[float] = None           # Return on Equity %

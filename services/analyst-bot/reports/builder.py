@@ -369,6 +369,49 @@ class ReportBuilder:
             mc = ttm.get("market_cap")
             snap.market_cap = mc * 1_000_000 if mc is not None else None
 
+            # ── Tier 3 context signals ────────────────────────────────────────
+            def _t3_payload(key: str) -> dict:
+                return derived.get(key, {}).get("payload") or {}
+
+            # Share Count Trend
+            t3_share_p = _t3_payload("t3_share_trend")
+            snap.share_trend_pct = t3_share_p.get("annual_change_pct")
+            snap.share_trend_tier = t3_share_p.get("tier")
+
+            # DCF
+            t3_dcf_p = _t3_payload("t3_dcf")
+            snap.dcf_market_vs_intrinsic_pct = t3_dcf_p.get("market_cap_vs_dcf_pct")
+            snap.dcf_tier = t3_dcf_p.get("tier")
+            snap.dcf_growth_rate_pct = t3_dcf_p.get("growth_rate_pct")
+            snap.dcf_value_millions = t3_dcf_p.get("dcf_value_millions")
+
+            # Interest Coverage
+            t3_ic_p = _t3_payload("t3_interest_coverage")
+            snap.interest_coverage = t3_ic_p.get("coverage_ratio")
+            snap.interest_coverage_tier = t3_ic_p.get("tier")
+
+            # Asset & Inventory Turnover
+            t3_at_p = _t3_payload("t3_asset_turnover")
+            snap.asset_turnover = t3_at_p.get("asset_turnover")
+            t3_inv_p = _t3_payload("t3_inventory_turnover")
+            snap.inventory_turnover = t3_inv_p.get("inventory_turnover")
+
+            # Analyst Target Price
+            t3_analyst_p = _t3_payload("t3_analyst_target")
+            snap.analyst_upside_pct = t3_analyst_p.get("upside_pct")
+            snap.analyst_target_price = t3_analyst_p.get("target_price")
+            snap.analyst_target_tier = t3_analyst_p.get("tier")
+
+            # Goodwill & Intangibles
+            t3_goodwill_p = _t3_payload("t3_goodwill_risk")
+            snap.goodwill_pct = t3_goodwill_p.get("goodwill_intangibles_pct")
+            snap.goodwill_tier = t3_goodwill_p.get("tier")
+
+            # Price-to-Sales
+            t3_ps_p = _t3_payload("t3_ps_ratio")
+            snap.ps_ratio = t3_ps_p.get("ps_ratio")
+            snap.ps_tier = t3_ps_p.get("tier")
+
             # ── Tier 2 derived signals ────────────────────────────────────────
             def _t2_payload(key: str) -> dict:
                 return derived.get(key, {}).get("payload") or {}
