@@ -85,6 +85,14 @@ def _tier_emoji(tier: Optional[str]) -> str:
         "undervalued_growth": "🟢", "fairly_valued_growth": "🟡", "expensive_growth": "🔴",
         "beat": "🟢", "inline": "🟡", "miss": "🔴",
         "expanding": "📈", "stable": "➡️", "compressing": "📉",
+        # Tier 3 — context signals
+        "buyback": "🟢", "flat": "🟡", "dilution_risk": "🔴",
+        "strong_margin_of_safety": "🟢", "fairly_valued": "🟡", "downside_risk": "🔴",
+        "very_safe": "🟢", "high_risk": "🔴",
+        "bullish_consensus": "🟢", "bearish_consensus": "🔴",
+        "low_risk": "🟢", "impairment_risk": "🔴",
+        "value": "🟢", "growth_fair": "🟡", "growth_premium_required": "🟡", "speculative": "🔴",
+        "high": "🟢", "moderate": "🟡", "low": "🔴",
         # Tier 2 — balance sheet health
         "excellent": "🟢", "adequate": "🟡", "destroying_value": "🔴",
         "conservative": "🟢", "manageable": "🟡",
@@ -358,6 +366,79 @@ def fundamental_tier2_embed(fund: FundamentalSnapshot) -> Optional[discord.Embed
     return embed
 
 
+# ── Tier 3 context panel embed ───────────────────────────────────────────────
+
+def fundamental_tier3_embed(fund: FundamentalSnapshot) -> Optional[discord.Embed]:
+    """
+    Returns a Tier 3 context embed (ranks 13–19), or None if no Tier 3 data
+    has been computed yet (XBRL data may take a full poll cycle to appear).
+    """
+    has_data = any([
+        fund.share_trend_tier is not None,
+        fund.dcf_tier is not None,
+        fund.interest_coverage is not None,
+        fund.analyst_upside_pct is not None,
+        fund.goodwill_pct is not None,
+        fund.ps_ratio is not None,
+    ])
+    if not has_data:
+        return None
+
+    embed = discord.Embed(
+        title=f"🔍 Deep Context — {fund.symbol}  (Tier 3)",
+        color=0x8E44AD,  # darker purple to distinguish from Tier 2
+    )
+
+    # Share Count Trend (rank 13)
+    if fund.share_trend_tier is not None:
+        sign = "+" if (fund.share_trend_pct or 0) >= 0 else ""
+        trend_str = f"{_tier_emoji(fund.share_trend_tier)} {sign}{_num(fund.share_trend_pct, 1)}%/yr — {fund.share_trend_tier}"
+        embed.add_field(name="Share Count Trend", value=trend_str, inline=True)
+
+    # DCF Intrinsic Value (rank 14)
+    if fund.dcf_tier is not None:
+        mv = fund.dcf_market_vs_intrinsic_pct
+        gr = fund.dcf_growth_rate_pct
+        dcf_str = f"{_tier_emoji(fund.dcf_tier)} price = {_num(mv, 0)}% of intrinsic"
+        if gr is not None:
+            dcf_str += f"  (growth assume {_num(gr, 1)}%)"
+        embed.add_field(name="DCF Margin of Safety", value=dcf_str, inline=False)
+
+    # Interest Coverage (rank 15)
+    if fund.interest_coverage is not None:
+        ic_str = f"{_tier_emoji(fund.interest_coverage_tier)} {_num(fund.interest_coverage, 1)}× ({fund.interest_coverage_tier or '—'})"
+        embed.add_field(name="Interest Coverage", value=ic_str, inline=True)
+
+    # P/S Ratio (rank 19)
+    if fund.ps_ratio is not None:
+        ps_str = f"{_tier_emoji(fund.ps_tier)} {_num(fund.ps_ratio, 1)}× ({fund.ps_tier or '—'})"
+        embed.add_field(name="Price/Sales", value=ps_str, inline=True)
+
+    # Asset Turnover (rank 16)
+    if fund.asset_turnover is not None:
+        at_str = f"{_num(fund.asset_turnover, 2)}×"
+        if fund.inventory_turnover is not None:
+            at_str += f"  |  Inventory {_num(fund.inventory_turnover, 1)}×/yr"
+        embed.add_field(name="Asset Turnover", value=at_str, inline=True)
+
+    # Analyst Target Price (rank 17)
+    if fund.analyst_upside_pct is not None:
+        sign = "+" if fund.analyst_upside_pct >= 0 else ""
+        tgt_str = (
+            f"{_tier_emoji(fund.analyst_target_tier)} {sign}{_num(fund.analyst_upside_pct, 1)}% upside"
+            f"  (target {_price(fund.analyst_target_price)})"
+        )
+        embed.add_field(name="Analyst Target", value=tgt_str, inline=False)
+
+    # Goodwill & Intangibles (rank 18)
+    if fund.goodwill_pct is not None:
+        gw_str = f"{_tier_emoji(fund.goodwill_tier)} {_num(fund.goodwill_pct, 1)}% of assets — {fund.goodwill_tier or '—'}"
+        embed.add_field(name="Goodwill/Intangibles", value=gw_str, inline=True)
+
+    embed.set_footer(text="Deep context · DCF is directional only — see bot.md for assumptions")
+    return embed
+
+
 # ── Sentiment + news embed ────────────────────────────────────────────────────
 
 def sentiment_news_embed(
@@ -400,6 +481,9 @@ def symbol_report_embeds(report: SymbolReport) -> list[discord.Embed]:
         t2 = fundamental_tier2_embed(report.fundamental)
         if t2:
             embeds.append(t2)
+        t3 = fundamental_tier3_embed(report.fundamental)
+        if t3:
+            embeds.append(t3)
     if report.sentiment or report.news:
         embeds.append(sentiment_news_embed(report.symbol, report.sentiment, report.news))
     return embeds

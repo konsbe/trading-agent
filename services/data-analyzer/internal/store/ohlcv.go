@@ -51,6 +51,22 @@ func QueryCryptoBars(ctx context.Context, pool *pgxpool.Pool, symbol, interval s
 	return scanAndReverse(rows)
 }
 
+// QueryLatestEquityClose returns the most recent closing price for symbol from
+// equity_ohlcv, or (0, false) if no row exists.
+// Used by fundamental-analysis scoreTier3 to compute analyst target upside.
+func QueryLatestEquityClose(ctx context.Context, pool *pgxpool.Pool, symbol, interval string) (float64, bool, error) {
+	var close float64
+	err := pool.QueryRow(ctx, `
+		SELECT close FROM equity_ohlcv
+		WHERE symbol=$1 AND interval=$2
+		ORDER BY ts DESC LIMIT 1`,
+		symbol, interval).Scan(&close)
+	if err != nil {
+		return 0, false, err
+	}
+	return close, true, nil
+}
+
 // scanAndReverse reads pgx rows into []compute.Bar and reverses the slice so
 // bars are ordered oldest-first, which is what all compute functions expect.
 func scanAndReverse(rows interface {

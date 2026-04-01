@@ -358,6 +358,39 @@ func (w *worker) storeFinancials(ctx context.Context, freq string, limit int) {
 				"CashCashEquivalentsAndShortTermInvestments",
 			), nil)
 
+			// ── Tier 3: Goodwill & Intangible Assets (rank 18) ───────────────
+			// Goodwill arises from acquisitions paying above book value. Heavy
+			// goodwill (>40% of total assets) carries impairment risk.
+			// XBRL concept names vary by filer; list most common in priority order.
+			upsert("goodwill_reported", conceptVal(bs,
+				"Goodwill", "GoodwillNet",
+				"BusinessAcquisitionCostOfAcquiredEntityPurchasePrice",
+			), nil)
+			upsert("intangible_assets_reported", conceptVal(bs,
+				"IntangibleAssetsNetExcludingGoodwill",
+				"FiniteLivedIntangibleAssetsNet",
+				"IntangibleAssetsNet",
+				"OtherIntangibleAssetsNet",
+			), nil)
+
+			// ── Tier 3: Inventory (rank 16 — inventory turnover) ─────────────
+			// Slowing inventory turnover signals weakening demand before revenue drops.
+			upsert("inventory_reported", conceptVal(bs,
+				"InventoryNet", "Inventories",
+				"FIFOInventoryAmount", "InventoryFinishedGoods",
+				"InventoryRawMaterialsAndSupplies",
+			), nil)
+
+			// ── Tier 3: Interest Expense (rank 15 — interest coverage) ───────
+			// Interest coverage = EBIT / Interest Expense.
+			// Interest expense is typically negative in XBRL; we take abs() in the analyzer.
+			upsert("interest_expense_reported", conceptVal(ic,
+				"InterestExpense",
+				"InterestAndDebtExpense",
+				"InterestExpenseDebt",
+				"FinanceLeaseInterestExpense",
+			), nil)
+
 			// Raw report payload for forward-compat access.
 			upsert("report_raw", nil, report)
 			stored++

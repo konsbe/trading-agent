@@ -73,6 +73,14 @@ func floatEnv(key string, def float64) float64 {
 	return v
 }
 
+func strEnvDefault(key, def string) string {
+	s := strings.TrimSpace(os.Getenv(key))
+	if s == "" {
+		return def
+	}
+	return s
+}
+
 func boolEnv(key string, def bool) bool {
 	s := strings.TrimSpace(os.Getenv(key))
 	if s == "" {
@@ -632,6 +640,51 @@ type FundamentalAnalysis struct {
 	// <5% asset-light, 5–15% moderate, >20% capital-intensive / FCF constrained.
 	CapExIntensityLow  float64 // <this = "asset_light"          default 5
 	CapExIntensityHigh float64 // >this = "capital_intensive"    default 20
+
+	// ── Tier 3: Share Count Trend — buybacks vs dilution (rank 13) ───────────
+	// Declining >2%/yr = buyback program (bullish), growing >3%/yr = dilution risk.
+	ShareDeclineBuyback float64 // annual decline % to qualify as buyback   default 2
+	ShareGrowthDilution float64 // annual growth % to qualify as dilution   default 3
+	ShareTrendYears     int     // years of history window to sample        default 2
+
+	// ── Tier 3: DCF Intrinsic Value (simplified 5-year model) (rank 14) ──────
+	// Simplified model: explicit FCF growth stage + perpetuity terminal value.
+	// Use as a directional sanity check, not a precise number.
+	// TODO: Python — more sophisticated inputs (sector WACC, analyst forecasts, scenario ranges).
+	DCFWACCPct        float64 // discount rate / WACC                default 10
+	DCFTerminalGrowth float64 // perpetual terminal growth rate (%)   default 3
+	DCFGrowthYears    int     // explicit FCF growth stage years       default 5
+	DCFMaxGrowthPct   float64 // cap on assumed FCF growth rate        default 20
+	DCFSafetyMargin   float64 // price as % of DCF: <this = strong buy default 70
+	DCFOvervalued     float64 // price as % of DCF: >this = overvalued default 110
+
+	// ── Tier 3: Interest Coverage Ratio (rank 15) ─────────────────────────────
+	// Interest Coverage = EBIT ÷ Interest Expense.
+	// <2× in a rising rate environment is high risk.
+	InterestCoverageSafe     float64 // >this = "very_safe"     default 5
+	InterestCoverageAdequate float64 // >this = "adequate"      default 2
+
+	// ── Tier 3: Goodwill & Intangibles % of Total Assets (rank 18) ───────────
+	// Goodwill impairment is non-cash but signals an acquisition that failed.
+	GoodwillLowPct  float64 // <this% = "low_risk"      default 20
+	GoodwillHighPct float64 // >this% = "high_risk"     default 40
+
+	// ── Tier 3: Price-to-Sales (P/S) Ratio (rank 19) ─────────────────────────
+	// Most useful for unprofitable or early-stage growth companies.
+	// Compare within sector — SaaS companies carry higher P/S than industrials.
+	PSValue       float64 // <this = "value"        default 5
+	PSFair        float64 // <this = "growth_fair"  default 10
+	PSSpeculative float64 // >this = "speculative"  default 15
+
+	// ── Tier 3: Analyst Target Price (rank 17) ────────────────────────────────
+	// Source: Alpha Vantage AnalystTargetPrice (stored as analyst_target_price).
+	// Upside = (target - price) / price × 100.
+	AnalystUpsideBullish  float64 // upside % above this = bullish consensus  default 15
+	AnalystDownsideBearish float64 // upside % below this = bearish consensus default -5
+
+	// ── Equity interval for Tier 3 live-price lookup ─────────────────────────
+	// Used when scoreTier3 queries the latest close from equity_ohlcv.
+	EquityInterval string // e.g. "1Day"
 }
 
 func LoadFundamentalAnalysis() (FundamentalAnalysis, error) {
@@ -718,5 +771,32 @@ func LoadFundamentalAnalysis() (FundamentalAnalysis, error) {
 
 		CapExIntensityLow:  floatEnv("FUNDAMENTAL_CAPEX_INTENSITY_LOW", 5),
 		CapExIntensityHigh: floatEnv("FUNDAMENTAL_CAPEX_INTENSITY_HIGH", 20),
+
+		// Tier 3
+		ShareDeclineBuyback: floatEnv("FUNDAMENTAL_SHARE_DECLINE_BUYBACK", 2),
+		ShareGrowthDilution: floatEnv("FUNDAMENTAL_SHARE_GROWTH_DILUTION", 3),
+		ShareTrendYears:     intEnv("FUNDAMENTAL_SHARE_TREND_YEARS", 2),
+
+		DCFWACCPct:        floatEnv("FUNDAMENTAL_DCF_WACC_PCT", 10),
+		DCFTerminalGrowth: floatEnv("FUNDAMENTAL_DCF_TERMINAL_GROWTH_PCT", 3),
+		DCFGrowthYears:    intEnv("FUNDAMENTAL_DCF_GROWTH_YEARS", 5),
+		DCFMaxGrowthPct:   floatEnv("FUNDAMENTAL_DCF_MAX_GROWTH_PCT", 20),
+		DCFSafetyMargin:   floatEnv("FUNDAMENTAL_DCF_SAFETY_MARGIN_PCT", 70),
+		DCFOvervalued:     floatEnv("FUNDAMENTAL_DCF_OVERVALUED_PCT", 110),
+
+		InterestCoverageSafe:     floatEnv("FUNDAMENTAL_INTEREST_COVERAGE_SAFE", 5),
+		InterestCoverageAdequate: floatEnv("FUNDAMENTAL_INTEREST_COVERAGE_ADEQUATE", 2),
+
+		GoodwillLowPct:  floatEnv("FUNDAMENTAL_GOODWILL_LOW_PCT", 20),
+		GoodwillHighPct: floatEnv("FUNDAMENTAL_GOODWILL_HIGH_PCT", 40),
+
+		PSValue:       floatEnv("FUNDAMENTAL_PS_VALUE", 5),
+		PSFair:        floatEnv("FUNDAMENTAL_PS_FAIR", 10),
+		PSSpeculative: floatEnv("FUNDAMENTAL_PS_SPECULATIVE", 15),
+
+		AnalystUpsideBullish:   floatEnv("FUNDAMENTAL_ANALYST_UPSIDE_BULLISH", 15),
+		AnalystDownsideBearish: floatEnv("FUNDAMENTAL_ANALYST_DOWNSIDE_BEARISH", -5),
+
+		EquityInterval: strEnvDefault("FUNDAMENTAL_EQUITY_INTERVAL", "1Day"),
 	}, nil
 }

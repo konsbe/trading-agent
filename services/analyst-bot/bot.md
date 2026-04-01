@@ -32,7 +32,7 @@ These appear on the price title and the trend field.
 
 `/price symbol:AAPL asset_type:equity` — Latest OHLCV bar (open, high, low, close, volume)
 `/signals symbol:AAPL asset_type:equity` — Fast one-embed snapshot of the most actionable signals
-`/analyze symbol:AAPL asset_type:equity` — Full deep-dive: price → technical → Tier 1 fundamentals → 🏦 Tier 2 balance sheet → news
+`/analyze symbol:AAPL asset_type:equity` — Full deep-dive: price → technical → Tier 1 fundamentals → 🏦 Tier 2 balance sheet → 🔍 Tier 3 deep context → news
 `/report` — Triggers the daily market report on demand (same as the 07:00 scheduled job)
 `/dictionary` — Sends this glossary as paginated Discord embeds
 `/status` — Bot health: DB ✅/❌, Redis ✅/❌, scheduler jobs, configured symbols
@@ -360,6 +360,98 @@ Capital expenditure as % of revenue. Asset-light businesses (SaaS, brands) keep 
 `🔴 capital_intensive` > 20% — Heavy reinvestment required; FCF constrained.
 
 Configurable via `FUNDAMENTAL_CAPEX_INTENSITY_LOW` (default 5) and `FUNDAMENTAL_CAPEX_INTENSITY_HIGH` (default 20).
+
+---
+
+## Deep Context (Tier 3)
+
+Shown as a **🔍 Deep Context** embed in `/analyze` for equity symbols. These metrics provide important context for decision-making but require more interpretation than Tier 1/2 signals. They appear only once XBRL data has been ingested and the analyzer has run a full cycle.
+
+> DCF values are directional sanity checks — never treat them as precise targets.
+
+---
+
+### Share Count Trend (Rank 13)
+
+Is the company shrinking or growing its share count over time? Net buybacks boost EPS per share without improving underlying earnings.
+
+`🟢 buyback` — Share count declining > 2%/yr. Active buyback program returns cash to shareholders.
+`🟡 flat` — Share count stable ±2%/yr. Neutral.
+`🔴 dilution_risk` — Share count growing > 3%/yr. Company is issuing stock (acquisitions, SBC, capital raises).
+
+Configurable via `FUNDAMENTAL_SHARE_DECLINE_BUYBACK` (default 2) and `FUNDAMENTAL_SHARE_GROWTH_DILUTION` (default 3).
+
+### DCF Margin of Safety (Rank 14)
+
+Simplified 5-year Discounted Cash Flow model. Computes the intrinsic value of the business from FCF growth projections and compares it to the current market cap.
+
+**Value shown**: `price = X% of intrinsic` — where 100% means priced exactly at intrinsic value.
+
+`🟢 strong_margin_of_safety` Price < 70% of DCF — 30%+ discount to intrinsic value. Strong buy signal.
+`🟡 fairly_valued` Price 70–110% of DCF — trading near intrinsic value.
+`🔴 downside_risk` Price > 110% of DCF — trading above intrinsic value estimate.
+
+**Model assumptions** (all configurable):
+- FCF growth rate: min(EPS 5Y growth, Revenue 5Y growth), capped at `FUNDAMENTAL_DCF_MAX_GROWTH_PCT` (default 20%)
+- WACC (discount rate): `FUNDAMENTAL_DCF_WACC_PCT` (default 10%)
+- Terminal growth: `FUNDAMENTAL_DCF_TERMINAL_GROWTH_PCT` (default 3%)
+- Explicit stage: `FUNDAMENTAL_DCF_GROWTH_YEARS` (default 5 years)
+
+⚠️ A 1% change in WACC or growth rate can shift the output by 30–50%. Use alongside multiples-based valuation.
+
+### Interest Coverage (Rank 15)
+
+Can the company comfortably pay interest on its debt? = EBIT ÷ Annual Interest Expense.
+
+`🟢 very_safe` > 5× — Operating earnings cover interest payments 5+ times over.
+`🟡 adequate` 2–5× — Serviceable but monitor if rates rise or earnings dip.
+`🔴 high_risk` < 2× — Interest consumes >50% of operating earnings. Very dangerous in an economic slowdown.
+
+Configurable via `FUNDAMENTAL_INTEREST_COVERAGE_SAFE` (default 5) and `FUNDAMENTAL_INTEREST_COVERAGE_ADEQUATE` (default 2).
+
+### Asset Turnover (Rank 16)
+
+Revenue generated per dollar of total assets. Higher = more capital-efficient business.
+
+`Asset Turnover: 1.23×` — Company generates $1.23 of revenue for every $1 of assets it holds.
+`Inventory X×/yr` — How many times inventory is sold and restocked per year (shown inline when available). Slowing inventory turnover is an early-warning signal for consumer and industrial companies.
+
+**No absolute thresholds** — compare over time and to sector peers. Asset-heavy businesses (steel, airlines) naturally score lower than asset-light businesses (software, consumer brands).
+
+### Analyst Target Price (Rank 17)
+
+Consensus analyst target price vs. current close price. Source: Alpha Vantage.
+
+`🟢 bullish_consensus` Upside > 15% — Analysts collectively expect significant appreciation.
+`🟡 neutral` Upside −5% to +15% — Analysts expect modest or no price change.
+`🔴 bearish_consensus` Upside < −5% — Analysts expect the stock to decline from here.
+
+`+23.5% upside (target $320.00)` — Stock is at $259, analysts target $320 → 23.5% upside.
+
+⚠️ This is a single consensus target. Full revision trend (30/60/90-day changes) requires paid data (Seeking Alpha / Finviz).
+
+Configurable via `FUNDAMENTAL_ANALYST_UPSIDE_BULLISH` (default 15) and `FUNDAMENTAL_ANALYST_DOWNSIDE_BEARISH` (default -5).
+
+### Goodwill & Intangibles % (Rank 18)
+
+Goodwill + intangible assets as a percentage of total assets. Goodwill arises when a company acquires another for more than book value. A goodwill impairment charge signals an acquisition that failed to deliver expected returns.
+
+`🟢 low_risk` < 20% of assets — Minimal acquisition risk.
+`🟡 monitor` 20–40% — Track acquisition discipline carefully.
+`🔴 impairment_risk` > 40% — Significant portion of assets are intangible; impairment write-down risk is elevated.
+
+Configurable via `FUNDAMENTAL_GOODWILL_LOW_PCT` (default 20) and `FUNDAMENTAL_GOODWILL_HIGH_PCT` (default 40).
+
+### Price/Sales Ratio (Rank 19)
+
+Market Cap ÷ TTM Revenue. Most useful when earnings are zero or negative (early-stage growth companies). **Always compare within sector** — SaaS companies typically command 5–15×; industrials > 3× is expensive.
+
+`🟢 value` P/S < 5× — Cheap relative to revenue (assuming eventual margin normalisation).
+`🟡 fairly_valued` P/S 5–10× — Standard range for mature growth companies.
+`🟡 growth_premium_required` P/S 10–15× — Requires sustained >20% revenue growth to justify.
+`🔴 speculative` P/S > 15× — Very high risk; small revenue growth disappointment can cause large price declines.
+
+Configurable via `FUNDAMENTAL_PS_VALUE` (default 5), `FUNDAMENTAL_PS_FAIR` (default 10), and `FUNDAMENTAL_PS_SPECULATIVE` (default 15).
 
 ---
 
