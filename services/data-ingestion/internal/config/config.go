@@ -183,11 +183,12 @@ func LoadOnchain() (Onchain, error) {
 
 type Sentiment struct {
 	Base
-	PollLunarCrush   time.Duration
-	PollFinnhubNews  time.Duration
-	LunarCrushKey    string
-	FinnhubKey       string
-	NewsSymbols      []string
+	PollLunarCrush    time.Duration
+	PollFinnhubNews   time.Duration
+	LunarCrushKey     string
+	FinnhubKey        string
+	NewsSymbols       []string // crypto symbols for LunarCrush
+	EquityNewsSymbols []string // equity tickers for Finnhub company-news
 }
 
 func LoadSentiment() (Sentiment, error) {
@@ -200,12 +201,17 @@ func LoadSentiment() (Sentiment, error) {
 	if len(newsSyms) == 0 {
 		newsSyms = []string{"BTC", "ETH"}
 	}
+	equitySyms := splitCSV("FINNHUB_EQUITY_NEWS_SYMBOLS")
+	if len(equitySyms) == 0 {
+		equitySyms = splitCSV("EQUITY_SYMBOLS")
+	}
 	return Sentiment{
-		Base:            b,
-		PollLunarCrush:  pollFor("DATA_SENTIMENT_LUNARCRUSH_POLL_INTERVAL", def),
-		PollFinnhubNews: pollFor("DATA_SENTIMENT_FINNHUB_NEWS_POLL_INTERVAL", def),
-		LunarCrushKey:   os.Getenv("LUNARCRUSH_API_KEY"),
-		FinnhubKey:      os.Getenv("FINNHUB_API_KEY"),
-		NewsSymbols:     newsSyms,
+		Base:              b,
+		PollLunarCrush:   pollFor("DATA_SENTIMENT_LUNARCRUSH_POLL_INTERVAL", def),
+		PollFinnhubNews:  pollFor("DATA_SENTIMENT_FINNHUB_NEWS_POLL_INTERVAL", def),
+		LunarCrushKey:    os.Getenv("LUNARCRUSH_API_KEY"),
+		FinnhubKey:       os.Getenv("FINNHUB_API_KEY"),
+		NewsSymbols:      newsSyms,
+		EquityNewsSymbols: equitySyms,
 	}, nil
 }

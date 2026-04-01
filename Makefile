@@ -2,9 +2,10 @@ ROOT    := $(abspath .)
 INFRA   := $(ROOT)/infra
 INGEST  := $(ROOT)/services/data-ingestion
 ANALYZER := $(ROOT)/services/data-analyzer
+BOT     := $(ROOT)/services/analyst-bot
 
-.PHONY: help tidy build-ingestion build-analyzer db-up db-down up down deploy ensure-env \
-	docker-build-timescaledb restart clean psql \
+.PHONY: help tidy build-ingestion build-analyzer db-up db-down up down deploy ensure-env ensure-corp-ca \
+	docker-build-timescaledb restart clean psql up-bot log-bot \
 	db-crypto-ohlcv db-crypto-global db-equity-ohlcv db-macro-fred db-onchain db-sentiment db-news db-tables \
 	db-technical db-technical-symbol db-fundamental db-fundamental-symbol \
 	log-docker-compose log-services log-analyzer \
@@ -15,6 +16,7 @@ help:
 	@echo "  make up            Full stack: DB + Redis + all ingestion + analyzer workers (--build)"
 	@echo "  make up-ingestion  Ingestion workers only (DB must be running)"
 	@echo "  make up-analyzer   Analyzer workers only (DB + ingestion must be running)"
+	@echo "  make up-bot        Discord analyst-bot only (DB + Redis must be running)"
 	@echo "  make down          Stop everything (volumes kept)"
 	@echo "  make restart       down + up --build; database data preserved"
 	@echo "  make clean         Nuclear: remove containers, volumes (DB wiped), and local images"
@@ -30,6 +32,7 @@ help:
 	@echo "━━━ Logs ━━━"
 	@echo "  log-services            All ingestion containers"
 	@echo "  log-analyzer            Both analyzer containers (technical-analysis + fundamental-analysis)"
+	@echo "  log-bot                 analyst-bot (Discord bot)"
 	@echo "  log-technical           data-technical (OHLCV bar fetcher)"
 	@echo "  log-fundamental         data-fundamental (Finnhub fundamentals fetcher)"
 	@echo "  log-technical-analysis  technical-analysis (indicator computation)"
@@ -52,6 +55,14 @@ help:
 ensure-env:
 	@test -f $(ROOT)/.env || cp $(ROOT)/.env.example $(ROOT)/.env
 
+# Create empty corp-ca.pem placeholders if they don't exist so Docker COPY never fails.
+# On machines with a corporate TLS proxy, replace the file with your CA cert manually:
+#   cp /path/to/your-ca.pem services/data-ingestion/corp-ca.pem
+#   cp /path/to/your-ca.pem services/analyst-bot/corp-ca.pem
+ensure-corp-ca:
+	@touch $(INGEST)/corp-ca.pem
+	@touch $(BOT)/corp-ca.pem
+
 tidy:
 	$(MAKE) -C $(INGEST) tidy
 	$(MAKE) -C $(ANALYZER) tidy
@@ -68,14 +79,20 @@ db-up:
 db-down:
 	$(MAKE) -C $(INFRA) db-down
 
-up deploy: ensure-env
+up deploy: ensure-env ensure-corp-ca
 	$(MAKE) -C $(INFRA) up
 
-up-ingestion: ensure-env
+up-ingestion: ensure-env ensure-corp-ca
 	$(MAKE) -C $(INFRA) up-ingestion
 
 up-analyzer: ensure-env
 	$(MAKE) -C $(INFRA) up-analyzer
+
+up-bot: ensure-env ensure-corp-ca
+	docker compose -f $(ROOT)/infra/docker-compose.yml --profile bot up -d --build --force-recreate analyst-bot
+
+log-bot:
+	docker compose -f $(ROOT)/infra/docker-compose.yml --profile bot logs -f analyst-bot
 
 down:
 	$(MAKE) -C $(INFRA) down

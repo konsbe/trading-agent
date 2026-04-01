@@ -167,5 +167,27 @@ services:
     profiles: [analyzer]
     restart: on-failure
 
+  # ── analyst-bot ────────────────────────────────────────────────────────────
+  # Discord bot + scheduler. Reads from TimescaleDB and Redis — no API calls.
+  # Start with: make up-bot  (or docker compose --profile bot up -d analyst-bot)
+  # Requires DISCORD_BOT_TOKEN in .env.
+  analyst-bot:
+    build:
+      context: ../services/analyst-bot
+      dockerfile: Dockerfile
+    env_file:
+      - path: ../.env
+        required: false
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@timescaledb:5432/trading?sslmode=disable
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    profiles: [bot]
+    restart: unless-stopped
+
 volumes:
   timescale_data:

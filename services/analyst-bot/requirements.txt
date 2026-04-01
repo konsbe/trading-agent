@@ -1,0 +1,16 @@
+# Discord
+py-cord>=2.6.0
+
+# Database
+asyncpg>=0.29.0
+
+# Redis
+redis[asyncio]>=5.0.0
+
+# Scheduling
+APScheduler>=3.10.0
+
+# Config
+pydantic-settings>=2.2.0
+pydantic>=2.6.0
+python-dotenv>=1.0.0
