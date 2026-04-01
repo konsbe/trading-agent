@@ -368,6 +368,60 @@ class ReportBuilder:
             # Finnhub stores market_cap in millions USD; convert to raw dollars for the formatter.
             mc = ttm.get("market_cap")
             snap.market_cap = mc * 1_000_000 if mc is not None else None
+
+            # ── Tier 2 derived signals ────────────────────────────────────────
+            def _t2_payload(key: str) -> dict:
+                return derived.get(key, {}).get("payload") or {}
+
+            # ROE / ROA
+            t2_roe_p = _t2_payload("t2_roe")
+            snap.roe_pct = t2_roe_p.get("roe_pct")
+            snap.roe_tier = t2_roe_p.get("tier")
+            t2_roa_p = _t2_payload("t2_roa")
+            snap.roa_pct = t2_roa_p.get("roa_pct")
+
+            # Leverage — D/E ratio
+            t2_lev_p = _t2_payload("t2_leverage")
+            snap.leverage_de = t2_lev_p.get("debt_to_equity")
+            snap.leverage_tier = t2_lev_p.get("tier")
+
+            # Net Debt / EBITDA proxy
+            t2_nd_p = _t2_payload("t2_net_debt_ebitda")
+            snap.net_debt_ebitda = t2_nd_p.get("ratio")
+            snap.net_debt_ebitda_tier = t2_nd_p.get("tier")
+
+            # EV/EBITDA
+            t2_ev_p = _t2_payload("t2_ev_ebitda")
+            snap.ev_ebitda = t2_ev_p.get("ev_to_ebitda")
+            snap.ev_ebitda_tier = t2_ev_p.get("tier")
+
+            # Current Ratio / Quick Ratio
+            t2_cr_p = _t2_payload("t2_current_ratio")
+            snap.current_ratio = t2_cr_p.get("current_ratio")
+            snap.current_ratio_tier = t2_cr_p.get("tier")
+            t2_qr_p = _t2_payload("t2_quick_ratio")
+            snap.quick_ratio = t2_qr_p.get("quick_ratio")
+
+            # P/B ratio
+            t2_pb_p = _t2_payload("t2_pb")
+            snap.pb_ratio = t2_pb_p.get("price_to_book")
+            snap.pb_tier = t2_pb_p.get("tier")
+
+            # Dividend yield + payout sustainability
+            t2_div_p = _t2_payload("t2_dividend")
+            snap.dividend_yield_pct = t2_div_p.get("dividend_yield_pct")
+            snap.dividend_sustainability = t2_div_p.get("sustainability")
+
+            # CapEx intensity
+            t2_capex_p = _t2_payload("t2_capex_intensity")
+            snap.capex_intensity_pct = t2_capex_p.get("capex_intensity_pct")
+            snap.capex_tier = t2_capex_p.get("tier")
+
+            # Tier 2 composite health
+            t2_health_p = _t2_payload("t2_health_score")
+            snap.t2_health_score = _d_val("t2_health_score")
+            snap.t2_health_tier = t2_health_p.get("tier")
+
             return snap
         except Exception as exc:
             log.warning("fundamental build failed symbol=%s: %s", symbol, exc)
