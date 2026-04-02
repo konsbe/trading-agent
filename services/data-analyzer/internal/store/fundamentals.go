@@ -75,6 +75,34 @@ func QueryLatestMetrics(ctx context.Context, pool *pgxpool.Pool, symbol string) 
 	return result, rows.Err()
 }
 
+// QueryLatestDerived returns the most recent value and payload for each derived
+// metric (source = 'fundamental_analysis') for a symbol. This is used by
+// scoreCorrelations to read prior-pass outputs (Tier 1–3, qualitative) without
+// re-computing them.
+func QueryLatestDerived(ctx context.Context, pool *pgxpool.Pool, symbol string) ([]FundamentalRow, error) {
+	rows, err := pool.Query(ctx, `
+		SELECT DISTINCT ON (metric) ts, period, metric, value, payload, source
+		FROM equity_fundamentals
+		WHERE symbol = $1
+		  AND source = 'fundamental_analysis'
+		ORDER BY metric, ts DESC`,
+		symbol)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var result []FundamentalRow
+	for rows.Next() {
+		var r FundamentalRow
+		if err := rows.Scan(&r.TS, &r.Period, &r.Metric, &r.Value, &r.Payload, &r.Source); err != nil {
+			return nil, err
+		}
+		result = append(result, r)
+	}
+	return result, rows.Err()
+}
+
 // QueryMetricSeries returns the last `limit` distinct quarterly periods for a
 // single metric of one symbol, ordered newest-first.
 //

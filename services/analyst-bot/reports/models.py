@@ -189,6 +189,31 @@ class FundamentalSnapshot:
     qual_rd_intensity_pct: Optional[float] = None  # R&D / revenue × 100
     qual_rd_tier: Optional[str] = None             # "investing_in_future" | "moderate" | "harvesting"
 
+    # ── Correlation Signals (cross-metric divergence analysis) ────────────────
+    # Cluster health scores — each cluster is scored -1 (alert) to +1 (healthy).
+    # Tier labels: "healthy" | "mixed_positive" | "mixed_negative" | "alert"
+    corr_earnings_quality_tier: Optional[str] = None    # EPS/FCF coherence, margin trends
+    corr_valuation_quality_tier: Optional[str] = None   # P/E vs growth/ROIC, FCF vs dividend, P/B vs ROE
+    corr_leverage_liquidity_tier: Optional[str] = None  # leverage + coverage + liquidity
+    corr_operational_tier: Optional[str] = None         # ROIC vs growth, CapEx vs FCF
+
+    # Aggregate cross-cluster summary
+    corr_summary_score: Optional[float] = None   # -1 to +1
+    corr_summary_tier: Optional[str] = None
+
+    # Master divergence signals — highest-conviction patterns
+    corr_master_net_signal: Optional[str] = None          # "strongly_bullish" | "bullish" | "neutral" | "bearish" | "strongly_bearish"
+    corr_bullish_convergence_fired: Optional[bool] = None  # low P/E + high ROIC + FCF + conservative D/E + insider buying
+    corr_bullish_convergence_score: Optional[int] = None   # how many of 5 conditions met
+    corr_hidden_value_fired: Optional[bool] = None         # EPS stagnant + FCF rising + low P/FCF
+    corr_deterioration_warning_fired: Optional[bool] = None  # EPS rising + FCF accruals + receivables growing
+    corr_value_trap_fired: Optional[bool] = None           # low P/E + low ROIC + high D/E + declining revenue
+    corr_leverage_cycle_fired: Optional[bool] = None       # 4 leverage metrics simultaneously deteriorating
+
+    # All warnings/positives accumulated across clusters (for display)
+    corr_warnings: list[str] = field(default_factory=list)
+    corr_positives: list[str] = field(default_factory=list)
+
 
 # ── Sentiment ─────────────────────────────────────────────────────────────────
 

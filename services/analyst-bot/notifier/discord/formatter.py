@@ -119,6 +119,11 @@ def _tier_emoji(tier: Optional[str]) -> str:
         "positive": "🟢", "negative": "🔴",
         "investing_in_future": "🟢", "harvesting": "🔴",
         "insufficient_data": "⚪",
+        # Correlation cluster tiers
+        "healthy": "🟢", "mixed_positive": "🟡", "mixed_negative": "🟠", "alert": "🔴",
+        # Master signal net labels
+        "strongly_bullish": "🟢🟢", "bullish": "🟢",
+        "strongly_bearish": "🔴🔴", "bearish": "🔴",
     }
     return mapping.get(tier or "", "⚪")
 
@@ -404,7 +409,7 @@ def fundamental_tier3_embed(fund: FundamentalSnapshot) -> Optional[discord.Embed
         return None
 
     embed = discord.Embed(
-        title=f"🔍 Deep Context — {fund.symbol}  (Tier 3)",
+        title=f"🔍 Deep Context — {fund.symbol} ",
         color=0x8E44AD,  # darker purple to distinguish from Tier 2
     )
 
@@ -590,6 +595,127 @@ def qualitative_embed(fund: FundamentalSnapshot) -> Optional[discord.Embed]:
     return embed
 
 
+# ── Correlation signals embed ──────────────────────────────────────────────────
+
+def correlations_embed(fund: FundamentalSnapshot) -> Optional[discord.Embed]:
+    """
+    Cross-metric divergence analysis embed.
+    Only shown when at least one interesting signal exists (a fired master signal
+    or at least one cluster not "mixed_positive" / "healthy").
+    """
+    # Check if there is anything meaningful to show.
+    has_master = any([
+        fund.corr_bullish_convergence_fired,
+        fund.corr_hidden_value_fired,
+        fund.corr_deterioration_warning_fired,
+        fund.corr_value_trap_fired,
+        fund.corr_leverage_cycle_fired,
+    ])
+    has_cluster = any(t is not None for t in [
+        fund.corr_earnings_quality_tier,
+        fund.corr_valuation_quality_tier,
+        fund.corr_leverage_liquidity_tier,
+        fund.corr_operational_tier,
+    ])
+    if not has_master and not has_cluster:
+        return None
+
+    # Choose embed colour based on master net signal.
+    color_map = {
+        "strongly_bullish": COLOR_GREEN,
+        "bullish": COLOR_GREEN,
+        "neutral": COLOR_GREY,
+        "bearish": COLOR_RED,
+        "strongly_bearish": COLOR_RED,
+    }
+    color = color_map.get(fund.corr_master_net_signal or "neutral", COLOR_GREY)
+
+    signal_emoji = {
+        "strongly_bullish": "🟢🟢",
+        "bullish": "🟢",
+        "neutral": "⚪",
+        "bearish": "🔴",
+        "strongly_bearish": "🔴🔴",
+    }
+    net_display = (
+        f"{signal_emoji.get(fund.corr_master_net_signal or 'neutral', '⚪')} "
+        f"{fund.corr_master_net_signal or '—'}"
+    )
+    score_display = f"({_num(fund.corr_summary_score, 2)})" if fund.corr_summary_score is not None else ""
+
+    embed = discord.Embed(
+        title=f"🔗 Correlations — {fund.symbol}  {net_display}  {score_display}",
+        color=color,
+    )
+
+    # Cluster health overview.
+    def _cluster_emoji(tier: Optional[str]) -> str:
+        return {"healthy": "🟢", "mixed_positive": "🟡", "mixed_negative": "🟠", "alert": "🔴"}.get(tier or "", "⚪")
+
+    cluster_lines = []
+    if fund.corr_earnings_quality_tier:
+        cluster_lines.append(f"{_cluster_emoji(fund.corr_earnings_quality_tier)} **Earnings Quality** — {fund.corr_earnings_quality_tier.replace('_', ' ')}")
+    if fund.corr_valuation_quality_tier:
+        cluster_lines.append(f"{_cluster_emoji(fund.corr_valuation_quality_tier)} **Valuation vs Quality** — {fund.corr_valuation_quality_tier.replace('_', ' ')}")
+    if fund.corr_leverage_liquidity_tier:
+        cluster_lines.append(f"{_cluster_emoji(fund.corr_leverage_liquidity_tier)} **Leverage & Liquidity** — {fund.corr_leverage_liquidity_tier.replace('_', ' ')}")
+    if fund.corr_operational_tier:
+        cluster_lines.append(f"{_cluster_emoji(fund.corr_operational_tier)} **Operational** — {fund.corr_operational_tier.replace('_', ' ')}")
+    if cluster_lines:
+        embed.add_field(name="Cluster Health", value="\n".join(cluster_lines), inline=False)
+
+    # ── Master Divergence Signals ─────────────────────────────────────────────
+    master_parts = []
+
+    if fund.corr_bullish_convergence_fired:
+        score_str = f" ({fund.corr_bullish_convergence_score}/5 conditions)" if fund.corr_bullish_convergence_score is not None else ""
+        master_parts.append(f"🟢 **★ Bullish Convergence**{score_str} — low P/E + high ROIC + FCF + conservative leverage + insider buying")
+
+    if fund.corr_hidden_value_fired:
+        master_parts.append("🟢 **★ Hidden Value** — EPS stagnant but FCF conversion high + attractive FCF yield (market prices on EPS; real cash missed)")
+
+    if fund.corr_deterioration_warning_fired:
+        master_parts.append("🔴 **★ Deterioration Warning** — EPS rising + FCF accrual concern + receivables growing faster than revenue (earnings possibly manufactured)")
+
+    if fund.corr_value_trap_fired:
+        master_parts.append("🔴 **★ Value Trap** — low P/E + low/adequate ROIC + elevated leverage + declining revenue (cheap for a reason)")
+
+    if fund.corr_leverage_cycle_fired:
+        master_parts.append("🔴 **★ Leverage Cycle Warning** — ≥3 of: high Net Debt/EBITDA, low interest coverage, poor FCF, liquidity risk (financial distress trajectory)")
+
+    if master_parts:
+        embed.add_field(
+            name="⚡ Master Signals Fired",
+            value=_trunc("\n".join(master_parts), 1024),
+            inline=False,
+        )
+
+    # Top warnings (max 4 to keep embed compact).
+    if fund.corr_warnings:
+        warn_lines = [f"• {w}" for w in fund.corr_warnings[:4]]
+        if len(fund.corr_warnings) > 4:
+            warn_lines.append(f"_…and {len(fund.corr_warnings) - 4} more_")
+        embed.add_field(
+            name="⚠️ Divergence Warnings",
+            value=_trunc("\n".join(warn_lines), 1024),
+            inline=False,
+        )
+
+    # Top positives (max 3).
+    if fund.corr_positives:
+        pos_lines = [f"• {p}" for p in fund.corr_positives[:3]]
+        if len(fund.corr_positives) > 3:
+            pos_lines.append(f"_…and {len(fund.corr_positives) - 3} more_")
+        embed.add_field(
+            name="✅ Aligned Signals",
+            value=_trunc("\n".join(pos_lines), 1024),
+            inline=False,
+        )
+
+    embed.set_footer(text="Correlations · Cross-metric divergence — see bot.md for signal definitions")
+    return embed
+
+
 # ── Symbol report (multi-embed) ───────────────────────────────────────────────
 
 def symbol_report_embeds(report: SymbolReport) -> list[discord.Embed]:
@@ -612,6 +738,9 @@ def symbol_report_embeds(report: SymbolReport) -> list[discord.Embed]:
         qual = qualitative_embed(report.fundamental)
         if qual:
             embeds.append(qual)
+        corr = correlations_embed(report.fundamental)
+        if corr:
+            embeds.append(corr)
     if report.sentiment or report.news:
         embeds.append(sentiment_news_embed(report.symbol, report.sentiment, report.news))
     return embeds

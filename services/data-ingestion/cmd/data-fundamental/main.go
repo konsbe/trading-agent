@@ -433,6 +433,17 @@ func (w *worker) storeFinancials(ctx context.Context, freq string, limit int) {
 			"InventoryRawMaterialsAndSupplies",
 		)), nil)
 
+		// ── Correlations: Accounts Receivable ─────────────────────────────
+		// Used by the deterioration warning signal: receivables growing faster
+		// than revenue = revenue being recognised before cash is collected.
+		// Stored in millions, consistent with all other XBRL dollar amounts.
+		upsert("accounts_receivable_reported", divM(conceptVal(bs,
+			"AccountsReceivableNetCurrent",
+			"ReceivablesNetCurrent",
+			"AccountsReceivableNet",
+			"TradeAndOtherReceivablesNetCurrent",
+		)), nil)
+
 		// ── Tier 3: Interest Expense (rank 15 — interest coverage) ───────
 		// Interest coverage = EBIT / Interest Expense.
 		// Interest expense is typically negative in XBRL; we take abs() in the analyzer.

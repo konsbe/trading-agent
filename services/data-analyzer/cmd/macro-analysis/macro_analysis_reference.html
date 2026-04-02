@@ -1,0 +1,3399 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Macro Analysis — Complete Reference</title>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;700;800&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@300;400;500&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --bg: #080a0e;
+            --bg2: #0d1018;
+            --bg3: #121620;
+            --bg4: #181d28;
+            --bg5: #1e2430;
+            --border: #1e2430;
+            --border2: #252d3d;
+            --border3: #2e3848;
+            --text: #c8d4e8;
+            --text2: #7a8ba8;
+            --text3: #3d4d68;
+            --accent: #4a9eff;
+            --accent-dim: #0a1a33;
+            --accent2: #7ab8ff;
+            --green: #3ecf72;
+            --green-dim: #0a2018;
+            --red: #ff5757;
+            --red-dim: #200a0a;
+            --amber: #ffb347;
+            --amber-dim: #201408;
+            --purple: #a78bfa;
+            --purple-dim: #150f2a;
+            --teal: #2dd4bf;
+            --teal-dim: #082018;
+            --coral: #ff7b54;
+            --coral-dim: #200e08;
+            --gold: #e8c547;
+            --gold-dim: #1e1808;
+            --pink: #f472b6;
+            --pink-dim: #200a18;
+        }
+
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0
+        }
+
+        body {
+            font-family: 'Syne', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            font-size: 14px;
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+
+        /* ATMOSPHERIC BACKGROUND */
+        body::after {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 400px;
+            background: radial-gradient(ellipse 80% 40% at 50% -10%, rgba(74, 158, 255, 0.07) 0%, transparent 70%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        /* HEADER */
+        .header {
+            padding: 48px 36px 32px;
+            border-bottom: 1px solid var(--border2);
+            position: relative;
+            z-index: 1;
+        }
+
+        .eyebrow {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 10px;
+            letter-spacing: .2em;
+            text-transform: uppercase;
+            color: var(--accent);
+            margin-bottom: 12px;
+            opacity: .8;
+        }
+
+        .header h1 {
+            font-size: 42px;
+            font-weight: 800;
+            letter-spacing: -.03em;
+            line-height: .95;
+            margin-bottom: 8px;
+        }
+
+        .header h1 .italic {
+            font-family: 'Instrument Serif', serif;
+            font-style: italic;
+            font-weight: 400;
+            color: var(--accent);
+        }
+
+        .header-sub {
+            font-size: 13px;
+            color: var(--text2);
+            font-weight: 400;
+            margin-top: 10px;
+        }
+
+        /* NAV */
+        .nav {
+            display: flex;
+            padding: 0 36px;
+            border-bottom: 1px solid var(--border2);
+            overflow-x: auto;
+            position: relative;
+            z-index: 1;
+            gap: 0;
+        }
+
+        .nav::-webkit-scrollbar {
+            height: 2px
+        }
+
+        .nav::-webkit-scrollbar-thumb {
+            background: var(--border3)
+        }
+
+        .ntab {
+            padding: 13px 18px;
+            font-size: 10px;
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 500;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+            cursor: pointer;
+            border: none;
+            background: none;
+            color: var(--text3);
+            border-bottom: 2px solid transparent;
+            transition: all .15s;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+
+        .ntab:hover {
+            color: var(--text2)
+        }
+
+        .ntab.active {
+            color: var(--accent);
+            border-bottom-color: var(--accent)
+        }
+
+        /* PANELS */
+        .panel {
+            display: none;
+            padding: 28px 36px 56px;
+            position: relative;
+            z-index: 1
+        }
+
+        .panel.active {
+            display: block
+        }
+
+        /* TIER */
+        .tier {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin: 28px 0 12px;
+        }
+
+        .tier:first-of-type {
+            margin-top: 0
+        }
+
+        .tier-txt {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 9px;
+            letter-spacing: .14em;
+            text-transform: uppercase;
+            color: var(--text3);
+            white-space: nowrap;
+        }
+
+        .tier-line {
+            flex: 1;
+            height: 1px;
+            background: var(--border2)
+        }
+
+        /* ITEMS */
+        .item {
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            margin-bottom: 6px;
+            overflow: hidden;
+            background: var(--bg2);
+            transition: border-color .12s;
+        }
+
+        .item:hover {
+            border-color: var(--border2)
+        }
+
+        .item.open {
+            border-color: var(--accent-dim)
+        }
+
+        .item-hd {
+            display: flex;
+            gap: 12px;
+            align-items: flex-start;
+            padding: 12px 16px;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .num {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 10px;
+            color: var(--text3);
+            min-width: 28px;
+            padding-top: 2px;
+            flex-shrink: 0;
+        }
+
+        .item.open .num {
+            color: var(--accent)
+        }
+
+        .imeta {
+            flex: 1
+        }
+
+        .iname {
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--text);
+            letter-spacing: -.01em;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .iline {
+            font-size: 11px;
+            color: var(--text2);
+            margin-top: 2px;
+            font-weight: 400
+        }
+
+        .tag {
+            font-size: 9px;
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 500;
+            padding: 2px 7px;
+            border-radius: 3px;
+            letter-spacing: .04em;
+            text-transform: uppercase;
+            flex-shrink: 0;
+        }
+
+        .t-mon {
+            background: var(--accent-dim);
+            color: var(--accent2)
+        }
+
+        .t-fis {
+            background: var(--green-dim);
+            color: var(--green)
+        }
+
+        .t-inf {
+            background: var(--amber-dim);
+            color: var(--amber)
+        }
+
+        .t-cyc {
+            background: var(--teal-dim);
+            color: var(--teal)
+        }
+
+        .t-geo {
+            background: var(--coral-dim);
+            color: var(--coral)
+        }
+
+        .t-fx {
+            background: var(--purple-dim);
+            color: var(--purple)
+        }
+
+        .t-com {
+            background: var(--gold-dim);
+            color: var(--gold)
+        }
+
+        .t-cred {
+            background: var(--pink-dim);
+            color: var(--pink)
+        }
+
+        .chv {
+            font-size: 9px;
+            color: var(--text3);
+            flex-shrink: 0;
+            margin-top: 4px;
+            transition: transform .18s;
+        }
+
+        .item.open .chv {
+            transform: rotate(180deg);
+            color: var(--accent)
+        }
+
+        /* BODY */
+        .ibody {
+            display: none;
+            padding: 0 16px 16px;
+            border-top: 1px solid var(--border)
+        }
+
+        .item.open .ibody {
+            display: block
+        }
+
+        .desc {
+            font-size: 12px;
+            color: var(--text2);
+            line-height: 1.68;
+            padding: 10px 0 8px;
+            font-weight: 400;
+        }
+
+        .g2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 7px;
+            margin-top: 4px
+        }
+
+        .g3 {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 7px;
+            margin-top: 4px
+        }
+
+        .card {
+            background: var(--bg3);
+            border: 1px solid var(--border2);
+            border-radius: 6px;
+            padding: 10px 12px;
+        }
+
+        .card.full {
+            grid-column: 1/-1
+        }
+
+        .clbl {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 8px;
+            letter-spacing: .1em;
+            text-transform: uppercase;
+            color: var(--accent);
+            margin-bottom: 5px;
+            opacity: .7;
+        }
+
+        .ctxt {
+            font-size: 11px;
+            color: var(--text);
+            line-height: 1.55;
+            font-weight: 400
+        }
+
+        .ctxt a {
+            color: var(--accent);
+            text-decoration: none;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 10px
+        }
+
+        .ctxt a:hover {
+            text-decoration: underline
+        }
+
+        .formula {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 10px;
+            color: var(--accent2);
+            background: var(--bg4);
+            padding: 7px 11px;
+            border-radius: 4px;
+            border-left: 2px solid var(--accent-dim);
+            margin-top: 7px;
+            line-height: 1.6;
+        }
+
+        /* RANGES */
+        .rngs {
+            display: flex;
+            flex-direction: column;
+            gap: 4px
+        }
+
+        .rr {
+            display: flex;
+            align-items: flex-start;
+            gap: 7px
+        }
+
+        .rd {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            flex-shrink: 0;
+            margin-top: 4px
+        }
+
+        .dg {
+            background: var(--green)
+        }
+
+        .da {
+            background: var(--amber)
+        }
+
+        .dr {
+            background: var(--red)
+        }
+
+        .rt {
+            font-size: 11px;
+            color: var(--text2)
+        }
+
+        /* SOURCE CHIPS */
+        .srcs {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            margin-top: 5px
+        }
+
+        .src {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 9px;
+            padding: 3px 8px;
+            border-radius: 3px;
+            background: var(--bg4);
+            border: 1px solid var(--border2);
+            color: var(--text2);
+        }
+
+        .src.p {
+            border-color: var(--accent-dim);
+            color: var(--accent2)
+        }
+
+        /* RELEASE BADGE */
+        .release {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 9px;
+            padding: 2px 7px;
+            border-radius: 3px;
+            background: var(--amber-dim);
+            border: 1px solid var(--amber-dim);
+            color: var(--amber);
+            flex-shrink: 0;
+        }
+
+        /* MARKET CYCLES PANEL */
+        .cycle-intro {
+            font-size: 13px;
+            color: var(--text2);
+            line-height: 1.7;
+            margin-bottom: 28px;
+            max-width: 760px;
+            font-weight: 400;
+        }
+
+        .cycle-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 20px
+        }
+
+        .cycle-card {
+            border-radius: 10px;
+            border: 1px solid var(--border2);
+            overflow: hidden;
+            background: var(--bg2);
+        }
+
+        .cycle-header {
+            padding: 14px 16px 10px;
+            border-bottom: 1px solid var(--border2);
+        }
+
+        .cycle-title {
+            font-size: 15px;
+            font-weight: 700;
+            letter-spacing: -.02em;
+            margin-bottom: 2px;
+        }
+
+        .cycle-sub {
+            font-size: 11px;
+            color: var(--text2);
+            font-weight: 400
+        }
+
+        .cycle-body {
+            padding: 14px 16px
+        }
+
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            padding: 6px 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .stat-row:last-child {
+            border-bottom: none
+        }
+
+        .stat-label {
+            font-size: 11px;
+            color: var(--text2);
+            font-weight: 400
+        }
+
+        .stat-val {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .cv-green {
+            color: var(--green)
+        }
+
+        .cv-red {
+            color: var(--red)
+        }
+
+        .cv-amber {
+            color: var(--amber)
+        }
+
+        .cv-blue {
+            color: var(--accent2)
+        }
+
+        .cv-purple {
+            color: var(--purple)
+        }
+
+        /* HISTORICAL TABLE */
+        .htable {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 11px;
+            margin-top: 0
+        }
+
+        .htable thead th {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 8px;
+            letter-spacing: .1em;
+            text-transform: uppercase;
+            color: var(--text3);
+            padding: 7px 10px;
+            border-bottom: 1px solid var(--border3);
+            text-align: left;
+            font-weight: 500;
+        }
+
+        .htable tbody td {
+            padding: 8px 10px;
+            border-bottom: 1px solid var(--border);
+            vertical-align: top;
+            color: var(--text2);
+            line-height: 1.5;
+            font-size: 11px;
+        }
+
+        .htable tbody tr:hover td {
+            background: var(--bg3)
+        }
+
+        .htable tbody td:first-child {
+            color: var(--text);
+            font-weight: 700;
+            font-size: 12px
+        }
+
+        .htable tbody td.mono {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 10px
+        }
+
+        /* NEWS PANEL */
+        .news-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px
+        }
+
+        .news-card {
+            border: 1px solid var(--border2);
+            border-radius: 8px;
+            background: var(--bg2);
+            overflow: hidden;
+        }
+
+        .news-card-hd {
+            padding: 12px 14px;
+            border-bottom: 1px solid var(--border2);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .news-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            flex-shrink: 0
+        }
+
+        .news-title {
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: -.01em
+        }
+
+        .news-impact {
+            margin-left: auto;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 8px;
+            letter-spacing: .06em;
+            text-transform: uppercase;
+            padding: 2px 7px;
+            border-radius: 3px;
+            flex-shrink: 0;
+        }
+
+        .imp-critical {
+            background: var(--red-dim);
+            color: var(--red)
+        }
+
+        .imp-high {
+            background: var(--amber-dim);
+            color: var(--amber)
+        }
+
+        .imp-med {
+            background: var(--accent-dim);
+            color: var(--accent2)
+        }
+
+        .imp-low {
+            background: var(--bg4);
+            color: var(--text3)
+        }
+
+        .news-body {
+            padding: 10px 14px
+        }
+
+        .news-source {
+            font-size: 11px;
+            color: var(--text2);
+            line-height: 1.7;
+            font-weight: 400;
+        }
+
+        .news-source b {
+            color: var(--text);
+            font-weight: 700
+        }
+
+        .news-link {
+            display: block;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 10px;
+            color: var(--accent);
+            margin-top: 2px;
+            text-decoration: none;
+        }
+
+        .news-link:hover {
+            text-decoration: underline
+        }
+
+        /* CORRELATION TABLE */
+        .corr-intro {
+            font-size: 13px;
+            color: var(--text2);
+            line-height: 1.65;
+            margin-bottom: 24px;
+            font-weight: 400;
+            max-width: 740px
+        }
+
+        .ccluster {
+            margin-bottom: 32px
+        }
+
+        .ccluster-title {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 10px;
+            letter-spacing: .1em;
+            text-transform: uppercase;
+            color: var(--accent);
+            margin-bottom: 6px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .ccluster-title::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: var(--accent-dim)
+        }
+
+        .ccluster-desc {
+            font-size: 12px;
+            color: var(--text2);
+            margin-bottom: 10px;
+            font-weight: 400
+        }
+
+        table.ct {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 11px
+        }
+
+        .ct thead th {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 8px;
+            letter-spacing: .1em;
+            text-transform: uppercase;
+            color: var(--text3);
+            padding: 6px 10px;
+            border-bottom: 1px solid var(--border3);
+            text-align: left;
+            font-weight: 500;
+        }
+
+        .ct tbody td {
+            padding: 8px 10px;
+            border-bottom: 1px solid var(--border);
+            vertical-align: top;
+            color: var(--text2);
+            line-height: 1.5;
+        }
+
+        .ct tbody tr:hover td {
+            background: var(--bg3)
+        }
+
+        .ct tbody td:first-child {
+            color: var(--text);
+            font-weight: 700;
+            font-size: 12px
+        }
+
+        .cp {
+            color: var(--green);
+            font-weight: 600
+        }
+
+        .cn {
+            color: var(--red);
+            font-weight: 600
+        }
+
+        .cw {
+            color: var(--amber);
+            font-weight: 600
+        }
+
+        .dir {
+            display: inline-block;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 9px;
+            padding: 2px 6px;
+            border-radius: 3px;
+            margin-right: 4px;
+        }
+
+        .dp {
+            background: var(--green-dim);
+            color: var(--green)
+        }
+
+        .dn {
+            background: var(--red-dim);
+            color: var(--red)
+        }
+
+        .dm {
+            background: var(--amber-dim);
+            color: var(--amber)
+        }
+
+        /* HIDDEN */
+        .hidden {
+            display: none !important
+        }
+
+        /* SCROLLBAR */
+        ::-webkit-scrollbar {
+            width: 5px;
+            height: 4px
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg)
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border3);
+            border-radius: 3px
+        }
+
+        @media(max-width:720px) {
+            .header {
+                padding: 28px 16px 22px
+            }
+
+            .header h1 {
+                font-size: 28px
+            }
+
+            .nav {
+                padding: 0 16px
+            }
+
+            .panel {
+                padding: 20px 16px 40px
+            }
+
+            .g2,
+            .g3,
+            .cycle-grid,
+            .news-grid {
+                grid-template-columns: 1fr
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="header">
+        <div class="eyebrow">Trading System · Module 3</div>
+        <h1>Macro<br><span class="italic">Analysis</span></h1>
+        <div class="header-sub">All factors ranked · Data sources · News feeds · Geopolitical signals · Market cycle
+            historical values · Correlations</div>
+    </div>
+
+    <nav class="nav">
+        <button class="ntab active" onclick="sw('monetary')">Monetary Policy</button>
+        <button class="ntab" onclick="sw('growth')">Growth &amp; Cycles</button>
+        <button class="ntab" onclick="sw('inflation')">Inflation &amp; Prices</button>
+        <button class="ntab" onclick="sw('global')">Global &amp; Geopolitical</button>
+        <button class="ntab" onclick="sw('news')">News Sources</button>
+        <button class="ntab" onclick="sw('cycles')">Market Cycles</button>
+        <button class="ntab" onclick="sw('corr')">Macro Correlations</button>
+    </nav>
+
+    <!-- ═══════════════════════════════
+     MONETARY POLICY
+═══════════════════════════════ -->
+    <div class="panel active" id="panel-monetary">
+        <div class="tier">
+            <div class="tier-line"></div><span class="tier-txt">Tier 1 — Central banks &amp; interest rates</span>
+            <div class="tier-line"></div>
+        </div>
+
+        <div class="item">
+            <div class="item-hd" onclick="tog(this.parentElement)">
+                <span class="num">01</span>
+                <div class="imeta">
+                    <div class="iname">Central Bank Policy Rate <span class="tag t-mon">Monetary</span><span
+                            class="release">8×/year</span></div>
+                    <div class="iline">Fed Funds Rate, ECB Rate, BoE Bank Rate, BoJ Policy Rate — the master variable of
+                        all asset markets</div>
+                </div><span class="chv">▼</span>
+            </div>
+            <div class="ibody">
+                <div class="desc">The single most important macro variable for all asset classes. Rate decisions set the
+                    cost of money globally. Rate hikes compress equity valuations (especially growth stocks), strengthen
+                    the currency, slow housing, and tighten credit. Rate cuts do the reverse. The pace of change and
+                    forward guidance matter as much as the level. The Fed leads global monetary conditions — when the
+                    Fed hikes, most central banks must follow or face currency weakness and imported inflation.</div>
+                <div class="g2">
+                    <div class="card">
+                        <div class="clbl">Strategy impact by rate regime</div>
+                        <div class="rngs">
+                            <div class="rr">
+                                <div class="rd dg"></div><span class="rt">Cutting cycle: bullish equities, especially
+                                    growth/tech. Buy duration.</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd da"></div><span class="rt">Neutral/pause: range-bound, stock-picking
+                                    matters more.</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd dr"></div><span class="rt">Hiking cycle: value over growth, banks
+                                    outperform, reduce duration.</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="clbl">Primary data sources</div>
+                        <div class="srcs">
+                            <span class="src p">federalreserve.gov (FOMC statements)</span>
+                            <span class="src p">FRED API — FEDFUNDS series</span>
+                            <span class="src">ECB: ecb.europa.eu</span>
+                            <span class="src">BoE: bankofengland.co.uk</span>
+                            <span class="src">BoJ: boj.or.jp</span>
+                            <span class="src">CME FedWatch Tool (rate probabilities)</span>
+                        </div>
+                    </div>
+                    <div class="card full">
+                        <div class="clbl">What to automate</div>
+                        <div class="ctxt">Scrape FOMC statements + minutes. LLM scores hawkish/dovish language on a −5
+                            to +5 scale. Track CME FedWatch implied rate probabilities via CME API — this is the
+                            market's real-time rate forecast. Alert when implied probability of a hike/cut in next
+                            meeting crosses 60%.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="item">
+            <div class="item-hd" onclick="tog(this.parentElement)">
+                <span class="num">02</span>
+                <div class="imeta">
+                    <div class="iname">Yield Curve (2s10s, 3m10y Spread) <span class="tag t-mon">Monetary</span><span
+                            class="release">Daily</span></div>
+                    <div class="iline">The most reliable recession predictor in modern economics — every US recession
+                        since 1970 was preceded by inversion</div>
+                </div><span class="chv">▼</span>
+            </div>
+            <div class="ibody">
+                <div class="desc">The spread between long-term and short-term Treasury yields. Normal (positive) yield
+                    curve = banks profitable, credit flows freely, economy expanding. Inverted (negative) = short rates
+                    exceed long rates, signaling market expects Fed will cut rates due to future weakness. The
+                    3-month/10-year spread is the most statistically reliable recession predictor. Inversion leads
+                    recession by 12–18 months. Re-steepening AFTER inversion (as short rates fall) is the actual
+                    recession arrival signal — not inversion itself.</div>
+                <div class="g2">
+                    <div class="card">
+                        <div class="clbl">Historical recession signal values</div>
+                        <div class="rngs">
+                            <div class="rr">
+                                <div class="rd dg"></div><span class="rt">2s10s &gt;100bps: healthy, expansionary
+                                    environment</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd da"></div><span class="rt">2s10s 0–100bps: flattening, late cycle
+                                    caution</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd dr"></div><span class="rt">2s10s &lt;0 (inverted): recession warning,
+                                    12–18 month lag</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd dr"></div><span class="rt">Re-steepening from inversion: recession likely
+                                    arriving NOW</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="clbl">Data sources</div>
+                        <div class="srcs">
+                            <span class="src p">FRED API: T10Y2Y series (2s10s)</span>
+                            <span class="src p">FRED API: T10Y3M series (3m10y)</span>
+                            <span class="src">Treasury.gov daily yield curve</span>
+                            <span class="src">Bloomberg (if available)</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="item">
+            <div class="item-hd" onclick="tog(this.parentElement)">
+                <span class="num">03</span>
+                <div class="imeta">
+                    <div class="iname">Real Interest Rates (Nominal minus Inflation) <span
+                            class="tag t-mon">Monetary</span><span class="release">Monthly</span></div>
+                    <div class="iline">The true cost of money — the most important driver of gold, growth stocks, and
+                        capital allocation</div>
+                </div><span class="chv">▼</span>
+            </div>
+            <div class="ibody">
+                <div class="desc">Real Rate = Nominal Rate − Inflation (or use TIPS yield as direct measure). Negative
+                    real rates punish cash holding and drive capital into risk assets, gold, and real estate — the
+                    2020–2021 asset bubble was directly caused by deeply negative real rates. Rapidly rising real rates
+                    (2022) are the most destabilizing macro event for asset prices, especially high-duration growth
+                    stocks. The 10Y TIPS yield is the cleanest real-time measure of real rates.</div>
+                <div class="g2">
+                    <div class="card">
+                        <div class="clbl">Real rate regimes</div>
+                        <div class="rngs">
+                            <div class="rr">
+                                <div class="rd dg"></div><span class="rt">Real rates deeply negative (&lt;−2%): max
+                                    risk-on, buy growth/gold</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd da"></div><span class="rt">Real rates −1% to +1%: balanced, normal equity
+                                    environment</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd dr"></div><span class="rt">Real rates &gt;2%: significant headwind for
+                                    growth stocks &amp; gold</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="clbl">Data sources</div>
+                        <div class="srcs">
+                            <span class="src p">FRED API: DFII10 (10Y TIPS yield = real rate)</span>
+                            <span class="src p">FRED API: T10YIE (10Y breakeven inflation)</span>
+                            <span class="src">Treasury.gov TIPS rates</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="item">
+            <div class="item-hd" onclick="tog(this.parentElement)">
+                <span class="num">04</span>
+                <div class="imeta">
+                    <div class="iname">Quantitative Easing / Tightening (QE/QT) &amp; Fed Balance Sheet <span
+                            class="tag t-mon">Monetary</span><span class="release">Weekly</span></div>
+                    <div class="iline">Central bank asset purchases that directly expand or contract global liquidity
+                    </div>
+                </div><span class="chv">▼</span>
+            </div>
+            <div class="ibody">
+                <div class="desc">QE injects liquidity by buying bonds — expands money supply, suppresses yields,
+                    inflates risk assets. QT removes liquidity by not reinvesting maturing bonds. The Fed balance sheet
+                    expanded from $900B (2008) to $9T (2022) before QT began. Rate of balance sheet change matters as
+                    much as level. Global liquidity (sum of major central bank balance sheets) is one of the strongest
+                    predictors of risk asset performance.</div>
+                <div class="g2">
+                    <div class="card">
+                        <div class="clbl">Data sources</div>
+                        <div class="srcs">
+                            <span class="src p">FRED API: WALCL (Fed total assets, weekly)</span>
+                            <span class="src">federalreserve.gov H.4.1 release</span>
+                            <span class="src">ECB: ecb.europa.eu/press/pr/wfs</span>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="clbl">What to track</div>
+                        <div class="ctxt">Week-over-week change in Fed total assets. Net QT pace (currently
+                            ~$60–95B/month). Alert if pace changes materially — suggests policy shift before formal
+                            announcement.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="item">
+            <div class="item-hd" onclick="tog(this.parentElement)">
+                <span class="num">05</span>
+                <div class="imeta">
+                    <div class="iname">Credit Spreads (HY &amp; IG vs. Treasuries) <span
+                            class="tag t-cred">Credit</span><span class="release">Daily</span></div>
+                    <div class="iline">The "smart money" signal — credit stress appears here before equity prices
+                        reflect it</div>
+                </div><span class="chv">▼</span>
+            </div>
+            <div class="ibody">
+                <div class="desc">Credit spread = yield of corporate bond minus equivalent Treasury yield. Widening
+                    spreads = rising perceived credit risk / risk-off. The High Yield (junk) spread is most sensitive.
+                    Credit market participants are more sophisticated than equity markets — stress in credit
+                    consistently precedes equity drawdowns by 4–8 weeks. The 2007 subprime spread blow-up preceded the
+                    equity crash by 6+ months. TED Spread (Libor minus T-bill) measures interbank stress.</div>
+                <div class="g2">
+                    <div class="card">
+                        <div class="clbl">Historical spread levels</div>
+                        <div class="rngs">
+                            <div class="rr">
+                                <div class="rd dg"></div><span class="rt">HY spread &lt;300bps: low risk, benign credit
+                                    environment</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd da"></div><span class="rt">HY spread 300–500bps: elevated caution, late
+                                    cycle</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd dr"></div><span class="rt">HY spread &gt;600bps: recession/crisis
+                                    pricing. 2020: 1100bps peak. 2009: 1900bps peak.</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="clbl">Data sources</div>
+                        <div class="srcs">
+                            <span class="src p">FRED API: BAMLH0A0HYM2 (HY spread)</span>
+                            <span class="src p">FRED API: BAMLC0A0CM (IG spread)</span>
+                            <span class="src">FRED API: TEDRATE (TED spread)</span>
+                            <span class="src">ICE BofA via FRED</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="tier">
+            <div class="tier-line"></div><span class="tier-txt">Tier 2 — Bond market signals</span>
+            <div class="tier-line"></div>
+        </div>
+
+        <div class="item">
+            <div class="item-hd" onclick="tog(this.parentElement)">
+                <span class="num">06</span>
+                <div class="imeta">
+                    <div class="iname">10-Year Treasury Yield <span class="tag t-mon">Monetary</span><span
+                            class="release">Daily</span></div>
+                    <div class="iline">The global risk-free rate — the most-watched single number after the Fed Funds
+                        rate</div>
+                </div><span class="chv">▼</span>
+            </div>
+            <div class="ibody">
+                <div class="desc">The benchmark for all asset valuations globally. Rising 10Y compresses equity P/E
+                    multiples (especially tech/growth), raises mortgage rates, strengthens USD, and pressures EM assets.
+                    Every 100bps rise in the 10Y historically reduces equity fair value by approximately 10–15% via
+                    discount rate effect. Equity earnings yield (1/P/E) should be compared to 10Y yield to assess
+                    relative value.</div>
+                <div class="g2">
+                    <div class="card">
+                        <div class="clbl">Data sources</div>
+                        <div class="srcs">
+                            <span class="src p">FRED API: DGS10 (10Y Treasury yield)</span>
+                            <span class="src p">FRED API: DGS2, DGS30 (2Y, 30Y)</span>
+                            <span class="src">Treasury.gov daily rates</span>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="clbl">Equity earnings yield comparison</div>
+                        <div class="ctxt">Earnings Yield = 1/P/E × 100. If S&amp;P P/E = 20, EY = 5%. If 10Y = 5%,
+                            equities offer no risk premium over "risk-free" bonds. This was the 2022–2023 headwind for
+                            equities. EY − 10Y = Equity Risk Premium. Below 1% = equities expensive relative to bonds.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="item">
+            <div class="item-hd" onclick="tog(this.parentElement)">
+                <span class="num">07</span>
+                <div class="imeta">
+                    <div class="iname">Breakeven Inflation Rate (TIPS Spread) <span
+                            class="tag t-inf">Inflation</span><span class="release">Daily</span></div>
+                    <div class="iline">The bond market's own inflation forecast — forward-looking signal for rate
+                        trajectory</div>
+                </div><span class="chv">▼</span>
+            </div>
+            <div class="ibody">
+                <div class="desc">5Y and 10Y breakeven inflation rates = nominal yield minus TIPS yield. Represents what
+                    bond markets expect inflation to average over the period. When breakevens rise sharply, the market
+                    expects the Fed to hike — a leading signal for rate-sensitive assets. 5Y5Y forward inflation swap
+                    (5-year inflation expectation starting in 5 years) is the Fed's preferred long-run anchoring
+                    measure.</div>
+                <div class="g2">
+                    <div class="card">
+                        <div class="clbl">Data sources</div>
+                        <div class="srcs">
+                            <span class="src p">FRED API: T5YIE (5Y breakeven)</span>
+                            <span class="src p">FRED API: T10YIE (10Y breakeven)</span>
+                            <span class="src">Bloomberg (5Y5Y forward)</span>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="clbl">Historical context</div>
+                        <div class="rngs">
+                            <div class="rr">
+                                <div class="rd dg"></div><span class="rt">Breakeven stable 2.0–2.5%: anchored, Fed
+                                    comfortable</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd da"></div><span class="rt">Rising above 2.5%: inflation becoming
+                                    unanchored risk</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd dr"></div><span class="rt">Above 3%: Fed will act aggressively — 2022
+                                    scenario</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="item">
+            <div class="item-hd" onclick="tog(this.parentElement)">
+                <span class="num">08</span>
+                <div class="imeta">
+                    <div class="iname">Money Supply (M2 Growth Rate) <span class="tag t-mon">Monetary</span><span
+                            class="release">Monthly</span></div>
+                    <div class="iline">Broad money creation — leads inflation by 12–24 months via the monetarist
+                        transmission lag</div>
+                </div><span class="chv">▼</span>
+            </div>
+            <div class="ibody">
+                <div class="desc">M2 includes cash, checking deposits, and near-money. Rapid M2 growth precedes
+                    inflation by 12–24 months. M2 contracted in 2022–2023 for the first time since the 1930s — a
+                    historically deflationary signal that took time to filter through. The M2 growth rate is one of
+                    Milton Friedman's core monetarist leading indicators. Watch year-over-year change rate, not absolute
+                    level.</div>
+                <div class="g2">
+                    <div class="card">
+                        <div class="clbl">Data sources</div>
+                        <div class="srcs">
+                            <span class="src p">FRED API: M2SL (M2 money stock, monthly)</span>
+                            <span class="src">FRED API: M2V (M2 velocity)</span>
+                            <span class="src">Federal Reserve H.6 release</span>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="clbl">Historical ranges</div>
+                        <div class="rngs">
+                            <div class="rr">
+                                <div class="rd dg"></div><span class="rt">M2 YoY growth 4–8%: normal, stable inflation
+                                    environment</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd dr"></div><span class="rt">M2 growth &gt;15%: inflationary surge
+                                    approaching (2020: +27%)</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd dr"></div><span class="rt">M2 YoY negative: deflationary pressure 12–18M
+                                    ahead</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════
+     GROWTH & CYCLES
+═══════════════════════════════ -->
+    <div class="panel" id="panel-growth">
+        <div class="tier">
+            <div class="tier-line"></div><span class="tier-txt">Tier 1 — Leading indicators (predict what's
+                coming)</span>
+            <div class="tier-line"></div>
+        </div>
+
+        <div class="item">
+            <div class="item-hd" onclick="tog(this.parentElement)">
+                <span class="num">01</span>
+                <div class="imeta">
+                    <div class="iname">PMI — Manufacturing &amp; Services (ISM, S&amp;P Global) <span
+                            class="tag t-cyc">Leading</span><span class="release">1st biz day/month</span></div>
+                    <div class="iline">The single best real-time leading indicator of economic momentum — above 50 =
+                        expansion</div>
+                </div><span class="chv">▼</span>
+            </div>
+            <div class="ibody">
+                <div class="desc">Purchasing Managers' Index surveys procurement managers on orders, output, employment,
+                    inventories, and prices. Above 50 = expansion; below 50 = contraction. The New Orders sub-component
+                    leads the headline by 1–2 months. Released the first business day of every month — one of the most
+                    market-moving scheduled data points. Global PMIs from China (Caixin), Eurozone, UK, and Japan
+                    provide cross-market signals for commodity and EM trades.</div>
+                <div class="g2">
+                    <div class="card">
+                        <div class="clbl">PMI threshold signals</div>
+                        <div class="rngs">
+                            <div class="rr">
+                                <div class="rd dg"></div><span class="rt">PMI &gt;55: strong expansion, cyclicals
+                                    outperform</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd dg"></div><span class="rt">PMI 50–55: moderate growth, broad market
+                                    positive</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd da"></div><span class="rt">PMI 45–50: slowing, shift toward
+                                    defensives</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd dr"></div><span class="rt">PMI &lt;45: contraction, recession risk
+                                    elevated</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd dr"></div><span class="rt">PMI &lt;40: severe contraction (COVID 2020:
+                                    ISM hit 41.5)</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="clbl">Data sources</div>
+                        <div class="srcs">
+                            <span class="src p">ismworld.org (ISM Manufacturing + Services)</span>
+                            <span class="src p">S&amp;P Global PMI (spglobal.com)</span>
+                            <span class="src">Caixin PMI: caixin.com/finance</span>
+                            <span class="src">Markit EU PMI: markiteconomics.com</span>
+                            <span class="src">FRED API: MANEMP, ISM series</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="item">
+            <div class="item-hd" onclick="tog(this.parentElement)">
+                <span class="num">02</span>
+                <div class="imeta">
+                    <div class="iname">Conference Board LEI (Leading Economic Index) <span
+                            class="tag t-cyc">Leading</span><span class="release">Monthly</span></div>
+                    <div class="iline">Composite of 10 leading indicators — three consecutive declines historically
+                        signal recession within 12 months</div>
+                </div><span class="chv">▼</span>
+            </div>
+            <div class="ibody">
+                <div class="desc">Combines 10 forward-looking indicators: average weekly hours (manufacturing), jobless
+                    claims, new orders, ISM new orders, building permits, S&amp;P 500, M2, interest rate spread, credit
+                    index, consumer expectations. Three consecutive monthly declines have preceded every U.S. recession
+                    since 1960. The "rule of three" — the most reliable single recession timing tool. When LEI starts
+                    declining, reduce equity exposure and increase cash/defensives.</div>
+                <div class="g2">
+                    <div class="card">
+                        <div class="clbl">Data sources</div>
+                        <div class="srcs">
+                            <span class="src p">Conference Board:
+                                conference-board.org/topics/us-leading-indicators</span>
+                            <span class="src p">FRED API: USSLIND (LEI)</span>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="clbl">Signal rule</div>
+                        <div class="ctxt">Track 6-month annualized rate of change. Below −3% with broad weakness = high
+                            recession probability. Watch both level and rate of change — level below 100 + accelerating
+                            decline is most bearish combination.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="item">
+            <div class="item-hd" onclick="tog(this.parentElement)">
+                <span class="num">03</span>
+                <div class="imeta">
+                    <div class="iname">Initial Jobless Claims (Weekly) <span class="tag t-cyc">Leading</span><span
+                            class="release">Every Thursday</span></div>
+                    <div class="iline">The highest-frequency labor market signal — released 48 hours after the reference
+                        week</div>
+                </div><span class="chv">▼</span>
+            </div>
+            <div class="ibody">
+                <div class="desc">New unemployment insurance claims filed each week. The 4-week moving average smooths
+                    volatility. Sustained rise above 300K (from a ~200K baseline) historically precedes unemployment
+                    spikes. Any single-week print above 500K is emergency territory (COVID March 2020: 6.9M). Markets
+                    react immediately to Thursday 8:30am releases. Continuing claims (total people receiving benefits)
+                    are a coincident indicator of labor market health.</div>
+                <div class="g2">
+                    <div class="card">
+                        <div class="clbl">Historical thresholds</div>
+                        <div class="rngs">
+                            <div class="rr">
+                                <div class="rd dg"></div><span class="rt">Claims &lt;225K: tight labor market, strong
+                                    economy</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd da"></div><span class="rt">Claims 225–300K: normalizing, late
+                                    cycle</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd dr"></div><span class="rt">Claims &gt;300K (sustained): labor market
+                                    breaking down</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd dr"></div><span class="rt">Claims &gt;500K: crisis/severe
+                                    recession</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="clbl">Data sources</div>
+                        <div class="srcs">
+                            <span class="src p">FRED API: ICSA (initial claims)</span>
+                            <span class="src p">FRED API: CCSA (continuing claims)</span>
+                            <span class="src">DOL.gov weekly release (Thursday 8:30am ET)</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="item">
+            <div class="item-hd" onclick="tog(this.parentElement)">
+                <span class="num">04</span>
+                <div class="imeta">
+                    <div class="iname">Housing Starts &amp; Building Permits <span class="tag t-cyc">Leading</span><span
+                            class="release">Monthly</span></div>
+                    <div class="iline">Housing leads the economic cycle by 6–12 months — the first sector to feel rate
+                        changes</div>
+                </div><span class="chv">▼</span>
+            </div>
+            <div class="ibody">
+                <div class="desc">Housing is the most rate-sensitive major sector — mortgages immediately reprice when
+                    rates change. Permits lead starts by 1–2 months. Housing accounts for 15–18% of GDP including
+                    related services (appliances, furniture, construction employment). Existing Home Sales reflect
+                    affordability conditions. The Case-Shiller Home Price Index tracks real estate asset values. When
+                    housing turns, the broader economy typically follows within 6–12 months.</div>
+                <div class="g2">
+                    <div class="card">
+                        <div class="clbl">Data sources</div>
+                        <div class="srcs">
+                            <span class="src p">FRED API: HOUST (housing starts)</span>
+                            <span class="src p">FRED API: PERMIT (building permits)</span>
+                            <span class="src">Census Bureau: census.gov/construction</span>
+                            <span class="src">NAR: realtor.org (existing home sales)</span>
+                            <span class="src">FRED API: CSUSHPISA (Case-Shiller)</span>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="clbl">Historical levels</div>
+                        <div class="rngs">
+                            <div class="rr">
+                                <div class="rd dg"></div><span class="rt">Starts &gt;1.5M annualized: strong housing
+                                    sector</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd da"></div><span class="rt">Starts 1.0–1.5M: moderate, normal range</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd dr"></div><span class="rt">Starts &lt;800K: severe contraction (2009 low:
+                                    478K)</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="tier">
+            <div class="tier-line"></div><span class="tier-txt">Tier 2 — Coincident indicators (confirm what's happening
+                now)</span>
+            <div class="tier-line"></div>
+        </div>
+
+        <div class="item">
+            <div class="item-hd" onclick="tog(this.parentElement)">
+                <span class="num">05</span>
+                <div class="imeta">
+                    <div class="iname">GDP Growth Rate (Quarterly) <span class="tag t-cyc">Coincident</span><span
+                            class="release">3 releases/quarter</span></div>
+                    <div class="iline">The broadest measure of economic output — two negative quarters = technical
+                        recession</div>
+                </div><span class="chv">▼</span>
+            </div>
+            <div class="ibody">
+                <div class="desc">GDP = Consumption + Investment + Government + Net Exports. The advance estimate
+                    (released ~1 month after quarter-end) moves markets most. Revised and final estimates refine the
+                    picture. GDPNow (Atlanta Fed) provides real-time GDP tracking. GDP components reveal where growth is
+                    concentrated or collapsing — consumption declining is the most serious signal as it's 70% of GDP. A
+                    "soft landing" = GDP stays positive while inflation cools; a "hard landing" = GDP turns negative.
+                </div>
+                <div class="g2">
+                    <div class="card">
+                        <div class="clbl">GDP growth regimes</div>
+                        <div class="rngs">
+                            <div class="rr">
+                                <div class="rd dg"></div><span class="rt">GDP &gt;3% annualized: strong expansion,
+                                    cyclicals lead</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd dg"></div><span class="rt">GDP 1–3%: moderate growth, mixed market
+                                    environment</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd da"></div><span class="rt">GDP 0–1%: stall speed, recession risk
+                                    rises</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd dr"></div><span class="rt">GDP negative ×2: technical recession (2020
+                                    Q1/Q2: −5%, −31.4%)</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="clbl">Data sources</div>
+                        <div class="srcs">
+                            <span class="src p">BEA.gov (official GDP releases)</span>
+                            <span class="src p">FRED API: GDPC1 (real GDP)</span>
+                            <span class="src p">Atlanta Fed GDPNow (real-time):
+                                atlantafed.org/cqer/research/gdpnow</span>
+                            <span class="src">NY Fed Nowcast</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="item">
+            <div class="item-hd" onclick="tog(this.parentElement)">
+                <span class="num">06</span>
+                <div class="imeta">
+                    <div class="iname">Non-Farm Payrolls (NFP) &amp; Unemployment Rate <span
+                            class="tag t-cyc">Coincident</span><span class="release">1st Friday/month</span></div>
+                    <div class="iline">The most market-moving monthly scheduled event — average hourly earnings is the
+                        key inflation sub-component</div>
+                </div><span class="chv">▼</span>
+            </div>
+            <div class="ibody">
+                <div class="desc">NFP measures net new jobs added in the non-agricultural sector. Released first Friday
+                    of each month at 8:30am ET. The unemployment rate, participation rate, and Average Hourly Earnings
+                    (wage growth) are equally important. The Sahm Rule: when the 3-month average unemployment rate rises
+                    0.5pp above its 12-month low, a recession has historically already begun. Wage growth above 4% in a
+                    2% inflation target regime puts upward pressure on services CPI.</div>
+                <div class="g2">
+                    <div class="card">
+                        <div class="clbl">Historical thresholds</div>
+                        <div class="rngs">
+                            <div class="rr">
+                                <div class="rd dg"></div><span class="rt">NFP &gt;200K/month: strong labor market, Fed
+                                    can stay hawkish</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd da"></div><span class="rt">NFP 75–200K: moderate, neutral for
+                                    policy</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd dr"></div><span class="rt">NFP &lt;0 (job losses): recession signal, Fed
+                                    will cut</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd dg"></div><span class="rt">Unemployment &lt;4%: very tight labor
+                                    market</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd dr"></div><span class="rt">Sahm Rule triggers &gt;0.5pp rise: recession
+                                    already underway</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="clbl">Data sources</div>
+                        <div class="srcs">
+                            <span class="src p">BLS.gov (official NFP release 8:30am ET Fri)</span>
+                            <span class="src p">FRED API: PAYEMS (total nonfarm payrolls)</span>
+                            <span class="src p">FRED API: UNRATE (unemployment rate)</span>
+                            <span class="src">FRED API: CES0500000003 (avg hourly earnings)</span>
+                            <span class="src">ADP National Employment Report (preview)</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="item">
+            <div class="item-hd" onclick="tog(this.parentElement)">
+                <span class="num">07</span>
+                <div class="imeta">
+                    <div class="iname">Retail Sales (Monthly) <span class="tag t-cyc">Coincident</span><span
+                            class="release">Mid-month</span></div>
+                    <div class="iline">Real-time consumer spending pulse — 70% of US GDP in monthly form</div>
+                </div><span class="chv">▼</span>
+            </div>
+            <div class="ibody">
+                <div class="desc">Measures consumer spending at point of sale. The "control group" (ex-autos, gas, food
+                    services, building materials) is the cleanest GDP input. Month-over-month changes are volatile — use
+                    3-month trend. Strong retail sales with falling inflation = real consumption growth (bullish).
+                    Strong retail sales with high inflation = consumers losing purchasing power (stagflation signal).
+                    Declining retail sales = consumption cracking.</div>
+                <div class="g2">
+                    <div class="card">
+                        <div class="clbl">Data sources</div>
+                        <div class="srcs">
+                            <span class="src p">Census Bureau: census.gov/retail (monthly advance retail)</span>
+                            <span class="src p">FRED API: RSAFS (retail &amp; food services)</span>
+                            <span class="src">FRED API: RRSFS (real retail sales)</span>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="clbl">Signal interpretation</div>
+                        <div class="rngs">
+                            <div class="rr">
+                                <div class="rd dg"></div><span class="rt">Real retail sales &gt;3% YoY: healthy consumer
+                                    spending</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd da"></div><span class="rt">0–3% YoY: slowing, monitor closely</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd dr"></div><span class="rt">Negative YoY: consumer recession
+                                    underway</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="tier">
+            <div class="tier-line"></div><span class="tier-txt">Tier 3 — Lagging &amp; sentiment indicators</span>
+            <div class="tier-line"></div>
+        </div>
+
+        <div class="item">
+            <div class="item-hd" onclick="tog(this.parentElement)">
+                <span class="num">08</span>
+                <div class="imeta">
+                    <div class="iname">Consumer Confidence (CB) &amp; Sentiment (Michigan) <span
+                            class="tag t-cyc">Leading</span><span class="release">Monthly</span></div>
+                    <div class="iline">Forward-looking spending intentions — extreme pessimism is a contrarian buy
+                        signal</div>
+                </div><span class="chv">▼</span>
+            </div>
+            <div class="ibody">
+                <div class="desc">Consumer sentiment surveys capture spending intentions before they show up in hard
+                    data. Michigan Survey: overall index + present conditions + expectations. Conference Board: similar
+                    structure. The expectations component is more forward-looking. Sharp drops in confidence (even
+                    before spending falls) are actionable for consumer discretionary sector weighting. Extremely low
+                    readings (Michigan below 60) have historically coincided with market bottoms.</div>
+                <div class="g2">
+                    <div class="card">
+                        <div class="clbl">Data sources</div>
+                        <div class="srcs">
+                            <span class="src p">University of Michigan: sca.isr.umich.edu</span>
+                            <span class="src p">FRED API: UMCSENT (Michigan sentiment)</span>
+                            <span class="src">Conference Board: conference-board.org</span>
+                            <span class="src">FRED API: CSCICP03USM665S (CB confidence)</span>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="clbl">Contrarian signals</div>
+                        <div class="rngs">
+                            <div class="rr">
+                                <div class="rd dg"></div><span class="rt">Michigan &lt;60: historically near market
+                                    bottoms (2022 low: 50)</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd da"></div><span class="rt">Michigan 60–85: normal range</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd dr"></div><span class="rt">Michigan &gt;100 + VIX &lt;12: complacency,
+                                    correction risk</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="item">
+            <div class="item-hd" onclick="tog(this.parentElement)">
+                <span class="num">09</span>
+                <div class="imeta">
+                    <div class="iname">Durable Goods Orders &amp; Core CapEx <span class="tag t-cyc">Leading</span><span
+                            class="release">Monthly</span></div>
+                    <div class="iline">Business investment intentions — the leading indicator for industrial sector
+                        earnings</div>
+                </div><span class="chv">▼</span>
+            </div>
+            <div class="ibody">
+                <div class="desc">Durable goods orders (products lasting 3+ years) signal business investment
+                    confidence. "Core capex" (non-defense, ex-aircraft) is the cleanest forward indicator of business
+                    spending. Leads industrial production by 3–6 months. Weak core capex signals business caution —
+                    often precedes earnings weakness in industrials, materials, and manufacturing sectors. Strong and
+                    accelerating capex = businesses confident in future demand.</div>
+                <div class="g2">
+                    <div class="card">
+                        <div class="clbl">Data sources</div>
+                        <div class="srcs">
+                            <span class="src p">Census Bureau: census.gov/manufacturing/m3</span>
+                            <span class="src p">FRED API: DGORDER (durable goods orders)</span>
+                            <span class="src">FRED API: NEWORDER (capital goods nondefense ex-aircraft)</span>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="clbl">Signal</div>
+                        <div class="rngs">
+                            <div class="rr">
+                                <div class="rd dg"></div><span class="rt">Core capex orders trending up &gt;3M: business
+                                    expansion mode</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd dr"></div><span class="rt">Core capex declining 3+ months: industrials
+                                    earnings warning</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════
+     INFLATION & PRICES
+═══════════════════════════════ -->
+    <div class="panel" id="panel-inflation">
+        <div class="tier">
+            <div class="tier-line"></div><span class="tier-txt">Tier 1 — Core inflation measures</span>
+            <div class="tier-line"></div>
+        </div>
+
+        <div class="item">
+            <div class="item-hd" onclick="tog(this.parentElement)">
+                <span class="num">01</span>
+                <div class="imeta">
+                    <div class="iname">CPI — Consumer Price Index (Headline &amp; Core) <span
+                            class="tag t-inf">Inflation</span><span class="release">Monthly, 2nd week</span></div>
+                    <div class="iline">The primary inflation benchmark — typically the most market-moving monthly data
+                        release</div>
+                </div><span class="chv">▼</span>
+            </div>
+            <div class="ibody">
+                <div class="desc">CPI measures price changes for a basket of consumer goods. Core CPI excludes food and
+                    energy (more volatile) — this is what the Fed targets. Shelter (Owner's Equivalent Rent) = 35% of
+                    CPI and has an 18-month lag to actual market rents, making it the longest-lasting inflation driver
+                    in rate cycles. Surprise to the upside on CPI day causes immediate bond selloff and equity rotation
+                    to defensives. Surprise to the downside = risk-on rally in growth stocks.</div>
+                <div class="g2">
+                    <div class="card">
+                        <div class="clbl">Historical CPI thresholds</div>
+                        <div class="rngs">
+                            <div class="rr">
+                                <div class="rd dg"></div><span class="rt">CPI 1.5–2.5%: Goldilocks — Fed comfortable,
+                                    equities thrive</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd da"></div><span class="rt">CPI 2.5–4%: above target, Fed tightening
+                                    bias</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd dr"></div><span class="rt">CPI &gt;5%: aggressive hiking cycle (2022: CPI
+                                    peaked at 9.1%)</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd dr"></div><span class="rt">CPI &lt;0 (deflation): recession/demand
+                                    collapse signal</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="clbl">Data sources</div>
+                        <div class="srcs">
+                            <span class="src p">BLS.gov CPI release (2nd Tuesday of month, 8:30am ET)</span>
+                            <span class="src p">FRED API: CPIAUCSL (headline CPI)</span>
+                            <span class="src p">FRED API: CPILFESL (core CPI ex food &amp; energy)</span>
+                            <span class="src">FRED API: CUSR0000SAH1 (shelter CPI component)</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="item">
+            <div class="item-hd" onclick="tog(this.parentElement)">
+                <span class="num">02</span>
+                <div class="imeta">
+                    <div class="iname">PCE Deflator (Personal Consumption Expenditures) <span
+                            class="tag t-inf">Inflation</span><span class="release">Monthly</span></div>
+                    <div class="iline">The Fed's preferred inflation measure — broader than CPI, with substitution
+                        adjustment</div>
+                </div><span class="chv">▼</span>
+            </div>
+            <div class="ibody">
+                <div class="desc">The Federal Reserve explicitly targets 2% PCE (not CPI). PCE typically runs 0.3–0.5pp
+                    below CPI due to chain-weighting (adjusts when consumers substitute cheaper alternatives). Core PCE
+                    (ex food and energy) is the key metric in Fed communications. When Powell says "inflation," he means
+                    PCE. Core PCE persistently above 2.5% means the Fed will not cut rates regardless of other economic
+                    data.</div>
+                <div class="g2">
+                    <div class="card">
+                        <div class="clbl">Data sources</div>
+                        <div class="srcs">
+                            <span class="src p">BEA.gov (PCE release — last business day of month)</span>
+                            <span class="src p">FRED API: PCEPI (PCE price index)</span>
+                            <span class="src p">FRED API: PCEPILFE (core PCE)</span>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="clbl">Fed target context</div>
+                        <div class="rngs">
+                            <div class="rr">
+                                <div class="rd dg"></div><span class="rt">Core PCE 1.8–2.2%: at target, policy
+                                    neutral</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd da"></div><span class="rt">Core PCE 2.2–3%: above target, hawkish
+                                    bias</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd dr"></div><span class="rt">Core PCE &gt;3%: aggressive tightening
+                                    mode</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="item">
+            <div class="item-hd" onclick="tog(this.parentElement)">
+                <span class="num">03</span>
+                <div class="imeta">
+                    <div class="iname">PPI — Producer Price Index (Pipeline Inflation) <span
+                            class="tag t-inf">Inflation</span><span class="release">Monthly</span></div>
+                    <div class="iline">Wholesale price changes — leads CPI by 3–6 months as costs pass through to
+                        consumers</div>
+                </div><span class="chv">▼</span>
+            </div>
+            <div class="ibody">
+                <div class="desc">PPI measures prices at the producer/wholesale level before goods reach consumers.
+                    Falling PPI with still-elevated CPI = disinflation in the pipeline. Rising PPI with stable CPI =
+                    margins being squeezed at the corporate level (watch for earnings misses from manufacturers). Final
+                    demand PPI is most watched; intermediate demand PPI gives earlier signal of what's coming
+                    downstream.</div>
+                <div class="g2">
+                    <div class="card">
+                        <div class="clbl">Data sources</div>
+                        <div class="srcs">
+                            <span class="src p">BLS.gov PPI release (day after CPI, 8:30am ET)</span>
+                            <span class="src p">FRED API: PPIACO (all commodities PPI)</span>
+                            <span class="src">FRED API: PPIFID (final demand PPI)</span>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="clbl">Lead relationship</div>
+                        <div class="ctxt">PPI typically leads CPI by 3–6 months. When PPI is falling rapidly (as in H2
+                            2022), expect CPI to follow down. When PPI spikes (Ukraine war Feb 2022: PPI hit +11.2%
+                            YoY), CPI surge is 3–6 months away. Monitor the PPI-CPI spread for corporate margin pressure
+                            signals.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="item">
+            <div class="item-hd" onclick="tog(this.parentElement)">
+                <span class="num">04</span>
+                <div class="imeta">
+                    <div class="iname">Oil &amp; Energy Prices (WTI, Brent, Natural Gas) <span
+                            class="tag t-com">Commodity</span><span class="release">Daily</span></div>
+                    <div class="iline">The most important commodity in global trade — direct CPI impact and geopolitical
+                        barometer</div>
+                </div><span class="chv">▼</span>
+            </div>
+            <div class="ibody">
+                <div class="desc">Oil is globally priced in USD. A $10/barrel oil move shifts US headline CPI by
+                    ~0.3–0.4pp. Oil also drives petrodollar recycling flows impacting EM currencies and sovereign wealth
+                    fund positioning. Energy sector earnings correlate directly with oil price. OPEC+ production
+                    decisions are political as much as economic — monitor OPEC meeting calendars. Natural gas affects
+                    European industrial competitiveness and utility sector earnings.</div>
+                <div class="g2">
+                    <div class="card">
+                        <div class="clbl">Macro oil price thresholds (WTI)</div>
+                        <div class="rngs">
+                            <div class="rr">
+                                <div class="rd dg"></div><span class="rt">WTI $60–80: Goldilocks — energy affordable,
+                                    sector profitable</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd da"></div><span class="rt">WTI $80–100: inflationary pressure building,
+                                    energy outperforms</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd dr"></div><span class="rt">WTI &gt;$100: demand destruction risk,
+                                    consumer headwind</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd dr"></div><span class="rt">WTI &lt;$50: deflationary signal, energy
+                                    sector stress</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="clbl">Data sources</div>
+                        <div class="srcs">
+                            <span class="src p">EIA.gov (US energy data, weekly)</span>
+                            <span class="src p">FRED API: DCOILWTICO (WTI crude oil)</span>
+                            <span class="src">FRED API: DCOILBRENTEU (Brent crude)</span>
+                            <span class="src">CME Group futures data</span>
+                            <span class="src">OPEC: opec.org</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="item">
+            <div class="item-hd" onclick="tog(this.parentElement)">
+                <span class="num">05</span>
+                <div class="imeta">
+                    <div class="iname">Wage Growth (Average Hourly Earnings, ECI) <span
+                            class="tag t-inf">Inflation</span><span class="release">Monthly/Quarterly</span></div>
+                    <div class="iline">Services inflation is largely wage-driven — the stickiest component of the
+                        inflation problem</div>
+                </div><span class="chv">▼</span>
+            </div>
+            <div class="ibody">
+                <div class="desc">Services inflation = labor costs. Wages are 60–70% of service sector costs. Employment
+                    Cost Index (ECI, quarterly) is the Fed's preferred measure — less volatile than AHE. Wage growth
+                    above 3.5% in a 2% inflation target regime creates "wage-price spiral" risk. This was the core
+                    2022–2023 challenge: goods disinflation arrived quickly but services inflation stayed elevated
+                    because wages remained high.</div>
+                <div class="g2">
+                    <div class="card">
+                        <div class="clbl">Data sources</div>
+                        <div class="srcs">
+                            <span class="src p">BLS.gov (AHE in NFP release)</span>
+                            <span class="src p">FRED API: CES0500000003 (avg hourly earnings)</span>
+                            <span class="src p">BLS.gov ECI (quarterly, end of Jan/Apr/Jul/Oct)</span>
+                            <span class="src">FRED API: ECIALLCIV (employment cost index)</span>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="clbl">Target ranges</div>
+                        <div class="rngs">
+                            <div class="rr">
+                                <div class="rd dg"></div><span class="rt">Wage growth 3–3.5%: consistent with 2%
+                                    inflation target</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd da"></div><span class="rt">3.5–4.5%: above target, services inflation
+                                    sticky</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd dr"></div><span class="rt">&gt;5%: wage-price spiral risk, Fed must hike
+                                    more</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="item">
+            <div class="item-hd" onclick="tog(this.parentElement)">
+                <span class="num">06</span>
+                <div class="imeta">
+                    <div class="iname">Industrial Metals — Copper, Aluminum, Iron Ore <span
+                            class="tag t-com">Commodity</span><span class="release">Daily</span></div>
+                    <div class="iline">"Dr. Copper" — the most reliable leading indicator of global industrial demand
+                    </div>
+                </div><span class="chv">▼</span>
+            </div>
+            <div class="ibody">
+                <div class="desc">Copper is used in virtually every industrial process — construction, electronics, EVs,
+                    infrastructure. Its price is a real-time barometer of global industrial demand, especially China
+                    (which consumes ~55% of global copper). Iron ore tracks Chinese steel and construction activity
+                    directly. AUD/USD is called the "liquid copper proxy" — it moves faster than the underlying
+                    commodity. Falling metals = global growth deceleration; rising metals = expansion.</div>
+                <div class="g2">
+                    <div class="card">
+                        <div class="clbl">Data sources</div>
+                        <div class="srcs">
+                            <span class="src p">LME (London Metal Exchange): lme.com</span>
+                            <span class="src p">Quandl/Nasdaq Data Link</span>
+                            <span class="src">FRED API: PCOPPUSDM (copper price)</span>
+                            <span class="src">CME Group futures</span>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="clbl">Sector impact</div>
+                        <div class="ctxt">Rising copper + rising iron ore + rising AUD = global expansion signal. Use as
+                            a cross-asset confirmation for cyclical sector weighting. Mining stocks (BHP, RIO, FCX) lead
+                            copper by 3–6 months due to forward pricing of operations. Divergence between copper price
+                            and mining stocks = potential rotation opportunity.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════
+     GLOBAL & GEOPOLITICAL
+═══════════════════════════════ -->
+    <div class="panel" id="panel-global">
+        <div class="tier">
+            <div class="tier-line"></div><span class="tier-txt">Tier 1 — Currency &amp; FX markets</span>
+            <div class="tier-line"></div>
+        </div>
+
+        <div class="item">
+            <div class="item-hd" onclick="tog(this.parentElement)">
+                <span class="num">01</span>
+                <div class="imeta">
+                    <div class="iname">US Dollar Index (DXY) &amp; Dollar Strength <span class="tag t-fx">FX</span><span
+                            class="release">Daily</span></div>
+                    <div class="iline">The most systemic single currency — dollar strength tightens global financial
+                        conditions for everyone</div>
+                </div><span class="chv">▼</span>
+            </div>
+            <div class="ibody">
+                <div class="desc">DXY tracks USD against EUR (57.6%), JPY (13.6%), GBP (11.9%), CAD (9.1%), SEK (4.2%),
+                    CHF (3.6%). Dollar strength: raises real debt burden of USD-denominated EM debt, suppresses
+                    commodity prices (priced in USD), hurts S&amp;P 500 multinationals' overseas earnings, tightens
+                    global financial conditions. Every major risk-off episode features a sharp dollar surge. The DXY is
+                    both a cause and symptom of global stress.</div>
+                <div class="g2">
+                    <div class="card">
+                        <div class="clbl">DXY level context</div>
+                        <div class="rngs">
+                            <div class="rr">
+                                <div class="rd dg"></div><span class="rt">DXY 95–100: neutral, broadly supportive for
+                                    equities</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd da"></div><span class="rt">DXY 100–105: headwind for commodities and
+                                    EM</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd dr"></div><span class="rt">DXY &gt;110: major global stress — EM crisis
+                                    risk (2022: DXY hit 114)</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="clbl">Data sources</div>
+                        <div class="srcs">
+                            <span class="src p">FRED API: DTWEXBGS (broad dollar index)</span>
+                            <span class="src p">ICE DXY index (tradingeconomics.com)</span>
+                            <span class="src">Investing.com (DXY real-time)</span>
+                            <span class="src">TradingView (DXY chart)</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="item">
+            <div class="item-hd" onclick="tog(this.parentElement)">
+                <span class="num">02</span>
+                <div class="imeta">
+                    <div class="iname">Yen Carry Trade &amp; JPY Dynamics <span class="tag t-fx">FX</span><span
+                            class="release">Daily</span></div>
+                    <div class="iline">The world's largest carry trade — sudden yen strength triggers global
+                        deleveraging events</div>
+                </div><span class="chv">▼</span>
+            </div>
+            <div class="ibody">
+                <div class="desc">The yen carry trade: borrow cheap in JPY (near-zero rates historically), invest in
+                    higher-yielding assets globally. When JPY suddenly strengthens (as in August 2024 when USD/JPY fell
+                    from 160 to 142 in weeks), forced carry trade unwinding cascades through EM equities, high-yield
+                    bonds, and risk assets globally. Monitor USD/JPY closely — a move below key support levels on this
+                    pair signals deleveraging risk across all risk assets simultaneously.</div>
+                <div class="g2">
+                    <div class="card">
+                        <div class="clbl">USD/JPY risk thresholds</div>
+                        <div class="rngs">
+                            <div class="rr">
+                                <div class="rd dg"></div><span class="rt">USD/JPY stable or rising: carry trade intact,
+                                    EM risk-on</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd da"></div><span class="rt">USD/JPY rapid 5%+ decline: early carry unwind
+                                    warning</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd dr"></div><span class="rt">USD/JPY rapid &gt;10% decline: systemic
+                                    deleveraging event</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="clbl">Data sources</div>
+                        <div class="srcs">
+                            <span class="src p">FRED API: DEXJPUS (USD/JPY)</span>
+                            <span class="src">Bank of Japan: boj.or.jp</span>
+                            <span class="src">CFTC COT report (JPY positioning)</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="tier">
+            <div class="tier-line"></div><span class="tier-txt">Tier 2 — Geopolitical &amp; structural factors</span>
+            <div class="tier-line"></div>
+        </div>
+
+        <div class="item">
+            <div class="item-hd" onclick="tog(this.parentElement)">
+                <span class="num">03</span>
+                <div class="imeta">
+                    <div class="iname">China Economic Data &amp; Property Sector <span
+                            class="tag t-geo">Geopolitical</span><span class="release">Monthly</span></div>
+                    <div class="iline">18% of global GDP — Chinese data moves copper, iron ore, AUD, and EM assets
+                        globally</div>
+                </div><span class="chv">▼</span>
+            </div>
+            <div class="ibody">
+                <div class="desc">China PMI (official + Caixin) moves commodity markets on release. Property sector
+                    stress (Evergrande 2021, Country Garden 2023) triggered global EM risk-off. Chinese exports data
+                    reveals global demand health. Fiscal stimulus announcements are major macro events — the September
+                    2024 PBOC stimulus package caused the largest single-day rally in Chinese equities in decades.
+                    Monitor PBOC policy decisions, RRR cuts, and MLF rate changes alongside NPC (National People's
+                    Congress) policy announcements.</div>
+                <div class="g2">
+                    <div class="card">
+                        <div class="clbl">Data sources</div>
+                        <div class="srcs">
+                            <span class="src p">NBS: stats.gov.cn (official China PMI)</span>
+                            <span class="src p">Caixin PMI: caixin.com (private PMI, more SME-focused)</span>
+                            <span class="src">PBOC: pbc.gov.cn</span>
+                            <span class="src">China customs (trade data)</span>
+                            <span class="src">FRED API: CHNGDPNQDSMEI (China GDP)</span>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="clbl">China PMI thresholds</div>
+                        <div class="rngs">
+                            <div class="rr">
+                                <div class="rd dg"></div><span class="rt">China PMI &gt;52: expansion, bullish for
+                                    copper/AUD/EM</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd da"></div><span class="rt">China PMI 50–52: stable, neutral commodity
+                                    signal</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd dr"></div><span class="rt">China PMI &lt;49: contraction, bearish for
+                                    commodities/EM</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="item">
+            <div class="item-hd" onclick="tog(this.parentElement)">
+                <span class="num">04</span>
+                <div class="imeta">
+                    <div class="iname">Trade Policy, Tariffs &amp; Trade Wars <span
+                            class="tag t-geo">Geopolitical</span><span class="release">Event-driven</span></div>
+                    <div class="iline">Tariffs are simultaneously inflationary and recessionary — the most complex
+                        policy risk to model</div>
+                </div><span class="chv">▼</span>
+            </div>
+            <div class="ibody">
+                <div class="desc">Tariffs raise import prices (inflationary) while reducing trade volume (recessionary).
+                    The 2018–2019 US-China trade war caused equity volatility and accelerated supply chain
+                    restructuring. The 2025 tariff escalation created significant uncertainty across industrials,
+                    consumer goods, and tech hardware. Sector impacts are targeted: steel tariffs hit auto and
+                    construction; semiconductor export controls hit tech; agricultural tariffs hurt farming communities
+                    with retaliation risk. Currency movements often partially offset tariff impacts.</div>
+                <div class="g2">
+                    <div class="card">
+                        <div class="clbl">Monitor</div>
+                        <div class="srcs">
+                            <span class="src p">USTR.gov (US trade representative)</span>
+                            <span class="src p">WTO.org (trade dispute filings)</span>
+                            <span class="src">Commerce.gov (trade statistics)</span>
+                            <span class="src">Peterson Institute for International Economics (piie.com)</span>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="clbl">Sector exposure matrix</div>
+                        <div class="ctxt">Steel/Aluminum tariffs → Autos, Construction, Industrials. Semiconductor
+                            export controls → Chip equipment, EDA software. Agricultural tariffs → Grains, farm
+                            equipment (DE, AGCO). Consumer goods → Retail margins, apparel. Track affected sectors in
+                            your scoring model as macro headwind.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="item">
+            <div class="item-hd" onclick="tog(this.parentElement)">
+                <span class="num">05</span>
+                <div class="imeta">
+                    <div class="iname">Geopolitical Risk Events (Wars, Sanctions, Political Instability) <span
+                            class="tag t-geo">Geopolitical</span><span class="release">Event-driven</span></div>
+                    <div class="iline">Non-linear tail risks — when they materialize, normal correlations break down
+                    </div>
+                </div><span class="chv">▼</span>
+            </div>
+            <div class="ibody">
+                <div class="desc">Armed conflicts disrupt energy, food, and supply chains. Russia-Ukraine (Feb 2022)
+                    triggered the largest European energy crisis in decades, caused global grain supply disruption, and
+                    accelerated NATO defense spending (bullish for defense stocks globally). Middle East tensions spike
+                    oil 5–15% within days. Taiwan Strait risk is the largest systemic geopolitical tail risk — it would
+                    affect global semiconductor supply and trigger massive capital flight from Asian markets. The GPR
+                    (Geopolitical Risk Index) quantifies risk level historically.</div>
+                <div class="g2">
+                    <div class="card">
+                        <div class="clbl">Monitor</div>
+                        <div class="srcs">
+                            <span class="src p">GPR Index: matteoiacoviello.com/gpr (free download)</span>
+                            <span class="src p">Global Conflict Tracker: cfr.org/global-conflict-tracker</span>
+                            <span class="src">GDELT Project: gdeltproject.org (news event database)</span>
+                            <span class="src">Stratfor: stratfor.com (geopolitical intelligence)</span>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="clbl">Sector impact by event type</div>
+                        <div class="ctxt">Middle East conflict → Energy ↑, Airlines ↓, Defense ↑. Russia/Ukraine →
+                            Energy ↑, Grains ↑, European industrials ↓. Taiwan tensions → Semiconductors ↓ globally,
+                            Defense ↑. EM political crisis → EM equities ↓, USD ↑, Gold ↑.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="item">
+            <div class="item-hd" onclick="tog(this.parentElement)">
+                <span class="num">06</span>
+                <div class="imeta">
+                    <div class="iname">Fiscal Policy, Deficits &amp; Debt Sustainability <span
+                            class="tag t-fis">Fiscal</span><span class="release">Quarterly/Annual</span></div>
+                    <div class="iline">Large fiscal deficits increase Treasury supply and can push long-term yields up
+                        regardless of Fed policy</div>
+                </div><span class="chv">▼</span>
+            </div>
+            <div class="ibody">
+                <div class="desc">The "fiscal dominance" concern: if deficits are large enough, rising bond supply
+                    pushes long yields higher even when the Fed is cutting short rates — this happened in H2 2023. US
+                    debt ceiling crises create systemic stress around potential technical default. UK Truss budget
+                    (2022) caused gilt yields to spike 150bps in days and GBP to crash — a textbook example of market
+                    discipline on fiscal excess. CBO (Congressional Budget Office) projections set long-term Treasury
+                    supply expectations.</div>
+                <div class="g2">
+                    <div class="card">
+                        <div class="clbl">Data sources</div>
+                        <div class="srcs">
+                            <span class="src p">CBO.gov (budget outlook)</span>
+                            <span class="src p">Treasury.gov (monthly budget statement)</span>
+                            <span class="src">FRED API: FYFSD (federal surplus or deficit)</span>
+                            <span class="src">IMF Fiscal Monitor: imf.org</span>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="clbl">Risk thresholds</div>
+                        <div class="rngs">
+                            <div class="rr">
+                                <div class="rd dg"></div><span class="rt">Deficit &lt;3% of GDP: manageable, no supply
+                                    pressure</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd da"></div><span class="rt">Deficit 3–6% GDP: elevated, watch term
+                                    premium</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd dr"></div><span class="rt">Deficit &gt;6% GDP (peacetime): market may
+                                    demand higher yields</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="item">
+            <div class="item-hd" onclick="tog(this.parentElement)">
+                <span class="num">07</span>
+                <div class="imeta">
+                    <div class="iname">Institutional Positioning — COT Reports &amp; 13F Filings <span
+                            class="tag t-cyc">Positioning</span><span class="release">Weekly/Quarterly</span></div>
+                    <div class="iline">What large institutional players are actually doing — not what they're saying
+                    </div>
+                </div><span class="chv">▼</span>
+            </div>
+            <div class="ibody">
+                <div class="desc">CFTC Commitments of Traders (COT) report shows commercial (hedger) vs. speculative
+                    (trend follower) positioning in futures markets. Extreme speculative net long positions are
+                    contrarian bearish signals. 13F filings (quarterly, 45 days after quarter-end) reveal hedge fund and
+                    mutual fund equity holdings. When top-quality funds (Ackman, Tepper, Einhorn) initiate large
+                    positions, their fundamental thesis is worth examining. Aggregate 13F data shows sector rotation
+                    trends by institutional money.</div>
+                <div class="g2">
+                    <div class="card">
+                        <div class="clbl">Data sources</div>
+                        <div class="srcs">
+                            <span class="src p">CFTC COT: cftc.gov/MarketReports/CommitmentsofTraders (weekly
+                                Friday)</span>
+                            <span class="src p">SEC 13F: sec.gov/cgi-bin/browse-edgar</span>
+                            <span class="src">Dataroma.com (guru 13F aggregator)</span>
+                            <span class="src">Whalewisdom.com (13F analytics)</span>
+                            <span class="src">Barchart COT data</span>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="clbl">COT contrarian signals</div>
+                        <div class="ctxt">When commercial hedgers (who know their industry best) are at extreme net long
+                            positions AND specs are extreme net short — strong contrarian buy. The opposite pattern is a
+                            reliable top signal. Most useful for commodities (gold, oil, grains) and currencies where
+                            hedger/speculator distinction is cleanest.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════
+     NEWS SOURCES
+═══════════════════════════════ -->
+    <div class="panel" id="panel-news">
+        <p
+            style="font-size:13px;color:var(--text2);line-height:1.7;margin-bottom:24px;max-width:740px;font-weight:400;">
+            Complete list of trusted sources for automated ingestion. Ranked by signal quality — critical sources first.
+            Every source here can be ingested via API or scraping and fed to the LLM qualitative layer for structured
+            sentiment scoring.</p>
+
+        <div class="tier">
+            <div class="tier-line"></div><span class="tier-txt">Central bank &amp; official sources — highest signal
+                quality</span>
+            <div class="tier-line"></div>
+        </div>
+        <div class="news-grid">
+            <div class="news-card">
+                <div class="news-card-hd">
+                    <div class="news-dot" style="background:var(--red)"></div>
+                    <div class="news-title">Federal Reserve</div><span class="news-impact imp-critical">Critical</span>
+                </div>
+                <div class="news-body">
+                    <div class="news-source">FOMC statements, minutes (3 weeks post-meeting), press conference
+                        transcripts, Beige Book (8×/year), governor speeches. These are the most market-moving
+                        qualitative documents in existence.<br>
+                        <b>For LLM:</b> Score hawkish/dovish language −5 to +5. Track word frequency changes vs. prior
+                        statement.
+                    </div>
+                    <a class="news-link" href="https://federalreserve.gov/monetarypolicy.htm"
+                        target="_blank">federalreserve.gov/monetarypolicy.htm</a>
+                    <a class="news-link" href="https://federalreserve.gov/apps/foid/Speeches.aspx"
+                        target="_blank">federalreserve.gov — all speeches (auto-updated)</a>
+                </div>
+            </div>
+            <div class="news-card">
+                <div class="news-card-hd">
+                    <div class="news-dot" style="background:var(--red)"></div>
+                    <div class="news-title">BLS, BEA, Census Bureau</div><span
+                        class="news-impact imp-critical">Critical</span>
+                </div>
+                <div class="news-body">
+                    <div class="news-source">Official US economic data releases. BLS: CPI, PPI, NFP, wage data. BEA:
+                        GDP, PCE, trade balance. Census: retail sales, durable goods, housing.</div>
+                    <a class="news-link" href="https://bls.gov/schedule/news_release/ecsummary.htm"
+                        target="_blank">BLS.gov — full release calendar</a>
+                    <a class="news-link" href="https://bea.gov/news" target="_blank">BEA.gov — national accounts
+                        releases</a>
+                    <a class="news-link" href="https://census.gov/economic-indicators" target="_blank">Census.gov —
+                        economic indicators</a>
+                </div>
+            </div>
+            <div class="news-card">
+                <div class="news-card-hd">
+                    <div class="news-dot" style="background:var(--amber)"></div>
+                    <div class="news-title">IMF, World Bank, OECD</div><span class="news-impact imp-high">High</span>
+                </div>
+                <div class="news-body">
+                    <div class="news-source">Quarterly World Economic Outlook (IMF), Global Economic Prospects (World
+                        Bank), Economic Outlook (OECD). Provide global GDP forecasts, EM risk assessments, and
+                        structural economic analysis. Essential for macro regime classification.</div>
+                    <a class="news-link" href="https://imf.org/en/Publications/WEO" target="_blank">IMF World Economic
+                        Outlook</a>
+                    <a class="news-link" href="https://worldbank.org/en/publication/global-economic-prospects"
+                        target="_blank">World Bank Global Economic Prospects</a>
+                    <a class="news-link" href="https://oecd.org/economic-outlook" target="_blank">OECD Economic
+                        Outlook</a>
+                </div>
+            </div>
+            <div class="news-card">
+                <div class="news-card-hd">
+                    <div class="news-dot" style="background:var(--amber)"></div>
+                    <div class="news-title">Other Central Banks</div><span class="news-impact imp-high">High</span>
+                </div>
+                <div class="news-body">
+                    <div class="news-source">ECB, Bank of England, Bank of Japan, PBOC, Bank of Canada, RBA. Policy
+                        decisions, meeting minutes, governor speeches. Each affects their regional markets and currency
+                        pairs.</div>
+                    <a class="news-link" href="https://ecb.europa.eu/press/pressreleases" target="_blank">ECB press
+                        releases</a>
+                    <a class="news-link" href="https://bankofengland.co.uk/news" target="_blank">Bank of England
+                        news</a>
+                    <a class="news-link" href="https://boj.or.jp/en/announcements/press" target="_blank">Bank of Japan
+                        announcements</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="tier">
+            <div class="tier-line"></div><span class="tier-txt">Economic &amp; financial news — programmatic
+                ingestion</span>
+            <div class="tier-line"></div>
+        </div>
+        <div class="news-grid">
+            <div class="news-card">
+                <div class="news-card-hd">
+                    <div class="news-dot" style="background:var(--amber)"></div>
+                    <div class="news-title">Reuters &amp; AP Economics</div><span
+                        class="news-impact imp-high">High</span>
+                </div>
+                <div class="news-body">
+                    <div class="news-source">Wire service real-time economic and financial news. Fastest to cover
+                        economic data releases, central bank decisions, and geopolitical events. RSS feeds available for
+                        free. Reuters API available for institutional subscribers.</div>
+                    <a class="news-link" href="https://reuters.com/business/finance"
+                        target="_blank">reuters.com/business/finance</a>
+                    <a class="news-link" href="https://feeds.reuters.com/reuters/businessNews" target="_blank">Reuters
+                        Business RSS feed</a>
+                </div>
+            </div>
+            <div class="news-card">
+                <div class="news-card-hd">
+                    <div class="news-dot" style="background:var(--amber)"></div>
+                    <div class="news-title">Financial Times &amp; WSJ</div><span
+                        class="news-impact imp-high">High</span>
+                </div>
+                <div class="news-body">
+                    <div class="news-source">Premium financial journalism. FT is strongest for European/global macro;
+                        WSJ for US markets and Fed coverage. Both have RSS feeds. Use for qualitative regime assessment.
+                        Scrape headlines and first paragraphs via RSS.</div>
+                    <a class="news-link" href="https://ft.com/rss/home" target="_blank">FT RSS feeds</a>
+                    <a class="news-link" href="https://wsj.com/news/rss-news-and-feeds" target="_blank">WSJ RSS
+                        feeds</a>
+                </div>
+            </div>
+            <div class="news-card">
+                <div class="news-card-hd">
+                    <div class="news-dot" style="background:var(--accent)"></div>
+                    <div class="news-title">NewsAPI &amp; Alpha Vantage News</div><span
+                        class="news-impact imp-med">Medium</span>
+                </div>
+                <div class="news-body">
+                    <div class="news-source">Programmatic news APIs ideal for automation. NewsAPI aggregates 70,000+
+                        sources with keyword filtering. Alpha Vantage News API provides sentiment-scored financial news
+                        with ticker tagging — perfect for per-stock qualitative scoring in the system.</div>
+                    <a class="news-link" href="https://newsapi.org" target="_blank">NewsAPI.org — free tier: 100
+                        req/day</a>
+                    <a class="news-link" href="https://alphavantage.co/documentation/#news-sentiment"
+                        target="_blank">Alpha Vantage News Sentiment API</a>
+                </div>
+            </div>
+            <div class="news-card">
+                <div class="news-card-hd">
+                    <div class="news-dot" style="background:var(--accent)"></div>
+                    <div class="news-title">Seeking Alpha &amp; Benzinga</div><span
+                        class="news-impact imp-med">Medium</span>
+                </div>
+                <div class="news-body">
+                    <div class="news-source">Seeking Alpha: best source for earnings call transcripts (free for recent
+                        quarters), sector analysis, analyst upgrades/downgrades. Benzinga: real-time news API with event
+                        tagging, earnings alerts, options flow. Both have APIs.</div>
+                    <a class="news-link" href="https://seekingalpha.com/api/v3/articles" target="_blank">Seeking Alpha
+                        API (subscription)</a>
+                    <a class="news-link" href="https://benzinga.com/apis/cloud-product" target="_blank">Benzinga Cloud
+                        APIs</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="tier">
+            <div class="tier-line"></div><span class="tier-txt">Geopolitical &amp; global intelligence</span>
+            <div class="tier-line"></div>
+        </div>
+        <div class="news-grid">
+            <div class="news-card">
+                <div class="news-card-hd">
+                    <div class="news-dot" style="background:var(--coral)"></div>
+                    <div class="news-title">GDELT Project</div><span class="news-impact imp-high">High</span>
+                </div>
+                <div class="news-body">
+                    <div class="news-source">The world's largest open database of human society — monitors news from
+                        250+ countries in 100+ languages, updated every 15 minutes. Quantifies geopolitical events,
+                        tone, and instability. Free API. Essential for the geopolitical risk layer of your system.</div>
+                    <a class="news-link" href="https://gdeltproject.org" target="_blank">gdeltproject.org — full free
+                        API</a>
+                    <a class="news-link" href="https://api.gdeltproject.org/api/v2/doc/doc" target="_blank">GDELT API v2
+                        documentation</a>
+                </div>
+            </div>
+            <div class="news-card">
+                <div class="news-card-hd">
+                    <div class="news-dot" style="background:var(--coral)"></div>
+                    <div class="news-title">Council on Foreign Relations</div><span
+                        class="news-impact imp-high">High</span>
+                </div>
+                <div class="news-body">
+                    <div class="news-source">Global Conflict Tracker updated in real-time. Best non-government source
+                        for conflict monitoring. The Global Risk Dashboard ranks current geopolitical risks by severity.
+                        Essential for qualitative geo risk assessment in weekly/monthly reports.</div>
+                    <a class="news-link" href="https://cfr.org/global-conflict-tracker" target="_blank">CFR Global
+                        Conflict Tracker</a>
+                    <a class="news-link" href="https://cfr.org/backgrounder" target="_blank">CFR Backgrounders
+                        (country/issue analysis)</a>
+                </div>
+            </div>
+            <div class="news-card">
+                <div class="news-card-hd">
+                    <div class="news-dot" style="background:var(--coral)"></div>
+                    <div class="news-title">Geopolitical Risk Index (GPR)</div><span
+                        class="news-impact imp-high">High</span>
+                </div>
+                <div class="news-body">
+                    <div class="news-source">Academic-grade geopolitical risk quantification by Caldara and Iacoviello
+                        (Federal Reserve economists). Monthly data back to 1900. Shows historical context for current
+                        tensions. Provides both overall GPR and threat/act sub-indices. Free download.</div>
+                    <a class="news-link" href="https://matteoiacoviello.com/gpr.htm"
+                        target="_blank">matteoiacoviello.com/gpr.htm — free data</a>
+                </div>
+            </div>
+            <div class="news-card">
+                <div class="news-card-hd">
+                    <div class="news-dot" style="background:var(--coral)"></div>
+                    <div class="news-title">ACLED &amp; UN OCHA</div><span class="news-impact imp-med">Medium</span>
+                </div>
+                <div class="news-body">
+                    <div class="news-source">ACLED (Armed Conflict Location & Event Data): real-time conflict data with
+                        geographic precision. UN OCHA: humanitarian situation reports for active crisis regions. Both
+                        free APIs. Use for quantifying conflict intensity in specific markets.</div>
+                    <a class="news-link" href="https://acleddata.com/data-export-tool" target="_blank">ACLED data export
+                        tool (free API)</a>
+                    <a class="news-link" href="https://reliefweb.int" target="_blank">UN ReliefWeb — crisis updates</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="tier">
+            <div class="tier-line"></div><span class="tier-txt">Qualitative human judgment sources — for LLM
+                ingestion</span>
+            <div class="tier-line"></div>
+        </div>
+        <div class="news-grid">
+            <div class="news-card">
+                <div class="news-card-hd">
+                    <div class="news-dot" style="background:var(--purple)"></div>
+                    <div class="news-title">Howard Marks Memos (Oaktree)</div><span
+                        class="news-impact imp-high">High</span>
+                </div>
+                <div class="news-body">
+                    <div class="news-source">The highest signal-to-noise qualitative macro commentary available free
+                        online. Marks manages $170B+ in credit. His memos on market cycles, risk, and investor
+                        psychology are published irregularly but consistently prescient. Feed every new memo to your LLM
+                        for structured insight extraction.</div>
+                    <a class="news-link" href="https://oaktreecapital.com/insights/memo"
+                        target="_blank">oaktreecapital.com/insights/memo</a>
+                </div>
+            </div>
+            <div class="news-card">
+                <div class="news-card-hd">
+                    <div class="news-dot" style="background:var(--purple)"></div>
+                    <div class="news-title">GMO Letters (Jeremy Grantham)</div><span
+                        class="news-impact imp-high">High</span>
+                </div>
+                <div class="news-body">
+                    <div class="news-source">Grantham is legendary for calling the 2000 and 2008 bubbles. GMO quarterly
+                        letters provide long-horizon asset class valuation views and bubble identification. Most
+                        relevant for regime-level risk assessment and long-term valuation context.</div>
+                    <a class="news-link" href="https://gmo.com/americas/research-library"
+                        target="_blank">gmo.com/americas/research-library</a>
+                </div>
+            </div>
+            <div class="news-card">
+                <div class="news-card-hd">
+                    <div class="news-dot" style="background:var(--purple)"></div>
+                    <div class="news-title">BofA Global Fund Manager Survey</div><span
+                        class="news-impact imp-high">High</span>
+                </div>
+                <div class="news-body">
+                    <div class="news-source">Monthly survey of ~300 fund managers overseeing $700B+. Shows cash levels
+                        (contrarian signal), equity overweight/underweight, biggest tail risks, sector allocations.
+                        Extreme readings (cash levels above 5.5% = buy signal; below 4% = contrarian sell) are
+                        actionable.</div>
+                    <a class="news-link" href="https://bofasecurities.com/en/articles/global-fund-manager-survey.html"
+                        target="_blank">BofA FMS (coverage via Reuters/Bloomberg)</a>
+                </div>
+            </div>
+            <div class="news-card">
+                <div class="news-card-hd">
+                    <div class="news-dot" style="background:var(--purple)"></div>
+                    <div class="news-title">AAII &amp; CNN Fear &amp; Greed</div><span
+                        class="news-impact imp-med">Medium</span>
+                </div>
+                <div class="news-body">
+                    <div class="news-source">AAII Investor Sentiment Survey: weekly bullish/bearish/neutral split of
+                        retail investors. Extreme bullishness (&gt;55%) is contrarian bearish; extreme bearishness
+                        (&gt;50%) is contrarian bullish. CNN Fear &amp; Greed Index: composite of 7 sentiment
+                        indicators, 0–100 scale.</div>
+                    <a class="news-link" href="https://aaii.com/sentimentsurvey"
+                        target="_blank">AAII.com/sentimentsurvey (free)</a>
+                    <a class="news-link" href="https://money.cnn.com/data/fear-and-greed" target="_blank">CNN Fear &amp;
+                        Greed Index</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="tier">
+            <div class="tier-line"></div><span class="tier-txt">Economic calendars — automate your event
+                monitoring</span>
+            <div class="tier-line"></div>
+        </div>
+        <div class="news-grid">
+            <div class="news-card">
+                <div class="news-card-hd">
+                    <div class="news-dot" style="background:var(--teal)"></div>
+                    <div class="news-title">Investing.com Economic Calendar</div><span
+                        class="news-impact imp-critical">Critical</span>
+                </div>
+                <div class="news-body">
+                    <div class="news-source">The most comprehensive free economic calendar. Covers 80+ countries, impact
+                        ratings (red/orange/yellow), actual vs. forecast vs. previous, and real-time countdown to
+                        releases. Has a free API. Essential for the system's event monitoring and pre-release volatility
+                        alerts.</div>
+                    <a class="news-link" href="https://investing.com/economic-calendar"
+                        target="_blank">investing.com/economic-calendar</a>
+                    <a class="news-link" href="https://rapidapi.com/apidojo/api/investing-business-news"
+                        target="_blank">Investing.com API (via RapidAPI)</a>
+                </div>
+            </div>
+            <div class="news-card">
+                <div class="news-card-hd">
+                    <div class="news-dot" style="background:var(--teal)"></div>
+                    <div class="news-title">TradingEconomics</div><span class="news-impact imp-high">High</span>
+                </div>
+                <div class="news-body">
+                    <div class="news-source">20M+ economic indicators from 196 countries. API access to historical and
+                        forecast data. Covers everything from major G7 releases to obscure EM indicators. Free tier
+                        available. Excellent for building macro dashboards and historical context for current readings.
+                    </div>
+                    <a class="news-link" href="https://tradingeconomics.com/calendar"
+                        target="_blank">tradingeconomics.com/calendar</a>
+                    <a class="news-link" href="https://tradingeconomics.com/api" target="_blank">TradingEconomics API
+                        documentation</a>
+                </div>
+            </div>
+            <div class="news-card">
+                <div class="news-card-hd">
+                    <div class="news-dot" style="background:var(--teal)"></div>
+                    <div class="news-title">FRED API (St. Louis Fed)</div><span
+                        class="news-impact imp-critical">Critical</span>
+                </div>
+                <div class="news-body">
+                    <div class="news-source">The most important single data API for macro analysis. 800,000+ economic
+                        series, free, reliable, used by professional economists globally. The programmer should build
+                        the entire macro data layer primarily on FRED. Auto-updates when new data is released. Python
+                        fredapi library makes integration trivial.</div>
+                    <a class="news-link" href="https://fred.stlouisfed.org/docs/api/fred" target="_blank">FRED API
+                        documentation (free API key)</a>
+                    <a class="news-link" href="https://github.com/mortada/fredapi" target="_blank">fredapi Python
+                        library (GitHub)</a>
+                </div>
+            </div>
+            <div class="news-card">
+                <div class="news-card-hd">
+                    <div class="news-dot" style="background:var(--teal)"></div>
+                    <div class="news-title">Earnings Whispers &amp; EarningsWhispers</div><span
+                        class="news-impact imp-med">Medium</span>
+                </div>
+                <div class="news-body">
+                    <div class="news-source">Earnings calendar with consensus estimates, whisper numbers, and earnings
+                        surprise history. Critical for the system's event risk management — position sizing should be
+                        automatically reduced before high-impact earnings events for concentrated positions.</div>
+                    <a class="news-link" href="https://earningswhispers.com" target="_blank">earningswhispers.com</a>
+                    <a class="news-link" href="https://finance.yahoo.com/calendar/earnings" target="_blank">Yahoo
+                        Finance earnings calendar (free)</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════
+     MARKET CYCLES — HISTORICAL VALUES
+═══════════════════════════════ -->
+    <div class="panel" id="panel-cycles">
+        <p class="cycle-intro">These are the definitive historical benchmarks for every phase of the market cycle. Every
+            number here is based on documented historical episodes. Use these as your system's reference values for
+            market phase classification, risk regime detection, and portfolio adjustment triggers.</p>
+
+        <div class="tier">
+            <div class="tier-line"></div><span class="tier-txt">Downside market phases — definitions, thresholds &amp;
+                historical data</span>
+            <div class="tier-line"></div>
+        </div>
+
+        <div class="cycle-grid">
+            <div class="cycle-card">
+                <div class="cycle-header">
+                    <div class="cycle-title" style="color:var(--amber)">Pullback</div>
+                    <div class="cycle-sub">Normal, healthy — occurs within uptrends</div>
+                </div>
+                <div class="cycle-body">
+                    <div class="stat-row"><span class="stat-label">Price decline from recent high</span><span
+                            class="stat-val cv-amber">−3% to −10%</span></div>
+                    <div class="stat-row"><span class="stat-label">Average duration</span><span
+                            class="stat-val cv-blue">2–4 weeks</span></div>
+                    <div class="stat-row"><span class="stat-label">Frequency (S&amp;P 500)</span><span
+                            class="stat-val cv-blue">3–5 times per year</span></div>
+                    <div class="stat-row"><span class="stat-label">VIX typical level</span><span
+                            class="stat-val cv-amber">18–25</span></div>
+                    <div class="stat-row"><span class="stat-label">Volume behavior</span><span class="stat-val">Often
+                            light/declining</span></div>
+                    <div class="stat-row"><span class="stat-label">Macro context</span><span class="stat-val">Uptrend
+                            intact, GDP positive</span></div>
+                    <div class="stat-row"><span class="stat-label">Strategy response</span><span
+                            class="stat-val cv-green">Buy the dip — do not exit</span></div>
+                </div>
+            </div>
+
+            <div class="cycle-card">
+                <div class="cycle-header">
+                    <div class="cycle-title" style="color:var(--amber)">Correction</div>
+                    <div class="cycle-sub">More serious — tests trend but does not break it</div>
+                </div>
+                <div class="cycle-body">
+                    <div class="stat-row"><span class="stat-label">Price decline from peak</span><span
+                            class="stat-val cv-amber">−10% to −20%</span></div>
+                    <div class="stat-row"><span class="stat-label">Average duration</span><span
+                            class="stat-val cv-blue">1–4 months</span></div>
+                    <div class="stat-row"><span class="stat-label">Frequency (S&amp;P 500)</span><span
+                            class="stat-val cv-blue">Once every 1–2 years</span></div>
+                    <div class="stat-row"><span class="stat-label">VIX typical level</span><span
+                            class="stat-val cv-amber">25–35</span></div>
+                    <div class="stat-row"><span class="stat-label">GDP context</span><span class="stat-val">Usually
+                            still positive</span></div>
+                    <div class="stat-row"><span class="stat-label">Credit spreads</span><span
+                            class="stat-val cv-amber">Moderately elevated</span></div>
+                    <div class="stat-row"><span class="stat-label">Strategy response</span><span
+                            class="stat-val cv-amber">Reduce risk 20–30%, add hedges</span></div>
+                </div>
+            </div>
+
+            <div class="cycle-card">
+                <div class="cycle-header">
+                    <div class="cycle-title" style="color:var(--red)">Bear Market</div>
+                    <div class="cycle-sub">Structural decline — usually recession-linked</div>
+                </div>
+                <div class="cycle-body">
+                    <div class="stat-row"><span class="stat-label">Price decline from peak</span><span
+                            class="stat-val cv-red">−20% or more</span></div>
+                    <div class="stat-row"><span class="stat-label">Average duration</span><span
+                            class="stat-val cv-blue">9–18 months</span></div>
+                    <div class="stat-row"><span class="stat-label">Avg S&amp;P 500 bear decline</span><span
+                            class="stat-val cv-red">−36% (since 1929)</span></div>
+                    <div class="stat-row"><span class="stat-label">VIX level at trough</span><span
+                            class="stat-val cv-red">35–45+</span></div>
+                    <div class="stat-row"><span class="stat-label">HY credit spread at trough</span><span
+                            class="stat-val cv-red">600–900bps</span></div>
+                    <div class="stat-row"><span class="stat-label">GDP behavior</span><span
+                            class="stat-val cv-red">Usually negative (recession)</span></div>
+                    <div class="stat-row"><span class="stat-label">Strategy response</span><span
+                            class="stat-val cv-red">Move to 50–70% cash/defensive</span></div>
+                </div>
+            </div>
+
+            <div class="cycle-card">
+                <div class="cycle-header">
+                    <div class="cycle-title" style="color:var(--red)">Market Crash</div>
+                    <div class="cycle-sub">Sudden, violent, panic-driven — often systemic event</div>
+                </div>
+                <div class="cycle-body">
+                    <div class="stat-row"><span class="stat-label">Speed of decline</span><span
+                            class="stat-val cv-red">−20%+ in days to weeks</span></div>
+                    <div class="stat-row"><span class="stat-label">VIX at crash peak</span><span
+                            class="stat-val cv-red">40–90</span></div>
+                    <div class="stat-row"><span class="stat-label">Volume behavior</span><span
+                            class="stat-val cv-red">Extreme — 3–5× average</span></div>
+                    <div class="stat-row"><span class="stat-label">Typical trigger</span><span class="stat-val">Systemic
+                            event or panic</span></div>
+                    <div class="stat-row"><span class="stat-label">Credit markets</span><span
+                            class="stat-val cv-red">Seize up — liquidity crisis</span></div>
+                    <div class="stat-row"><span class="stat-label">Strategy response</span><span
+                            class="stat-val cv-red">Circuit breaker: go flat immediately</span></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="tier">
+            <div class="tier-line"></div><span class="tier-txt">Historical major market events — reference values</span>
+            <div class="tier-line"></div>
+        </div>
+        <table class="htable">
+            <thead>
+                <tr>
+                    <th>Event</th>
+                    <th>Year</th>
+                    <th>S&amp;P 500 Peak-Trough</th>
+                    <th>Duration</th>
+                    <th>VIX Peak</th>
+                    <th>HY Spread Peak</th>
+                    <th>GDP Trough</th>
+                    <th>Recovery to new ATH</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Great Depression</td>
+                    <td>1929–1932</td>
+                    <td class="mono cv-red">−89.2%</td>
+                    <td class="mono">34 months</td>
+                    <td class="mono">N/A</td>
+                    <td class="mono">N/A</td>
+                    <td class="mono">−26.7%</td>
+                    <td class="mono cv-amber">25 years</td>
+                </tr>
+                <tr>
+                    <td>Black Monday</td>
+                    <td>1987</td>
+                    <td class="mono cv-red">−33.5%</td>
+                    <td class="mono">1 day / 3 months</td>
+                    <td class="mono cv-red">~150 (est)</td>
+                    <td class="mono">Moderate</td>
+                    <td class="mono cv-green">+3.5%</td>
+                    <td class="mono cv-green">2 years</td>
+                </tr>
+                <tr>
+                    <td>Dot-com Bust</td>
+                    <td>2000–2002</td>
+                    <td class="mono cv-red">−49.1%</td>
+                    <td class="mono">31 months</td>
+                    <td class="mono cv-red">42.7</td>
+                    <td class="mono cv-red">1,100bps</td>
+                    <td class="mono cv-amber">−0.3%</td>
+                    <td class="mono cv-amber">7 years</td>
+                </tr>
+                <tr>
+                    <td>Global Financial Crisis</td>
+                    <td>2007–2009</td>
+                    <td class="mono cv-red">−56.8%</td>
+                    <td class="mono">17 months</td>
+                    <td class="mono cv-red">80.7</td>
+                    <td class="mono cv-red">1,900bps</td>
+                    <td class="mono cv-red">−4.3%</td>
+                    <td class="mono cv-amber">5.5 years</td>
+                </tr>
+                <tr>
+                    <td>Euro Debt Crisis</td>
+                    <td>2011</td>
+                    <td class="mono cv-amber">−21.6%</td>
+                    <td class="mono">7 months</td>
+                    <td class="mono cv-red">48.0</td>
+                    <td class="mono cv-amber">900bps</td>
+                    <td class="mono cv-green">+1.6%</td>
+                    <td class="mono cv-green">1.5 years</td>
+                </tr>
+                <tr>
+                    <td>COVID-19 Crash</td>
+                    <td>2020</td>
+                    <td class="mono cv-red">−33.9%</td>
+                    <td class="mono">33 days (fastest)</td>
+                    <td class="mono cv-red">85.5</td>
+                    <td class="mono cv-red">1,100bps</td>
+                    <td class="mono cv-red">−31.4% (Q2 ann)</td>
+                    <td class="mono cv-green">148 days (fastest)</td>
+                </tr>
+                <tr>
+                    <td>2022 Rate Shock Bear</td>
+                    <td>2022</td>
+                    <td class="mono cv-red">−25.4%</td>
+                    <td class="mono">12 months</td>
+                    <td class="mono cv-amber">36.4</td>
+                    <td class="mono cv-amber">600bps</td>
+                    <td class="mono cv-amber">−1.6% (H1)</td>
+                    <td class="mono cv-green">1 year</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="tier">
+            <div class="tier-line"></div><span class="tier-txt">Upside market phases — definitions &amp; macro
+                context</span>
+            <div class="tier-line"></div>
+        </div>
+
+        <div class="cycle-grid">
+            <div class="cycle-card">
+                <div class="cycle-header">
+                    <div class="cycle-title" style="color:var(--green)">Early Recovery / Accumulation</div>
+                    <div class="cycle-sub">Post-bear bottom — maximum pessimism, maximum opportunity</div>
+                </div>
+                <div class="cycle-body">
+                    <div class="stat-row"><span class="stat-label">Price behavior</span><span
+                            class="stat-val cv-green">Bottoming, volatile, base-building</span></div>
+                    <div class="stat-row"><span class="stat-label">Typical price gain off bottom</span><span
+                            class="stat-val cv-green">+15% to +30% in first 6 months</span></div>
+                    <div class="stat-row"><span class="stat-label">Sentiment</span><span
+                            class="stat-val cv-amber">Deeply pessimistic (max fear)</span></div>
+                    <div class="stat-row"><span class="stat-label">VIX level</span><span class="stat-val cv-amber">25–40
+                            (declining from peak)</span></div>
+                    <div class="stat-row"><span class="stat-label">GDP</span><span class="stat-val">Still negative or
+                            just turning +</span></div>
+                    <div class="stat-row"><span class="stat-label">Fed policy</span><span
+                            class="stat-val cv-green">Cutting aggressively</span></div>
+                    <div class="stat-row"><span class="stat-label">Best sectors</span><span
+                            class="stat-val cv-green">Cyclicals, financials, discretionary</span></div>
+                    <div class="stat-row"><span class="stat-label">Key signal</span><span
+                            class="stat-val cv-green">Credit spreads starting to compress</span></div>
+                </div>
+            </div>
+
+            <div class="cycle-card">
+                <div class="cycle-header">
+                    <div class="cycle-title" style="color:var(--green)">Early-Mid Expansion</div>
+                    <div class="cycle-sub">Broad participation — the easiest phase to be in</div>
+                </div>
+                <div class="cycle-body">
+                    <div class="stat-row"><span class="stat-label">Price behavior</span><span
+                            class="stat-val cv-green">Steady uptrend, new highs forming</span></div>
+                    <div class="stat-row"><span class="stat-label">Typical annual S&amp;P return</span><span
+                            class="stat-val cv-green">+15% to +25%</span></div>
+                    <div class="stat-row"><span class="stat-label">VIX level</span><span class="stat-val cv-green">12–18
+                            (low, stable)</span></div>
+                    <div class="stat-row"><span class="stat-label">GDP growth</span><span class="stat-val cv-green">2–4%
+                            (above trend)</span></div>
+                    <div class="stat-row"><span class="stat-label">PMI</span><span class="stat-val cv-green">&gt;52
+                            (expanding)</span></div>
+                    <div class="stat-row"><span class="stat-label">Earnings growth</span><span
+                            class="stat-val cv-green">10–20% YoY</span></div>
+                    <div class="stat-row"><span class="stat-label">Best sectors</span><span
+                            class="stat-val cv-green">Technology, industrials, materials</span></div>
+                    <div class="stat-row"><span class="stat-label">Duration historically</span><span
+                            class="stat-val cv-blue">2–4 years of this phase</span></div>
+                </div>
+            </div>
+
+            <div class="cycle-card">
+                <div class="cycle-header">
+                    <div class="cycle-title" style="color:var(--amber)">Late Cycle / Peak</div>
+                    <div class="cycle-sub">Overheating — metrics look great but risk is building</div>
+                </div>
+                <div class="cycle-body">
+                    <div class="stat-row"><span class="stat-label">Price behavior</span><span
+                            class="stat-val cv-amber">Gains continuing but slowing</span></div>
+                    <div class="stat-row"><span class="stat-label">Typical annual S&amp;P return</span><span
+                            class="stat-val cv-amber">+5% to +15% (volatile)</span></div>
+                    <div class="stat-row"><span class="stat-label">VIX level</span><span
+                            class="stat-val cv-amber">Oscillating 15–30 with spikes</span></div>
+                    <div class="stat-row"><span class="stat-label">GDP growth</span><span
+                            class="stat-val cv-amber">1–2.5% (above but slowing)</span></div>
+                    <div class="stat-row"><span class="stat-label">Inflation</span><span
+                            class="stat-val cv-amber">Rising — Fed hiking</span></div>
+                    <div class="stat-row"><span class="stat-label">Yield curve</span><span
+                            class="stat-val cv-red">Flattening or inverting</span></div>
+                    <div class="stat-row"><span class="stat-label">Best sectors</span><span
+                            class="stat-val cv-amber">Energy, materials, healthcare</span></div>
+                    <div class="stat-row"><span class="stat-label">Key warning signals</span><span
+                            class="stat-val cv-red">LEI declining, yield curve inverting</span></div>
+                </div>
+            </div>
+
+            <div class="cycle-card">
+                <div class="cycle-header">
+                    <div class="cycle-title" style="color:var(--green)">Bull Market — Key Historical Stats</div>
+                    <div class="cycle-sub">Long-term uptrends: S&amp;P 500 historical benchmarks</div>
+                </div>
+                <div class="cycle-body">
+                    <div class="stat-row"><span class="stat-label">Average bull market gain</span><span
+                            class="stat-val cv-green">+178% (since 1928)</span></div>
+                    <div class="stat-row"><span class="stat-label">Average bull market duration</span><span
+                            class="stat-val cv-blue">5.5 years (since 1928)</span></div>
+                    <div class="stat-row"><span class="stat-label">Longest bull market</span><span
+                            class="stat-val cv-blue">2009–2020: 10.8 years</span></div>
+                    <div class="stat-row"><span class="stat-label">Largest bull market gain</span><span
+                            class="stat-val cv-green">2009–2020: +530%</span></div>
+                    <div class="stat-row"><span class="stat-label">S&amp;P 500 avg annual return (100yr)</span><span
+                            class="stat-val cv-green">+10.5% (incl. dividends)</span></div>
+                    <div class="stat-row"><span class="stat-label">% of time S&amp;P in bull market</span><span
+                            class="stat-val cv-green">~78% of all trading days</span></div>
+                    <div class="stat-row"><span class="stat-label">Avg correction during bull market</span><span
+                            class="stat-val cv-amber">−13.7% (every 1.8 years avg)</span></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="tier">
+            <div class="tier-line"></div><span class="tier-txt">Economic macro thresholds — the numbers your system
+                needs to classify the regime</span>
+            <div class="tier-line"></div>
+        </div>
+        <table class="htable">
+            <thead>
+                <tr>
+                    <th>Indicator</th>
+                    <th>Recession / Bear</th>
+                    <th>Caution / Late Cycle</th>
+                    <th>Neutral / Normal</th>
+                    <th>Expansion / Bull</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>GDP Growth (annualized)</td>
+                    <td class="mono cv-red">&lt;0% (2 qtrs)</td>
+                    <td class="mono cv-amber">0–1.5%</td>
+                    <td class="mono">1.5–2.5%</td>
+                    <td class="mono cv-green">&gt;2.5%</td>
+                </tr>
+                <tr>
+                    <td>Unemployment Rate (US)</td>
+                    <td class="mono cv-red">&gt;6% rising</td>
+                    <td class="mono cv-amber">4.5–6%</td>
+                    <td class="mono">3.5–4.5%</td>
+                    <td class="mono cv-green">&lt;3.5%</td>
+                </tr>
+                <tr>
+                    <td>NFP Monthly Change</td>
+                    <td class="mono cv-red">&lt;0 (net job losses)</td>
+                    <td class="mono cv-amber">0–75K</td>
+                    <td class="mono">75–200K</td>
+                    <td class="mono cv-green">&gt;200K</td>
+                </tr>
+                <tr>
+                    <td>ISM Manufacturing PMI</td>
+                    <td class="mono cv-red">&lt;45</td>
+                    <td class="mono cv-amber">45–50</td>
+                    <td class="mono">50–55</td>
+                    <td class="mono cv-green">&gt;55</td>
+                </tr>
+                <tr>
+                    <td>CPI (Headline YoY)</td>
+                    <td class="mono cv-red">&lt;0 or &gt;7%</td>
+                    <td class="mono cv-amber">4–7% or &lt;1%</td>
+                    <td class="mono">1–2.5%</td>
+                    <td class="mono cv-green">2–3% (controlled)</td>
+                </tr>
+                <tr>
+                    <td>10Y-2Y Yield Spread</td>
+                    <td class="mono cv-red">&lt;−50bps (deeply inv)</td>
+                    <td class="mono cv-amber">−50 to 0bps</td>
+                    <td class="mono">0–100bps</td>
+                    <td class="mono cv-green">&gt;100bps</td>
+                </tr>
+                <tr>
+                    <td>HY Credit Spread</td>
+                    <td class="mono cv-red">&gt;700bps</td>
+                    <td class="mono cv-amber">400–700bps</td>
+                    <td class="mono">250–400bps</td>
+                    <td class="mono cv-green">&lt;250bps</td>
+                </tr>
+                <tr>
+                    <td>VIX (Fear Index)</td>
+                    <td class="mono cv-red">&gt;35</td>
+                    <td class="mono cv-amber">25–35</td>
+                    <td class="mono">15–25</td>
+                    <td class="mono cv-green">&lt;15</td>
+                </tr>
+                <tr>
+                    <td>Conference Board LEI</td>
+                    <td class="mono cv-red">−3+ months consecutive declines</td>
+                    <td class="mono cv-amber">Flat or 1–2 declines</td>
+                    <td class="mono">Flat to slightly up</td>
+                    <td class="mono cv-green">Rising consistently</td>
+                </tr>
+                <tr>
+                    <td>Initial Jobless Claims (4WMA)</td>
+                    <td class="mono cv-red">&gt;350K rising</td>
+                    <td class="mono cv-amber">275–350K</td>
+                    <td class="mono">200–275K</td>
+                    <td class="mono cv-green">&lt;200K</td>
+                </tr>
+                <tr>
+                    <td>Fed Policy Stance</td>
+                    <td class="mono cv-red">Emergency cuts / QE</td>
+                    <td class="mono cv-amber">Hiking or on pause</td>
+                    <td class="mono">Neutral</td>
+                    <td class="mono cv-green">Accommodative / cutting</td>
+                </tr>
+                <tr>
+                    <td>S&amp;P 500 vs 200-day MA</td>
+                    <td class="mono cv-red">10%+ below 200MA</td>
+                    <td class="mono cv-amber">0–5% below 200MA</td>
+                    <td class="mono">At or just above 200MA</td>
+                    <td class="mono cv-green">5%+ above 200MA</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- ═══════════════════════════════
+     MACRO CORRELATIONS
+═══════════════════════════════ -->
+    <div class="panel" id="panel-corr">
+        <p class="corr-intro">The most important macro transmission chains — how one variable causes moves in another
+            across markets. These are the relationships your system's regime classification must understand to correctly
+            weight each signal.</p>
+
+        <div class="ccluster">
+            <div class="ccluster-title">1. The primary rate transmission chain</div>
+            <div class="ccluster-desc">The most important macro chain — how Fed decisions ripple through every asset
+                class with different lags.</div>
+            <table class="ct">
+                <thead>
+                    <tr>
+                        <th>Cause</th>
+                        <th>Effect</th>
+                        <th>Direction</th>
+                        <th>Typical lag</th>
+                        <th>Trading implication</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Fed hikes rates</td>
+                        <td>Short-term yields rise</td>
+                        <td><span class="dir dp">Direct</span></td>
+                        <td>Immediate</td>
+                        <td>Money market funds become attractive vs. equities</td>
+                    </tr>
+                    <tr>
+                        <td>Short rates rise</td>
+                        <td>Yield curve flattens / inverts</td>
+                        <td><span class="dir dp">Direct</span></td>
+                        <td>Weeks</td>
+                        <td>Bank stocks underperform (compressed net interest margin)</td>
+                    </tr>
+                    <tr>
+                        <td>Real rates rise</td>
+                        <td>Growth stocks compress</td>
+                        <td><span class="dir dn">Inverse</span></td>
+                        <td>Immediate to months</td>
+                        <td>Duration effect: DCF values fall as discount rate rises. Worst for unprofitable tech.</td>
+                    </tr>
+                    <tr>
+                        <td>Rate hikes</td>
+                        <td>USD strengthens</td>
+                        <td><span class="dir dp">Direct</span></td>
+                        <td>Days to weeks</td>
+                        <td>Headwind for S&amp;P 500 multinationals (20–40% international revenue)</td>
+                    </tr>
+                    <tr>
+                        <td>USD strengthens</td>
+                        <td>Commodities fall</td>
+                        <td><span class="dir dn">Inverse</span></td>
+                        <td>Weeks</td>
+                        <td>Commodity producers (energy, materials) underperform; commodity importers benefit</td>
+                    </tr>
+                    <tr>
+                        <td>Rate hikes</td>
+                        <td>Housing slows</td>
+                        <td><span class="dir dn">Inverse</span></td>
+                        <td>3–9 months</td>
+                        <td>Homebuilders, REITs, mortgage lenders all underperform</td>
+                    </tr>
+                    <tr>
+                        <td>Yield curve inverts</td>
+                        <td>Bank lending tightens</td>
+                        <td><span class="dir dp">Direct</span></td>
+                        <td>3–6 months</td>
+                        <td>Credit contraction → small business stress → employment weakness</td>
+                    </tr>
+                    <tr>
+                        <td>Credit tightens</td>
+                        <td>Recession risk rises</td>
+                        <td><span class="dir dp">Direct</span></td>
+                        <td>6–18 months</td>
+                        <td>Reduce cyclical exposure; increase cash/defensives/short duration</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="ccluster">
+            <div class="ccluster-title">2. Dollar &amp; inter-market correlation matrix</div>
+            <div class="ccluster-desc">USD strength is the most cross-market impactful variable after Fed policy itself.
+            </div>
+            <table class="ct">
+                <thead>
+                    <tr>
+                        <th>When USD rises (DXY up)</th>
+                        <th>Correlation</th>
+                        <th>Magnitude</th>
+                        <th>Mechanism</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Gold price</td>
+                        <td><span class="cn">Inverse (−0.7 to −0.9)</span></td>
+                        <td>Strong</td>
+                        <td>Gold priced in USD — stronger dollar = same gold in USD costs less</td>
+                    </tr>
+                    <tr>
+                        <td>Oil / Commodities (CRB)</td>
+                        <td><span class="cn">Inverse (−0.5 to −0.8)</span></td>
+                        <td>Strong</td>
+                        <td>All commodities priced in USD — dollar up = commodity prices fall globally</td>
+                    </tr>
+                    <tr>
+                        <td>EM equities (EEM)</td>
+                        <td><span class="cn">Inverse (−0.6 to −0.8)</span></td>
+                        <td>Strong</td>
+                        <td>USD debt burden rises, capital flows from EM to US, EM currencies weaken</td>
+                    </tr>
+                    <tr>
+                        <td>S&amp;P 500 (large caps)</td>
+                        <td><span class="cn">Mildly inverse (−0.2 to −0.4)</span></td>
+                        <td>Moderate</td>
+                        <td>~40% of S&amp;P revenue is international — translates back at lower USD value</td>
+                    </tr>
+                    <tr>
+                        <td>US small caps (IWM)</td>
+                        <td><span class="cp">Slightly positive</span></td>
+                        <td>Weak</td>
+                        <td>Small caps mostly domestic revenue — less currency headwind than large caps</td>
+                    </tr>
+                    <tr>
+                        <td>AUD/USD</td>
+                        <td><span class="cn">Inverse (strong)</span></td>
+                        <td>Very strong</td>
+                        <td>AUD is a commodity/China proxy — USD up = AUD down typically</td>
+                    </tr>
+                    <tr>
+                        <td>US Treasuries (TLT)</td>
+                        <td><span class="cp">Mildly positive</span></td>
+                        <td>Moderate</td>
+                        <td>Flight-to-quality often involves buying both USD and Treasuries simultaneously</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="ccluster">
+            <div class="ccluster-title">3. Inflation regime &amp; sector rotation correlation</div>
+            <div class="ccluster-desc">The most important portfolio positioning insight — which sectors perform in which
+                inflation/rate regime.</div>
+            <table class="ct">
+                <thead>
+                    <tr>
+                        <th>Macro regime</th>
+                        <th>Outperforming sectors</th>
+                        <th>Underperforming sectors</th>
+                        <th>Key macro signals</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><span class="cp">Low inflation, low rates, growth</span></td>
+                        <td>Technology, Consumer Discretionary, Communication Services, Growth stocks</td>
+                        <td>Energy, Materials, Financials (low margins)</td>
+                        <td>CPI &lt;2.5%, 10Y &lt;2%, PMI &gt;52, GDP &gt;2.5%</td>
+                    </tr>
+                    <tr>
+                        <td><span class="cw">Rising inflation, rising rates</span></td>
+                        <td>Energy, Materials, Financials (rising NIM), Healthcare, Real Assets</td>
+                        <td>Technology, Long-duration growth, REITs, Utilities</td>
+                        <td>CPI &gt;3%, 10Y rising, yield curve steepening from trough</td>
+                    </tr>
+                    <tr>
+                        <td><span class="cn">High inflation + slowing growth (stagflation)</span></td>
+                        <td>Energy, Commodity producers, TIPS, Gold, Cash</td>
+                        <td>Almost everything else — the worst environment</td>
+                        <td>CPI &gt;5%, PMI &lt;50, GDP slowing, real wages falling</td>
+                    </tr>
+                    <tr>
+                        <td><span class="cw">Declining inflation, pause before cuts</span></td>
+                        <td>Healthcare, Consumer Staples, Utilities (defensive), Quality value</td>
+                        <td>Cyclicals, speculative growth</td>
+                        <td>CPI falling toward 3%, Fed pausing, yield curve still inverted</td>
+                    </tr>
+                    <tr>
+                        <td><span class="cp">Falling inflation, rate cuts, recovery</span></td>
+                        <td>Technology, Small caps, Financials, Consumer Discretionary, Growth</td>
+                        <td>Energy (demand concern), Commodity producers</td>
+                        <td>CPI near 2%, Fed cutting, yield curve steepening, PMI recovering</td>
+                    </tr>
+                    <tr>
+                        <td><span class="cn">Deflation / recession</span></td>
+                        <td>Treasuries (TLT), Cash, Gold, Consumer Staples, Healthcare</td>
+                        <td>Cyclicals, Financials, Energy, Industrials</td>
+                        <td>CPI &lt;1%, GDP negative, PMI &lt;45, HY spreads &gt;600bps</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="ccluster">
+            <div class="ccluster-title">4. Credit as the leading indicator for equities</div>
+            <div class="ccluster-desc">Credit markets consistently lead equity markets at turning points. These are the
+                specific signals to watch.</div>
+            <table class="ct">
+                <thead>
+                    <tr>
+                        <th>Credit signal</th>
+                        <th>Equity implication</th>
+                        <th>Historical lead time</th>
+                        <th>Source data</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><span class="cn">HY spreads widening &gt;50bps in one month</span></td>
+                        <td>Equity correction likely within 4–8 weeks</td>
+                        <td>4–8 weeks</td>
+                        <td>FRED: BAMLH0A0HYM2</td>
+                    </tr>
+                    <tr>
+                        <td><span class="cn">Investment grade spreads above 200bps</span></td>
+                        <td>Significant equity downside underway or imminent</td>
+                        <td>0–4 weeks</td>
+                        <td>FRED: BAMLC0A0CM</td>
+                    </tr>
+                    <tr>
+                        <td><span class="cp">HY spreads compressing from elevated levels</span></td>
+                        <td>Equity recovery sustainable — credit leading the way</td>
+                        <td>2–6 weeks lead on equities</td>
+                        <td>FRED: BAMLH0A0HYM2</td>
+                    </tr>
+                    <tr>
+                        <td><span class="cn">TED spread spike above 100bps</span></td>
+                        <td>Systemic banking stress — emergency risk-off protocol</td>
+                        <td>Immediate to 2 weeks</td>
+                        <td>FRED: TEDRATE</td>
+                    </tr>
+                    <tr>
+                        <td><span class="cn">Bank CDS spreads doubling</span></td>
+                        <td>Bank stress event likely (SVB/Credit Suisse pattern)</td>
+                        <td>Days to weeks</td>
+                        <td>Bloomberg / Markit CDS data</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="ccluster">
+            <div class="ccluster-title">5. China macro → global commodity &amp; EM chain</div>
+            <div class="ccluster-desc">The most reliable EM and commodity transmission mechanism — essential for
+                cross-asset regime signals.</div>
+            <table class="ct">
+                <thead>
+                    <tr>
+                        <th>China signal</th>
+                        <th>Correlated asset</th>
+                        <th>Direction</th>
+                        <th>Mechanism</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>China Caixin PMI above 52</td>
+                        <td>Copper price</td>
+                        <td><span class="cp">Positive (+0.7)</span></td>
+                        <td>China consumes 55% of global copper — demand signal directly</td>
+                    </tr>
+                    <tr>
+                        <td>China construction activity rising</td>
+                        <td>Iron ore, Steel</td>
+                        <td><span class="cp">Positive (very strong)</span></td>
+                        <td>Chinese steel production = 50%+ of global — property/infra drives demand</td>
+                    </tr>
+                    <tr>
+                        <td>China growth accelerating</td>
+                        <td>AUD/USD</td>
+                        <td><span class="cp">Positive (+0.8)</span></td>
+                        <td>Australia exports 40%+ of goods to China — AUD is liquid China proxy</td>
+                    </tr>
+                    <tr>
+                        <td>China PMI below 49</td>
+                        <td>EM equities broadly</td>
+                        <td><span class="cn">Negative</span></td>
+                        <td>China is the demand engine for EM economies — contraction exports weakness</td>
+                    </tr>
+                    <tr>
+                        <td>PBOC stimulus announcement</td>
+                        <td>Hong Kong/China equities, Copper, AUD</td>
+                        <td><span class="cp">Sharp positive (days)</span></td>
+                        <td>Sep 2024 stimulus caused Hang Seng +20% in 5 days — most powerful EM catalyst</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+function sw(id) {
+  const ids = ['monetary','growth','inflation','global','news','cycles','corr'];
+  document.querySelectorAll('.ntab').forEach((t,i) => t.classList.toggle('active', ids[i]===id));
+  document.querySelectorAll('.panel').forEach(p => p.classList.toggle('active', p.id==='panel-'+id));
+}
+function tog(el) { el.classList.toggle('open'); }
+    </script>
+</body>
+
+</html>
