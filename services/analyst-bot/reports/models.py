@@ -168,6 +168,27 @@ class FundamentalSnapshot:
     t2_health_score: Optional[float] = None  # -1 … +1 (ROE + D/E + Current Ratio)
     t2_health_tier: Optional[str] = None     # "healthy" | "neutral" | "stressed"
 
+    # ── Qualitative signals (structurally derived, no LLM) ────────────────────
+    # Moat Proxy — gross margin stability + ROE level (Tier 1: Competitive Moat)
+    qual_moat_proxy_tier: Optional[str] = None     # "strong_moat_proxy" | "moderate_moat_proxy" | "weak_moat_proxy"
+    qual_moat_margin_mean: Optional[float] = None  # mean gross margin across history (%)
+    qual_moat_margin_std: Optional[float] = None   # std dev of gross margin (pp) — lower = more stable
+
+    # Insider Activity — SEC Form 4 cluster detection (Tier 1: Management Quality)
+    qual_insider_signal: Optional[str] = None       # "cluster_buy" | "single_buy" | "neutral" | "cluster_sell"
+    qual_insider_buyer_count: Optional[int] = None  # distinct insiders buying in window
+    qual_insider_seller_count: Optional[int] = None
+
+    # News Sentiment — Alpha Vantage per-article scores (Tier 2: News Sentiment)
+    qual_news_sentiment_7d: Optional[float] = None    # avg sentiment over 7 days (-1 to +1)
+    qual_news_sentiment_7d_tier: Optional[str] = None  # "positive" | "neutral" | "negative"
+    qual_news_sentiment_30d: Optional[float] = None   # avg sentiment over 30 days
+    qual_news_sentiment_30d_tier: Optional[str] = None
+
+    # R&D Intensity — R&D as % of quarterly revenue (Tier 2: R&D Pipeline)
+    qual_rd_intensity_pct: Optional[float] = None  # R&D / revenue × 100
+    qual_rd_tier: Optional[str] = None             # "investing_in_future" | "moderate" | "harvesting"
+
 
 # ── Sentiment ─────────────────────────────────────────────────────────────────
 

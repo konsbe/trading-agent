@@ -73,17 +73,32 @@ func main() {
 	if cfg.EnableRecommendation {
 		w.runRecommendations(context.Background())
 	}
+	if cfg.EnableInsiderTransactions {
+		w.runInsiderTransactions(context.Background())
+	}
+	if cfg.EnableNewsSentiment && av.HasKey() {
+		w.runNewsSentiment(context.Background())
+	}
+	if cfg.EnableInstitutionalOwnership {
+		w.runInstitutionalOwnership(context.Background())
+	}
 
 	tMetrics := time.NewTicker(cfg.PollMetrics)
 	tFinancials := time.NewTicker(cfg.PollFinancials)
 	tEarnings := time.NewTicker(cfg.PollEarnings)
 	tOverview := time.NewTicker(cfg.PollOverview)
 	tRecommendation := time.NewTicker(cfg.PollRecommendation)
+	tInsider := time.NewTicker(cfg.PollInsiderTransactions)
+	tNewsSentiment := time.NewTicker(cfg.PollNewsSentiment)
+	tInstitutional := time.NewTicker(cfg.PollInstitutionalOwnership)
 	defer tMetrics.Stop()
 	defer tFinancials.Stop()
 	defer tEarnings.Stop()
 	defer tOverview.Stop()
 	defer tRecommendation.Stop()
+	defer tInsider.Stop()
+	defer tNewsSentiment.Stop()
+	defer tInstitutional.Stop()
 
 	for {
 		select {
@@ -106,6 +121,18 @@ func main() {
 		case <-tRecommendation.C:
 			if cfg.EnableRecommendation {
 				w.runRecommendations(context.Background())
+			}
+		case <-tInsider.C:
+			if cfg.EnableInsiderTransactions {
+				w.runInsiderTransactions(context.Background())
+			}
+		case <-tNewsSentiment.C:
+			if cfg.EnableNewsSentiment && av.HasKey() {
+				w.runNewsSentiment(context.Background())
+			}
+		case <-tInstitutional.C:
+			if cfg.EnableInstitutionalOwnership {
+				w.runInstitutionalOwnership(context.Background())
 			}
 		}
 	}
@@ -416,6 +443,33 @@ func (w *worker) storeFinancials(ctx context.Context, freq string, limit int) {
 			"FinanceLeaseInterestExpense",
 		)), nil)
 
+		// ── ROIC inputs: pre-tax income, tax expense, current liabilities ─
+		// Used by the analyzer to compute NOPAT / Invested Capital.
+		// NOPAT = OperatingIncome × (1 − effective_tax_rate)
+		// Invested Capital = Total Assets − Current Liabilities
+		upsert("pretax_income_reported", divM(conceptVal(ic,
+			"IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest",
+			"IncomeLossFromContinuingOperationsBeforeIncomeTaxes",
+			"IncomeLossBeforeIncomeTaxes",
+		)), nil)
+		upsert("tax_expense_reported", divM(conceptVal(ic,
+			"IncomeTaxExpenseBenefit",
+			"IncomeTaxExpense",
+			"CurrentIncomeTaxExpenseBenefit",
+		)), nil)
+		upsert("current_liabilities_reported", divM(conceptVal(bs,
+			"LiabilitiesCurrent",
+			"CurrentLiabilities",
+		)), nil)
+
+		// ── R&D Expense ─────────────────────────────────────────────────────
+		// Enables qual_rd_intensity: R&D% of revenue signals innovation investment.
+		// Stored in millions, consistent with all other XBRL dollar amounts.
+		upsert("rd_expense_reported", divM(conceptVal(ic,
+			"ResearchAndDevelopmentExpense",
+			"ResearchAndDevelopmentExpenseExcludingAcquiredInProcessCost",
+		)), nil)
+
 			// Raw report payload for forward-compat access.
 			upsert("report_raw", nil, report)
 			stored++
@@ -642,6 +696,171 @@ func (w *worker) runRecommendations(ctx context.Context) {
 			"current_net_score", current,
 			"trend_delta", delta,
 		)
+	}
+}
+
+// ─── Qualitative data: insider transactions ───────────────────────────────────
+//
+// Fetches SEC Form 4 insider buy/sell filings from Finnhub.
+// Cluster buying (3+ distinct insiders in 90 days) is a high-conviction signal.
+//
+// Transaction codes:
+//
+//	P = open-market purchase  (most bullish)
+//	S = sale                  (informational — insiders sell for many reasons)
+//	A = award/grant           (compensation, not informational)
+//	F = tax withholding       (automatic, ignore)
+//	M = option exercise       (often followed by S, not informational on its own)
+
+func (w *worker) runInsiderTransactions(ctx context.Context) {
+	for _, sym := range w.cfg.Symbols {
+		items, err := w.fh.InsiderTransactions(ctx, sym)
+		if err != nil {
+			w.log.Warn("finnhub insider-transactions", "symbol", sym, "err", err)
+			continue
+		}
+
+		stored := 0
+		for _, item := range items {
+			// transactionDate: "2024-01-15" → parse to time.Time.
+			dateStr, _ := item["transactionDate"].(string)
+			if dateStr == "" {
+				continue
+			}
+			ts, err := time.Parse("2006-01-02", dateStr)
+			if err != nil {
+				continue
+			}
+
+			name, _ := item["name"].(string)
+			code, _ := item["transactionCode"].(string)
+			if code == "" {
+				code, _ = item["acquistionOrDisposition"].(string)
+			}
+
+			var shares *float64
+			if v, ok := item["change"].(float64); ok {
+				abs := v
+				if abs < 0 {
+					abs = -abs
+				}
+				shares = &abs
+			}
+
+			var price *float64
+			if v, ok := item["transactionPrice"].(float64); ok && v > 0 {
+				price = &v
+			}
+
+			var filingDate *time.Time
+			if fd, _ := item["filingDate"].(string); fd != "" {
+				if ft, err2 := time.Parse("2006-01-02", fd); err2 == nil {
+					filingDate = &ft
+				}
+			}
+
+			if err := store.UpsertInsiderTransaction(ctx, w.pool, ts, sym, name, code, shares, price, filingDate); err != nil {
+				w.log.Error("upsert insider_transaction", "symbol", sym, "err", err)
+				continue
+			}
+			stored++
+		}
+
+		w.log.Info("insider transactions stored", "symbol", sym, "count", stored)
+	}
+}
+
+// ─── Qualitative data: news sentiment ────────────────────────────────────────
+//
+// Fetches up to 50 recent articles with per-ticker sentiment scores from
+// Alpha Vantage NEWS_SENTIMENT. Each article is inserted into news_headlines
+// with the numeric sentiment score populated.
+//
+// Sentiment scale: > 0.35 Bullish, 0.15–0.35 Somewhat-Bullish,
+// -0.15–0.15 Neutral, -0.35–-0.15 Somewhat-Bearish, < -0.35 Bearish.
+
+func (w *worker) runNewsSentiment(ctx context.Context) {
+	if !w.av.HasKey() {
+		w.log.Debug("Alpha Vantage key not set; skipping news sentiment")
+		return
+	}
+	ts := time.Now().UTC()
+	_ = ts
+	for _, sym := range w.cfg.Symbols {
+		articles, err := w.av.NewsSentiment(ctx, sym)
+		if err != nil {
+			w.log.Warn("alpha vantage news_sentiment", "symbol", sym, "err", err)
+			continue
+		}
+
+		stored := 0
+		for _, art := range articles {
+			score := art.OverallSentimentScore
+			if art.HasTickerSentiment {
+				score = art.TickerSentimentScore
+			}
+			sentScore := score
+
+			if err := store.InsertNews(ctx, w.pool, art.TimePublished, "alphavantage_sentiment", sym,
+				art.Title, art.URL, &sentScore, nil,
+			); err != nil {
+				w.log.Debug("insert news sentiment", "symbol", sym, "err", err)
+				continue
+			}
+			stored++
+		}
+
+		w.log.Info("news sentiment stored", "symbol", sym, "articles", stored)
+	}
+}
+
+// ─── Qualitative data: institutional ownership ────────────────────────────────
+//
+// Fetches the top institutional holders from Finnhub and stores their
+// aggregate position change as an equity_fundamentals derived metric.
+// Positive total change = institutions net accumulating; negative = distributing.
+
+func (w *worker) runInstitutionalOwnership(ctx context.Context) {
+	ts := time.Now().UTC()
+	for _, sym := range w.cfg.Symbols {
+		holders, err := w.fh.InvestorOwnership(ctx, sym, w.cfg.InstitutionalOwnershipLimit)
+		if err != nil {
+			w.log.Warn("finnhub investor-ownership", "symbol", sym, "err", err)
+			continue
+		}
+		if len(holders) == 0 {
+			continue
+		}
+
+		var totalShares, totalChange float64
+		for _, h := range holders {
+			if v, ok := h["share"].(float64); ok {
+				totalShares += v
+			}
+			if v, ok := h["change"].(float64); ok {
+				totalChange += v
+			}
+		}
+
+		holderCount := float64(len(holders))
+		upsert := func(metric string, value *float64, payload any) {
+			if err := store.UpsertFundamental(ctx, w.pool, ts, sym, "ttm", metric, value, payload, "finnhub_ownership"); err != nil {
+				w.log.Error("upsert fundamental", "metric", metric, "symbol", sym, "err", err)
+			}
+		}
+
+		upsert("institutional_holder_count", &holderCount, map[string]any{
+			"top_n":        w.cfg.InstitutionalOwnershipLimit,
+			"total_shares": totalShares,
+			"total_change": totalChange,
+			"note":         "count of top institutional holders in Finnhub investor-ownership response",
+		})
+		upsert("institutional_net_change", &totalChange, map[string]any{
+			"positive": "institutions net buying (accumulating)",
+			"negative": "institutions net selling (distributing)",
+		})
+
+		w.log.Info("institutional ownership stored", "symbol", sym, "holders", len(holders), "net_change", totalChange)
 	}
 }
 

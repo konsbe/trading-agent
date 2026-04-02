@@ -288,13 +288,22 @@ The `ROA` (Return on Assets) shown inline is informational: > 10% high efficienc
 
 ### ROIC (Return on Invested Capital)
 
-ROIC measures how efficiently the company deploys **all** invested capital (equity + debt). It is a stricter test than ROE because it cannot be inflated by leverage. ROIC consistently above the cost of capital (typically ~10%) is the hallmark of a compounding machine. Source: Finnhub `roic5Y` (5-year average).
+ROIC measures how efficiently the company deploys **all** invested capital (equity + debt). It is a stricter test than ROE because it cannot be inflated by leverage. ROIC consistently above the cost of capital (typically ~10%) is the hallmark of a compounding machine.
+
+**How it's computed (from XBRL SEC filings — free tier):**
+`NOPAT = Operating Income × (1 − effective tax rate)` (annualised from latest quarter × 4)
+`Invested Capital = Total Assets − Current Liabilities`
+`ROIC = NOPAT / Invested Capital × 100`
+
+Fallback: Finnhub `roic5Y` (5-year average) when XBRL data is unavailable.
 
 `🟢 moat_quality` > 15% — Durable economic moat. Company earns well above its cost of capital.
 `🟡 adequate_roic` 8–15% — Acceptable. Value creation present but not exceptional.
 `🔴 low_roic` < 8% — Earning near or below cost of capital. Capital deployment is inefficient.
 
-Example: `🟢 +28.5% (moat_quality) · 5Y avg` — AAPL earns 28.5% on all invested capital over the last 5 years, well above its ~10% cost of capital.
+The `source` shown in parentheses is `xbrl_computed` (live quarterly data) or `finnhub_5y_avg` (historical average). XBRL is preferred as it reflects the most recent filing.
+
+Example: `🟢 +24.1% (moat_quality)` — AAPL's NOPAT divided by invested capital = 24.1%, well above its ~10% cost of capital.
 
 Configurable via `FUNDAMENTAL_ROIC_EXCELLENT` (default 15) and `FUNDAMENTAL_ROIC_ADEQUATE` (default 8).
 
@@ -511,6 +520,81 @@ Alerts post to `#alerts` automatically every 5 minutes (configurable). Each has 
 `VIX: 25.2` — FRED `VIXCLS`. Market fear index. See VIX Regime section above.
 `10Y: 4.35%` — FRED `DGS10`. 10-year US Treasury yield. Rising = tighter financial conditions.
 `EUR/USD: 1.1520` — FRED `DEXUSEU`. Euro vs US Dollar exchange rate.
+
+---
+
+## Qualitative Signals
+
+Qualitative signals appear in the `🧠 Qualitative Signals` embed after the Tier 3 deep-context block. These are **structural proxies** computed from real data — they do not require reading 10-K prose or earnings call transcripts. An LLM layer (planned for a future release) will add richer text-based analysis.
+
+### Moat Proxy (Tier 1 — Competitive Moat)
+
+A moat proxy is computed from three structural inputs — no text analysis required.
+
+**Scoring (1 point each):**
+Current gross margin ≥ 40% → pricing power signal.
+Gross margin standard deviation < `QUAL_MOAT_STABLE_STD_PP` (default 5pp) across 8 quarters → stability signal.
+ROE ≥ 15% → sustained profitability signal.
+
+`🏰 strong_moat_proxy` 3/3 — All three signals pass. Strong structural evidence of a durable competitive position.
+`🟡 moderate_moat_proxy` 2/3 — Partial evidence. Monitor for erosion.
+`🔴 weak_moat_proxy` 0–1/3 — No structural moat detected.
+
+The `GM avg` shows the mean gross margin across history; `σ` shows the standard deviation in percentage points. A low σ means margins are stable, not just high.
+
+Configurable via `QUAL_MOAT_STABLE_STD_PP` (default 5) and `QUAL_MOAT_STABILITY_QUARTERS` (default 8).
+
+**Note:** This proxy can only detect structural evidence of a moat. It cannot assess brand strength, patent pipelines, or network effects — those require LLM analysis of 10-K filings.
+
+### Insider Activity (Tier 1 — Management Quality)
+
+Reads SEC Form 4 filings ingested from Finnhub `/stock/insider-transactions`. Tracks open-market purchases (`P`) by corporate insiders (executives, directors, major shareholders).
+
+**Why it matters:** Insiders sell for many reasons (taxes, diversification, planned liquidations). But insiders **buy** for only one reason — they believe the stock is undervalued. Cluster buying (multiple distinct insiders buying within a short window) is one of the highest-conviction bullish signals available.
+
+`🟢 cluster_buy` 3+ distinct insiders purchased open-market shares within the lookback window. High-conviction bullish.
+`🟡 single_buy` 1–2 insiders purchased. Mildly bullish — could be individual conviction or routine.
+`🔴 cluster_sell` 3+ distinct insiders sold shares. Informational — see note below.
+`🟡 neutral` No significant insider activity in the lookback window.
+
+The **buyer count** and **seller count** show how many distinct insiders transacted.
+
+**Note:** Cluster selling is less informative than cluster buying. Directors routinely sell for estate planning, tax purposes, and 10b5-1 plans. Flag it as context, not a primary signal.
+
+Configurable via `QUAL_INSIDER_CLUSTER_WINDOW_DAYS` (default 90) and `QUAL_INSIDER_CLUSTER_MIN_BUYERS` (default 3).
+
+### News Sentiment (Tier 2 — Media Narrative)
+
+7-day and 30-day rolling average sentiment scores computed from Alpha Vantage `NEWS_SENTIMENT` API. Each article is scored from −1.0 (Bearish) to +1.0 (Bullish). The per-ticker score is used when available, falling back to the overall article sentiment.
+
+`🟢 positive` Average sentiment > 0.15 — Recent news flow is predominantly positive.
+`🟡 neutral` Average sentiment −0.15 to +0.15 — Mixed or flat news coverage.
+`🔴 negative` Average sentiment < −0.15 — Recent news flow is predominantly negative.
+`⚪ insufficient_data` No news articles with sentiment scores in the window. Enable `FUNDAMENTAL_ENABLE_NEWS_SENTIMENT=true` and wait for the first poll cycle.
+
+**Reading the trend:** If 7-day sentiment is significantly worse than 30-day, sentiment is deteriorating. If 7-day is significantly better, it's improving.
+
+Example: `🟢 7d: +0.28 | 30d: +0.18` — Recent week is more bullish than the trailing month; momentum improving.
+
+Configurable via `QUAL_SENTIMENT_POSITIVE_THRESHOLD` (default 0.15) and `QUAL_SENTIMENT_NEGATIVE_THRESHOLD` (default −0.15).
+
+### R&D Intensity (Tier 2 — Innovation Trajectory)
+
+R&D expense as a percentage of quarterly revenue, both from XBRL SEC filings. Signals whether a company is investing in its future or harvesting its current position.
+
+`🟢 investing_in_future` R&D ≥ `QUAL_RD_HEALTHY_PCT`% of revenue (default 10%) — Company is actively building future products.
+`🟡 moderate` R&D ≥ `QUAL_RD_MODERATE_PCT`% of revenue (default 3%) — Moderate R&D investment.
+`🔴 harvesting` R&D < `QUAL_RD_MODERATE_PCT`% of revenue — Company is milking existing products with little reinvestment.
+
+**Sector context:** Thresholds vary significantly by industry. Tune for your watchlist:
+Tech/Software: healthy 10–20%, warning < 5%.
+Pharma/Biotech: healthy 15–25%, critical for pipeline sustainability.
+Industrials/Consumer: healthy 2–5%, > 8% is exceptional.
+ETFs/Banks/REITs: R&D is not applicable — expect no data.
+
+Configurable via `QUAL_RD_HEALTHY_PCT` (default 10) and `QUAL_RD_MODERATE_PCT` (default 3).
+
+---
 
 ## ETF / SPY Note
 

@@ -47,6 +47,23 @@ type Fundamental struct {
 
 	// Number of annual reports to store (default 5 = 5 years of 10-Ks).
 	AnnualFinancialsLimit int
+
+	// ── Qualitative data ingestion ────────────────────────────────────────────
+	// Insider transactions (Finnhub /stock/insider-transactions, SEC Form 4).
+	// Cluster buying (3+ insiders in 90 days) is a high-conviction bullish signal.
+	EnableInsiderTransactions bool
+	PollInsiderTransactions   time.Duration // default 24h
+
+	// News sentiment via Alpha Vantage NEWS_SENTIMENT endpoint.
+	// Populates news_headlines.sentiment with per-article numeric scores (-1 to +1).
+	EnableNewsSentiment    bool
+	PollNewsSentiment      time.Duration // default 24h
+
+	// Institutional ownership (Finnhub /stock/investor-ownership).
+	// Tracks top-holder share changes quarter-over-quarter.
+	EnableInstitutionalOwnership bool
+	PollInstitutionalOwnership   time.Duration // default 7×24h (quarterly data)
+	InstitutionalOwnershipLimit  int           // number of top holders to fetch (default 25)
 }
 
 func LoadFundamental() (Fundamental, error) {
@@ -84,24 +101,36 @@ func LoadFundamental() (Fundamental, error) {
 		annualLimit = 5
 	}
 
+	instLimit := intEnv("FUNDAMENTAL_INSTITUTIONAL_OWNERSHIP_LIMIT", 25)
+	if instLimit < 1 {
+		instLimit = 25
+	}
+
 	return Fundamental{
-		Base:                   b,
-		FinnhubKey:             os.Getenv("FINNHUB_API_KEY"),
-		AlphaVantageKey:        os.Getenv("ALPHA_VANTAGE_API_KEY"),
-		Symbols:                syms,
-		PollMetrics:            pollFor("DATA_FUNDAMENTAL_METRICS_POLL_INTERVAL", defaultMetrics),
-		PollFinancials:         pollFor("DATA_FUNDAMENTAL_FINANCIALS_POLL_INTERVAL", defaultFinancials),
-		PollEarnings:           pollFor("DATA_FUNDAMENTAL_EARNINGS_POLL_INTERVAL", defaultEarnings),
-		PollOverview:           pollFor("DATA_FUNDAMENTAL_OVERVIEW_POLL_INTERVAL", defaultOverview),
-		PollRecommendation:     pollFor("DATA_FUNDAMENTAL_RECOMMENDATION_POLL_INTERVAL", defaultRecommendation),
-		EnableMetrics:          env("FUNDAMENTAL_ENABLE_METRICS", "true") == "true",
-		EnableFinancials:       env("FUNDAMENTAL_ENABLE_FINANCIALS", "true") == "true",
-		EnableEarnings:         env("FUNDAMENTAL_ENABLE_EARNINGS", "true") == "true",
-		EnableOverview:         env("FUNDAMENTAL_ENABLE_OVERVIEW", "true") == "true",
-		EnableRecommendation:   env("FUNDAMENTAL_ENABLE_RECOMMENDATION", "true") == "true",
-		EnableAnnualFinancials: env("FUNDAMENTAL_ENABLE_ANNUAL_FINANCIALS", "true") == "true",
-		FinancialsFreq:         freq,
-		FinancialsLimit:        limit,
-		AnnualFinancialsLimit:  annualLimit,
+		Base:                         b,
+		FinnhubKey:                   os.Getenv("FINNHUB_API_KEY"),
+		AlphaVantageKey:              os.Getenv("ALPHA_VANTAGE_API_KEY"),
+		Symbols:                      syms,
+		PollMetrics:                  pollFor("DATA_FUNDAMENTAL_METRICS_POLL_INTERVAL", defaultMetrics),
+		PollFinancials:               pollFor("DATA_FUNDAMENTAL_FINANCIALS_POLL_INTERVAL", defaultFinancials),
+		PollEarnings:                 pollFor("DATA_FUNDAMENTAL_EARNINGS_POLL_INTERVAL", defaultEarnings),
+		PollOverview:                 pollFor("DATA_FUNDAMENTAL_OVERVIEW_POLL_INTERVAL", defaultOverview),
+		PollRecommendation:           pollFor("DATA_FUNDAMENTAL_RECOMMENDATION_POLL_INTERVAL", defaultRecommendation),
+		EnableMetrics:                env("FUNDAMENTAL_ENABLE_METRICS", "true") == "true",
+		EnableFinancials:             env("FUNDAMENTAL_ENABLE_FINANCIALS", "true") == "true",
+		EnableEarnings:               env("FUNDAMENTAL_ENABLE_EARNINGS", "true") == "true",
+		EnableOverview:               env("FUNDAMENTAL_ENABLE_OVERVIEW", "true") == "true",
+		EnableRecommendation:         env("FUNDAMENTAL_ENABLE_RECOMMENDATION", "true") == "true",
+		EnableAnnualFinancials:       env("FUNDAMENTAL_ENABLE_ANNUAL_FINANCIALS", "true") == "true",
+		FinancialsFreq:               freq,
+		FinancialsLimit:              limit,
+		AnnualFinancialsLimit:        annualLimit,
+		EnableInsiderTransactions:    env("FUNDAMENTAL_ENABLE_INSIDER_TRANSACTIONS", "true") == "true",
+		PollInsiderTransactions:      pollFor("DATA_FUNDAMENTAL_INSIDER_POLL_INTERVAL", 24*time.Hour),
+		EnableNewsSentiment:          env("FUNDAMENTAL_ENABLE_NEWS_SENTIMENT", "true") == "true",
+		PollNewsSentiment:            pollFor("DATA_FUNDAMENTAL_NEWS_SENTIMENT_POLL_INTERVAL", 24*time.Hour),
+		EnableInstitutionalOwnership: env("FUNDAMENTAL_ENABLE_INSTITUTIONAL_OWNERSHIP", "true") == "true",
+		PollInstitutionalOwnership:   pollFor("DATA_FUNDAMENTAL_INSTITUTIONAL_POLL_INTERVAL", 7*24*time.Hour),
+		InstitutionalOwnershipLimit:  instLimit,
 	}, nil
 }

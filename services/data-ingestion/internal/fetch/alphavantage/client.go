@@ -87,6 +87,95 @@ func (c *Client) Overview(ctx context.Context, symbol string) (map[string]string
 	return m, nil
 }
 
+// NewsSentimentArticle is a single article returned by the NEWS_SENTIMENT endpoint.
+type NewsSentimentArticle struct {
+	Title                 string
+	URL                   string
+	TimePublished         time.Time
+	OverallSentimentScore float64
+	TickerSentimentScore  float64  // per-ticker score (0 when ticker not in feed)
+	HasTickerSentiment    bool
+}
+
+// NewsSentiment fetches up to 50 recent articles with sentiment scores for a ticker.
+// Endpoint: function=NEWS_SENTIMENT&tickers=<ticker>&sort=LATEST&limit=50
+//
+// Rate limit note: 1 call per ticker per day is sufficient. This counts against
+// the same 25 calls/day Alpha Vantage free-tier budget as Overview().
+//
+// Alpha Vantage sentiment scale:
+//
+//	>  0.35 = Bullish,  0.15–0.35 = Somewhat-Bullish, -0.15–0.15 = Neutral,
+//	-0.35–-0.15 = Somewhat-Bearish,  < -0.35 = Bearish
+func (c *Client) NewsSentiment(ctx context.Context, ticker string) ([]NewsSentimentArticle, error) {
+	if !c.HasKey() {
+		return nil, fmt.Errorf("alpha vantage: API key not configured")
+	}
+	if err := c.Limiter.Wait(ctx); err != nil {
+		return nil, err
+	}
+	reqURL := fmt.Sprintf("%s?function=NEWS_SENTIMENT&tickers=%s&sort=LATEST&limit=50&apikey=%s",
+		base, ticker, c.APIKey)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := c.HTTP.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("alpha vantage news_sentiment %s: HTTP %s", ticker, resp.Status)
+	}
+
+	var raw struct {
+		Information string `json:"Information"`
+		Feed        []struct {
+			Title                 string  `json:"title"`
+			URL                   string  `json:"url"`
+			TimePublished         string  `json:"time_published"` // "20240115T120000"
+			OverallSentimentScore float64 `json:"overall_sentiment_score"`
+			TickerSentiment       []struct {
+				Ticker               string `json:"ticker"`
+				TickerSentimentScore string `json:"ticker_sentiment_score"`
+			} `json:"ticker_sentiment"`
+		} `json:"feed"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
+		return nil, err
+	}
+	if raw.Information != "" {
+		return nil, fmt.Errorf("alpha vantage: %s", raw.Information)
+	}
+
+	articles := make([]NewsSentimentArticle, 0, len(raw.Feed))
+	for _, item := range raw.Feed {
+		ts, err := time.Parse("20060102T150405", item.TimePublished)
+		if err != nil {
+			ts = time.Now().UTC()
+		}
+		art := NewsSentimentArticle{
+			Title:                 item.Title,
+			URL:                   item.URL,
+			TimePublished:         ts,
+			OverallSentimentScore: item.OverallSentimentScore,
+		}
+		// Find ticker-specific sentiment if available.
+		for _, ts2 := range item.TickerSentiment {
+			if ts2.Ticker == ticker {
+				if f, err2 := strconv.ParseFloat(ts2.TickerSentimentScore, 64); err2 == nil {
+					art.TickerSentimentScore = f
+					art.HasTickerSentiment = true
+				}
+				break
+			}
+		}
+		articles = append(articles, art)
+	}
+	return articles, nil
+}
+
 // FloatField parses a numeric string field from an Overview response.
 // Returns nil when the field is absent, "None", or non-numeric.
 func FloatField(m map[string]string, key string) *float64 {

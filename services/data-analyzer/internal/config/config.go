@@ -704,6 +704,31 @@ type FundamentalAnalysis struct {
 	// ── Equity interval for Tier 3 live-price lookup ─────────────────────────
 	// Used when scoreTier3 queries the latest close from equity_ohlcv.
 	EquityInterval string // e.g. "1Day"
+
+	// ── Qualitative scoring ───────────────────────────────────────────────────
+	// Insider cluster detection window and minimum unique-buyer threshold.
+	// cluster_buy is triggered when ≥ InsiderClusterMinBuyers distinct insiders
+	// submit Form 4 purchase filings within InsiderClusterWindowDays.
+	InsiderClusterWindowDays int     // default 90
+	InsiderClusterMinBuyers  int     // default 3
+
+	// Number of quarterly gross-margin data points used to compute the moat
+	// stability score (std dev of quarterly gross margin).
+	QualMoatStabilityQuarters int // default 8
+
+	// News sentiment thresholds. Sentiment scores are numeric Alpha Vantage values
+	// in the range -1.0 to +1.0 (0 = neutral).
+	QualSentimentPositive float64 // AVG sentiment > this → "positive"  default 0.15
+	QualSentimentNegative float64 // AVG sentiment < this → "negative"  default -0.15
+
+	// R&D intensity thresholds as % of revenue.
+	// Sector context: tech typically 10–20%; pharma 15–25%; industrials 2–5%.
+	QualRDHealthyPct  float64 // >= this → "investing_in_future"  default 10
+	QualRDModeratePct float64 // >= this → "moderate"             default 3
+
+	// Gross-margin standard deviation threshold (percentage points) for moat scoring.
+	// Low std dev = stable pricing power.
+	QualMoatStableStdPP float64 // std-dev < this → considered stable  default 5
 }
 
 func LoadFundamentalAnalysis() (FundamentalAnalysis, error) {
@@ -824,5 +849,15 @@ func LoadFundamentalAnalysis() (FundamentalAnalysis, error) {
 		FCFConversionLow:  floatEnv("FUNDAMENTAL_FCF_CONVERSION_LOW", 0.7),
 
 		EquityInterval: strEnvDefault("FUNDAMENTAL_EQUITY_INTERVAL", "1Day"),
+
+		// Qualitative
+		InsiderClusterWindowDays:  intEnv("QUAL_INSIDER_CLUSTER_WINDOW_DAYS", 90),
+		InsiderClusterMinBuyers:   intEnv("QUAL_INSIDER_CLUSTER_MIN_BUYERS", 3),
+		QualMoatStabilityQuarters: intEnv("QUAL_MOAT_STABILITY_QUARTERS", 8),
+		QualSentimentPositive:     floatEnv("QUAL_SENTIMENT_POSITIVE_THRESHOLD", 0.15),
+		QualSentimentNegative:     floatEnv("QUAL_SENTIMENT_NEGATIVE_THRESHOLD", -0.15),
+		QualRDHealthyPct:          floatEnv("QUAL_RD_HEALTHY_PCT", 10),
+		QualRDModeratePct:         floatEnv("QUAL_RD_MODERATE_PCT", 3),
+		QualMoatStableStdPP:       floatEnv("QUAL_MOAT_STABLE_STD_PP", 5),
 	}, nil
 }

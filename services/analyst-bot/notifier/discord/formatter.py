@@ -113,6 +113,12 @@ def _tier_emoji(tier: Optional[str]) -> str:
         "healthy": "🟢", "stressed": "🔴",
         # Tier 2 health composite re-uses Tier 1 tier names
         "low_yield": "🟡",
+        # Qualitative tiers
+        "strong_moat_proxy": "🏰", "moderate_moat_proxy": "🟡", "weak_moat_proxy": "🔴",
+        "cluster_buy": "🟢", "single_buy": "🟡", "cluster_sell": "🔴",
+        "positive": "🟢", "negative": "🔴",
+        "investing_in_future": "🟢", "harvesting": "🔴",
+        "insufficient_data": "⚪",
     }
     return mapping.get(tier or "", "⚪")
 
@@ -493,6 +499,97 @@ def sentiment_news_embed(
     return embed
 
 
+def qualitative_embed(fund: FundamentalSnapshot) -> Optional[discord.Embed]:
+    """
+    Returns an embed for qualitative signals or None if no data is available.
+    Shows moat proxy, insider activity, news sentiment trend, and R&D intensity.
+    Only rendered when at least one qualitative signal has non-null data.
+    """
+    has_any = any([
+        fund.qual_moat_proxy_tier,
+        fund.qual_insider_signal and fund.qual_insider_signal != "neutral",
+        fund.qual_news_sentiment_7d_tier and fund.qual_news_sentiment_7d_tier != "insufficient_data",
+        fund.qual_rd_tier,
+    ])
+    if not has_any:
+        return None
+
+    tier = fund.qual_moat_proxy_tier or fund.qual_insider_signal or "neutral"
+    color = {
+        "strong_moat_proxy": COLOR_GREEN, "cluster_buy": COLOR_GREEN, "positive": COLOR_GREEN,
+        "moderate_moat_proxy": COLOR_YELLOW, "single_buy": COLOR_YELLOW, "neutral": COLOR_GREY,
+        "weak_moat_proxy": COLOR_RED, "cluster_sell": COLOR_RED, "negative": COLOR_RED,
+    }.get(tier, COLOR_GREY)
+
+    embed = discord.Embed(
+        title=f"🧠 Qualitative Signals — {fund.symbol}",
+        color=color,
+    )
+
+    # Moat proxy
+    if fund.qual_moat_proxy_tier:
+        moat_e = _tier_emoji(fund.qual_moat_proxy_tier)
+        moat_label = fund.qual_moat_proxy_tier.replace("_", " ")
+        detail = ""
+        if fund.qual_moat_margin_mean is not None:
+            detail += f"  GM avg {fund.qual_moat_margin_mean:.1f}%"
+        if fund.qual_moat_margin_std is not None:
+            detail += f"  σ {fund.qual_moat_margin_std:.1f}pp"
+        embed.add_field(
+            name="Moat Proxy",
+            value=f"{moat_e} {moat_label}{detail}",
+            inline=False,
+        )
+
+    # Insider activity
+    if fund.qual_insider_signal:
+        ins_e = _tier_emoji(fund.qual_insider_signal)
+        ins_label = fund.qual_insider_signal.replace("_", " ")
+        detail = ""
+        if fund.qual_insider_buyer_count is not None and fund.qual_insider_buyer_count > 0:
+            detail += f"  {fund.qual_insider_buyer_count} buyer(s)"
+        if fund.qual_insider_seller_count is not None and fund.qual_insider_seller_count > 0:
+            detail += f"  {fund.qual_insider_seller_count} seller(s)"
+        embed.add_field(
+            name="Insider Activity (90d)",
+            value=f"{ins_e} {ins_label}{detail}",
+            inline=False,
+        )
+
+    # News sentiment
+    if fund.qual_news_sentiment_7d_tier and fund.qual_news_sentiment_7d_tier != "insufficient_data":
+        sent_e = _tier_emoji(fund.qual_news_sentiment_7d_tier)
+        sent_7 = f"{fund.qual_news_sentiment_7d:+.2f}" if fund.qual_news_sentiment_7d is not None else "—"
+        sent_30 = f"{fund.qual_news_sentiment_30d:+.2f}" if fund.qual_news_sentiment_30d is not None else "—"
+        embed.add_field(
+            name="News Sentiment",
+            value=f"{sent_e} 7d: **{sent_7}** | 30d: **{sent_30}**",
+            inline=False,
+        )
+    elif fund.qual_news_sentiment_30d_tier and fund.qual_news_sentiment_30d_tier != "insufficient_data":
+        sent_e = _tier_emoji(fund.qual_news_sentiment_30d_tier)
+        sent_30 = f"{fund.qual_news_sentiment_30d:+.2f}" if fund.qual_news_sentiment_30d is not None else "—"
+        embed.add_field(
+            name="News Sentiment (30d)",
+            value=f"{sent_e} **{sent_30}**",
+            inline=False,
+        )
+
+    # R&D intensity
+    if fund.qual_rd_tier:
+        rd_e = _tier_emoji(fund.qual_rd_tier)
+        rd_label = fund.qual_rd_tier.replace("_", " ")
+        rd_pct = f"{fund.qual_rd_intensity_pct:.1f}% of revenue" if fund.qual_rd_intensity_pct is not None else ""
+        embed.add_field(
+            name="R&D Intensity",
+            value=f"{rd_e} {rd_label}  {rd_pct}",
+            inline=False,
+        )
+
+    embed.set_footer(text="Qualitative · Structural proxies only — moat/insider/sentiment/R&D")
+    return embed
+
+
 # ── Symbol report (multi-embed) ───────────────────────────────────────────────
 
 def symbol_report_embeds(report: SymbolReport) -> list[discord.Embed]:
@@ -512,6 +609,9 @@ def symbol_report_embeds(report: SymbolReport) -> list[discord.Embed]:
         t3 = fundamental_tier3_embed(report.fundamental)
         if t3:
             embeds.append(t3)
+        qual = qualitative_embed(report.fundamental)
+        if qual:
+            embeds.append(qual)
     if report.sentiment or report.news:
         embeds.append(sentiment_news_embed(report.symbol, report.sentiment, report.news))
     return embeds
