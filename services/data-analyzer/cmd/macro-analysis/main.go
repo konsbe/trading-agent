@@ -1,5 +1,5 @@
 // macro-analysis reads raw FRED observations stored by data-ingestion/data-equity
-// and derives monetary-policy signals that the analyst-bot can consume directly.
+// and derives macro signals that the analyst-bot can consume directly.
 //
 // Data flow:
 //   data-equity (data-ingestion)
@@ -7,30 +7,33 @@
 //     → macro-analysis (this binary, data-analyzer)
 //     → macro_derived (TimescaleDB, source = "macro_analysis")
 //
-// Monetary Policy signals derived (Tier 1 — free data):
-//   mp_rate           Fed Funds Rate level + YoY direction (hiking/cutting/neutral)
-//   mp_yield_curve    2s10s + 3m10y spreads + regime (steep/normal/flat/inverted/re_steepening)
-//   mp_real_rate      10Y TIPS yield + regime (deeply_negative/balanced/headwind)
-//   mp_balance_sheet  Fed total assets (QE/QT/neutral) — 4-week change
-//   mp_credit_spread  HY + IG OAS spreads + regime (benign/elevated/crisis)
+// Monetary Policy signals (analyzeMonetary):
+//   mp_rate, mp_yield_curve, mp_real_rate, mp_balance_sheet,
+//   mp_credit_spread, mp_breakeven_inflation, mp_treasury_yields,
+//   mp_m2_supply, mp_stance
 //
-// Bond Market signals derived (Tier 2 — free data):
-//   mp_breakeven_inflation  10Y + 5Y breakeven rates + regime (anchored/rising/unanchored)
-//   mp_treasury_yields      2Y / 10Y / 30Y term structure snapshot
-//   mp_m2_supply            M2 YoY growth rate + regime (normal/inflationary/deflationary)
-//
-// Composite:
-//   mp_stance   Weighted aggregate of all signals (-1 = restrictive … +1 = accommodative)
+// Growth Cycle signals (analyzeGrowth) — all free FRED data:
+//   gc_pmi            ISM Manufacturing PMI (NAPM)
+//   gc_lei            Conference Board LEI level + 6m trend (USSLIND)
+//   gc_claims         Initial + continuing jobless claims (ICSA / CCSA)
+//   gc_housing        Housing starts + permits (HOUST / PERMIT)
+//   gc_gdp            Real GDP annualized QoQ growth (GDPC1)
+//   gc_employment     Nonfarm payrolls + unemployment + AHE + Sahm Rule
+//   gc_consumer       Retail sales YoY (RRSFS) + Michigan sentiment (UMCSENT)
+//   gc_capex          Core capex trend (NEWORDER)
+//   gc_stance         Composite weighted score (-1 contraction … +1 expansion)
 //
 // TODO [LLM]:  Score FOMC statements and minutes hawkish/dovish on -5 to +5 scale.
 // TODO [PAID]: CME FedWatch implied rate probabilities (requires CME API subscription).
-// TODO [PAID]: 5Y5Y forward inflation swap — Bloomberg or ICE Data.
-// TODO [FUTURE]: Add ECB (ECBDFR via FRED), BoE (UKBANKRATE via FRED), BoJ policy rate.
-// TODO [FUTURE]: Growth panel — GDP (GDPC1), ISM PMI (MANEMP proxy), jobless claims (IC4WSA).
+// TODO [PAID]: S&P Global (Markit) Manufacturing PMI — higher frequency and sector breakdown.
+// TODO [PAID]: ISM Services PMI — requires ISM membership or paid feed.
+// TODO [PAID]: China Caixin PMI / Eurozone / UK / Japan PMI — paid subscriptions.
+// TODO [SCRAPE]: GDPNow (Atlanta Fed real-time GDP) — no public API; needs web scraping.
+// TODO [PAID]: ADP National Employment Report — no free API.
 // TODO [FUTURE]: Inflation panel — CPI (CPIAUCSL), Core PCE (PCEPILFE), PPI (WPSFD4131).
-// TODO [FUTURE]: Global panel — China PMI, EM stress signals, DXY (no direct FRED series).
-// TODO [FUTURE]: Equity Risk Premium — link to fundamental-analysis composite P/E for ERP calc.
-// TODO [PYTHON]: Migrate to Python + asyncpg once LLM scoring layer is added; SQL is identical.
+// TODO [FUTURE]: Global panel — ECB rate (ECBDFR), BoE (UKBANKRATE), EM stress signals.
+// TODO [FUTURE]: Equity Risk Premium — link FA composite P/E → forward ERP calculation.
+// TODO [PYTHON]: Migrate to Python + asyncpg once the LLM scoring layer is added.
 package main
 
 import (
@@ -72,7 +75,7 @@ func main() {
 	}
 	defer pool.Close()
 
-	w := &worker{cfg: cfg, pool: pool, log: log}
+	w := &worker{cfg: cfg, growthCfg: config.LoadGrowthCycle(), pool: pool, log: log}
 
 	// Wait for data-equity to complete its initial FRED fetch before the first
 	// macro-analysis pass. Without a delay, macro-analysis runs immediately and
@@ -117,14 +120,15 @@ func macroStartupDelay() int {
 }
 
 type worker struct {
-	cfg  config.MacroAnalysis
-	pool *pgxpool.Pool
-	log  *slog.Logger
+	cfg        config.MacroAnalysis
+	growthCfg  config.GrowthCycle
+	pool       *pgxpool.Pool
+	log        *slog.Logger
 }
 
 func (w *worker) analyzeAll(ctx context.Context) {
 	w.analyzeMonetary(ctx)
-	// TODO [FUTURE]: w.analyzeGrowth(ctx)     — GDP, ISM PMI, jobless claims
+	w.analyzeGrowth(ctx)
 	// TODO [FUTURE]: w.analyzeInflation(ctx)  — CPI, Core PCE, PPI, OER
 	// TODO [FUTURE]: w.analyzeGlobal(ctx)     — China PMI, EM risk, global CBs
 	// TODO [FUTURE]: w.analyzeCycles(ctx)     — composite regime detection
@@ -525,5 +529,515 @@ func (w *worker) analyzeMonetary(ctx context.Context) {
 		"stance", stance,
 		"score", fmt.Sprintf("%.2f", stanceScore),
 		"signals", len(usedSignals),
+	)
+}
+
+// ── Growth Cycle Analysis ─────────────────────────────────────────────────────
+
+// analyzeGrowth derives growth-cycle signals from FRED series stored in
+// macro_fred and writes the results to macro_derived.
+//
+// All signals are market-wide (not per-symbol).  The composite gc_stance score
+// is the primary output consumed by the analyst-bot daily-report embed.
+//
+// Tier 1 (Leading indicators — move before the economy):
+//   PMI (NAPM), LEI (USSLIND), jobless claims (ICSA/CCSA), housing (HOUST/PERMIT)
+//
+// Tier 2 (Coincident indicators — move with the economy):
+//   Real GDP (GDPC1), payrolls (PAYEMS), unemployment (UNRATE),
+//   avg hourly earnings (CES0500000003), Sahm Rule (SAHMREALTIME),
+//   retail sales (RSAFS/RRSFS)
+//
+// Tier 3 (Lagging / Sentiment):
+//   Michigan Sentiment (UMCSENT), Durable Goods (DGORDER), Core Capex (NEWORDER)
+func (w *worker) analyzeGrowth(ctx context.Context) {
+	ts := time.Now().UTC()
+	gc := w.growthCfg
+
+	ptr := func(v float64) *float64 { return &v }
+
+	upsert := func(metric string, value *float64, payload any) {
+		if err := store.UpsertMacroDerived(ctx, w.pool, ts, metric, value, payload); err != nil {
+			w.log.Error("upsert growth derived", "metric", metric, "err", err)
+		}
+	}
+
+	fredLatest := func(seriesID string) (float64, bool) {
+		v, _, ok := store.QueryMacroFredLatest(ctx, w.pool, seriesID)
+		return v, ok
+	}
+
+	// fredSeries returns the last n observations (newest first).
+	fredSeries := func(seriesID string, n int) []store.MacroObs {
+		rows, err := store.QueryMacroFredSeries(ctx, w.pool, seriesID, n)
+		if err != nil {
+			return nil
+		}
+		return rows
+	}
+
+	// scaledScore clamps a value to [-1, +1] and returns a *float64.
+	clamp := func(v float64) float64 {
+		if v > 1 {
+			return 1
+		}
+		if v < -1 {
+			return -1
+		}
+		return v
+	}
+
+	// ── Scoring accumulator ───────────────────────────────────────────────────
+	// Each signal contributes a score in [-1, +1] with an associated weight.
+	// Tier 1 (leading) weight 0.35, Tier 2 (coincident) weight 0.45,
+	// Tier 3 (lagging/sentiment) weight 0.20 — distributed across sub-signals.
+	type scored struct {
+		score  float64
+		weight float64
+	}
+	var scores []scored
+	usedSignals := 0
+
+	addScore := func(s, w float64) {
+		scores = append(scores, scored{clamp(s), w})
+		usedSignals++
+	}
+
+	// ── Tier 1: PMI — ISM Manufacturing (NAPM) ──────────────────────────────
+	// Monthly.  Values: >55 strong_expansion, >50 expansion, >45 slowing,
+	// >40 contraction, <40 severe_contraction.
+	// TODO [PAID]: Replace/supplement with S&P Global Markit PMI for higher frequency.
+	// TODO [PAID]: Add ISM Services PMI when an API feed is available.
+	pmiObs := fredSeries("NAPM", 12)
+	pmiRegime := "no_data"
+	var pmiScore float64
+	if len(pmiObs) > 0 {
+		pmi := pmiObs[0].Value
+		switch {
+		case pmi >= gc.PMIStrong:
+			pmiRegime = "strong_expansion"
+			pmiScore = 1.0
+		case pmi >= gc.PMIExpansion:
+			pmiRegime = "expansion"
+			pmiScore = 0.4
+		case pmi >= gc.PMISlow:
+			pmiRegime = "slowing"
+			pmiScore = -0.2
+		case pmi >= gc.PMISevere:
+			pmiRegime = "contraction"
+			pmiScore = -0.6
+		default:
+			pmiRegime = "severe_contraction"
+			pmiScore = -1.0
+		}
+		// 3-month trend: compare latest to 3 months ago.
+		trend3m := "stable"
+		if len(pmiObs) >= 4 {
+			delta := pmi - pmiObs[3].Value
+			if delta >= 2 {
+				trend3m = "improving"
+			} else if delta <= -2 {
+				trend3m = "deteriorating"
+			}
+		}
+		addScore(pmiScore, 0.15) // Tier 1 sub-signal
+		upsert("gc_pmi", ptr(pmi), map[string]any{
+			"regime":  pmiRegime,
+			"score":   pmiScore,
+			"trend3m": trend3m,
+			"series":  "NAPM",
+		})
+	} else {
+		upsert("gc_pmi", nil, map[string]any{"regime": pmiRegime})
+	}
+
+	// ── Tier 1: LEI — Conference Board Leading Economic Index (USSLIND) ──────
+	// Monthly level.  We compute 6-month change and annualise it.
+	// 3 consecutive declines ("rule of three") = classic recession warning.
+	// Note: FRED provides the composite index only; sub-components are paid.
+	leiObs := fredSeries("USSLIND", 12)
+	leiRegime := "no_data"
+	var leiScore float64
+	if len(leiObs) >= 2 {
+		lei := leiObs[0].Value
+		leiScore6m := 0.0
+		leiTrend := "stable"
+		if len(leiObs) >= 7 {
+			// 6-month annualised rate of change.
+			leiScore6m = ((lei/leiObs[6].Value) - 1) * 100
+			// Rule of 3: count consecutive monthly declines.
+			consecutiveDeclines := 0
+			for i := 0; i < len(leiObs)-1 && i < 6; i++ {
+				if leiObs[i].Value < leiObs[i+1].Value {
+					consecutiveDeclines++
+				} else {
+					break
+				}
+			}
+			if consecutiveDeclines >= 3 {
+				leiTrend = "rule_of_three_decline"
+			} else if leiScore6m > gc.LEIExpansionRate {
+				leiTrend = "expanding"
+			} else if leiScore6m < gc.LEIRecessionRate {
+				leiTrend = "recession_risk"
+			} else {
+				leiTrend = "slowing"
+			}
+		}
+		switch leiTrend {
+		case "expanding":
+			leiRegime = "expanding"
+			leiScore = 0.8
+		case "slowing":
+			leiRegime = "slowing"
+			leiScore = -0.2
+		case "recession_risk", "rule_of_three_decline":
+			leiRegime = leiTrend
+			leiScore = -0.9
+		default:
+			leiRegime = "stable"
+			leiScore = 0.0
+		}
+		addScore(leiScore, 0.12)
+		upsert("gc_lei", ptr(lei), map[string]any{
+			"regime":            leiRegime,
+			"score":             leiScore,
+			"six_month_rate_pct": math.Round(leiScore6m*100) / 100,
+			"series":            "USSLIND",
+		})
+	} else {
+		upsert("gc_lei", nil, map[string]any{"regime": leiRegime})
+	}
+
+	// ── Tier 1: Initial Jobless Claims (ICSA) + Continuing Claims (CCSA) ─────
+	// Weekly.  Use 4-week moving average to smooth single-week noise.
+	claimsRegime := "no_data"
+	var claimsScore float64
+	icsa := fredSeries("ICSA", 8)
+	if len(icsa) >= 4 {
+		// 4-week MA.
+		ma4 := (icsa[0].Value + icsa[1].Value + icsa[2].Value + icsa[3].Value) / 4
+		var contClaims *float64
+		if cv, ok := fredLatest("CCSA"); ok {
+			contClaims = ptr(cv)
+		}
+		switch {
+		case ma4 < gc.ClaimsTight:
+			claimsRegime = "tight_labor"
+			claimsScore = 0.9
+		case ma4 < gc.ClaimsNormalizing:
+			claimsRegime = "normal"
+			claimsScore = 0.3
+		case ma4 < gc.ClaimsCrisis:
+			claimsRegime = "normalizing"
+			claimsScore = -0.3
+		default:
+			claimsRegime = "crisis"
+			claimsScore = -1.0
+		}
+		payload := map[string]any{
+			"regime":       claimsRegime,
+			"score":        claimsScore,
+			"icsa_4w_ma":   math.Round(ma4),
+			"icsa_latest":  icsa[0].Value,
+		}
+		if contClaims != nil {
+			payload["ccsa_latest"] = *contClaims
+		}
+		addScore(claimsScore, 0.08)
+		upsert("gc_claims", ptr(ma4), payload)
+	} else {
+		upsert("gc_claims", nil, map[string]any{"regime": claimsRegime})
+	}
+
+	// ── Tier 1: Housing Starts (HOUST) + Building Permits (PERMIT) ───────────
+	// Monthly, annualised thousands of units.
+	housingRegime := "no_data"
+	var housingScore float64
+	if hv, ok := fredLatest("HOUST"); ok {
+		var permitVal *float64
+		if pv, ok2 := fredLatest("PERMIT"); ok2 {
+			permitVal = ptr(pv)
+		}
+		switch {
+		case hv >= gc.HousingStrong:
+			housingRegime = "strong"
+			housingScore = 0.8
+		case hv >= gc.HousingWeak:
+			housingRegime = "moderate"
+			housingScore = 0.2
+		default:
+			housingRegime = "weak"
+			housingScore = -0.8
+		}
+		payload := map[string]any{
+			"regime":       housingRegime,
+			"score":        housingScore,
+			"houst_k_ann":  math.Round(hv),
+		}
+		if permitVal != nil {
+			payload["permit_k_ann"] = math.Round(*permitVal)
+		}
+		addScore(housingScore, 0.08)
+		upsert("gc_housing", ptr(hv), payload)
+	} else {
+		upsert("gc_housing", nil, map[string]any{"regime": housingRegime})
+	}
+
+	// ── Tier 2: Real GDP (GDPC1) ──────────────────────────────────────────────
+	// Quarterly levels (billions of chained 2012 dollars).  Convert to
+	// annualised quarter-on-quarter percentage change.
+	// Signal is always 1–3 months stale — supplement with LEI + claims for timeliness.
+	gdpRegime := "no_data"
+	var gdpScore float64
+	gdpObs := fredSeries("GDPC1", 8)
+	if len(gdpObs) >= 2 {
+		gdp := gdpObs[0].Value
+		gdpPrior := gdpObs[1].Value
+		// Annualised QoQ: ((current/prior)^4 - 1) × 100.
+		gdpAnnPct := (math.Pow(gdp/gdpPrior, 4) - 1) * 100
+		switch {
+		case gdpAnnPct >= gc.GDPStrong:
+			gdpRegime = "strong"
+			gdpScore = 1.0
+		case gdpAnnPct >= gc.GDPStall:
+			gdpRegime = "moderate"
+			gdpScore = 0.3
+		case gdpAnnPct >= 0:
+			gdpRegime = "stall_speed"
+			gdpScore = -0.3
+		default:
+			gdpRegime = "recession"
+			gdpScore = -1.0
+		}
+		addScore(gdpScore, 0.14)
+		upsert("gc_gdp", ptr(gdpAnnPct), map[string]any{
+			"regime":     gdpRegime,
+			"score":      gdpScore,
+			"ann_pct":    math.Round(gdpAnnPct*100) / 100,
+			"gdpc1_bn":   math.Round(gdp),
+			"series":     "GDPC1",
+		})
+	} else {
+		upsert("gc_gdp", nil, map[string]any{"regime": gdpRegime})
+	}
+
+	// ── Tier 2: Employment — Payrolls + Unemployment + AHE + Sahm Rule ───────
+	// PAYEMS: monthly net jobs added (thousands).
+	// UNRATE: unemployment rate (%).
+	// CES0500000003: avg hourly earnings all employees (%).
+	// SAHMREALTIME: Sahm Rule indicator — >= 0.5 = recession confirmed.
+	// TODO [PAID]: ADP National Employment Report — supplement monthly payrolls.
+	emplRegime := "no_data"
+	var emplScore float64
+	if nfp, ok := fredLatest("PAYEMS"); ok {
+		var unrate, ahe, sahm *float64
+		if v, ok2 := fredLatest("UNRATE"); ok2 {
+			unrate = ptr(v)
+		}
+		if v, ok2 := fredLatest("CES0500000003"); ok2 {
+			ahe = ptr(v)
+		}
+		if v, ok2 := fredLatest("SAHMREALTIME"); ok2 {
+			sahm = ptr(v)
+		}
+
+		// Sahm rule overrides everything when triggered.
+		if sahm != nil && *sahm >= gc.SahmThreshold {
+			emplRegime = "recession_confirmed"
+			emplScore = -1.0
+		} else {
+			switch {
+			case nfp >= gc.NFPStrong:
+				emplRegime = "strong"
+				emplScore = 1.0
+			case nfp >= gc.NFPModerate:
+				emplRegime = "moderate"
+				emplScore = 0.3
+			case nfp >= 0:
+				emplRegime = "slowing"
+				emplScore = -0.3
+			default:
+				emplRegime = "contraction"
+				emplScore = -1.0
+			}
+		}
+		payload := map[string]any{
+			"regime":      emplRegime,
+			"score":       emplScore,
+			"payems_k":    nfp,
+		}
+		if unrate != nil {
+			payload["unrate_pct"] = *unrate
+		}
+		if ahe != nil {
+			payload["ahe_pct"] = *ahe
+		}
+		if sahm != nil {
+			payload["sahm_pp"] = math.Round(*sahm*100) / 100
+		}
+		addScore(emplScore, 0.14)
+		upsert("gc_employment", ptr(nfp), payload)
+	} else {
+		upsert("gc_employment", nil, map[string]any{"regime": emplRegime})
+	}
+
+	// ── Tier 2: Consumer — Real Retail Sales (RRSFS) YoY % ───────────────────
+	// RRSFS is inflation-adjusted — it cleanly reflects volume growth.
+	// RSAFS (nominal) included in payload for context.
+	consumerRegime := "no_data"
+	var consumerScore float64
+	rrsfSeries := fredSeries("RRSFS", 14)
+	if len(rrsfSeries) >= 13 {
+		current := rrsfSeries[0].Value
+		priorYear := rrsfSeries[12].Value
+		yoyPct := (current/priorYear - 1) * 100
+		switch {
+		case yoyPct >= gc.RetailHealthy:
+			consumerRegime = "healthy"
+			consumerScore = 0.8
+		case yoyPct >= 0:
+			consumerRegime = "slowing"
+			consumerScore = 0.0
+		default:
+			consumerRegime = "contraction"
+			consumerScore = -0.8
+		}
+		payload := map[string]any{
+			"regime":          consumerRegime,
+			"score":           consumerScore,
+			"rrsfs_yoy_pct":   math.Round(yoyPct*100) / 100,
+			"rrsfs_current_mn": math.Round(current),
+		}
+		if nv, ok := fredLatest("RSAFS"); ok {
+			payload["rsafs_nominal_mn"] = math.Round(nv)
+		}
+		addScore(consumerScore, 0.10)
+		upsert("gc_consumer", ptr(yoyPct), payload)
+	} else {
+		upsert("gc_consumer", nil, map[string]any{"regime": consumerRegime})
+	}
+
+	// ── Tier 3: Michigan Consumer Sentiment (UMCSENT) ─────────────────────────
+	// Contrarian signal: <60 = near historical market bottoms.
+	// >100 + VIX<12 = potential complacency zone.
+	umichRegime := "no_data"
+	var umichScore float64
+	if umics, ok := fredLatest("UMCSENT"); ok {
+		switch {
+		case umics < gc.UMichBottom:
+			umichRegime = "near_bottom"
+			umichScore = 0.3 // contrarian bullish — panic buying opportunity
+		case umics > gc.UMichComplacency:
+			umichRegime = "complacency"
+			umichScore = -0.3 // contrarian bearish — peak optimism
+		case umics < 80:
+			umichRegime = "pessimistic"
+			umichScore = 0.1
+		default:
+			umichRegime = "normal"
+			umichScore = 0.2
+		}
+		addScore(umichScore, 0.05)
+		upsert("gc_consumer_sentiment", ptr(umics), map[string]any{
+			"regime": umichRegime,
+			"score":  umichScore,
+			"series": "UMCSENT",
+		})
+	} else {
+		upsert("gc_consumer_sentiment", nil, map[string]any{"regime": umichRegime})
+	}
+
+	// ── Tier 3: Core Capex — New Orders, Capital Goods Nondefense Ex-Aircraft ─
+	// (NEWORDER — monthly, millions of dollars, seasonally adjusted)
+	// 3-month rolling change vs 3 months prior as a trend signal.
+	// DGORDER (Durable Goods total) also stored for context.
+	capexRegime := "no_data"
+	var capexScore float64
+	newOrderObs := fredSeries("NEWORDER", 7)
+	if len(newOrderObs) >= 4 {
+		latest3avg := (newOrderObs[0].Value + newOrderObs[1].Value + newOrderObs[2].Value) / 3
+		prior3avg := (newOrderObs[3].Value + newOrderObs[4].Value + newOrderObs[5].Value) / 3
+		trend3m := (latest3avg/prior3avg - 1) * 100
+		switch {
+		case trend3m >= gc.CapexExpansion:
+			capexRegime = "expanding"
+			capexScore = 0.8
+		case trend3m >= 0:
+			capexRegime = "stable"
+			capexScore = 0.2
+		case trend3m >= gc.CapexWarning:
+			capexRegime = "slowing"
+			capexScore = -0.2
+		default:
+			capexRegime = "warning"
+			capexScore = -0.8
+		}
+		payload := map[string]any{
+			"regime":          capexRegime,
+			"score":           capexScore,
+			"neworder_3m_pct": math.Round(trend3m*100) / 100,
+			"neworder_latest": math.Round(newOrderObs[0].Value),
+			"series":          "NEWORDER",
+		}
+		if dgv, ok := fredLatest("DGORDER"); ok {
+			payload["dgorder_latest"] = math.Round(dgv)
+		}
+		addScore(capexScore, 0.05)
+		upsert("gc_capex", ptr(trend3m), payload)
+	} else {
+		upsert("gc_capex", nil, map[string]any{"regime": capexRegime})
+	}
+
+	// ── Composite Growth Stance ───────────────────────────────────────────────
+	// Weighted mean of all scored signals.  Weights sum to 0.91 when all
+	// signals are available (remaining 0.09 reserved for future Tier 1 paid PMI).
+	stanceScore := 0.0
+	weightSum := 0.0
+	for _, s := range scores {
+		stanceScore += s.score * s.weight
+		weightSum += s.weight
+	}
+	var gcStance string
+	var gcStanceScore *float64
+	if usedSignals == 0 {
+		gcStance = "insufficient_data"
+		upsert("gc_stance", nil, map[string]any{
+			"stance":  gcStance,
+			"signals": 0,
+			"todo_pmi_paid": "S&P Global / ISM Services PMI would improve leading-indicator coverage",
+		})
+	} else {
+		if weightSum > 0 {
+			stanceScore /= weightSum
+		}
+		switch {
+		case stanceScore >= gc.GrowthExpansionScore:
+			gcStance = "expansion"
+		case stanceScore <= gc.GrowthContractionScore:
+			gcStance = "contraction"
+		default:
+			gcStance = "slowdown"
+		}
+		gcStanceScore = ptr(stanceScore)
+		upsert("gc_stance", gcStanceScore, map[string]any{
+			"stance":         gcStance,
+			"score":          math.Round(stanceScore*1000) / 1000,
+			"signals_used":   usedSignals,
+			"pmi_regime":     pmiRegime,
+			"lei_regime":     leiRegime,
+			"claims_regime":  claimsRegime,
+			"housing_regime": housingRegime,
+			"gdp_regime":     gdpRegime,
+			"empl_regime":    emplRegime,
+			"consumer_regime": consumerRegime,
+			"capex_regime":   capexRegime,
+		})
+	}
+
+	w.log.Info("growth cycle analysis complete",
+		"stance", gcStance,
+		"score", fmt.Sprintf("%.3f", stanceScore),
+		"signals", usedSignals,
 	)
 }

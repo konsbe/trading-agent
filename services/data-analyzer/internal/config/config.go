@@ -808,6 +808,124 @@ type MacroAnalysis struct {
 	MPRestrictiveScore   float64 // weighted score < this = "restrictive"    default -0.4
 }
 
+// ── GrowthCycle ───────────────────────────────────────────────────────────────
+
+// GrowthCycle holds thresholds for the growth-cycle analysis pass in the
+// macro-analysis worker.  All values are configurable via .env — no recompile
+// required to tune the algorithm.
+//
+// Data sources: all free FRED series.  No external APIs beyond FRED.
+//
+// TODO [PAID]:  Add S&P Global (Markit) PMI once a subscription is available.
+// TODO [PAID]:  ISM Services PMI — requires ISM membership or paid data feed.
+// TODO [PAID]:  China Caixin PMI — paid subscription.
+// TODO [SCRAPE]: GDPNow (Atlanta Fed real-time GDP) — no public API.
+// TODO [FUTURE]: Migrate to Python + asyncpg once LLM growth scoring is added.
+type GrowthCycle struct {
+	PollInterval time.Duration
+
+	// ── PMI (NAPM — ISM Manufacturing, monthly, index 0–100) ─────────────────
+	// Above 50 = expansion, below 50 = contraction.  New Orders sub-component
+	// leads the headline by 1–2 months but is not a separate free FRED series.
+	PMIStrong     float64 // >this = "strong_expansion"   default 55
+	PMIExpansion  float64 // >this = "expansion"           default 50
+	PMISlow       float64 // <this = "slowing"             default 45
+	PMISevere     float64 // <this = "severe_contraction"  default 40
+
+	// ── LEI (USSLIND — Conference Board Leading Economic Index, monthly) ──────
+	// Tracks the 6-month annualized rate of change.
+	// 3 consecutive monthly declines = historical recession signal ("rule of three").
+	LEIExpansionRate float64 // 6m rate > this = "expanding"      default 0.0
+	LEIRecessionRate float64 // 6m rate < this = "recession_risk"  default -3.0
+
+	// ── Initial Jobless Claims (ICSA — weekly, persons) ──────────────────────
+	// 4-week moving average used to smooth single-week volatility.
+	ClaimsTight       float64 // 4w MA < this = "tight_labor"       default 225000
+	ClaimsNormalizing float64 // 4w MA > this = "normalizing"        default 300000
+	ClaimsCrisis      float64 // 4w MA > this = "crisis"             default 500000
+
+	// ── Housing Starts (HOUST — monthly, annualized thousands of units) ───────
+	// Housing accounts for 15–18% of GDP including related services.
+	// When housing turns, broader economy typically follows in 6–12 months.
+	HousingStrong float64 // > this thousands = "strong"  default 1500
+	HousingWeak   float64 // < this thousands = "weak"    default 800
+
+	// ── Real GDP (GDPC1 — quarterly, annualized %) ────────────────────────────
+	// Computed from quarterly levels: (current/prior - 1) × 400 for annualized %.
+	// Quarterly frequency means this signal is always 1–3 months stale.
+	GDPStrong float64 // >this % = "strong"      default 3.0
+	GDPStall  float64 // <this % = "stall_speed" default 1.0
+
+	// ── Nonfarm Payrolls (PAYEMS — monthly, thousands net added) ─────────────
+	// MoM change: >200K strong, 75–200K moderate, <0 recession signal.
+	NFPStrong   float64 // >this K/month = "strong"    default 200
+	NFPModerate float64 // >this K/month = "moderate"  default 75
+
+	// ── Sahm Rule (SAHMREALTIME — monthly, pp above 12-month low) ────────────
+	// >=0.5pp = recession historically already underway (not a leading indicator —
+	// it confirms recession after the fact but is faster than NBER dating).
+	SahmThreshold float64 // >= this = "recession_signal"  default 0.5
+
+	// ── Real Retail Sales (RRSFS — monthly, YoY % change) ────────────────────
+	// Inflation-adjusted consumption: cleanest GDP input for the consumer sector.
+	RetailHealthy float64 // YoY > this = "healthy"   default 3.0
+
+	// ── Michigan Consumer Sentiment (UMCSENT — monthly, index) ───────────────
+	// Contrarian signal: <60 near market bottoms; >100 + VIX<12 = complacency.
+	UMichBottom      float64 // <this = "near_bottom"    default 60
+	UMichComplacency float64 // >this = "complacency"    default 100
+
+	// ── Core Capex (NEWORDER — monthly, % 3-month trend) ─────────────────────
+	// Capital Goods Nondefense Ex-Aircraft: cleanest business investment proxy.
+	// 3-month rolling change vs 3 months prior used to smooth monthly volatility.
+	CapexExpansion float64 // 3m trend > this = "expanding"  default 3.0
+	CapexWarning   float64 // 3m trend < this = "warning"    default -3.0
+
+	// ── Composite Growth Stance score boundaries ──────────────────────────────
+	GrowthExpansionScore  float64 // weighted score > this = "expansion"   default 0.4
+	GrowthContractionScore float64 // weighted score < this = "contraction" default -0.4
+}
+
+func LoadGrowthCycle() GrowthCycle {
+	return GrowthCycle{
+		PollInterval: pollFor("DATA_MACRO_GROWTH_POLL_INTERVAL", 12*time.Hour),
+
+		PMIStrong:    floatEnv("GROWTH_PMI_STRONG", 55),
+		PMIExpansion: floatEnv("GROWTH_PMI_EXPANSION", 50),
+		PMISlow:      floatEnv("GROWTH_PMI_SLOW", 45),
+		PMISevere:    floatEnv("GROWTH_PMI_SEVERE", 40),
+
+		LEIExpansionRate: floatEnv("GROWTH_LEI_EXPANSION_RATE", 0.0),
+		LEIRecessionRate: floatEnv("GROWTH_LEI_RECESSION_RATE", -3.0),
+
+		ClaimsTight:       floatEnv("GROWTH_CLAIMS_TIGHT", 225000),
+		ClaimsNormalizing: floatEnv("GROWTH_CLAIMS_NORMALIZING", 300000),
+		ClaimsCrisis:      floatEnv("GROWTH_CLAIMS_CRISIS", 500000),
+
+		HousingStrong: floatEnv("GROWTH_HOUSING_STRONG", 1500),
+		HousingWeak:   floatEnv("GROWTH_HOUSING_WEAK", 800),
+
+		GDPStrong: floatEnv("GROWTH_GDP_STRONG", 3.0),
+		GDPStall:  floatEnv("GROWTH_GDP_STALL", 1.0),
+
+		NFPStrong:   floatEnv("GROWTH_NFP_STRONG", 200),
+		NFPModerate: floatEnv("GROWTH_NFP_MODERATE", 75),
+
+		SahmThreshold: floatEnv("GROWTH_SAHM_THRESHOLD", 0.5),
+
+		RetailHealthy: floatEnv("GROWTH_RETAIL_HEALTHY", 3.0),
+
+		UMichBottom:      floatEnv("GROWTH_UMICH_BOTTOM", 60),
+		UMichComplacency: floatEnv("GROWTH_UMICH_COMPLACENCY", 100),
+
+		CapexExpansion: floatEnv("GROWTH_CAPEX_EXPANSION", 3.0),
+		CapexWarning:   floatEnv("GROWTH_CAPEX_WARNING", -3.0),
+
+		GrowthExpansionScore:   floatEnv("GROWTH_EXPANSION_SCORE", 0.4),
+		GrowthContractionScore: floatEnv("GROWTH_CONTRACTION_SCORE", -0.4),
+	}
+}
+
 func LoadMacroAnalysis() (MacroAnalysis, error) {
 	b := LoadBase()
 	if b.DatabaseURL == "" {

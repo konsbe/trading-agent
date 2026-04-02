@@ -290,9 +290,64 @@ class MacroSnapshot:
     m2_yoy_pct: Optional[float] = None           # M2 YoY growth rate (%)
     m2_regime: Optional[str] = None              # "inflationary"|"normal"|"slow"|"deflationary"
 
-    # Composite
+    # Composite Monetary Policy
     mp_stance: Optional[str] = None              # "accommodative"|"neutral"|"restrictive"
     mp_score: Optional[float] = None             # -1.0 (restrictive) … +1.0 (accommodative)
+
+    # ── Growth Cycle — Tier 1 (Leading) ─────────────────────────────────────
+    # ISM Manufacturing PMI (NAPM)
+    gc_pmi: Optional[float] = None               # raw index value (0–100)
+    gc_pmi_regime: Optional[str] = None          # "strong_expansion"|"expansion"|"slowing"|"contraction"|"severe_contraction"
+    gc_pmi_trend3m: Optional[str] = None         # "improving"|"stable"|"deteriorating"
+
+    # Conference Board LEI (USSLIND) — 6-month annualised rate
+    gc_lei: Optional[float] = None               # index level
+    gc_lei_six_month_rate: Optional[float] = None  # annualised 6m rate (%)
+    gc_lei_regime: Optional[str] = None          # "expanding"|"slowing"|"recession_risk"|"rule_of_three_decline"
+
+    # Initial Jobless Claims (ICSA) — 4-week MA
+    gc_claims_4w_ma: Optional[float] = None      # persons, 4-week average
+    gc_claims_latest: Optional[float] = None     # latest weekly value
+    gc_claims_ccsa: Optional[float] = None       # continuing claims (CCSA)
+    gc_claims_regime: Optional[str] = None       # "tight_labor"|"normal"|"normalizing"|"crisis"
+
+    # Housing Starts (HOUST) + Building Permits (PERMIT)
+    gc_housing_starts: Optional[float] = None    # annualised thousands of units
+    gc_housing_permits: Optional[float] = None   # annualised thousands of units
+    gc_housing_regime: Optional[str] = None      # "strong"|"moderate"|"weak"
+
+    # ── Growth Cycle — Tier 2 (Coincident) ──────────────────────────────────
+    # Real GDP (GDPC1)
+    gc_gdp_ann_pct: Optional[float] = None       # annualised QoQ % growth
+    gc_gdp_regime: Optional[str] = None          # "strong"|"moderate"|"stall_speed"|"recession"
+
+    # Employment (PAYEMS / UNRATE / AHE / Sahm Rule)
+    gc_payrolls_k: Optional[float] = None        # net monthly jobs added (thousands)
+    gc_unemployment: Optional[float] = None      # UNRATE (%)
+    gc_ahe_pct: Optional[float] = None           # avg hourly earnings (%)
+    gc_sahm_pp: Optional[float] = None           # Sahm Rule indicator (pp above 12m low)
+    gc_empl_regime: Optional[str] = None         # "strong"|"moderate"|"slowing"|"contraction"|"recession_confirmed"
+
+    # Consumer — Real Retail Sales (RRSFS) YoY %
+    gc_retail_yoy_pct: Optional[float] = None    # inflation-adjusted YoY % change
+    gc_retail_nominal_mn: Optional[float] = None # RSAFS nominal (millions)
+    gc_consumer_regime: Optional[str] = None     # "healthy"|"slowing"|"contraction"
+
+    # ── Growth Cycle — Tier 3 (Lagging / Sentiment) ──────────────────────────
+    # Michigan Consumer Sentiment (UMCSENT)
+    gc_umich: Optional[float] = None             # index level
+    gc_umich_regime: Optional[str] = None        # "near_bottom"|"pessimistic"|"normal"|"complacency"
+
+    # Core Capex — New Orders, Capital Goods Nondefense Ex-Aircraft (NEWORDER)
+    gc_capex_3m_pct: Optional[float] = None      # 3-month rolling % change
+    gc_capex_latest: Optional[float] = None      # latest monthly level (millions)
+    gc_durable_goods: Optional[float] = None     # DGORDER total (millions)
+    gc_capex_regime: Optional[str] = None        # "expanding"|"stable"|"slowing"|"warning"
+
+    # ── Growth Cycle Composite ────────────────────────────────────────────────
+    gc_stance: Optional[str] = None              # "expansion"|"slowdown"|"contraction"|"insufficient_data"
+    gc_score: Optional[float] = None             # -1.0 (contraction) … +1.0 (expansion)
+    gc_signals_used: Optional[int] = None        # number of sub-signals that had data
 
 
 # ── Composite symbol report ───────────────────────────────────────────────────
