@@ -70,15 +70,20 @@ func main() {
 	if cfg.EnableOverview && av.HasKey() {
 		w.runOverview(context.Background())
 	}
+	if cfg.EnableRecommendation {
+		w.runRecommendations(context.Background())
+	}
 
 	tMetrics := time.NewTicker(cfg.PollMetrics)
 	tFinancials := time.NewTicker(cfg.PollFinancials)
 	tEarnings := time.NewTicker(cfg.PollEarnings)
 	tOverview := time.NewTicker(cfg.PollOverview)
+	tRecommendation := time.NewTicker(cfg.PollRecommendation)
 	defer tMetrics.Stop()
 	defer tFinancials.Stop()
 	defer tEarnings.Stop()
 	defer tOverview.Stop()
+	defer tRecommendation.Stop()
 
 	for {
 		select {
@@ -97,6 +102,10 @@ func main() {
 		case <-tOverview.C:
 			if cfg.EnableOverview && av.HasKey() {
 				w.runOverview(context.Background())
+			}
+		case <-tRecommendation.C:
+			if cfg.EnableRecommendation {
+				w.runRecommendations(context.Background())
 			}
 		}
 	}
@@ -556,6 +565,82 @@ func (w *worker) runOverview(ctx context.Context) {
 			"symbol", sym,
 			"sector", sector,
 			"forward_pe", alphavantage.FloatField(data, "ForwardPE"),
+		)
+	}
+}
+
+// ─── Analyst Recommendation Trend ────────────────────────────────────────────
+//
+// Finnhub /stock/recommendation returns a monthly series of analyst consensus
+// counts: strongBuy, buy, hold, sell, strongSell.
+//
+// We compute:
+//   net_score_current  = (strongBuy + buy) − (strongSell + sell)  for latest month
+//   analyst_rec_trend  = net_score_current − net_score_prior  (month-over-month Δ)
+//
+// Positive trend = analysts are upgrading (net buys increasing).
+// Negative trend = analysts are downgrading (net buys decreasing).
+// Both values are stored in equity_fundamentals so the scoring worker can consume them.
+
+func (w *worker) runRecommendations(ctx context.Context) {
+	ts := time.Now().UTC()
+	for _, sym := range w.cfg.Symbols {
+		items, err := w.fh.Recommendation(ctx, sym)
+		if err != nil {
+			w.log.Warn("finnhub recommendation", "symbol", sym, "err", err)
+			continue
+		}
+		if len(items) < 2 {
+			w.log.Debug("recommendation: not enough data", "symbol", sym, "months", len(items))
+			continue
+		}
+
+		netScore := func(m map[string]any) float64 {
+			get := func(key string) float64 {
+				if v, ok := m[key].(float64); ok {
+					return v
+				}
+				return 0
+			}
+			return (get("strongBuy") + get("buy")) - (get("strongSell") + get("sell"))
+		}
+
+		current := netScore(items[0])
+		prior := netScore(items[1])
+		delta := current - prior
+
+		upsert := func(metric string, value *float64, payload any) {
+			if err := store.UpsertFundamental(ctx, w.pool, ts, sym, "ttm", metric, value, payload, "finnhub_recommendation"); err != nil {
+				w.log.Error("upsert fundamental", "metric", metric, "symbol", sym, "err", err)
+			}
+		}
+
+		// Current net buy score (absolute level).
+		cur := current
+		upsert("analyst_rec_net_score", &cur, map[string]any{
+			"period":      items[0]["period"],
+			"strong_buy":  items[0]["strongBuy"],
+			"buy":         items[0]["buy"],
+			"hold":        items[0]["hold"],
+			"sell":        items[0]["sell"],
+			"strong_sell": items[0]["strongSell"],
+			"note":        "net_score = (strongBuy+buy) − (strongSell+sell) for latest analyst poll month",
+		})
+
+		// Month-over-month change in net buy score (the revision trend signal).
+		upsert("analyst_rec_trend", &delta, map[string]any{
+			"current_period":      items[0]["period"],
+			"prior_period":        items[1]["period"],
+			"net_score_current":   current,
+			"net_score_prior":     prior,
+			"delta":               delta,
+			"note":                "positive = analysts upgrading consensus; negative = downgrading",
+		})
+
+		w.log.Info("analyst recommendation trend stored",
+			"symbol", sym,
+			"current_net_score", current,
+			"trend_delta", delta,
 		)
 	}
 }

@@ -91,6 +91,12 @@ def _tier_emoji(tier: Optional[str]) -> str:
         "very_safe": "🟢", "high_risk": "🔴",
         "bullish_consensus": "🟢", "bearish_consensus": "🔴",
         "low_risk": "🟢", "impairment_risk": "🔴",
+        # ROIC tiers
+        "moat_quality": "🟢", "adequate_roic": "🟡", "low_roic": "🔴",
+        # FCF conversion
+        "high_quality_cash": "🟢", "accrual_concern": "🔴",
+        # Analyst rec trend
+        "upgrading": "🟢", "downgrading": "🔴",
         "value": "🟢", "growth_fair": "🟡", "growth_premium_required": "🟡", "speculative": "🔴",
         "high": "🟢", "moderate": "🟡", "low": "🔴",
         # Tier 2 — balance sheet health
@@ -325,6 +331,11 @@ def fundamental_tier2_embed(fund: FundamentalSnapshot) -> Optional[discord.Embed
             roe_str += f"  ROA {_pct(fund.roa_pct)}"
         embed.add_field(name="ROE (Return on Equity)", value=roe_str, inline=False)
 
+    # ROIC — Return on Invested Capital (5-year average)
+    if fund.roic_pct is not None:
+        roic_str = f"{_tier_emoji(fund.roic_tier)} {_pct(fund.roic_pct)} ({fund.roic_tier or '—'}) · 5Y avg"
+        embed.add_field(name="ROIC", value=roic_str, inline=False)
+
     # Leverage — D/E ratio
     if fund.leverage_de is not None:
         lev_str = f"{_tier_emoji(fund.leverage_tier)} {_num(fund.leverage_de, 2)}× ({fund.leverage_tier or '—'})"
@@ -380,6 +391,8 @@ def fundamental_tier3_embed(fund: FundamentalSnapshot) -> Optional[discord.Embed
         fund.analyst_upside_pct is not None,
         fund.goodwill_pct is not None,
         fund.ps_ratio is not None,
+        fund.fcf_conversion_ratio is not None,
+        fund.analyst_rec_trend_tier is not None,
     ])
     if not has_data:
         return None
@@ -434,6 +447,21 @@ def fundamental_tier3_embed(fund: FundamentalSnapshot) -> Optional[discord.Embed
     if fund.goodwill_pct is not None:
         gw_str = f"{_tier_emoji(fund.goodwill_tier)} {_num(fund.goodwill_pct, 1)}% of assets — {fund.goodwill_tier or '—'}"
         embed.add_field(name="Goodwill/Intangibles", value=gw_str, inline=True)
+
+    # FCF Conversion Rate (T3.9)
+    if fund.fcf_conversion_ratio is not None:
+        fcf_conv_str = f"{_tier_emoji(fund.fcf_conversion_tier)} {_num(fund.fcf_conversion_ratio, 2)}× ({fund.fcf_conversion_tier or '—'})"
+        embed.add_field(name="FCF Conversion", value=fcf_conv_str, inline=True)
+
+    # Analyst Recommendation Trend (T3.10)
+    if fund.analyst_rec_trend_tier is not None:
+        delta = fund.analyst_rec_trend_delta
+        sign = "+" if (delta or 0) >= 0 else ""
+        rec_emoji = {"upgrading": "🟢", "downgrading": "🔴", "neutral": "🟡"}.get(fund.analyst_rec_trend_tier or "", "⚪")
+        rec_str = f"{rec_emoji} {sign}{_num(delta, 0)} net delta — {fund.analyst_rec_trend_tier}"
+        if fund.analyst_rec_net_score is not None:
+            rec_str += f"  (net score {_num(fund.analyst_rec_net_score, 0)})"
+        embed.add_field(name="Analyst Rec Trend", value=rec_str, inline=False)
 
     embed.set_footer(text="Deep context · DCF is directional only — see bot.md for assumptions")
     return embed
