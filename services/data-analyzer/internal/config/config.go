@@ -729,6 +729,27 @@ type FundamentalAnalysis struct {
 	// Gross-margin standard deviation threshold (percentage points) for moat scoring.
 	// Low std dev = stable pricing power.
 	QualMoatStableStdPP float64 // std-dev < this → considered stable  default 5
+
+	// ── Correlation analysis thresholds ───────────────────────────────────────
+
+	// Minimum conditions met (out of 5) for the "bullish convergence" master
+	// signal to fire. Higher = more conservative / fewer false positives.
+	// Configurable via CORR_BULLISH_CONVERGENCE_MIN_CONDITIONS (default 3).
+	CorrBullishConvergenceMin int
+
+	// Minimum conditions met (out of 4) for the "leverage cycle warning" master
+	// signal to fire. Configurable via CORR_LEVERAGE_CYCLE_MIN_CONDITIONS (default 3).
+	CorrLeverageCycleMin int
+
+	// Minimum conditions met (out of 4) for the "value trap" master signal.
+	// Configurable via CORR_VALUE_TRAP_MIN_CONDITIONS (default 3).
+	CorrValueTrapMin int
+
+	// Receivables / revenue growth ratio threshold for the deterioration warning.
+	// If accounts_receivable growth rate > revenue growth rate × this multiplier,
+	// receivables are considered "growing faster than revenue".
+	// Configurable via CORR_RECEIVABLES_GROWTH_MULTIPLIER (default 1.1).
+	CorrReceivablesGrowthMultiplier float64
 }
 
 func LoadFundamentalAnalysis() (FundamentalAnalysis, error) {
@@ -849,6 +870,12 @@ func LoadFundamentalAnalysis() (FundamentalAnalysis, error) {
 		FCFConversionLow:  floatEnv("FUNDAMENTAL_FCF_CONVERSION_LOW", 0.7),
 
 		EquityInterval: strEnvDefault("FUNDAMENTAL_EQUITY_INTERVAL", "1Day"),
+
+		// Correlation analysis
+		CorrBullishConvergenceMin:       intEnv("CORR_BULLISH_CONVERGENCE_MIN_CONDITIONS", 3),
+		CorrLeverageCycleMin:            intEnv("CORR_LEVERAGE_CYCLE_MIN_CONDITIONS", 3),
+		CorrValueTrapMin:                intEnv("CORR_VALUE_TRAP_MIN_CONDITIONS", 3),
+		CorrReceivablesGrowthMultiplier: floatEnv("CORR_RECEIVABLES_GROWTH_MULTIPLIER", 1.1),
 
 		// Qualitative
 		InsiderClusterWindowDays:  intEnv("QUAL_INSIDER_CLUSTER_WINDOW_DAYS", 90),

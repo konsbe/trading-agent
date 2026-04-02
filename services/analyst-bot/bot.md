@@ -596,6 +596,91 @@ Configurable via `QUAL_RD_HEALTHY_PCT` (default 10) and `QUAL_RD_MODERATE_PCT` (
 
 ---
 
+## Correlation Signals
+
+Correlations are displayed in a **🔗 Correlations** embed below the Qualitative embed. They only appear when at least one interesting pattern is detected (a fired master signal or a cluster scoring below "mixed_positive").
+
+Cross-metric divergence is more valuable than any single metric in isolation. When two metrics that should move together diverge, it often precedes a price move by 5–10 trading days.
+
+### Cluster Health
+
+Four clusters assess coherence within related metric groups. Each cluster scores −1 (severe divergence) to +1 (fully aligned).
+
+| Tier | Score range | Meaning |
+|---|---|---|
+| `🟢 healthy` | ≥ 0.5 | Metrics in this cluster are aligned — no divergence detected |
+| `🟡 mixed positive` | 0 – 0.5 | Mostly aligned with minor inconsistencies |
+| `🟠 mixed negative` | −0.5 – 0 | Some divergence detected — watch carefully |
+| `🔴 alert` | < −0.5 | Multiple divergences in this cluster — high risk signal |
+
+**Cluster definitions:**
+
+- **Earnings Quality** — EPS/FCF alignment, revenue vs EPS coherence, gross vs net margin trends, revenue growth vs pricing power
+- **Valuation vs Quality** — P/E vs earnings growth rate, P/E vs ROIC, FCF yield vs dividend yield (coverage), P/B vs ROE
+- **Leverage & Liquidity** — Net Debt/EBITDA vs interest coverage, current ratio vs FCF conversion, D/E vs net margin, goodwill vs FCF conversion
+- **Operational** — ROIC vs revenue growth (dilutive growth detection), gross margin trend as demand proxy, CapEx intensity vs FCF yield
+
+### Master Divergence Signals (★ = Highest Conviction)
+
+These five patterns have the highest historical predictive value. Each fires when ≥ N simultaneous conditions are met.
+
+#### ★ Bullish Convergence 🟢🟢
+All five factors pointing in the same direction — rarest and most reliable bullish signal.
+
+Conditions checked (need ≥ `CORR_BULLISH_CONVERGENCE_MIN_CONDITIONS`, default 3 of 5):
+1. Low P/E (below `FUNDAMENTAL_PE_ABS_GROWTH` threshold)
+2. High ROIC (moat_quality tier)
+3. FCF healthy (high_quality_cash conversion OR attractive FCF yield)
+4. Conservative leverage (D/E below `FUNDAMENTAL_DE_CONSERVATIVE`)
+5. Insider buying (cluster_buy or single_buy from Form 4 data)
+
+**Score shown:** e.g. `★ Bullish Convergence (4/5 conditions)` — 4 of 5 align.
+
+#### ★ Hidden Value 🟢
+Earnings held down by non-cash charges while real cash generation is strong. Market prices on EPS; you buy on FCF.
+
+Fires when ≥ 2 of: EPS stagnant/neutral + FCF conversion high quality + FCF yield attractive.
+
+#### ★ Deterioration Warning 🔴
+Earnings are being manufactured through accrual accounting — customers are buying but not paying, or revenue is recognised before cash is collected.
+
+Fires when ≥ 2 of: EPS strong + FCF accrual concern + receivables growing faster than revenue (ratio > `CORR_RECEIVABLES_GROWTH_MULTIPLIER`, default 1.1×).
+
+**Red flag:** When this fires alongside a strong consensus earnings beat, investigate accounts receivable growth and capitalised expenses.
+
+#### ★ Value Trap 🔴
+Cheap for a reason — the business is structurally deteriorating. Value investors attracted by the low P/E get trapped as earnings keep declining.
+
+Fires when ≥ `CORR_VALUE_TRAP_MIN_CONDITIONS` (default 3) of 4: low P/E + low/adequate ROIC + elevated leverage + declining revenue.
+
+#### ★ Leverage Cycle Warning 🔴🔴
+Four leverage and liquidity metrics simultaneously deteriorating — financial distress trajectory. In a rising rate environment this combination can move to a credit event within 2–4 quarters.
+
+Fires when ≥ `CORR_LEVERAGE_CYCLE_MIN_CONDITIONS` (default 3) of 4: Net Debt/EBITDA high risk + interest coverage high risk + FCF poor conversion + current ratio liquidity risk.
+
+### Net Signal
+
+The overall correlation verdict, combining all five master signals:
+
+| Display | Meaning |
+|---|---|
+| `🟢🟢 strongly_bullish` | 2+ bullish master signals, 0 bearish |
+| `🟢 bullish` | 1 bullish master signal, 0 bearish |
+| `⚪ neutral` | Signals balanced or none fired |
+| `🔴 bearish` | 1 bearish master signal, 0 bullish |
+| `🔴🔴 strongly_bearish` | 2+ bearish master signals fired |
+
+### Configurable Variables
+
+| Variable | Default | Effect |
+|---|---|---|
+| `CORR_BULLISH_CONVERGENCE_MIN_CONDITIONS` | 3 | Min conditions (of 5) for Bullish Convergence to fire |
+| `CORR_VALUE_TRAP_MIN_CONDITIONS` | 3 | Min conditions (of 4) for Value Trap to fire |
+| `CORR_LEVERAGE_CYCLE_MIN_CONDITIONS` | 3 | Min conditions (of 4) for Leverage Cycle to fire |
+| `CORR_RECEIVABLES_GROWTH_MULTIPLIER` | 1.1 | AR/Revenue growth ratio threshold for Deterioration Warning |
+
+---
+
 ## ETF / SPY Note
 
 SPY is an ETF (Exchange-Traded Fund) that tracks the S&P 500 index. ETFs have no individual earnings, P/E ratio, or margins — all fundamental fields will show `⚪ —`. Only price and technical signals apply.

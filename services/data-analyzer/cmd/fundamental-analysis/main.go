@@ -25,6 +25,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"math"
@@ -116,6 +117,7 @@ func (w *worker) analyzeAll(ctx context.Context) {
 		w.scoreTier2(ctx, sym, rows)
 		w.scoreTier3(ctx, sym, rows)
 		w.scoreQualitative(ctx, sym, rows)
+		w.scoreCorrelations(ctx, sym, rows)
 	}
 }
 
@@ -1667,6 +1669,630 @@ func (w *worker) scoreQualitative(ctx context.Context, symbol string, rows []sto
 	}
 
 	w.log.Info("qualitative signals computed", "symbol", symbol)
+}
+
+// scoreCorrelations computes cross-metric divergence signals from the previously
+// derived Tier 1–3 and qualitative metrics. It reads derived rows already
+// persisted by prior scoring passes (score, scoreTier2, scoreTier3, scoreQualitative)
+// and analyses whether metrics that should move together are actually diverging.
+//
+// Outputs (period = "derived", source = "fundamental_analysis"):
+//   corr_earnings_quality   — EPS/FCF alignment, revenue/EPS coherence, margin trends
+//   corr_valuation_quality  — P/E vs growth/ROIC, FCF vs dividend, P/B vs ROE
+//   corr_leverage_liquidity — Net Debt/EBITDA vs coverage, current ratio vs FCF, D/E vs margin
+//   corr_operational        — ROIC vs revenue growth, margin trends, CapEx vs FCF
+//   corr_master_signals     — 5 high-conviction divergence patterns
+//   corr_summary            — cross-cluster aggregate score
+//
+// TODO: migrate to Python — pandas makes pairwise delta computation trivial.
+func (w *worker) scoreCorrelations(ctx context.Context, symbol string, rows []store.FundamentalRow) {
+	ts := time.Now().UTC()
+	cfg := w.cfg
+
+	// Build raw latest map (same pattern as all other scoring functions).
+	latest := make(map[string]float64, len(rows))
+	for _, r := range rows {
+		if r.Value == nil {
+			continue
+		}
+		if _, exists := latest[r.Metric]; !exists {
+			latest[r.Metric] = *r.Value
+		}
+	}
+
+	// Load all derived metrics written by prior passes in this cycle.
+	derivedRows, err := store.QueryLatestDerived(ctx, w.pool, symbol)
+	if err != nil {
+		w.log.Error("scoreCorrelations: load derived", "symbol", symbol, "err", err)
+		return
+	}
+
+	dVals := make(map[string]float64, len(derivedRows))
+	dPay := make(map[string]map[string]any, len(derivedRows))
+	for _, d := range derivedRows {
+		if d.Value != nil {
+			dVals[d.Metric] = *d.Value
+		}
+		if len(d.Payload) > 0 {
+			var p map[string]any
+			if json.Unmarshal(d.Payload, &p) == nil {
+				dPay[d.Metric] = p
+			}
+		}
+	}
+
+	// Helpers.
+	ptr := func(v float64) *float64 { return &v }
+
+	upsert := func(metric string, value *float64, payload any) {
+		if err := store.UpsertFundamentalDerived(ctx, w.pool, ts, symbol, "derived", metric, value, payload); err != nil {
+			w.log.Error("upsert corr metric", "symbol", symbol, "metric", metric, "err", err)
+		}
+	}
+
+	// dTier returns the "tier" field from a derived metric's payload.
+	dTier := func(metric string) string {
+		if p, ok := dPay[metric]; ok {
+			if t, ok2 := p["tier"].(string); ok2 {
+				return t
+			}
+		}
+		return ""
+	}
+
+	// seriesTrend queries the 2 most recent XBRL values for a metric and returns
+	// the ratio (newest/oldest). >1 = rising, <1 = falling.
+	seriesTrend := func(metric string) (ratio float64, ok bool) {
+		s, qErr := store.QueryMetricSeries(ctx, w.pool, symbol, metric, 2)
+		if qErr != nil || len(s) < 2 || s[0].Value == nil || s[1].Value == nil {
+			return 1, false
+		}
+		older := *s[1].Value
+		if older == 0 {
+			return 1, false
+		}
+		return *s[0].Value / older, true
+	}
+
+	// ── Cluster 1: Earnings Quality ────────────────────────────────────────────
+	// EPS, FCF, Revenue, and Gross/Net Margin should trend together.
+	// Divergence signals accounting manipulation or structural cost problems.
+	var eq1Warnings, eq1Positives []string
+	eq1Score, eq1Max := 0.0, 0.0
+
+	// 1a. EPS vs FCF alignment (already computed by score() as fcf_eps_divergence).
+	epsFCFTier := dTier("fcf_eps_divergence")
+	if epsFCFTier != "" {
+		eq1Max++
+		switch epsFCFTier {
+		case "accruals_concern":
+			eq1Score--
+			eq1Warnings = append(eq1Warnings, "EPS growing but FCF accrual concern — possible earnings inflation via non-cash accounting")
+		case "eps_backed_by_fcf":
+			eq1Score++
+			eq1Positives = append(eq1Positives, "EPS growth backed by real FCF — high-quality earnings")
+		}
+	}
+
+	// 1b. Revenue vs EPS coherence.
+	// EPS strong + revenue weak = buybacks masking deterioration.
+	// Revenue strong + EPS weak = cost structure breaking.
+	epsTier := dTier("eps_strength")
+	revTier := dTier("revenue_strength")
+	if epsTier != "" && revTier != "" {
+		eq1Max++
+		switch {
+		case epsTier == "strong" && revTier == "weak":
+			eq1Score--
+			eq1Warnings = append(eq1Warnings, "EPS rising but revenue falling — buybacks or cost cuts masking organic deterioration")
+		case revTier == "strong" && epsTier == "weak":
+			eq1Score -= 0.5
+			eq1Warnings = append(eq1Warnings, "Revenue rising but EPS falling — cost structure breaking down, margins compressing at scale")
+		case revTier == "strong" && epsTier == "strong":
+			eq1Score++
+			eq1Positives = append(eq1Positives, "Revenue and EPS growing together — genuine organic quality growth")
+		}
+	}
+
+	// 1c. Gross vs Net margin trend coherence.
+	// Gross expanding + net compressing = SG&A or interest costs surging below the gross line.
+	gmTrend := dTier("gross_margin_trend_8q")
+	nmTrend := dTier("net_margin_trend_8q")
+	// Fallback: some versions stored without _8q suffix.
+	if gmTrend == "" {
+		gmTrend = dTier("gross_margin_trend")
+	}
+	if nmTrend == "" {
+		nmTrend = dTier("net_margin_trend")
+	}
+	if gmTrend != "" && nmTrend != "" {
+		eq1Max++
+		switch {
+		case gmTrend == "expanding" && nmTrend == "compressing":
+			eq1Score--
+			eq1Warnings = append(eq1Warnings, "Gross margin expanding but net margin compressing — SG&A, interest, or tax costs surging below gross line")
+		case gmTrend == "compressing" && nmTrend == "compressing":
+			eq1Score--
+			eq1Warnings = append(eq1Warnings, "Both margins compressing — broad profitability deterioration")
+		case gmTrend == "expanding" && nmTrend == "expanding":
+			eq1Score++
+			eq1Positives = append(eq1Positives, "Both margins expanding — improving operating leverage throughout the P&L")
+		}
+	}
+
+	// 1d. Revenue growth vs gross margin coherence (scaling with/without pricing power).
+	revGrowth, hasRevGrowth := latest["revenue_growth_ttm_yoy"]
+	if hasRevGrowth && gmTrend != "" {
+		eq1Max++
+		switch {
+		case revGrowth >= cfg.RevGrowthStrong && gmTrend == "compressing":
+			eq1Score -= 0.5
+			eq1Warnings = append(eq1Warnings, fmt.Sprintf("Fast revenue growth (%.1f%%) with compressing gross margin — scaling without pricing power", revGrowth))
+		case revGrowth >= cfg.RevGrowthStrong && (gmTrend == "stable" || gmTrend == "expanding"):
+			eq1Score++
+			eq1Positives = append(eq1Positives, fmt.Sprintf("Fast revenue growth (%.1f%%) with stable/expanding gross margin — quality growth combination", revGrowth))
+		case revGrowth < 0 && gmTrend == "compressing":
+			eq1Score--
+			eq1Warnings = append(eq1Warnings, "Revenue declining AND gross margin compressing — double deterioration signal")
+		}
+	}
+
+	eq1Cluster := clamp1(safeDiv(eq1Score, eq1Max))
+	upsert("corr_earnings_quality", ptr(eq1Cluster), map[string]any{
+		"tier":        corrTier(eq1Cluster),
+		"warnings":    eq1Warnings,
+		"positives":   eq1Positives,
+		"checks_run":  eq1Max,
+		"note":        "EPS/FCF alignment, revenue/EPS coherence, gross vs net margin trends",
+	})
+
+	// ── Cluster 2: Valuation vs Quality ───────────────────────────────────────
+	// Valuation multiples should reflect underlying quality.
+	// Divergence between price paid and quality earned signals mis-pricing.
+	var vq2Warnings, vq2Positives []string
+	vq2Score, vq2Max := 0.0, 0.0
+
+	pe, hasPE := latest["pe_ratio_ttm"]
+	epsGrowth, hasEPSGrowth := latest["eps_growth_ttm_yoy"]
+	roicTier := dTier("t2_roic")
+	levTier := dTier("t2_leverage")
+	fcfConvTier := dTier("t3_fcf_conversion")
+	fcfYieldTier := dTier("fcf_yield_tier")
+
+	// 2a. P/E vs EPS growth rate.
+	if hasPE && hasEPSGrowth {
+		vq2Max++
+		switch {
+		case pe > cfg.PEAbsGrowth && epsGrowth < cfg.EPSGrowthWeak:
+			vq2Score--
+			vq2Warnings = append(vq2Warnings, fmt.Sprintf("High P/E %.1f× + low EPS growth %.1f%% — valuation trap risk, paying premium for deteriorating earnings", pe, epsGrowth))
+		case pe < cfg.PEAbsValue && epsGrowth >= cfg.EPSGrowthStrong:
+			vq2Score++
+			vq2Positives = append(vq2Positives, fmt.Sprintf("Low P/E %.1f× + strong EPS growth %.1f%% — potential undervaluation (check PEG)", pe, epsGrowth))
+		}
+	}
+
+	// 2b. P/E vs ROIC.
+	if hasPE && roicTier != "" {
+		vq2Max++
+		switch {
+		case pe > cfg.PEAbsGrowth && roicTier == "low_roic":
+			vq2Score--
+			vq2Warnings = append(vq2Warnings, "High P/E + low ROIC — unjustified valuation premium, investors paying for quality that doesn't exist")
+		case pe < cfg.PEAbsValue && roicTier == "moat_quality":
+			vq2Score++
+			vq2Positives = append(vq2Positives, "Low P/E + high ROIC (moat quality) — rare value opportunity in a quality business")
+		}
+	}
+
+	// 2c. FCF yield vs dividend yield (dividend sustainability check).
+	fcfYieldPct, hasFCFY := dVals["fcf_yield"]
+	var divYieldPct float64
+	if p := dPay["t2_dividend"]; p != nil {
+		if v, ok := p["dividend_yield_pct"].(float64); ok {
+			divYieldPct = v
+		}
+	}
+	if hasFCFY && divYieldPct > cfg.DividendYieldMin {
+		vq2Max++
+		if divYieldPct > fcfYieldPct {
+			vq2Score--
+			vq2Warnings = append(vq2Warnings, fmt.Sprintf("Dividend yield %.1f%% > FCF yield %.1f%% — dividend not covered by free cash flow, cut risk elevated", divYieldPct, fcfYieldPct))
+		} else if fcfYieldPct >= divYieldPct*1.5 {
+			vq2Score++
+			vq2Positives = append(vq2Positives, "FCF yield comfortably covers dividend — sustainable income with room for growth")
+		}
+	}
+
+	// 2d. P/B vs ROE (Graham value signal).
+	pbTier := dTier("t2_pb")
+	roeTier := dTier("t2_roe")
+	if pbTier != "" && roeTier != "" {
+		vq2Max++
+		switch {
+		case (pbTier == "value_signal") && roeTier == "excellent":
+			vq2Score++
+			vq2Positives = append(vq2Positives, "Low P/B + high sustained ROE — classic deep value signal (low price for high quality capital allocation)")
+		case (pbTier == "limited_safety_margin") && roeTier != "excellent":
+			vq2Score--
+			vq2Warnings = append(vq2Warnings, "High P/B + declining/moderate ROE — multiple contraction risk, paying for quality that is eroding")
+		}
+	}
+
+	vq2Cluster := clamp1(safeDiv(vq2Score, vq2Max))
+	upsert("corr_valuation_quality", ptr(vq2Cluster), map[string]any{
+		"tier":       corrTier(vq2Cluster),
+		"warnings":   vq2Warnings,
+		"positives":  vq2Positives,
+		"checks_run": vq2Max,
+		"note":       "P/E vs growth/ROIC, FCF vs dividend coverage, P/B vs ROE",
+	})
+
+	// ── Cluster 3: Leverage & Liquidity ───────────────────────────────────────
+	// Balance sheet metrics that interact to determine resilience under stress.
+	var lev3Warnings, lev3Positives []string
+	lev3Score, lev3Max := 0.0, 0.0
+
+	ndTier := dTier("t2_net_debt_ebitda")
+	icTier := dTier("t3_interest_coverage")
+	crTier := dTier("t2_current_ratio")
+	gwTier := dTier("t3_goodwill_risk")
+	netMarginPct, hasNM := latest["net_margin_ttm"]
+
+	// 3a. Net Debt/EBITDA + Interest Coverage (credit stress signal).
+	if ndTier != "" && icTier != "" {
+		lev3Max++
+		switch {
+		case ndTier == "high_risk" && icTier == "high_risk":
+			lev3Score -= 2 // both bad = accelerating financial distress
+			lev3Warnings = append(lev3Warnings, "High Net Debt/EBITDA AND low interest coverage — accelerating financial distress, credit event risk in rising rate environment")
+		case ndTier == "high_risk" || icTier == "high_risk":
+			lev3Score--
+			lev3Warnings = append(lev3Warnings, "One leverage/coverage metric at high-risk level — balance sheet vulnerable to rate rises or revenue shortfall")
+		case ndTier == "conservative" && icTier == "very_safe":
+			lev3Score++
+			lev3Positives = append(lev3Positives, "Conservative net debt + very safe interest coverage — highly resilient balance sheet")
+		}
+	}
+
+	// 3b. Current Ratio + FCF Conversion (cash burn detection).
+	if crTier != "" && fcfConvTier != "" {
+		lev3Max++
+		switch {
+		case crTier == "liquidity_risk" && fcfConvTier == "accrual_concern":
+			lev3Score--
+			lev3Warnings = append(lev3Warnings, "Deteriorating current ratio + weak FCF conversion — cash burn accelerating, may need to raise capital or issue expensive debt")
+		case crTier == "safe" && fcfConvTier == "high_quality_cash":
+			lev3Score++
+			lev3Positives = append(lev3Positives, "Strong liquidity + high-quality cash earnings — resilient in economic stress scenarios")
+		}
+	}
+
+	// 3c. D/E + Net Margin (leverage is only safe with strong margins).
+	if levTier != "" && hasNM {
+		lev3Max++
+		switch {
+		case levTier == "high_leverage" && netMarginPct < cfg.NetMarginAvg:
+			lev3Score--
+			lev3Warnings = append(lev3Warnings, fmt.Sprintf("High D/E + thin net margin %.1f%% — any revenue shortfall can cascade to insolvency risk", netMarginPct))
+		case levTier == "conservative" && netMarginPct >= cfg.NetMarginStrong:
+			lev3Score++
+			lev3Positives = append(lev3Positives, "Low leverage + strong net margins — excellent financial resilience across market cycles")
+		}
+	}
+
+	// 3d. Goodwill/Intangibles + FCF Conversion (serial acquirer check).
+	if gwTier != "" && fcfConvTier != "" {
+		lev3Max++
+		switch {
+		case (gwTier == "impairment_risk" || gwTier == "monitor") && fcfConvTier == "accrual_concern":
+			lev3Score--
+			lev3Warnings = append(lev3Warnings, "High goodwill exposure + weak FCF conversion — acquisitions generating reported earnings but not real cash, impairment risk")
+		case gwTier == "low_risk" && fcfConvTier == "high_quality_cash":
+			lev3Score++
+			lev3Positives = append(lev3Positives, "Low goodwill exposure + high FCF conversion — organic, cash-backed growth (not acquisition-dependent)")
+		}
+	}
+
+	lev3Raw := safeDiv(lev3Score, lev3Max)
+	if lev3Raw < -1 {
+		lev3Raw = -1
+	}
+	lev3Cluster := clamp1(lev3Raw)
+	upsert("corr_leverage_liquidity", ptr(lev3Cluster), map[string]any{
+		"tier":       corrTier(lev3Cluster),
+		"warnings":   lev3Warnings,
+		"positives":  lev3Positives,
+		"checks_run": lev3Max,
+		"note":       "Net Debt/EBITDA vs coverage, current ratio vs FCF conversion, D/E vs net margin, goodwill vs conversion",
+	})
+
+	// ── Cluster 4: Operational Efficiency ─────────────────────────────────────
+	// How well the business converts inputs to profitable outputs.
+	var op4Warnings, op4Positives []string
+	op4Score, op4Max := 0.0, 0.0
+
+	capexTier := dTier("t2_capex_intensity")
+
+	// 4a. ROIC vs Revenue Growth (dilutive growth detection).
+	if roicTier != "" && revTier != "" {
+		op4Max++
+		switch {
+		case roicTier == "low_roic" && revTier == "strong":
+			op4Score--
+			op4Warnings = append(op4Warnings, "Strong revenue growth + low ROIC — growth is dilutive, company investing in sub-cost-of-capital projects")
+		case roicTier == "moat_quality" && revTier == "strong":
+			op4Score++
+			op4Positives = append(op4Positives, "High ROIC + strong revenue growth — compounding machine, every reinvested dollar earns above cost of capital")
+		case roicTier == "moat_quality" && revTier == "weak":
+			// High quality but not growing — mature harvest phase, not necessarily bad.
+			op4Score += 0.5
+			op4Positives = append(op4Positives, "High ROIC + slowing revenue — mature harvest phase, strong returns on existing capital")
+		}
+	}
+
+	// 4b. Gross margin trend as demand proxy.
+	gmTrendOp := gmTrend // already loaded
+	if gmTrendOp != "" {
+		op4Max++
+		switch gmTrendOp {
+		case "compressing":
+			op4Score--
+			op4Warnings = append(op4Warnings, "Gross margin compressing — pricing power weakening or input costs rising faster than selling prices")
+		case "expanding":
+			op4Score++
+			op4Positives = append(op4Positives, "Gross margin expanding — pricing power intact, favourable demand/cost dynamics")
+		}
+	}
+
+	// 4c. CapEx intensity vs FCF yield (harvest vs reinvestment signal).
+	if capexTier != "" && fcfYieldTier != "" {
+		op4Max++
+		switch {
+		case capexTier == "asset_light" && fcfYieldTier == "attractive":
+			op4Score++
+			op4Positives = append(op4Positives, "Low CapEx intensity + attractive FCF yield — asset-light model generating strong free cash for shareholders")
+		case capexTier == "capital_intensive" && fcfYieldTier == "avoid":
+			op4Score--
+			op4Warnings = append(op4Warnings, "High CapEx intensity + weak FCF yield — heavy reinvestment absorbing all cash, limited shareholder returns")
+		}
+	}
+
+	op4Cluster := clamp1(safeDiv(op4Score, op4Max))
+	upsert("corr_operational", ptr(op4Cluster), map[string]any{
+		"tier":       corrTier(op4Cluster),
+		"warnings":   op4Warnings,
+		"positives":  op4Positives,
+		"checks_run": op4Max,
+		"note":       "ROIC vs revenue growth (dilution check), gross margin trend, CapEx vs FCF yield (harvest vs grow)",
+	})
+
+	// ── Master Divergence Signals ─────────────────────────────────────────────
+	// Five high-conviction patterns with the highest historical predictive value.
+	// Each fires when ≥ N conditions are simultaneously true.
+
+	type masterSig struct {
+		Fired      bool     `json:"fired"`
+		Score      int      `json:"score"`
+		Conditions []string `json:"conditions_met"`
+	}
+
+	// M1. ★ Bullish Convergence: low P/E + high ROIC + FCF healthy + D/E conservative + insider buying.
+	m1 := masterSig{}
+	{
+		var met []string
+		if hasPE && pe < cfg.PEAbsGrowth {
+			met = append(met, fmt.Sprintf("low_pe (%.1f×)", pe))
+		}
+		if roicTier == "moat_quality" {
+			met = append(met, "high_roic (moat_quality)")
+		}
+		if fcfConvTier == "high_quality_cash" || fcfYieldTier == "attractive" {
+			met = append(met, "fcf_healthy")
+		}
+		if levTier == "conservative" {
+			met = append(met, "conservative_leverage")
+		}
+		insiderTier := dTier("qual_insider_signal")
+		if insiderTier == "cluster_buy" || insiderTier == "single_buy" {
+			met = append(met, "insider_buying")
+		}
+		m1.Score = len(met)
+		m1.Conditions = met
+		m1.Fired = len(met) >= cfg.CorrBullishConvergenceMin
+	}
+
+	// M2. ★ Hidden Value: EPS stagnant + FCF high quality + FCF yield attractive.
+	// Market prices on EPS; the real cash generation is being missed.
+	m2 := masterSig{}
+	{
+		var met []string
+		if epsTier == "weak" || epsTier == "neutral" {
+			met = append(met, "eps_stagnant_or_neutral")
+		}
+		if fcfConvTier == "high_quality_cash" {
+			met = append(met, "high_quality_fcf_conversion")
+		}
+		if fcfYieldTier == "attractive" {
+			met = append(met, "attractive_fcf_yield")
+		}
+		m2.Score = len(met)
+		m2.Conditions = met
+		m2.Fired = len(met) >= 2
+	}
+
+	// M3. ★ Deterioration Warning: EPS strong + FCF accrual concern + receivables growing faster than revenue.
+	// Earnings are being manufactured via accrual accounting.
+	m3 := masterSig{}
+	{
+		var met []string
+		if epsTier == "strong" {
+			met = append(met, "eps_strong")
+		}
+		if epsFCFTier == "accruals_concern" {
+			met = append(met, "fcf_accruals_concern")
+		}
+		// Compare receivables growth to revenue growth via XBRL series.
+		arRatio, arOK := seriesTrend("accounts_receivable_reported")
+		revRatio, revOK := seriesTrend("revenue_reported")
+		if arOK && revOK && arRatio > revRatio*cfg.CorrReceivablesGrowthMultiplier {
+			met = append(met, fmt.Sprintf("receivables_growing_faster_than_revenue (AR %.2f× vs Rev %.2f×)", arRatio, revRatio))
+		}
+		m3.Score = len(met)
+		m3.Conditions = met
+		m3.Fired = len(met) >= 2
+	}
+
+	// M4. ★ Value Trap: low P/E + declining ROIC + elevated D/E + declining revenue.
+	// Cheap for a reason — business is structurally deteriorating.
+	m4 := masterSig{}
+	{
+		var met []string
+		if hasPE && pe < cfg.PEAbsGrowth {
+			met = append(met, fmt.Sprintf("low_pe (%.1f×)", pe))
+		}
+		if roicTier == "low_roic" || roicTier == "adequate_roic" {
+			met = append(met, "low_or_adequate_roic")
+		}
+		if levTier == "high_leverage" || levTier == "manageable" {
+			met = append(met, "elevated_leverage")
+		}
+		if revTier == "weak" {
+			met = append(met, "declining_revenue")
+		}
+		m4.Score = len(met)
+		m4.Conditions = met
+		m4.Fired = len(met) >= cfg.CorrValueTrapMin
+	}
+
+	// M5. ★ Leverage Cycle Warning: Net Debt high + coverage low + FCF poor + current ratio low.
+	// Four leverage/liquidity metrics simultaneously deteriorating = financial distress trajectory.
+	m5 := masterSig{}
+	{
+		var met []string
+		if ndTier == "high_risk" {
+			met = append(met, "net_debt_ebitda_high_risk")
+		}
+		if icTier == "high_risk" {
+			met = append(met, "interest_coverage_high_risk")
+		}
+		if fcfConvTier == "accrual_concern" {
+			met = append(met, "fcf_poor_conversion")
+		}
+		if crTier == "liquidity_risk" {
+			met = append(met, "current_ratio_liquidity_risk")
+		}
+		m5.Score = len(met)
+		m5.Conditions = met
+		m5.Fired = len(met) >= cfg.CorrLeverageCycleMin
+	}
+
+	bullishN, bearishN := 0, 0
+	if m1.Fired {
+		bullishN++
+	}
+	if m2.Fired {
+		bullishN++
+	}
+	if m3.Fired {
+		bearishN++
+	}
+	if m4.Fired {
+		bearishN++
+	}
+	if m5.Fired {
+		bearishN++
+	}
+	netSig := bullishN - bearishN
+	netLabel := "neutral"
+	switch {
+	case netSig >= 2:
+		netLabel = "strongly_bullish"
+	case netSig == 1:
+		netLabel = "bullish"
+	case netSig <= -2:
+		netLabel = "strongly_bearish"
+	case netSig == -1:
+		netLabel = "bearish"
+	}
+
+	upsert("corr_master_signals", ptr(float64(netSig)), map[string]any{
+		"bullish_convergence":    m1,
+		"hidden_value":           m2,
+		"deterioration_warning":  m3,
+		"value_trap":             m4,
+		"leverage_cycle_warning": m5,
+		"net_signal":             netLabel,
+		"bullish_count":          bullishN,
+		"bearish_count":          bearishN,
+	})
+
+	// Overall summary — average of the four cluster scores.
+	summaryScore := round2((eq1Cluster + vq2Cluster + lev3Cluster + op4Cluster) / 4)
+	var allWarnings []string
+	allWarnings = append(allWarnings, eq1Warnings...)
+	allWarnings = append(allWarnings, vq2Warnings...)
+	allWarnings = append(allWarnings, lev3Warnings...)
+	allWarnings = append(allWarnings, op4Warnings...)
+
+	upsert("corr_summary", ptr(summaryScore), map[string]any{
+		"overall_score": summaryScore,
+		"tier":          corrTier(summaryScore),
+		"clusters": map[string]string{
+			"earnings_quality":   corrTier(eq1Cluster),
+			"valuation_quality":  corrTier(vq2Cluster),
+			"leverage_liquidity": corrTier(lev3Cluster),
+			"operational":        corrTier(op4Cluster),
+		},
+		"master_net_signal": netLabel,
+		"master_fired": map[string]bool{
+			"bullish_convergence":    m1.Fired,
+			"hidden_value":           m2.Fired,
+			"deterioration_warning":  m3.Fired,
+			"value_trap":             m4.Fired,
+			"leverage_cycle_warning": m5.Fired,
+		},
+		"warnings_count":  len(allWarnings),
+		"positives_count": len(eq1Positives) + len(vq2Positives) + len(lev3Positives) + len(op4Positives),
+	})
+
+	w.log.Info("correlations scored", "symbol", symbol,
+		"summary", summaryScore, "net_signal", netLabel,
+		"bullish", bullishN, "bearish", bearishN,
+	)
+}
+
+// corrTier maps a cluster score in [-1, +1] to a human-readable tier label.
+func corrTier(score float64) string {
+	switch {
+	case score >= 0.5:
+		return "healthy"
+	case score >= 0:
+		return "mixed_positive"
+	case score >= -0.5:
+		return "mixed_negative"
+	default:
+		return "alert"
+	}
+}
+
+// safeDiv divides numerator by denominator, returning 0 when denominator is 0.
+func safeDiv(num, denom float64) float64 {
+	if denom == 0 {
+		return 0
+	}
+	return num / denom
+}
+
+// clamp1 clamps a value to [-1, +1].
+func clamp1(v float64) float64 {
+	if v > 1 {
+		return 1
+	}
+	if v < -1 {
+		return -1
+	}
+	return v
 }
 
 // meanStd computes the mean and population standard deviation of a float64 slice.

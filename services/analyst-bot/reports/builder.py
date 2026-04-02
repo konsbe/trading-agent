@@ -513,6 +513,48 @@ class ReportBuilder:
             snap.qual_rd_intensity_pct = qual_rd_p.get("rd_pct")
             snap.qual_rd_tier = qual_rd_p.get("tier")
 
+            # ── Correlation signals ───────────────────────────────────────────
+            def _corr_payload(key: str) -> dict:
+                return derived.get(key, {}).get("payload") or {}
+
+            # Cluster tiers
+            snap.corr_earnings_quality_tier = (_corr_payload("corr_earnings_quality").get("tier"))
+            snap.corr_valuation_quality_tier = (_corr_payload("corr_valuation_quality").get("tier"))
+            snap.corr_leverage_liquidity_tier = (_corr_payload("corr_leverage_liquidity").get("tier"))
+            snap.corr_operational_tier = (_corr_payload("corr_operational").get("tier"))
+
+            # Summary
+            corr_sum_p = _corr_payload("corr_summary")
+            snap.corr_summary_score = _d_val("corr_summary")
+            snap.corr_summary_tier = corr_sum_p.get("tier")
+
+            # Master signals
+            corr_master_p = _corr_payload("corr_master_signals")
+            snap.corr_master_net_signal = corr_master_p.get("net_signal")
+
+            bc = corr_master_p.get("bullish_convergence") or {}
+            snap.corr_bullish_convergence_fired = bc.get("fired")
+            snap.corr_bullish_convergence_score = bc.get("score")
+
+            hv = corr_master_p.get("hidden_value") or {}
+            snap.corr_hidden_value_fired = hv.get("fired")
+
+            dw = corr_master_p.get("deterioration_warning") or {}
+            snap.corr_deterioration_warning_fired = dw.get("fired")
+
+            vt = corr_master_p.get("value_trap") or {}
+            snap.corr_value_trap_fired = vt.get("fired")
+
+            lc = corr_master_p.get("leverage_cycle_warning") or {}
+            snap.corr_leverage_cycle_fired = lc.get("fired")
+
+            # Accumulate all warnings and positives across clusters for display
+            for ckey in ("corr_earnings_quality", "corr_valuation_quality",
+                         "corr_leverage_liquidity", "corr_operational"):
+                cp = _corr_payload(ckey)
+                snap.corr_warnings.extend(cp.get("warnings") or [])
+                snap.corr_positives.extend(cp.get("positives") or [])
+
             return snap
         except Exception as exc:
             log.warning("fundamental build failed symbol=%s: %s", symbol, exc)
