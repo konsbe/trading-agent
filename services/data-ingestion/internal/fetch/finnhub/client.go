@@ -230,6 +230,39 @@ func (c *Client) Earnings(ctx context.Context, symbol string) ([]map[string]any,
 	return items, nil
 }
 
+// Recommendation fetches the analyst recommendation trend for a symbol.
+// Endpoint: GET /stock/recommendation?symbol=<sym>
+// Returns an array of monthly objects with buy/hold/sell/strongBuy/strongSell counts.
+// Newest month is first in the slice.
+func (c *Client) Recommendation(ctx context.Context, symbol string) ([]map[string]any, error) {
+	if !c.HasToken() {
+		return nil, fmt.Errorf("finnhub token missing")
+	}
+	if err := c.Limiter.Wait(ctx); err != nil {
+		return nil, err
+	}
+	q := url.Values{}
+	q.Set("symbol", symbol)
+	q.Set("token", c.Token)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, base+"/stock/recommendation?"+q.Encode(), nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := c.HTTP.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("finnhub recommendation %s: %s", symbol, resp.Status)
+	}
+	var items []map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&items); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 // ─── Quote helpers ─────────────────────────────────────────────────────────────
 
 // StoreQuoteAsEquityBar builds a coarse bar from quote snapshot (uses current price as close).

@@ -21,16 +21,18 @@ type Fundamental struct {
 	Symbols []string
 
 	// Poll intervals.
-	PollMetrics    time.Duration // /stock/metric — TTM ratios updated daily
-	PollFinancials time.Duration // /stock/financials-reported — quarterly cadence
-	PollEarnings   time.Duration // /stock/earnings — updated after each report
-	PollOverview   time.Duration // Alpha Vantage OVERVIEW — weekly is sufficient
+	PollMetrics         time.Duration // /stock/metric — TTM ratios updated daily
+	PollFinancials      time.Duration // /stock/financials-reported — quarterly cadence
+	PollEarnings        time.Duration // /stock/earnings — updated after each report
+	PollOverview        time.Duration // Alpha Vantage OVERVIEW — weekly is sufficient
+	PollRecommendation  time.Duration // /stock/recommendation — analyst buy/hold/sell monthly
 
 	// Feature toggles.
-	EnableMetrics    bool // Tier 1: EPS, revenue, P/E, FCF, margins (TTM ratios)
-	EnableFinancials bool // Detailed quarterly/annual income + cash-flow statements
-	EnableEarnings   bool // Historical EPS actuals vs estimates (earnings surprises)
-	EnableOverview   bool // Alpha Vantage: forward P/E, sector, beta (requires ALPHA_VANTAGE_API_KEY)
+	EnableMetrics         bool // Tier 1: EPS, revenue, P/E, FCF, margins (TTM ratios)
+	EnableFinancials      bool // Detailed quarterly/annual income + cash-flow statements
+	EnableEarnings        bool // Historical EPS actuals vs estimates (earnings surprises)
+	EnableOverview        bool // Alpha Vantage: forward P/E, sector, beta (requires ALPHA_VANTAGE_API_KEY)
+	EnableRecommendation  bool // Analyst consensus recommendation trend (free tier)
 
 	// Frequency for financials-reported endpoint ("quarterly" or "annual").
 	FinancialsFreq string
@@ -61,10 +63,11 @@ func LoadFundamental() (Fundamental, error) {
 		syms = []string{"AAPL", "MSFT", "SPY"}
 	}
 
-	defaultMetrics := 24 * time.Hour
-	defaultFinancials := 7 * 24 * time.Hour
-	defaultEarnings := 24 * time.Hour
-	defaultOverview := 7 * 24 * time.Hour // weekly — free tier is 25 calls/day
+	defaultMetrics        := 24 * time.Hour
+	defaultFinancials     := 7 * 24 * time.Hour
+	defaultEarnings       := 24 * time.Hour
+	defaultOverview       := 7 * 24 * time.Hour  // weekly — free tier is 25 calls/day
+	defaultRecommendation := 24 * time.Hour       // analyst rec changes monthly; daily poll is sufficient
 
 	freq := "quarterly"
 	if v := os.Getenv("FUNDAMENTAL_FINANCIALS_FREQ"); v == "annual" {
@@ -90,10 +93,12 @@ func LoadFundamental() (Fundamental, error) {
 		PollFinancials:         pollFor("DATA_FUNDAMENTAL_FINANCIALS_POLL_INTERVAL", defaultFinancials),
 		PollEarnings:           pollFor("DATA_FUNDAMENTAL_EARNINGS_POLL_INTERVAL", defaultEarnings),
 		PollOverview:           pollFor("DATA_FUNDAMENTAL_OVERVIEW_POLL_INTERVAL", defaultOverview),
+		PollRecommendation:     pollFor("DATA_FUNDAMENTAL_RECOMMENDATION_POLL_INTERVAL", defaultRecommendation),
 		EnableMetrics:          env("FUNDAMENTAL_ENABLE_METRICS", "true") == "true",
 		EnableFinancials:       env("FUNDAMENTAL_ENABLE_FINANCIALS", "true") == "true",
 		EnableEarnings:         env("FUNDAMENTAL_ENABLE_EARNINGS", "true") == "true",
 		EnableOverview:         env("FUNDAMENTAL_ENABLE_OVERVIEW", "true") == "true",
+		EnableRecommendation:   env("FUNDAMENTAL_ENABLE_RECOMMENDATION", "true") == "true",
 		EnableAnnualFinancials: env("FUNDAMENTAL_ENABLE_ANNUAL_FINANCIALS", "true") == "true",
 		FinancialsFreq:         freq,
 		FinancialsLimit:        limit,

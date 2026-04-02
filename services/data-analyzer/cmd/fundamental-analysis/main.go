@@ -284,6 +284,14 @@ func (w *worker) score(ctx context.Context, symbol string, rows []store.Fundamen
 			fcfYield = ptr(fy)
 			fcfYieldSource = "fcf_ttm ÷ market_cap × 100"
 		}
+	} else if fcf, okF := latest["fcf_reported"]; okF && fcf > 0 {
+		// Fallback: use XBRL-derived FCF (operating CF − CapEx, in millions).
+		// Both fcf_reported and market_cap are in millions → ratio is unit-clean.
+		if mktCap, okM := latest["market_cap"]; okM && mktCap > 0 {
+			fy := fcf / mktCap * 100
+			fcfYield = ptr(fy)
+			fcfYieldSource = "fcf_reported ÷ market_cap × 100 (XBRL fallback)"
+		}
 	}
 
 	if fcfYield != nil {
@@ -683,6 +691,33 @@ func (w *worker) scoreTier2(ctx context.Context, symbol string, rows []store.Fun
 			"roa_pct": roa,
 			"tier":    tier,
 			"note":    "informational only; >10% high efficiency, 5-10% moderate, <5% low asset utilisation",
+		})
+	}
+
+	// ── T2.2b ROIC — Return on Invested Capital (rank 06, extended) ───────────
+	// Finnhub /stock/metric roic5Y = 5-year average ROIC (stored as roic_5y).
+	// ROIC >15% sustained is the classic Buffett / Munger moat indicator.
+	// Composite-scored alongside ROE; both measuring the same dimension so each
+	// contributes half-weight (counted once in t2Score / t2Max pair).
+	// Thresholds: FUNDAMENTAL_ROIC_EXCELLENT (15) / FUNDAMENTAL_ROIC_ADEQUATE (8).
+	if roic, ok := latest["roic_5y"]; ok {
+		tier := "low_roic"
+		score := -1.0
+		if roic >= cfg.ROICExcellent {
+			tier = "moat_quality"
+			score = 1
+		} else if roic >= cfg.ROICAdequate {
+			tier = "adequate_roic"
+			score = 0
+		}
+		t2Score += score
+		t2Max++
+		upsert("t2_roic", ptr(roic), map[string]any{
+			"roic_pct":   roic,
+			"tier":       tier,
+			"source":     "finnhub_5y_avg",
+			"thresholds": fmt.Sprintf(">%.0f%% moat (Buffett), %.0f-%.0f%% adequate, <%.0f%% low ROIC", cfg.ROICExcellent, cfg.ROICAdequate, cfg.ROICExcellent, cfg.ROICAdequate),
+			"note":       "5-year average ROIC from Finnhub roic5Y field",
 		})
 	}
 
@@ -1271,6 +1306,57 @@ func (w *worker) scoreTier3(ctx context.Context, symbol string, rows []store.Fun
 				"note":                  "compare within sector; SaaS 5-15× is normal, industrials >3× is expensive",
 			})
 		}
+	}
+
+	// ── T3.9 FCF Conversion Rate ──────────────────────────────────────────────
+	// FCF Conversion = FCF / Net Income. A ratio >1.0 means the company converts
+	// more than 100% of its accounting profits into real cash — a sign of high
+	// earnings quality (non-cash depreciation adds back). <0.7 = aggressive
+	// accruals or large working-capital drag relative to reported income.
+	// Source: fcf_reported and net_income_reported (both XBRL, in millions).
+	// Thresholds: FUNDAMENTAL_FCF_CONVERSION_HIGH (1.0) / FUNDAMENTAL_FCF_CONVERSION_LOW (0.7).
+	if fcfM > 0 {
+		if netInc, ok := latest["net_income_reported"]; ok && netInc > 0 {
+			fcfConv := fcfM / netInc
+			tier := "accrual_concern"
+			if fcfConv >= cfg.FCFConversionHigh {
+				tier = "high_quality_cash"
+			} else if fcfConv >= cfg.FCFConversionLow {
+				tier = "moderate"
+			}
+			upsert("t3_fcf_conversion", ptr(fcfConv), map[string]any{
+				"fcf_conversion_ratio": fcfConv,
+				"fcf_millions":         fcfM,
+				"net_income_millions":  netInc,
+				"tier":                 tier,
+				"thresholds":           fmt.Sprintf(">%.1f× high quality cash, %.1f-%.1f× moderate, <%.1f× accrual concern", cfg.FCFConversionHigh, cfg.FCFConversionLow, cfg.FCFConversionHigh, cfg.FCFConversionLow),
+				"note":                 "ratio >1 = cash earnings exceed accounting earnings (depreciation adds back); <0.7 = red flag",
+			})
+		}
+	}
+
+	// ── T3.10 Analyst Recommendation Trend (rank 17 extended) ─────────────────
+	// Source: analyst_rec_trend stored by data-fundamental's runRecommendations()
+	// using Finnhub /stock/recommendation month-over-month delta in net buy score.
+	// Positive delta = more analysts upgraded this month vs last (bullish signal).
+	// Negative delta = more analysts downgraded (bearish signal).
+	// Thresholds: FUNDAMENTAL_ANALYST_REC_UPGRADE_DELTA (5) / _DOWNGRADE_DELTA (-5).
+	if recTrend, ok := latest["analyst_rec_trend"]; ok {
+		tier := "neutral"
+		if recTrend >= cfg.AnalystRecUpgrade {
+			tier = "upgrading"
+		} else if recTrend <= cfg.AnalystRecDowngrade {
+			tier = "downgrading"
+		}
+		// Net score level gives context (absolute analyst confidence).
+		netScore, _ := latest["analyst_rec_net_score"]
+		upsert("t3_analyst_rec_trend", ptr(recTrend), map[string]any{
+			"trend_delta":        recTrend,
+			"net_score_current":  netScore,
+			"tier":               tier,
+			"thresholds":         fmt.Sprintf("delta >%.0f = upgrading, <%.0f = downgrading, else neutral", cfg.AnalystRecUpgrade, cfg.AnalystRecDowngrade),
+			"note":               "Finnhub /stock/recommendation month-over-month change in (strongBuy+buy) − (strongSell+sell)",
+		})
 	}
 
 	w.log.Info("tier3 fundamental context computed", "symbol", symbol)

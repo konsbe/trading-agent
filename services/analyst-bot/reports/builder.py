@@ -412,6 +412,17 @@ class ReportBuilder:
             snap.ps_ratio = t3_ps_p.get("ps_ratio")
             snap.ps_tier = t3_ps_p.get("tier")
 
+            # FCF Conversion Rate (T3.9)
+            t3_fcf_conv_p = _t3_payload("t3_fcf_conversion")
+            snap.fcf_conversion_ratio = t3_fcf_conv_p.get("fcf_conversion_ratio")
+            snap.fcf_conversion_tier = t3_fcf_conv_p.get("tier")
+
+            # Analyst Recommendation Trend (T3.10)
+            t3_rec_p = _t3_payload("t3_analyst_rec_trend")
+            snap.analyst_rec_trend_delta = t3_rec_p.get("trend_delta")
+            snap.analyst_rec_trend_tier = t3_rec_p.get("tier")
+            snap.analyst_rec_net_score = t3_rec_p.get("net_score_current")
+
             # ── Tier 2 derived signals ────────────────────────────────────────
             def _t2_payload(key: str) -> dict:
                 return derived.get(key, {}).get("payload") or {}
@@ -422,6 +433,11 @@ class ReportBuilder:
             snap.roe_tier = t2_roe_p.get("tier")
             t2_roa_p = _t2_payload("t2_roa")
             snap.roa_pct = t2_roa_p.get("roa_pct")
+
+            # ROIC
+            t2_roic_p = _t2_payload("t2_roic")
+            snap.roic_pct = t2_roic_p.get("roic_pct")
+            snap.roic_tier = t2_roic_p.get("tier")
 
             # Leverage — D/E ratio
             t2_lev_p = _t2_payload("t2_leverage")

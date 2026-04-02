@@ -286,6 +286,18 @@ Configurable via `FUNDAMENTAL_ROE_EXCELLENT` (default 15) and `FUNDAMENTAL_ROE_A
 
 The `ROA` (Return on Assets) shown inline is informational: > 10% high efficiency, 5–10% moderate, < 5% low.
 
+### ROIC (Return on Invested Capital)
+
+ROIC measures how efficiently the company deploys **all** invested capital (equity + debt). It is a stricter test than ROE because it cannot be inflated by leverage. ROIC consistently above the cost of capital (typically ~10%) is the hallmark of a compounding machine. Source: Finnhub `roic5Y` (5-year average).
+
+`🟢 moat_quality` > 15% — Durable economic moat. Company earns well above its cost of capital.
+`🟡 adequate_roic` 8–15% — Acceptable. Value creation present but not exceptional.
+`🔴 low_roic` < 8% — Earning near or below cost of capital. Capital deployment is inefficient.
+
+Example: `🟢 +28.5% (moat_quality) · 5Y avg` — AAPL earns 28.5% on all invested capital over the last 5 years, well above its ~10% cost of capital.
+
+Configurable via `FUNDAMENTAL_ROIC_EXCELLENT` (default 15) and `FUNDAMENTAL_ROIC_ADEQUATE` (default 8).
+
 ### Debt/Equity (D/E Ratio)
 
 How much debt finances the business versus equity. Rising interest rates make high-debt companies more vulnerable — each refinancing hits earnings harder.
@@ -428,9 +440,21 @@ Consensus analyst target price vs. current close price. Source: Alpha Vantage.
 
 `+23.5% upside (target $320.00)` — Stock is at $259, analysts target $320 → 23.5% upside.
 
-⚠️ This is a single consensus target. Full revision trend (30/60/90-day changes) requires paid data (Seeking Alpha / Finviz).
-
 Configurable via `FUNDAMENTAL_ANALYST_UPSIDE_BULLISH` (default 15) and `FUNDAMENTAL_ANALYST_DOWNSIDE_BEARISH` (default -5).
+
+### Analyst Rec Trend (New — Rank 17 extended)
+
+Month-over-month change in the net analyst buy score, computed from Finnhub `/stock/recommendation` (free tier). Each month Finnhub provides a count of analysts with `strongBuy`, `buy`, `hold`, `sell`, `strongSell` ratings. The **net score** = `(strongBuy + buy) − (strongSell + sell)`. The **trend delta** = net score this month minus net score last month.
+
+`🟢 upgrading` Delta > 5 — More analysts moved to bullish ratings vs last month. Positive revision momentum.
+`🟡 neutral` Delta −5 to +5 — Consensus is stable month-over-month.
+`🔴 downgrading` Delta < −5 — More analysts moved to bearish ratings vs last month. Negative revision momentum.
+
+The **net score** shown in parentheses is the absolute current level (e.g. `net score 44` = 44 more bullish analysts than bearish).
+
+Example: `🟢 +8 net delta — upgrading (net score 44)` — 8 more analysts upgraded to buy vs last month; 44 net bullish analysts in total.
+
+Configurable via `FUNDAMENTAL_ANALYST_REC_UPGRADE_DELTA` (default 5) and `FUNDAMENTAL_ANALYST_REC_DOWNGRADE_DELTA` (default -5).
 
 ### Goodwill & Intangibles % (Rank 18)
 
@@ -452,6 +476,20 @@ Market Cap ÷ TTM Revenue. Most useful when earnings are zero or negative (early
 `🔴 speculative` P/S > 15× — Very high risk; small revenue growth disappointment can cause large price declines.
 
 Configurable via `FUNDAMENTAL_PS_VALUE` (default 5), `FUNDAMENTAL_PS_FAIR` (default 10), and `FUNDAMENTAL_PS_SPECULATIVE` (default 15).
+
+### FCF Conversion Rate (New — T3.9)
+
+FCF Conversion = FCF / Net Income. This ratio reveals **earnings quality** — how much of accounting profit actually materialises as real cash. A ratio > 1.0 is common because non-cash depreciation adds back to operating income. A ratio < 0.7 is a red flag: it means reported earnings are significantly ahead of actual cash generation (aggressive accruals, deferred costs, or large working-capital buildup).
+
+Source: `fcf_reported` and `net_income_reported` from XBRL SEC filings (both in millions).
+
+`🟢 high_quality_cash` ≥ 1.0× — FCF equals or exceeds net income. Earnings are fully cash-backed or better.
+`🟡 moderate` 0.7–1.0× — Most earnings convert to cash. Acceptable.
+`🔴 accrual_concern` < 0.7× — Significant gap between accounting profits and real cash. Investigate working-capital trends, revenue recognition, or CapEx treatment.
+
+Example: `🟢 1.23× (high_quality_cash)` — AAPL generates $1.23 in free cash for every $1 of net income reported.
+
+Configurable via `FUNDAMENTAL_FCF_CONVERSION_HIGH` (default 1.0) and `FUNDAMENTAL_FCF_CONVERSION_LOW` (default 0.7).
 
 ---
 

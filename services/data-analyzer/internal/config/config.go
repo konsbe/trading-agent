@@ -604,6 +604,12 @@ type FundamentalAnalysis struct {
 	ROEExcellent float64 // >this = "excellent"  default 15
 	ROEAdequate  float64 // >this = "adequate"   default 8
 
+	// ── Tier 2: ROIC (Return on Invested Capital) ──────────────────────────
+	// Finnhub provides 5-year average ROIC (roic5Y). ROIC >15% = durable moat.
+	// Composite-scored alongside ROE to avoid double-weighting.
+	ROICExcellent float64 // >this = "moat_quality"  default 15
+	ROICAdequate  float64 // >this = "adequate_roic"  default 8
+
 	// ── Tier 2: Debt-to-Equity leverage ──────────────────────────────────────
 	// D/E <1 conservative, 1-2 manageable (monitor), >2 high risk in rate rises.
 	DEConservative float64 // <this = "conservative"  default 1.0
@@ -682,6 +688,19 @@ type FundamentalAnalysis struct {
 	AnalystUpsideBullish  float64 // upside % above this = bullish consensus  default 15
 	AnalystDownsideBearish float64 // upside % below this = bearish consensus default -5
 
+	// ── Tier 3: Analyst Recommendation Trend (rank 17 extended) ─────────────
+	// Computed from Finnhub /stock/recommendation month-over-month delta.
+	// net_buy_change > AnalystRecUpgrade = analysts upgrading consensus.
+	// net_buy_change < AnalystRecDowngrade = analysts downgrading.
+	AnalystRecUpgrade   float64 // delta above this = "upgrading"    default 5
+	AnalystRecDowngrade float64 // delta below this = "downgrading"   default -5
+
+	// ── Tier 3: FCF Conversion Rate ───────────────────────────────────────────
+	// FCF Conversion = FCF / Net Income. >1.0 = cash-backed earnings (high quality).
+	// <0.7 = aggressive accruals or large working-capital drag.
+	FCFConversionHigh float64 // >=this = "high_quality_cash"  default 1.0
+	FCFConversionLow  float64 // >=this = "moderate"           default 0.7
+
 	// ── Equity interval for Tier 3 live-price lookup ─────────────────────────
 	// Used when scoreTier3 queries the latest close from equity_ohlcv.
 	EquityInterval string // e.g. "1Day"
@@ -746,8 +765,10 @@ func LoadFundamentalAnalysis() (FundamentalAnalysis, error) {
 		MarginTrendQuarters: intEnv("FUNDAMENTAL_MARGIN_TREND_QUARTERS", 8),
 
 		// Tier 2
-		ROEExcellent: floatEnv("FUNDAMENTAL_ROE_EXCELLENT", 15),
-		ROEAdequate:  floatEnv("FUNDAMENTAL_ROE_ADEQUATE", 8),
+		ROEExcellent:  floatEnv("FUNDAMENTAL_ROE_EXCELLENT", 15),
+		ROEAdequate:   floatEnv("FUNDAMENTAL_ROE_ADEQUATE", 8),
+		ROICExcellent: floatEnv("FUNDAMENTAL_ROIC_EXCELLENT", 15),
+		ROICAdequate:  floatEnv("FUNDAMENTAL_ROIC_ADEQUATE", 8),
 
 		DEConservative: floatEnv("FUNDAMENTAL_DE_CONSERVATIVE", 1.0),
 		DEManageable:   floatEnv("FUNDAMENTAL_DE_MANAGEABLE", 2.0),
@@ -796,6 +817,11 @@ func LoadFundamentalAnalysis() (FundamentalAnalysis, error) {
 
 		AnalystUpsideBullish:   floatEnv("FUNDAMENTAL_ANALYST_UPSIDE_BULLISH", 15),
 		AnalystDownsideBearish: floatEnv("FUNDAMENTAL_ANALYST_DOWNSIDE_BEARISH", -5),
+		AnalystRecUpgrade:      floatEnv("FUNDAMENTAL_ANALYST_REC_UPGRADE_DELTA", 5),
+		AnalystRecDowngrade:    floatEnv("FUNDAMENTAL_ANALYST_REC_DOWNGRADE_DELTA", -5),
+
+		FCFConversionHigh: floatEnv("FUNDAMENTAL_FCF_CONVERSION_HIGH", 1.0),
+		FCFConversionLow:  floatEnv("FUNDAMENTAL_FCF_CONVERSION_LOW", 0.7),
 
 		EquityInterval: strEnvDefault("FUNDAMENTAL_EQUITY_INTERVAL", "1Day"),
 	}, nil

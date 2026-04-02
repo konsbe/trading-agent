@@ -125,11 +125,23 @@ class FundamentalSnapshot:
     ps_ratio: Optional[float] = None             # market cap / revenue TTM
     ps_tier: Optional[str] = None               # "value" | "fairly_valued" | "growth_premium_required" | "speculative"
 
+    # ── Tier 3 new metrics ────────────────────────────────────────────────────
+    # FCF Conversion Rate (new, T3.9)
+    fcf_conversion_ratio: Optional[float] = None  # FCF / Net Income
+    fcf_conversion_tier: Optional[str] = None     # "high_quality_cash" | "moderate" | "accrual_concern"
+    # Analyst Recommendation Trend (new, T3.10)
+    analyst_rec_trend_delta: Optional[float] = None  # month-over-month delta in net buy score
+    analyst_rec_trend_tier: Optional[str] = None    # "upgrading" | "neutral" | "downgrading"
+    analyst_rec_net_score: Optional[float] = None   # absolute net buy score (strongBuy+buy)-(strongSell+sell)
+
     # ── Tier 2 derived signals (t2_* metrics, period = "derived") ────────────
     # ROE / ROA — profitability efficiency (reference rank 06)
     roe_pct: Optional[float] = None           # Return on Equity %
     roe_tier: Optional[str] = None            # "excellent" | "adequate" | "destroying_value"
     roa_pct: Optional[float] = None           # Return on Assets % (informational)
+    # ROIC — Return on Invested Capital (T2.2b)
+    roic_pct: Optional[float] = None          # 5-year average ROIC %
+    roic_tier: Optional[str] = None           # "moat_quality" | "adequate_roic" | "low_roic"
     # Leverage — D/E ratio (reference rank 07)
     leverage_de: Optional[float] = None       # Debt/Equity ratio
     leverage_tier: Optional[str] = None       # "conservative" | "manageable" | "high_leverage"
