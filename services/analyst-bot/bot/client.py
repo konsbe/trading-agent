@@ -6,6 +6,7 @@ scheduler) so every cog can access them via self.bot.<attr>.
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import TYPE_CHECKING
 
@@ -74,6 +75,23 @@ class TradingBot(discord.Bot):
                 name="the markets 📊",
             )
         )
+
+        if self.cfg.bot_report_on_startup:
+            asyncio.ensure_future(self._send_startup_report())
+
+    async def _send_startup_report(self) -> None:
+        """Send the daily report on startup after a short settling delay."""
+        delay = self.cfg.bot_report_on_startup_delay
+        if delay > 0:
+            await asyncio.sleep(delay)
+
+        log.info("sending startup daily report (delay=%ds)", delay)
+        from scheduler.jobs.daily_report import DailyReportJob
+        job = DailyReportJob(self.cfg, self.builder, self.notifiers)
+        try:
+            await job.run()
+        except Exception as exc:
+            log.error("startup report failed: %s", exc)
 
     async def on_application_command_error(
         self,

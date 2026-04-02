@@ -67,6 +67,14 @@ class BotConfig(BaseSettings):
     bot_weekly_digest_cron: str = "0 8 * * 1"   # Monday 08:00 UTC
     bot_alert_scan_interval: int = 300           # seconds between alert scans
 
+    # Send the daily report automatically whenever the bot starts up.
+    # Useful after restarts/deploys so the channel always has a fresh report.
+    # Set to false to suppress the startup send (e.g. in dev).
+    bot_report_on_startup: bool = True
+    # Seconds to wait after on_ready before sending the startup report.
+    # Gives the scheduler and connection pool time to fully settle.
+    bot_report_on_startup_delay: int = 5
+
     # ── Alert thresholds ─────────────────────────────────────────────────────
     bot_rsi_oversold: float = 30.0
     bot_rsi_overbought: float = 70.0

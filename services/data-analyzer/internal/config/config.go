@@ -752,6 +752,97 @@ type FundamentalAnalysis struct {
 	CorrReceivablesGrowthMultiplier float64
 }
 
+// ── MacroAnalysis ─────────────────────────────────────────────────────────────
+
+// MacroAnalysis holds all thresholds and toggles for the macro-analysis worker.
+// Every value is configurable via .env so the algorithm can be adapted to
+// different rate regimes without recompiling.
+//
+// TODO: migrate to Python once the LLM layer (FOMC scoring, news NLP) is added.
+// The TimescaleDB queries are identical; only the driver changes.
+type MacroAnalysis struct {
+	Base
+	PollInterval time.Duration
+
+	// ── Yield Curve (T10Y2Y — 2s10s spread, in percentage points) ─────────────
+	// >1.0pp = steep (expansion). 0–1.0pp = normal. 0 to -0.5pp = flat/warning.
+	// <-0.5pp = inverted (recession signal, 12–18 month lag).
+	// Re-steepening after inversion = recession arriving.
+	YCSteepThreshold    float64 // >this = "steep"         default 1.0
+	YCFlatThreshold     float64 // <this = "flat"           default 0.0
+	YCInvertedThreshold float64 // <this = "inverted"       default -0.5
+	YCRestepeningBps    float64 // rise from minimum (pp) to call re-steepening default 0.5
+	YCLookbackDays      int     // days of history for re-steepening detection   default 90
+
+	// ── Real Interest Rate (DFII10 — 10Y TIPS yield, in %) ───────────────────
+	// Deeply negative (<−2%) = max risk-on, drives capital into gold & growth.
+	// Headwind (>+2%) = significant drag on growth stocks and gold.
+	RealRateDeeplyNeg float64 // <this = "deeply_negative"  default -2.0
+	RealRateHeadwind  float64 // >this = "headwind"          default 2.0
+
+	// ── Fed Balance Sheet (WALCL — weekly, in millions USD) ──────────────────
+	// WALCL is in millions; thresholds are stored/compared in billions.
+	// QE/QT detection: compare latest to value 4 weeks ago.
+	BSExpandThresholdBn  float64 // 4w change > +this Bn = "qe"  default 100
+	BSContractThresholdBn float64 // 4w change < -this Bn = "qt"  default 100
+
+	// ── Credit Spreads (BAMLH0A0HYM2 — HY OAS, in %, displayed in bps) ───────
+	// Series value is in %; multiply × 100 for bps display.
+	// <300bps benign, 300–600bps elevated, >600bps crisis.
+	HYElevatedThreshold float64 // bps above which = "elevated"  default 300
+	HYCrisisThreshold   float64 // bps above which = "crisis"     default 600
+
+	// ── Breakeven Inflation (T10YIE — 10Y, in %) ─────────────────────────────
+	// <2.5% anchored (Fed comfortable). >3.0% = unanchored, Fed acts aggressively.
+	BreakevenRisingPct     float64 // >this = "rising"      default 2.5
+	BreakevenUnanchoredPct float64 // >this = "unanchored"  default 3.0
+
+	// ── M2 Money Supply (M2SL — monthly, in billions USD) ────────────────────
+	// YoY growth rate drives inflation 12–24 months ahead.
+	// >15% = inflationary surge. <0% = deflationary pressure.
+	M2InflationaryPct float64 // YoY% > this = "inflationary"  default 15
+	M2NormalMin       float64 // YoY% > this = "normal"         default 4
+
+	// ── Composite MP Stance score boundaries ─────────────────────────────────
+	MPAccommodativeScore float64 // weighted score > this = "accommodative"  default 0.4
+	MPRestrictiveScore   float64 // weighted score < this = "restrictive"    default -0.4
+}
+
+func LoadMacroAnalysis() (MacroAnalysis, error) {
+	b := LoadBase()
+	if b.DatabaseURL == "" {
+		return MacroAnalysis{}, fmt.Errorf("DATABASE_URL is required")
+	}
+	return MacroAnalysis{
+		Base:         b,
+		PollInterval: pollFor("DATA_MACRO_ANALYSIS_POLL_INTERVAL", 6*time.Hour),
+
+		YCSteepThreshold:    floatEnv("MACRO_YC_STEEP_THRESHOLD", 1.0),
+		YCFlatThreshold:     floatEnv("MACRO_YC_FLAT_THRESHOLD", 0.0),
+		YCInvertedThreshold: floatEnv("MACRO_YC_INVERTED_THRESHOLD", -0.5),
+		YCRestepeningBps:    floatEnv("MACRO_YC_RESTEEPENING_BPS", 0.5),
+		YCLookbackDays:      intEnv("MACRO_YC_LOOKBACK_DAYS", 90),
+
+		RealRateDeeplyNeg: floatEnv("MACRO_REAL_RATE_DEEPLY_NEGATIVE", -2.0),
+		RealRateHeadwind:  floatEnv("MACRO_REAL_RATE_HEADWIND", 2.0),
+
+		BSExpandThresholdBn:   floatEnv("MACRO_BS_EXPAND_THRESHOLD_BN", 100.0),
+		BSContractThresholdBn: floatEnv("MACRO_BS_CONTRACT_THRESHOLD_BN", 100.0),
+
+		HYElevatedThreshold: floatEnv("MACRO_HY_ELEVATED_BPS", 300),
+		HYCrisisThreshold:   floatEnv("MACRO_HY_CRISIS_BPS", 600),
+
+		BreakevenRisingPct:     floatEnv("MACRO_BREAKEVEN_RISING_PCT", 2.5),
+		BreakevenUnanchoredPct: floatEnv("MACRO_BREAKEVEN_UNANCHORED_PCT", 3.0),
+
+		M2InflationaryPct: floatEnv("MACRO_M2_INFLATIONARY_PCT", 15.0),
+		M2NormalMin:       floatEnv("MACRO_M2_NORMAL_MIN_PCT", 4.0),
+
+		MPAccommodativeScore: floatEnv("MACRO_MP_ACCOMMODATIVE_SCORE", 0.4),
+		MPRestrictiveScore:   floatEnv("MACRO_MP_RESTRICTIVE_SCORE", -0.4),
+	}, nil
+}
+
 func LoadFundamentalAnalysis() (FundamentalAnalysis, error) {
 	b := LoadBase()
 	if b.DatabaseURL == "" {

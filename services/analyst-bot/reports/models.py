@@ -242,9 +242,57 @@ class NewsHeadline:
 
 @dataclass
 class MacroSnapshot:
-    vix: Optional[float] = None
-    dgs10: Optional[float] = None    # 10Y Treasury yield
-    dexuseu: Optional[float] = None  # USD/EUR exchange rate
+    # ── Raw FRED values (always available if data-equity is running) ───────────
+    vix: Optional[float] = None          # VIXCLS — market fear index
+    dgs10: Optional[float] = None        # DGS10 — 10Y Treasury yield (%)
+    dexuseu: Optional[float] = None      # DEXUSEU — EUR/USD rate
+
+    # ── Monetary Policy Tier 1 — raw FRED observations ────────────────────────
+    fedfunds: Optional[float] = None     # FEDFUNDS — effective fed funds rate (%)
+    dgs2: Optional[float] = None         # DGS2 — 2Y Treasury yield (%)
+    dgs30: Optional[float] = None        # DGS30 — 30Y Treasury yield (%)
+    real_rate_10y: Optional[float] = None  # DFII10 — 10Y TIPS real yield (%)
+    hy_spread: Optional[float] = None    # BAMLH0A0HYM2 — HY OAS (bps; stored raw in %, ×100)
+    ig_spread: Optional[float] = None    # BAMLC0A0CM — IG OAS (bps; stored raw in %, ×100)
+
+    # ── Monetary Policy Tier 2 — raw FRED observations ────────────────────────
+    breakeven_10y: Optional[float] = None  # T10YIE — 10Y breakeven inflation (%)
+    breakeven_5y: Optional[float] = None   # T5YIE — 5Y breakeven inflation (%)
+    m2_billions: Optional[float] = None    # M2SL — M2 money stock (billions USD)
+
+    # ── Computed signals from macro_derived (written by macro-analysis worker) ─
+    # Policy Rate
+    mp_rate_regime: Optional[str] = None         # "hiking" | "neutral" | "cutting"
+    mp_rate_change_yoy_bps: Optional[float] = None  # YoY change in bps
+
+    # Yield Curve
+    yield_curve_2s10s: Optional[float] = None    # T10Y2Y spread (pp)
+    yield_curve_3m10y: Optional[float] = None    # T10Y3M spread (pp)
+    yield_curve_regime: Optional[str] = None     # "steep"|"normal"|"flat"|"inverted"|"re_steepening"
+
+    # Real Rate
+    real_rate_regime: Optional[str] = None       # "deeply_negative"|"balanced"|"headwind"
+
+    # Balance Sheet
+    fed_balance_sheet_bn: Optional[float] = None # Fed total assets in billions
+    fed_bs_4w_change_bn: Optional[float] = None  # 4-week change in billions
+    fed_bs_regime: Optional[str] = None          # "qe" | "neutral" | "qt"
+
+    # Credit Spreads
+    credit_hy_bps: Optional[float] = None        # HY spread in bps (from payload)
+    credit_ig_bps: Optional[float] = None        # IG spread in bps (from payload)
+    credit_regime: Optional[str] = None          # "benign"|"elevated"|"crisis"
+
+    # Breakeven Inflation
+    inflation_expectations_regime: Optional[str] = None  # "anchored"|"rising"|"unanchored"
+
+    # M2
+    m2_yoy_pct: Optional[float] = None           # M2 YoY growth rate (%)
+    m2_regime: Optional[str] = None              # "inflationary"|"normal"|"slow"|"deflationary"
+
+    # Composite
+    mp_stance: Optional[str] = None              # "accommodative"|"neutral"|"restrictive"
+    mp_score: Optional[float] = None             # -1.0 (restrictive) … +1.0 (accommodative)
 
 
 # ── Composite symbol report ───────────────────────────────────────────────────

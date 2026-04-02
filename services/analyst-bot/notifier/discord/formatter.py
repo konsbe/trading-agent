@@ -746,6 +746,154 @@ def symbol_report_embeds(report: SymbolReport) -> list[discord.Embed]:
     return embeds
 
 
+# ── Monetary Policy embed ─────────────────────────────────────────────────────
+
+def macro_monetary_embed(macro: MacroSnapshot) -> Optional[discord.Embed]:
+    """Detailed Monetary Policy embed for the daily report.
+
+    Shows all computed macro_derived signals alongside raw FRED observations.
+    Returns None when no computed signals are available yet (macro-analysis
+    worker has not run, or macro_fred has no relevant data).
+    """
+    has_computed = any([
+        macro.mp_stance,
+        macro.yield_curve_regime,
+        macro.mp_rate_regime,
+        macro.credit_regime,
+    ])
+    if not has_computed:
+        return None
+
+    # Colour follows MP stance
+    stance_color = {
+        "accommodative": COLOR_GREEN,
+        "neutral":       COLOR_GREY,
+        "restrictive":   COLOR_RED,
+    }.get(macro.mp_stance or "neutral", COLOR_GREY)
+
+    stance_emoji = {
+        "accommodative": "🟢",
+        "neutral":       "🟡",
+        "restrictive":   "🔴",
+    }.get(macro.mp_stance or "neutral", "⚪")
+
+    score_str = f"({macro.mp_score:+.2f})" if macro.mp_score is not None else ""
+    stance_display = f"{stance_emoji} {macro.mp_stance or '—'} {score_str}".strip()
+
+    embed = discord.Embed(
+        title=f"🏦 Monetary Policy — {stance_display}",
+        color=stance_color,
+    )
+
+    # ── Helper lookups ────────────────────────────────────────────────────────
+
+    _regime_e = {
+        # Rate
+        "hiking":         "🔴", "neutral": "🟡", "cutting": "🟢",
+        # Yield curve
+        "steep":          "🟢", "normal": "🟡", "flat": "🟠",
+        "inverted":       "🔴", "re_steepening": "🔴🔴",
+        # Real rate
+        "deeply_negative": "🟢", "balanced": "🟡", "headwind": "🔴",
+        # Balance sheet
+        "qe":             "🟢", "qt": "🔴",
+        # Credit
+        "benign":         "🟢", "elevated": "🟠", "crisis": "🔴",
+        # Breakeven
+        "anchored":       "🟢", "rising": "🟡", "unanchored": "🔴",
+        # M2
+        "inflationary":   "🔴", "slow": "🟡", "deflationary": "🟢",
+    }
+
+    def _re(regime: Optional[str]) -> str:
+        return _regime_e.get(regime or "", "⚪")
+
+    def _pp(val: Optional[float], suffix: str = "") -> str:
+        """Format a value for display; — when None."""
+        if val is None:
+            return "—"
+        return f"{val:+.2f}{suffix}" if val < 0 or val > 0 else f"{val:.2f}{suffix}"
+
+    def _f(val: Optional[float], fmt: str = ".2f", suffix: str = "") -> str:
+        if val is None:
+            return "—"
+        return f"{val:{fmt}}{suffix}"
+
+    # ── Tier 1 signal rows ────────────────────────────────────────────────────
+    t1_lines: list[str] = []
+
+    # Policy Rate
+    regime_r = macro.mp_rate_regime or "—"
+    rate_val = _f(macro.fedfunds, ".2f", "%")
+    chg_str = f" ({macro.mp_rate_change_yoy_bps:+.0f}bps YoY)" if macro.mp_rate_change_yoy_bps is not None else ""
+    t1_lines.append(f"{_re(macro.mp_rate_regime)} **Policy Rate** — {rate_val}  `{regime_r}`{chg_str}")
+
+    # Yield Curve
+    yc_val = _pp(macro.yield_curve_2s10s, "pp")
+    yc_3m = f"  3m10y: {_pp(macro.yield_curve_3m10y, 'pp')}" if macro.yield_curve_3m10y is not None else ""
+    yc_regime = macro.yield_curve_regime or "—"
+    t1_lines.append(f"{_re(macro.yield_curve_regime)} **Yield Curve (2s10s)** — {yc_val}  `{yc_regime}`{yc_3m}")
+
+    # Real Rate
+    rr_val = _pp(macro.real_rate_10y, "%")
+    rr_regime = macro.real_rate_regime or "—"
+    be_str = f"  (BE 10Y: {_f(macro.breakeven_10y, '.2f', '%')})" if macro.breakeven_10y is not None else ""
+    t1_lines.append(f"{_re(macro.real_rate_regime)} **Real Rate (TIPS 10Y)** — {rr_val}  `{rr_regime}`{be_str}")
+
+    # Balance Sheet
+    bs_val = f"${_f(macro.fed_balance_sheet_bn, '.1f')}B" if macro.fed_balance_sheet_bn else "—"
+    chg_bs = f"  ({macro.fed_bs_4w_change_bn:+.0f}B / 4w)" if macro.fed_bs_4w_change_bn is not None else ""
+    bs_regime = macro.fed_bs_regime or "—"
+    t1_lines.append(f"{_re(macro.fed_bs_regime)} **Balance Sheet** — {bs_val}  `{bs_regime}`{chg_bs}")
+
+    # Credit Spreads
+    hy_str = f"HY {_f(macro.credit_hy_bps, '.0f')}bps" if macro.credit_hy_bps is not None else "HY —"
+    ig_str = f" / IG {_f(macro.credit_ig_bps, '.0f')}bps" if macro.credit_ig_bps is not None else ""
+    cr_regime = macro.credit_regime or "—"
+    t1_lines.append(f"{_re(macro.credit_regime)} **Credit Spreads** — {hy_str}{ig_str}  `{cr_regime}`")
+
+    embed.add_field(name="Monetary Policy — Tier 1", value="\n".join(t1_lines), inline=False)
+
+    # ── Tier 2 signal rows ────────────────────────────────────────────────────
+    t2_lines: list[str] = []
+
+    # Breakeven Inflation
+    be10_str = _f(macro.breakeven_10y, ".2f", "%")
+    be5_str = f" / 5Y: {_f(macro.breakeven_5y, '.2f', '%')}" if macro.breakeven_5y is not None else ""
+    be_regime = macro.inflation_expectations_regime or "—"
+    t2_lines.append(f"{_re(macro.inflation_expectations_regime)} **Breakeven Inflation** — 10Y: {be10_str}{be5_str}  `{be_regime}`")
+
+    # Treasury Term Structure
+    if any(x is not None for x in [macro.dgs2, macro.dgs10, macro.dgs30]):
+        parts = []
+        if macro.dgs2:
+            parts.append(f"2Y: {_f(macro.dgs2, '.2f', '%')}")
+        if macro.dgs10:
+            parts.append(f"10Y: {_f(macro.dgs10, '.2f', '%')}")
+        if macro.dgs30:
+            parts.append(f"30Y: {_f(macro.dgs30, '.2f', '%')}")
+        t2_lines.append(f"📊 **Treasury Yields** — {' | '.join(parts)}")
+
+    # M2 Money Supply
+    m2_val = f"{_pp(macro.m2_yoy_pct, '%')} YoY" if macro.m2_yoy_pct is not None else "—"
+    m2_regime = macro.m2_regime or "—"
+    m2_raw = f"  (M2: ${_f(macro.m2_billions, '.0f')}B)" if macro.m2_billions is not None else ""
+    t2_lines.append(f"{_re(macro.m2_regime)} **M2 Money Supply** — {m2_val}  `{m2_regime}`{m2_raw}")
+
+    if t2_lines:
+        embed.add_field(name="Bond Market — Tier 2", value="\n".join(t2_lines), inline=False)
+
+    # ── Footer notes ──────────────────────────────────────────────────────────
+    footer_parts = ["Score: +1.0 = max accommodative | -1.0 = max restrictive"]
+    if macro.mp_stance == "restrictive":
+        footer_parts.append("⚠️ Restrictive policy is a headwind for growth stocks and duration.")
+    elif macro.mp_stance == "accommodative":
+        footer_parts.append("🟢 Accommodative policy supports risk assets and growth equities.")
+    embed.set_footer(text=" · ".join(footer_parts))
+
+    return embed
+
+
 # ── Daily report (summary embed per symbol) ───────────────────────────────────
 
 def daily_report_embeds(report: DailyReport) -> list[discord.Embed]:
@@ -773,6 +921,12 @@ def daily_report_embeds(report: DailyReport) -> list[discord.Embed]:
         if macro_parts:
             header.add_field(name="Macro", value=" | ".join(macro_parts), inline=False)
     embeds.append(header)
+
+    # Monetary Policy embed (appears once per report, immediately after header)
+    if report.macro:
+        mp_embed = macro_monetary_embed(report.macro)
+        if mp_embed:
+            embeds.append(mp_embed)
 
     # Per-symbol compact summary
     for sr in report.symbols:

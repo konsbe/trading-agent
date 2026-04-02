@@ -81,3 +81,30 @@ async def latest_macro(pool: asyncpg.Pool, series_id: str) -> Optional[float]:
         series_id,
     )
     return float(row["value"]) if row else None
+
+
+async def latest_macro_derived(pool: asyncpg.Pool, metric: str) -> Optional[dict]:
+    """Return the most recent payload dict for a macro_derived metric.
+
+    The macro-analysis worker stores computed signals (yield curve regime,
+    mp_stance, …) in macro_derived. This helper merges the scalar `value`
+    and the JSONB `payload` into a single flat dict for the builder.
+
+    Returns None if the metric has not been computed yet.
+    """
+    import json
+
+    row = await pool.fetchrow(
+        """SELECT value, payload FROM macro_derived
+           WHERE metric = $1 AND source = 'macro_analysis'
+           ORDER BY ts DESC LIMIT 1""",
+        metric,
+    )
+    if not row:
+        return None
+    result: dict = {}
+    if row["value"] is not None:
+        result["value"] = float(row["value"])
+    if row["payload"]:
+        result.update(json.loads(row["payload"]))
+    return result
