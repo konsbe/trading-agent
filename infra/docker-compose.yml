@@ -167,6 +167,24 @@ services:
     profiles: [analyzer]
     restart: on-failure
 
+  macro-analysis:
+    build:
+      context: ../services/data-analyzer
+      dockerfile: Dockerfile
+    command: ["/app/macro-analysis"]
+    env_file:
+      - path: ../.env
+        required: false
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@timescaledb:5432/trading?sslmode=disable
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+      # data-equity (ingestion profile) populates macro_fred. FRED data is fetched
+      # weekly/monthly so a 60-second startup delay is sufficient.
+    profiles: [analyzer]
+    restart: on-failure
+
   # ── analyst-bot ────────────────────────────────────────────────────────────
   # Discord bot + scheduler. Reads from TimescaleDB and Redis — no API calls.
   # Start with: make up-bot  (or docker compose --profile bot up -d analyst-bot)

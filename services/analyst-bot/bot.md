@@ -681,6 +681,209 @@ The overall correlation verdict, combining all five master signals:
 
 ---
 
+## Macro Analysis — Monetary Policy
+
+The `🏦 Monetary Policy` embed appears **once per daily report**, immediately after the header line (VIX / 10Y / EUR/USD). It shows the current monetary environment classified into regimes — the single biggest macro driver of asset prices.
+
+Data source: **FRED (Federal Reserve Economic Data)**. Computed by the `macro-analysis` worker, stored in `macro_derived`. Updates every 6 hours (configurable).
+
+---
+
+### Overall Stance
+
+The composite verdict across all monetary policy signals.
+
+| Display | Score | Meaning |
+|---|---|---|
+| `🟢 accommodative (+X.XX)` | > +0.4 | Policy is supportive of risk assets. Rates falling or low, credit benign, yield curve healthy. Bullish for growth equities. |
+| `🟡 neutral (+X.XX)` | ±0.4 | Mixed signals. No clear tailwind or headwind from monetary conditions. |
+| `🔴 restrictive (-X.XX)` | < -0.4 | Policy is a headwind. Rates high/rising, credit stressed, or yield curve inverted. Bearish for growth and duration. |
+
+Score range: **−1.0** (maximum restrictive) to **+1.0** (maximum accommodative).
+
+Configurable: `MACRO_MP_ACCOMMODATIVE_SCORE` (default 0.4) · `MACRO_MP_RESTRICTIVE_SCORE` (default -0.4)
+
+---
+
+### Tier 1 — Monetary Policy Signals
+
+#### 🏛️ Policy Rate (FEDFUNDS)
+The effective federal funds rate — the primary lever the Fed uses to control inflation and growth.
+
+| Display | Regime | Meaning |
+|---|---|---|
+| `🔴 hiking` | YoY change > +25bps | Rate is rising — tightening credit, compressing multiples. Value > growth. Banks outperform. |
+| `🟡 neutral` | YoY change ±25bps | Rate stable — no directional tailwind or headwind from rate cycle. |
+| `🟢 cutting` | YoY change < -25bps | Rate is falling — accommodative for risk assets. Growth > value. Buy duration. |
+
+The YoY change in basis points is shown in parentheses: e.g. `(-125bps YoY)`.
+
+Source: `FRED FEDFUNDS` (monthly, %)
+
+> **TODO [LLM]**: FOMC statement hawkish/dovish scoring (−5 to +5) will be added with the LLM layer.
+> **TODO [PAID]**: CME FedWatch implied rate probabilities require CME Group API subscription.
+> **TODO [FUTURE]**: ECB (`ECBDFR`), BoE (`UKBANKRATE`), BoJ rates via FRED.
+
+---
+
+#### 📐 Yield Curve (2s10s · T10Y2Y / 3m10y · T10Y3M)
+The spread between long-term and short-term Treasury yields. One of the most reliable recession predictors in finance — historically accurate with a 12–18 month lag.
+
+| Display | Spread | Regime | Meaning |
+|---|---|---|---|
+| `🟢 steep` | > +1.0pp | Growth expansion phase | Lenders earn more from long loans → credit flows freely. Banks earn well. Pro-growth. |
+| `🟡 normal` | 0 – +1.0pp | Healthy cycle | No warning signal. Normal credit environment. |
+| `🟠 flat` | −0.5pp – 0 | Caution | Curve approaching inversion. Tightening cycle mature. Watch closely. |
+| `🔴 inverted` | < −0.5pp | Recession warning | Short rates > long rates — borrowing is unprofitable, credit contracts. Has preceded every US recession since 1970. |
+| `🔴🔴 re_steepening` | Rising from inverted low | **Recession arriving** | The most dangerous signal. Was inverted, now steepening. Historically means the recession has begun, not ended. |
+
+The 3-month/10-year spread (`T10Y3M`) is the most statistically robust variant and shown alongside 2s10s for confirmation.
+
+Source: `FRED T10Y2Y` + `FRED T10Y3M` (daily, percentage points)
+
+Configurable: `MACRO_YC_STEEP_THRESHOLD` · `MACRO_YC_FLAT_THRESHOLD` · `MACRO_YC_INVERTED_THRESHOLD` · `MACRO_YC_RESTEEPENING_BPS` · `MACRO_YC_LOOKBACK_DAYS`
+
+---
+
+#### 💹 Real Rate — TIPS 10Y (DFII10)
+The 10-Year Treasury Inflation-Protected Securities yield — the cleanest measure of the true real cost of borrowing. The single most important variable for gold and growth stock pricing.
+
+| Display | Real Rate | Regime | Meaning |
+|---|---|---|---|
+| `🟢 deeply_negative` | < −2% | Maximum risk-on | Real rates deep in negative territory. Capital floods into growth stocks, gold, real estate. 2020–21 bubble environment. |
+| `🟡 balanced` | −2% to +2% | Normal equity environment | No extreme distortion. Asset prices governed by earnings, not rate manipulation. |
+| `🔴 headwind` | > +2% | Growth and gold drag | High real yields make cash and bonds competitive vs equities. Compresses growth multiples. |
+
+Breakeven inflation (10Y) is shown in parentheses: e.g. `(BE 10Y: 2.35%)`.
+
+Source: `FRED DFII10` (daily, %)
+
+Configurable: `MACRO_REAL_RATE_DEEPLY_NEGATIVE` (default −2.0%) · `MACRO_REAL_RATE_HEADWIND` (default +2.0%)
+
+---
+
+#### 🏦 Fed Balance Sheet (WALCL)
+Total assets held by the Federal Reserve. QE = expanding (injecting liquidity). QT = contracting (withdrawing liquidity). Changes in pace signal policy shifts before formal announcements.
+
+| Display | 4-week change | Regime | Meaning |
+|---|---|---|---|
+| `🟢 qe` | > +$100B / 4w | Quantitative Easing | Fed buying bonds, expanding money supply. Suppresses long yields, supports asset prices. |
+| `🟡 neutral` | Within ±$100B / 4w | No active policy | Balance sheet stable. No incremental stimulus or tightening from this channel. |
+| `🔴 qt` | < −$100B / 4w | Quantitative Tightening | Fed allowing bonds to roll off. Upward pressure on long yields. Reduces market liquidity. |
+
+Displayed as `$X.XT  (+/-$XXB / 4w)`.
+
+Source: `FRED WALCL` (weekly, millions USD — displayed in billions)
+
+Configurable: `MACRO_BS_EXPAND_THRESHOLD_BN` (default 100) · `MACRO_BS_CONTRACT_THRESHOLD_BN` (default 100)
+
+---
+
+#### 📉 Credit Spreads (HY + IG OAS)
+Option-adjusted spreads measure how much extra yield corporate bonds pay vs equivalent Treasuries. Credit stress reliably leads equity drawdowns by 4–8 weeks.
+
+| Display | HY Spread | Regime | Meaning |
+|---|---|---|---|
+| `🟢 benign` | < 300bps | Normal credit environment | Markets confident. Corporate borrowing conditions healthy. No financial stress. |
+| `🟠 elevated` | 300 – 600bps | Risk-off | Investors demanding more compensation for credit risk. Tightening financial conditions. Watch closely. |
+| `🔴 crisis` | > 600bps | Severe financial stress | Credit markets seizing up. Borrowing costs spiking. Precedes broad equity selloffs. 2020 peak 1100bps, 2009 peak 1900bps. |
+
+Displayed as `HY 280bps / IG 90bps`.
+
+Source: `FRED BAMLH0A0HYM2` (HY) · `FRED BAMLC0A0CM` (IG) — daily, in % × 100 for bps display
+
+> **NOTE**: `TEDRATE` (TED Spread) was discontinued by FRED in May 2023. HY OAS is the primary credit stress indicator.
+
+Configurable: `MACRO_HY_ELEVATED_BPS` (default 300) · `MACRO_HY_CRISIS_BPS` (default 600)
+
+---
+
+### Tier 2 — Bond Market Signals
+
+#### 📊 Breakeven Inflation (T10YIE / T5YIE)
+The bond market's expectation for average inflation over the period (nominal yield − TIPS yield). When breakevenss rise sharply, the market expects the Fed to hike — a leading signal for rate-sensitive assets.
+
+| Display | 10Y Breakeven | Regime | Meaning |
+|---|---|---|---|
+| `🟢 anchored` | < 2.5% | Fed comfortable | Inflation expectations stable. No forced policy action expected. |
+| `🟡 rising` | 2.5% – 3.0% | Growing risk | Market starting to price in higher inflation. Watch for acceleration. |
+| `🔴 unanchored` | > 3.0% | Fed must act | 2022 scenario. Expectations unmoored — Fed will hike aggressively until anchored again. |
+
+Displayed as `10Y: 2.35% / 5Y: 2.20%`.
+
+Source: `FRED T10YIE` + `FRED T5YIE` (daily, %)
+
+> **TODO [PAID]**: 5Y5Y forward inflation swap (the Fed's preferred long-run anchor) requires Bloomberg terminal or ICE Data subscription.
+
+Configurable: `MACRO_BREAKEVEN_RISING_PCT` (default 2.5%) · `MACRO_BREAKEVEN_UNANCHORED_PCT` (default 3.0%)
+
+---
+
+#### 📈 Treasury Yields (2Y / 10Y / 30Y)
+Benchmark rates for all global asset valuations. Every +100bps in the 10Y compresses equity fair value by ~10–15% via the discount rate effect.
+
+Displayed as `2Y: 4.85% | 10Y: 4.30% | 30Y: 4.50%`.
+
+Source: `FRED DGS2` · `FRED DGS10` · `FRED DGS30` (daily, %)
+
+> **TODO [FUTURE]**: Equity Risk Premium = (1/P·E × 100) − 10Y. Requires S&P composite P/E from fundamental-analysis derived table (cross-service future link).
+
+---
+
+#### 💰 M2 Money Supply (M2SL)
+The broad money stock. M2 YoY growth leads inflation by 12–24 months — one of the most powerful long-lead macro indicators. M2 contracted for the first time since the 1930s in 2022–23.
+
+| Display | YoY Growth | Regime | Meaning |
+|---|---|---|---|
+| `🔴 inflationary` | > +15% | Surge — inflation incoming | Excess money creation. Inflation will arrive 12–24 months later. 2020: +27% preceded 2021–22 inflation spike. |
+| `🟢 normal` | +4% – +15% | Healthy growth | Money supply expanding at a normal pace. No inflation or deflation concern. |
+| `🟡 slow` | 0% – +4% | Below-normal growth | Growth slower than trend. Mild disinflationary signal. |
+| `🟢 deflationary` | < 0% | Rare contraction | Money supply shrinking — strong disinflationary force. Eventually forces Fed to cut. Bullish for bonds. |
+
+Displayed as `+2.1% YoY  (M2: $21,500B)`.
+
+Source: `FRED M2SL` (monthly, billions USD)
+
+> **TODO [FUTURE]**: M2 Velocity (`M2V`, quarterly) adds monetarist context — low signal frequency limits usefulness in daily reports.
+
+Configurable: `MACRO_M2_INFLATIONARY_PCT` (default 15%) · `MACRO_M2_NORMAL_MIN_PCT` (default 4%)
+
+---
+
+### Composite Score Weights
+
+The overall stance score is a weighted average of all individual signals:
+
+| Signal | Weight | Most Impactful When |
+|---|---|---|
+| Rate regime | 2.0× | Fed actively hiking or cutting |
+| Yield curve | 2.0× | Inverted or re-steepening |
+| Credit spread | 2.0× | Elevated or crisis |
+| Real rate | 1.5× | Deeply negative or headwind |
+| Balance sheet | 1.0× | QE or QT actively running |
+| Breakeven inflation | 1.0× | Unanchored |
+| M2 supply | 0.5× | Extreme contraction or surge |
+
+---
+
+### Future Macro Panels (Not Yet Implemented)
+
+These panels are planned but require data sources not yet available in the free tier:
+
+| Panel | Status | Blocker |
+|---|---|---|
+| **FOMC Statement Scoring** | TODO — LLM layer | Requires NLP model to score hawkish/dovish language |
+| **CME FedWatch probabilities** | TODO — paid API | Requires CME Group API subscription |
+| **Growth Panel** (GDP, PMI, jobless claims) | TODO — future | Data exists in FRED but analysis worker not yet built |
+| **Inflation Panel** (CPI, Core PCE, PPI) | TODO — future | Data exists in FRED but analysis worker not yet built |
+| **Equity Risk Premium** | TODO — future | Requires linking S&P composite P/E from fundamental-analysis |
+| **Global CBs** (ECB, BoE, BoJ) | TODO — future | Series IDs available in FRED; worker expansion needed |
+| **China PMI** (Caixin) | TODO — paid/scrape | No free FRED equivalent |
+| **5Y5Y Forward Inflation Swap** | TODO — paid | Bloomberg terminal or ICE Data required |
+| **SOFR-OIS Spread** (TED replacement) | TODO — future | FRED SOFR + DFF available; computation not yet built |
+
+---
+
 ## ETF / SPY Note
 
 SPY is an ETF (Exchange-Traded Fund) that tracks the S&P 500 index. ETFs have no individual earnings, P/E ratio, or margins — all fundamental fields will show `⚪ —`. Only price and technical signals apply.

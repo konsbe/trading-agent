@@ -597,9 +597,63 @@ class ReportBuilder:
     async def _build_macro(self) -> MacroSnapshot:
         snap = MacroSnapshot()
         try:
+            # ── Raw FRED values ────────────────────────────────────────────────
             snap.vix = await ohlcv.latest_macro(self._pool, "VIXCLS")
             snap.dgs10 = await ohlcv.latest_macro(self._pool, "DGS10")
             snap.dexuseu = await ohlcv.latest_macro(self._pool, "DEXUSEU")
+            snap.fedfunds = await ohlcv.latest_macro(self._pool, "FEDFUNDS")
+            snap.dgs2 = await ohlcv.latest_macro(self._pool, "DGS2")
+            snap.dgs30 = await ohlcv.latest_macro(self._pool, "DGS30")
+            snap.real_rate_10y = await ohlcv.latest_macro(self._pool, "DFII10")
+            snap.breakeven_10y = await ohlcv.latest_macro(self._pool, "T10YIE")
+            snap.breakeven_5y = await ohlcv.latest_macro(self._pool, "T5YIE")
+
+            # HY/IG spreads: FRED series is in % — convert to bps for display
+            hy_raw = await ohlcv.latest_macro(self._pool, "BAMLH0A0HYM2")
+            ig_raw = await ohlcv.latest_macro(self._pool, "BAMLC0A0CM")
+            snap.hy_spread = hy_raw * 100 if hy_raw is not None else None
+            snap.ig_spread = ig_raw * 100 if ig_raw is not None else None
+
+            m2 = await ohlcv.latest_macro(self._pool, "M2SL")
+            snap.m2_billions = m2
+
+            # ── Computed signals from macro_derived ───────────────────────────
+            async def _md(metric: str) -> dict:
+                return await ohlcv.latest_macro_derived(self._pool, metric) or {}
+
+            rate_p = await _md("mp_rate")
+            snap.mp_rate_regime = rate_p.get("regime")
+            snap.mp_rate_change_yoy_bps = rate_p.get("change_yoy_bps")
+
+            yc_p = await _md("mp_yield_curve")
+            snap.yield_curve_2s10s = yc_p.get("spread_2s10s_pct")
+            snap.yield_curve_3m10y = yc_p.get("spread_3m10y_pct")
+            snap.yield_curve_regime = yc_p.get("regime")
+
+            rr_p = await _md("mp_real_rate")
+            snap.real_rate_regime = rr_p.get("regime")
+
+            bs_p = await _md("mp_balance_sheet")
+            snap.fed_balance_sheet_bn = bs_p.get("total_assets_billions")
+            snap.fed_bs_4w_change_bn = bs_p.get("4w_change_billions")
+            snap.fed_bs_regime = bs_p.get("regime")
+
+            cs_p = await _md("mp_credit_spread")
+            snap.credit_hy_bps = cs_p.get("hy_spread_bps")
+            snap.credit_ig_bps = cs_p.get("ig_spread_bps")
+            snap.credit_regime = cs_p.get("regime")
+
+            be_p = await _md("mp_breakeven_inflation")
+            snap.inflation_expectations_regime = be_p.get("regime")
+
+            m2_p = await _md("mp_m2_supply")
+            snap.m2_yoy_pct = float(m2_p["yoy_pct"]) if m2_p.get("yoy_pct") is not None else None
+            snap.m2_regime = m2_p.get("regime")
+
+            stance_p = await _md("mp_stance")
+            snap.mp_stance = stance_p.get("stance")
+            snap.mp_score = stance_p.get("value")  # stored as the scalar value field
+
         except Exception as exc:
             log.warning("macro build failed: %s", exc)
         return snap
