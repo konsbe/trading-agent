@@ -884,6 +884,224 @@ These panels are planned but require data sources not yet available in the free 
 
 ---
 
+## Macro Analysis — Growth Cycle
+
+The Growth Cycle embed appears in `/report` immediately after the Monetary Policy embed.  
+It is a **market-wide analysis** — not per-symbol, not per-asset. It describes the current state of the **real economy** (production, employment, consumer spending, business investment).
+
+Understanding the phase of the growth cycle is critical for asset allocation:
+- **Expansion**: cyclical equities outperform; high-yield credit tightens; commodities rally.
+- **Slowdown**: defensives and quality outperform; duration extends; vol picks up.
+- **Contraction**: cash and bonds outperform; credit spreads widen; earnings fall.
+
+---
+
+### Composite Score
+
+| Display | Score | Meaning |
+|---------|-------|---------|
+| `🟢 Expansion (score)` | > +0.4 | Multiple leading indicators pointing to economic growth |
+| `🟡 Slowdown (score)` | -0.4 to +0.4 | Mixed signals — economy neither accelerating nor collapsing |
+| `🔴 Contraction (score)` | < -0.4 | Multiple indicators flagging economic deterioration or recession |
+| `⚪ Insufficient Data` | — | FRED data not yet populated; restart after `data-equity` runs |
+
+Score range: +1.0 = maximum expansion, -1.0 = maximum contraction.  
+Configurable via `GROWTH_EXPANSION_SCORE` (default 0.4) and `GROWTH_CONTRACTION_SCORE` (default -0.4).
+
+---
+
+### Tier 1 — Leading Indicators
+
+Leading indicators move **before** the economy — they provide 2–12 months of advance notice.
+
+#### ISM Manufacturing PMI (NAPM)
+Source: FRED `NAPM` (monthly, 0–100 index)  
+Above 50 = expansion; below 50 = contraction. The gold standard for manufacturing cycle timing.
+
+| Display | PMI Value | Meaning |
+|---------|-----------|---------|
+| 🟢 `strong_expansion` | ≥ 55 | Factories running hot — new orders and production accelerating |
+| 🟢 `expansion` | 50–55 | Moderate growth — above the breakeven level |
+| 🟡 `slowing` | 45–50 | Below breakeven — growth decelerating, watch closely |
+| 🔴 `contraction` | 40–45 | Manufacturing contracting — orders and output falling |
+| 🔴 `severe_contraction` | < 40 | Deep recession conditions in manufacturing |
+
+3-month trend `improving` / `stable` / `deteriorating` is also shown when available.
+
+Configurable: `GROWTH_PMI_STRONG` (55), `GROWTH_PMI_EXPANSION` (50), `GROWTH_PMI_SLOW` (45), `GROWTH_PMI_SEVERE` (40)
+
+> **TODO [PAID]**: S&P Global (Markit) PMI provides monthly data with sector breakdown. ISM Services PMI requires ISM membership or paid feed.
+
+---
+
+#### Conference Board LEI (USSLIND)
+Source: FRED `USSLIND` (monthly, index level)  
+The Conference Board's composite of 10 leading indicators. Shows where the economy is heading 6–12 months ahead.
+
+| Display | 6-Month Rate | Meaning |
+|---------|-------------|---------|
+| 🟢 `expanding` | > 0% | Composite leading indicator is rising — growth expected |
+| 🟡 `slowing` | 0% to -3% | Deceleration — watch other signals carefully |
+| 🔴 `recession_risk` | < -3% | Broad weakness across components |
+| 🔴 `rule_of_three_decline` | 3+ consecutive monthly drops | Classic recession warning — historically highly reliable |
+
+Configurable: `GROWTH_LEI_EXPANSION_RATE` (0.0), `GROWTH_LEI_RECESSION_RATE` (-3.0)
+
+---
+
+#### Initial Jobless Claims (ICSA + CCSA)
+Source: FRED `ICSA` (weekly), `CCSA` (weekly)  
+People filing for unemployment benefits for the first time. A real-time, high-frequency labour market signal. 4-week moving average used to reduce single-week noise.
+
+| Display | 4-Week MA | Meaning |
+|---------|-----------|---------|
+| 🟢 `tight_labor` | < 225K | Layoffs extremely low — employers holding on to workers |
+| 🟡 `normal` | 225K–300K | Healthy labour market — typical mid-cycle range |
+| 🟡 `normalizing` | 300K–500K | Layoffs rising — labour market cooling |
+| 🔴 `crisis` | > 500K | Mass layoff event — 2020 pandemic peaked at 6.8M |
+
+`CCSA` (continuing claims) shows how long the unemployed remain out of work.
+
+Configurable: `GROWTH_CLAIMS_TIGHT` (225000), `GROWTH_CLAIMS_NORMALIZING` (300000), `GROWTH_CLAIMS_CRISIS` (500000)
+
+---
+
+#### Housing Starts + Building Permits (HOUST / PERMIT)
+Source: FRED `HOUST`, `PERMIT` (monthly, annualised thousands of units)  
+Housing is 15–18% of GDP (including related services). When housing turns, the broader economy typically follows in 6–12 months — permits lead starts by 1–2 months.
+
+| Display | Starts (ann.) | Meaning |
+|---------|---------------|---------|
+| 🟢 `strong` | ≥ 1,500K | Housing boom — builders active, mortgage demand high |
+| 🟡 `moderate` | 800K–1,500K | Normal cycle range |
+| 🔴 `weak` | < 800K | Severe housing contraction (2009 low was 478K) |
+
+Configurable: `GROWTH_HOUSING_STRONG` (1500), `GROWTH_HOUSING_WEAK` (800)
+
+---
+
+### Tier 2 — Coincident Indicators
+
+Coincident indicators move **with** the economy — they confirm what is happening now.
+
+#### Real GDP (GDPC1)
+Source: FRED `GDPC1` (quarterly, billions of chained 2012 dollars)  
+The broadest measure of economic output. Annualised quarter-on-quarter growth is computed from the level data. This signal is always 1–3 months stale — supplement with LEI and claims for timeliness.
+
+| Display | Annualised QoQ | Meaning |
+|---------|----------------|---------|
+| 🟢 `strong` | > 3% | Economy firing on all cylinders |
+| 🟡 `moderate` | 1–3% | Normal expansion range |
+| 🟡 `stall_speed` | 0–1% | Growth dangerously close to zero — small shock could tip to recession |
+| 🔴 `recession` | < 0% | Economy shrinking — two consecutive quarters = technical recession |
+
+Configurable: `GROWTH_GDP_STRONG` (3.0), `GROWTH_GDP_STALL` (1.0)
+
+---
+
+#### Employment — Payrolls + Unemployment + AHE + Sahm Rule
+Sources: `PAYEMS` (monthly net jobs, thousands), `UNRATE` (%), `CES0500000003` (avg hourly earnings %), `SAHMREALTIME`
+
+The Sahm Rule overrides all other employment signals when triggered.
+
+| Display | Signal | Meaning |
+|---------|--------|---------|
+| 🔴 `recession_confirmed` | Sahm ≥ 0.5pp | Unemployment has risen enough above its 12-month low to historically confirm an ongoing recession. Acts as override. |
+| 🟢 `strong` | Payrolls ≥ +200K/mo | Labour market booming — consistent with late expansion |
+| 🟡 `moderate` | +75K to +200K/mo | Healthy but not overheating |
+| 🟡 `slowing` | 0 to +75K/mo | Labour market barely growing |
+| 🔴 `contraction` | < 0 | Net job losses — recession signal |
+
+Average Hourly Earnings (`AHE`) and `CCSA` are shown as supplementary context.
+
+Configurable: `GROWTH_NFP_STRONG` (200), `GROWTH_NFP_MODERATE` (75), `GROWTH_SAHM_THRESHOLD` (0.5)
+
+> **TODO [PAID]**: ADP National Employment Report — no free API.
+
+---
+
+#### Real Retail Sales YoY — RRSFS
+Source: FRED `RRSFS` (monthly, millions of chained 2012 dollars)  
+Inflation-adjusted consumer spending. Removes price noise to show actual volume growth. `RSAFS` (nominal) shown for context.
+
+| Display | YoY % | Meaning |
+|---------|--------|---------|
+| 🟢 `healthy` | > 3% | Consumer spending well above inflation — expansion driver |
+| 🟡 `slowing` | 0–3% | Growth decelerating — consumer cautious |
+| 🔴 `contraction` | < 0% | Real spending declining — consumer recession signal |
+
+Configurable: `GROWTH_RETAIL_HEALTHY` (3.0)
+
+---
+
+### Tier 3 — Lagging / Sentiment Indicators
+
+Lagging indicators confirm trends **after** they are established. Sentiment is often a contrarian signal at extremes.
+
+#### Michigan Consumer Sentiment (UMCSENT)
+Source: FRED `UMCSENT` (monthly, 0–200 index)  
+Survey-based measure of household optimism. Most useful as a **contrarian signal at extremes**.
+
+| Display | Index | Meaning |
+|---------|-------|---------|
+| 🟢 `near_bottom` | < 60 | Extreme pessimism — historically near market lows. Contrarian bullish. |
+| 🟡 `pessimistic` | 60–80 | Below-average confidence — consumers cautious |
+| 🟡 `normal` | 80–100 | Normal confidence range |
+| 🔴 `complacency` | > 100 | Extreme optimism — historically near market peaks. Contrarian bearish. |
+
+Configurable: `GROWTH_UMICH_BOTTOM` (60), `GROWTH_UMICH_COMPLACENCY` (100)
+
+---
+
+#### Core Capex — New Orders, Nondefense Capital Goods Ex-Aircraft (NEWORDER)
+Source: FRED `NEWORDER` (monthly, millions, seasonally adjusted)  
+The cleanest proxy for business capital expenditure plans. Excludes defense (government) and aircraft (lumpy Boeing orders). 3-month rolling change vs prior 3 months is used to reduce monthly noise.
+
+| Display | 3-Month Trend | Meaning |
+|---------|---------------|---------|
+| 🟢 `expanding` | > +3% | Businesses investing in equipment — confidence in future growth |
+| 🟡 `stable` | 0–3% | Neutral business investment |
+| 🟡 `slowing` | -3% to 0% | Capex easing — caution setting in |
+| 🔴 `warning` | < -3% | Businesses pulling back investment — recession risk rising |
+
+`DGORDER` (Total Durable Goods Orders) shown in payload for broader context.
+
+Configurable: `GROWTH_CAPEX_EXPANSION` (3.0), `GROWTH_CAPEX_WARNING` (-3.0)
+
+---
+
+### Composite Score Weights
+
+| Signal | Tier | Weight |
+|--------|------|--------|
+| ISM Manufacturing PMI | Tier 1 | 0.15 |
+| Conference Board LEI | Tier 1 | 0.12 |
+| Initial Jobless Claims | Tier 1 | 0.08 |
+| Housing Starts | Tier 1 | 0.08 |
+| Real GDP | Tier 2 | 0.14 |
+| Nonfarm Payrolls + Sahm | Tier 2 | 0.14 |
+| Real Retail Sales | Tier 2 | 0.10 |
+| Michigan Sentiment | Tier 3 | 0.05 |
+| Core Capex | Tier 3 | 0.05 |
+
+Total weight when all signals available: 0.91 (0.09 reserved for future paid PMI signals).
+
+---
+
+### What is NOT yet implemented (Future TODOs)
+
+| What | Why Blocked |
+|------|-------------|
+| **S&P Global (Markit) PMI** | Paid subscription only — would improve leading indicator quality |
+| **ISM Services PMI** | Requires ISM membership or paid feed |
+| **China Caixin PMI** | Paid |
+| **Eurozone / UK / Japan PMI** | Paid |
+| **GDPNow (Atlanta Fed)** | No public API — requires web scraping |
+| **ADP Employment Report** | No free API |
+| **Conference Board LEI sub-components** | Raw component data is paid; only `USSLIND` composite is free on FRED |
+
+---
+
 ## ETF / SPY Note
 
 SPY is an ETF (Exchange-Traded Fund) that tracks the S&P 500 index. ETFs have no individual earnings, P/E ratio, or margins — all fundamental fields will show `⚪ —`. Only price and technical signals apply.

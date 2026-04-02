@@ -894,6 +894,154 @@ def macro_monetary_embed(macro: MacroSnapshot) -> Optional[discord.Embed]:
     return embed
 
 
+# ── Growth Cycle embed ────────────────────────────────────────────────────────
+
+def macro_growth_embed(macro: MacroSnapshot) -> Optional[discord.Embed]:
+    """Growth Cycle macro embed for the daily report.
+
+    Shows Tier 1 (leading), Tier 2 (coincident), and Tier 3 (lagging/sentiment)
+    growth indicators computed by the macro-analysis worker from free FRED data.
+    Returns None when no growth signals are available yet.
+    """
+    has_data = any([
+        macro.gc_stance,
+        macro.gc_pmi,
+        macro.gc_gdp_ann_pct,
+        macro.gc_payrolls_k,
+    ])
+    if not has_data:
+        return None
+
+    # Stance → colour and display label
+    STANCE_COLOR: dict[str, int] = {
+        "expansion":          COLOR_GREEN,
+        "slowdown":           COLOR_YELLOW,
+        "contraction":        COLOR_RED,
+        "insufficient_data":  COLOR_GREY,
+    }
+    STANCE_LABEL: dict[str, str] = {
+        "expansion":          "🟢 Expansion",
+        "slowdown":           "🟡 Slowdown",
+        "contraction":        "🔴 Contraction",
+        "insufficient_data":  "⚪ Insufficient Data",
+    }
+    stance = macro.gc_stance or "insufficient_data"
+    stance_color = STANCE_COLOR.get(stance, COLOR_GREY)
+    stance_label = STANCE_LABEL.get(stance, f"⚪ {stance}")
+    score_str = f"{macro.gc_score:+.2f}" if macro.gc_score is not None else "+0.00"
+
+    embed = discord.Embed(
+        title=f"📈 Growth Cycle — {stance_label} ({score_str})",
+        color=stance_color,
+    )
+
+    # ── Helper formatters ─────────────────────────────────────────────────────
+    def _regime_emoji(regime: Optional[str]) -> str:
+        """Map a regime string to a single emoji prefix."""
+        if regime is None:
+            return "⚪"
+        GOOD = {"strong_expansion", "expansion", "strong", "tight_labor", "healthy",
+                "expanding", "near_bottom"}
+        WARN = {"slowing", "moderate", "normal", "normalizing", "stable", "pessimistic",
+                "stall_speed", "rule_of_three_decline"}
+        BAD  = {"contraction", "severe_contraction", "recession", "recession_risk",
+                "recession_confirmed", "weak", "crisis", "complacency", "warning"}
+        if regime in GOOD:
+            return "🟢"
+        if regime in BAD:
+            return "🔴"
+        if regime in WARN:
+            return "🟡"
+        return "⚪"
+
+    def _fmt_regime(regime: Optional[str]) -> str:
+        return (regime or "—").replace("_", " ")
+
+    def _dash(v: Optional[float], fmt: str = ".1f") -> str:
+        return f"{v:{fmt}}" if v is not None else "—"
+
+    # ── Tier 1 — Leading Indicators ───────────────────────────────────────────
+    t1_lines: list[str] = []
+
+    # PMI
+    pmi_e = _regime_emoji(macro.gc_pmi_regime)
+    pmi_val = _dash(macro.gc_pmi, ".1f")
+    pmi_regime = _fmt_regime(macro.gc_pmi_regime)
+    pmi_trend = f" · {macro.gc_pmi_trend3m}" if macro.gc_pmi_trend3m and macro.gc_pmi_trend3m != "stable" else ""
+    t1_lines.append(f"{pmi_e} **ISM PMI** — {pmi_val} · {pmi_regime}{pmi_trend}")
+
+    # LEI
+    lei_e = _regime_emoji(macro.gc_lei_regime)
+    lei_regime = _fmt_regime(macro.gc_lei_regime)
+    lei_rate = f" ({macro.gc_lei_six_month_rate:+.1f}% 6m)" if macro.gc_lei_six_month_rate is not None else ""
+    t1_lines.append(f"{lei_e} **LEI** — {lei_regime}{lei_rate}")
+
+    # Initial Claims
+    claims_e = _regime_emoji(macro.gc_claims_regime)
+    claims_regime = _fmt_regime(macro.gc_claims_regime)
+    claims_ma = f"{macro.gc_claims_4w_ma:,.0f}" if macro.gc_claims_4w_ma is not None else "—"
+    ccsa_str = f" · CCSA {macro.gc_claims_ccsa:,.0f}" if macro.gc_claims_ccsa is not None else ""
+    t1_lines.append(f"{claims_e} **Initial Claims** — 4w avg: {claims_ma}{ccsa_str} · {claims_regime}")
+
+    # Housing
+    housing_e = _regime_emoji(macro.gc_housing_regime)
+    housing_regime = _fmt_regime(macro.gc_housing_regime)
+    starts_str = f"{macro.gc_housing_starts:,.0f}K" if macro.gc_housing_starts is not None else "—"
+    permits_str = f"{macro.gc_housing_permits:,.0f}K" if macro.gc_housing_permits is not None else ""
+    permits_part = f" · Permits {permits_str}" if permits_str else ""
+    t1_lines.append(f"{housing_e} **Housing** — Starts {starts_str}{permits_part} · {housing_regime}")
+
+    # ── Tier 2 — Coincident Indicators ───────────────────────────────────────
+    t2_lines: list[str] = []
+
+    # GDP
+    gdp_e = _regime_emoji(macro.gc_gdp_regime)
+    gdp_val = f"{macro.gc_gdp_ann_pct:+.1f}% ann." if macro.gc_gdp_ann_pct is not None else "—"
+    gdp_regime = _fmt_regime(macro.gc_gdp_regime)
+    t2_lines.append(f"{gdp_e} **Real GDP** — {gdp_val} · {gdp_regime}")
+
+    # Employment
+    empl_e = _regime_emoji(macro.gc_empl_regime)
+    empl_regime = _fmt_regime(macro.gc_empl_regime)
+    nfp_str = f"{macro.gc_payrolls_k:+,.0f}K" if macro.gc_payrolls_k is not None else "—"
+    unrate_str = f" · UNRATE {macro.gc_unemployment:.1f}%" if macro.gc_unemployment is not None else ""
+    sahm_str = f" · Sahm {macro.gc_sahm_pp:.2f}pp" if macro.gc_sahm_pp is not None else ""
+    t2_lines.append(f"{empl_e} **Payrolls** — {nfp_str}{unrate_str}{sahm_str} · {empl_regime}")
+
+    # Retail Sales
+    retail_e = _regime_emoji(macro.gc_consumer_regime)
+    retail_regime = _fmt_regime(macro.gc_consumer_regime)
+    retail_yoy = f"{macro.gc_retail_yoy_pct:+.1f}% YoY" if macro.gc_retail_yoy_pct is not None else "—"
+    t2_lines.append(f"{retail_e} **Real Retail** — {retail_yoy} · {retail_regime}")
+
+    # ── Tier 3 — Lagging / Sentiment ─────────────────────────────────────────
+    t3_lines: list[str] = []
+
+    # Michigan Sentiment
+    if macro.gc_umich is not None:
+        umich_e = _regime_emoji(macro.gc_umich_regime)
+        umich_regime = _fmt_regime(macro.gc_umich_regime)
+        t3_lines.append(f"{umich_e} **Michigan Sentiment** — {macro.gc_umich:.1f} · {umich_regime}")
+
+    # Core Capex
+    if macro.gc_capex_regime is not None:
+        capex_e = _regime_emoji(macro.gc_capex_regime)
+        capex_regime = _fmt_regime(macro.gc_capex_regime)
+        capex_trend = f" {macro.gc_capex_3m_pct:+.1f}% 3m" if macro.gc_capex_3m_pct is not None else ""
+        t3_lines.append(f"{capex_e} **Core Capex** —{capex_trend} · {capex_regime}")
+
+    # Add fields
+    embed.add_field(name="Leading Indicators — Tier 1", value="\n".join(t1_lines), inline=False)
+    embed.add_field(name="Coincident Indicators — Tier 2", value="\n".join(t2_lines), inline=False)
+    if t3_lines:
+        embed.add_field(name="Lagging / Sentiment — Tier 3", value="\n".join(t3_lines), inline=False)
+
+    # Footer
+    sigs = f"{macro.gc_signals_used} signals" if macro.gc_signals_used else "partial data"
+    embed.set_footer(text=f"Growth Cycle · {sigs} · FRED free data · see bot.md for thresholds")
+    return embed
+
+
 # ── Daily report (summary embed per symbol) ───────────────────────────────────
 
 def daily_report_embeds(report: DailyReport) -> list[discord.Embed]:
@@ -927,6 +1075,12 @@ def daily_report_embeds(report: DailyReport) -> list[discord.Embed]:
         mp_embed = macro_monetary_embed(report.macro)
         if mp_embed:
             embeds.append(mp_embed)
+
+    # Growth Cycle embed (follows Monetary Policy)
+    if report.macro:
+        gc_embed = macro_growth_embed(report.macro)
+        if gc_embed:
+            embeds.append(gc_embed)
 
     # Per-symbol compact summary
     for sr in report.symbols:

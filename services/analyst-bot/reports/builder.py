@@ -654,6 +654,62 @@ class ReportBuilder:
             snap.mp_stance = stance_p.get("stance")
             snap.mp_score = stance_p.get("value")  # stored as the scalar value field
 
+            # ── Growth Cycle — Tier 1 (Leading) ──────────────────────────────
+            pmi_p = await _md("gc_pmi")
+            snap.gc_pmi = pmi_p.get("value")
+            snap.gc_pmi_regime = pmi_p.get("regime")
+            snap.gc_pmi_trend3m = pmi_p.get("trend3m")
+
+            lei_p = await _md("gc_lei")
+            snap.gc_lei = lei_p.get("value")
+            snap.gc_lei_six_month_rate = lei_p.get("six_month_rate_pct")
+            snap.gc_lei_regime = lei_p.get("regime")
+
+            claims_p = await _md("gc_claims")
+            snap.gc_claims_4w_ma = claims_p.get("icsa_4w_ma")
+            snap.gc_claims_latest = claims_p.get("icsa_latest")
+            snap.gc_claims_ccsa = claims_p.get("ccsa_latest")
+            snap.gc_claims_regime = claims_p.get("regime")
+
+            housing_p = await _md("gc_housing")
+            snap.gc_housing_starts = housing_p.get("houst_k_ann")
+            snap.gc_housing_permits = housing_p.get("permit_k_ann")
+            snap.gc_housing_regime = housing_p.get("regime")
+
+            # ── Growth Cycle — Tier 2 (Coincident) ───────────────────────────
+            gdp_p = await _md("gc_gdp")
+            snap.gc_gdp_ann_pct = gdp_p.get("ann_pct")
+            snap.gc_gdp_regime = gdp_p.get("regime")
+
+            empl_p = await _md("gc_employment")
+            snap.gc_payrolls_k = empl_p.get("payems_k")
+            snap.gc_unemployment = empl_p.get("unrate_pct")
+            snap.gc_ahe_pct = empl_p.get("ahe_pct")
+            snap.gc_sahm_pp = empl_p.get("sahm_pp")
+            snap.gc_empl_regime = empl_p.get("regime")
+
+            consumer_p = await _md("gc_consumer")
+            snap.gc_retail_yoy_pct = consumer_p.get("rrsfs_yoy_pct")
+            snap.gc_retail_nominal_mn = consumer_p.get("rsafs_nominal_mn")
+            snap.gc_consumer_regime = consumer_p.get("regime")
+
+            # ── Growth Cycle — Tier 3 (Lagging / Sentiment) ──────────────────
+            umich_p = await _md("gc_consumer_sentiment")
+            snap.gc_umich = umich_p.get("value")
+            snap.gc_umich_regime = umich_p.get("regime")
+
+            capex_p = await _md("gc_capex")
+            snap.gc_capex_3m_pct = capex_p.get("neworder_3m_pct")
+            snap.gc_capex_latest = capex_p.get("neworder_latest")
+            snap.gc_durable_goods = capex_p.get("dgorder_latest")
+            snap.gc_capex_regime = capex_p.get("regime")
+
+            # ── Growth Cycle Composite ─────────────────────────────────────────
+            gc_stance_p = await _md("gc_stance")
+            snap.gc_stance = gc_stance_p.get("stance")
+            snap.gc_score = gc_stance_p.get("value")
+            snap.gc_signals_used = gc_stance_p.get("signals_used")
+
         except Exception as exc:
             log.warning("macro build failed: %s", exc)
         return snap
