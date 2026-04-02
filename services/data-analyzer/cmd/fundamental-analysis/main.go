@@ -115,6 +115,7 @@ func (w *worker) analyzeAll(ctx context.Context) {
 		w.analyzeMarginTrend(ctx, sym)
 		w.scoreTier2(ctx, sym, rows)
 		w.scoreTier3(ctx, sym, rows)
+		w.scoreQualitative(ctx, sym, rows)
 	}
 }
 
@@ -695,30 +696,87 @@ func (w *worker) scoreTier2(ctx context.Context, symbol string, rows []store.Fun
 	}
 
 	// ── T2.2b ROIC — Return on Invested Capital (rank 06, extended) ───────────
-	// Finnhub /stock/metric roic5Y = 5-year average ROIC (stored as roic_5y).
-	// ROIC >15% sustained is the classic Buffett / Munger moat indicator.
-	// Composite-scored alongside ROE; both measuring the same dimension so each
-	// contributes half-weight (counted once in t2Score / t2Max pair).
+	// Formula:  ROIC = NOPAT / Invested Capital × 100
+	//   NOPAT          = Operating Income × (1 − effective tax rate)
+	//   Effective rate = tax_expense / pretax_income (bounded 0–50%)
+	//   Invested Cap   = Total Assets − Current Liabilities
+	//
+	// All XBRL values are per-quarter (the latest filed period). We annualise the
+	// income-statement items (×4) to produce a TTM NOPAT estimate. The balance-
+	// sheet denominator is point-in-time (no annualisation needed).
+	//
+	// Primary source: XBRL (tax_expense_reported, pretax_income_reported,
+	//                        operating_income_reported, total_assets_reported,
+	//                        current_liabilities_reported).
+	// Fallback:       Finnhub roic5Y (5-year average, stored as roic_5y).
 	// Thresholds: FUNDAMENTAL_ROIC_EXCELLENT (15) / FUNDAMENTAL_ROIC_ADEQUATE (8).
-	if roic, ok := latest["roic_5y"]; ok {
-		tier := "low_roic"
-		score := -1.0
-		if roic >= cfg.ROICExcellent {
-			tier = "moat_quality"
-			score = 1
-		} else if roic >= cfg.ROICAdequate {
-			tier = "adequate_roic"
-			score = 0
+	{
+		var roic float64
+		var roicSource string
+		var roicPayload map[string]any
+
+		opInc, hasOpInc := latest["operating_income_reported"]
+		taxExp, hasTax := latest["tax_expense_reported"]
+		pretax, hasPretax := latest["pretax_income_reported"]
+		totAssets, hasAssets := latest["total_assets_reported"]
+		curLiab, hasCurLiab := latest["current_liabilities_reported"]
+
+		if hasOpInc && opInc != 0 && hasAssets && totAssets > 0 && hasCurLiab && curLiab >= 0 {
+			// Effective tax rate from latest period; clamp to [0, 0.50].
+			taxRate := 0.21 // statutory US default when tax data is absent
+			if hasTax && hasPretax && pretax != 0 {
+				r := taxExp / pretax
+				if r > 0 && r < 0.50 {
+					taxRate = r
+				}
+			}
+			nopatTTM := (opInc * 4) * (1 - taxRate) // annualised NOPAT
+			investedCap := totAssets - curLiab
+			if investedCap > 0 {
+				roic = nopatTTM / investedCap * 100
+				roicSource = "xbrl_computed"
+				roicPayload = map[string]any{
+					"roic_pct":          roic,
+					"nopat_ttm":         nopatTTM,
+					"invested_capital":  investedCap,
+					"effective_tax_rate": fmt.Sprintf("%.1f%%", taxRate*100),
+					"operating_income_q": opInc,
+					"total_assets":       totAssets,
+					"current_liabilities": curLiab,
+					"note":              "NOPAT = op_income_q×4×(1−tax_rate); InvCap = total_assets−current_liabilities",
+				}
+			}
 		}
-		t2Score += score
-		t2Max++
-		upsert("t2_roic", ptr(roic), map[string]any{
-			"roic_pct":   roic,
-			"tier":       tier,
-			"source":     "finnhub_5y_avg",
-			"thresholds": fmt.Sprintf(">%.0f%% moat (Buffett), %.0f-%.0f%% adequate, <%.0f%% low ROIC", cfg.ROICExcellent, cfg.ROICAdequate, cfg.ROICExcellent, cfg.ROICAdequate),
-			"note":       "5-year average ROIC from Finnhub roic5Y field",
-		})
+
+		// Fallback to Finnhub 5-year average when XBRL inputs are insufficient.
+		if roicSource == "" {
+			if r5y, ok := latest["roic_5y"]; ok {
+				roic = r5y
+				roicSource = "finnhub_5y_avg"
+				roicPayload = map[string]any{
+					"roic_pct": roic,
+					"note":     "5-year average ROIC from Finnhub roic5Y; XBRL inputs were unavailable",
+				}
+			}
+		}
+
+		if roicSource != "" {
+			tier := "low_roic"
+			score := -1.0
+			if roic >= cfg.ROICExcellent {
+				tier = "moat_quality"
+				score = 1
+			} else if roic >= cfg.ROICAdequate {
+				tier = "adequate_roic"
+				score = 0
+			}
+			t2Score += score
+			t2Max++
+			roicPayload["tier"] = tier
+			roicPayload["source"] = roicSource
+			roicPayload["thresholds"] = fmt.Sprintf(">%.0f%% moat, %.0f-%.0f%% adequate, <%.0f%% low", cfg.ROICExcellent, cfg.ROICAdequate, cfg.ROICExcellent, cfg.ROICAdequate)
+			upsert("t2_roic", ptr(roic), roicPayload)
+		}
 	}
 
 	// ── T2.3 Debt-to-Equity leverage ──────────────────────────────────────────
@@ -1360,6 +1418,277 @@ func (w *worker) scoreTier3(ctx context.Context, symbol string, rows []store.Fun
 	}
 
 	w.log.Info("tier3 fundamental context computed", "symbol", symbol)
+}
+
+// ─── Qualitative signals (Tier 1 + 2) ────────────────────────────────────────
+//
+// scoreQualitative computes structurally-derivable qualitative signals without
+// requiring an LLM. Four signals are produced:
+//
+//   - qual_moat_proxy        — gross margin stability + ROE level (moat approximation)
+//   - qual_insider_signal    — insider cluster buy/sell from SEC Form 4 data
+//   - qual_news_sentiment_7d — average Alpha Vantage sentiment for symbol over 7 days
+//   - qual_news_sentiment_30d— same over 30 days
+//   - qual_rd_intensity      — R&D expense as % of revenue (innovation investment proxy)
+//
+// TODO: when LLM API is integrated, add:
+//   - qual_moat_narrative    from 10-K Item 1 text analysis
+//   - qual_earnings_call_tone from transcript sentiment
+//   - qual_risk_factor_change year-over-year diff of 10-K Item 1A
+
+func (w *worker) scoreQualitative(ctx context.Context, symbol string, rows []store.FundamentalRow) {
+	ts := time.Now().UTC()
+	cfg := w.cfg
+
+	// Build latest map (same pattern as score()).
+	latest := make(map[string]float64, len(rows))
+	for _, r := range rows {
+		if r.Value != nil {
+			if _, exists := latest[r.Metric]; !exists {
+				latest[r.Metric] = *r.Value
+			}
+		}
+	}
+
+	ptr := func(v float64) *float64 { return &v }
+	upsert := func(metric string, value *float64, payload any) {
+		if err := store.UpsertFundamentalDerived(ctx, w.pool, ts, symbol, "derived", metric, value, payload); err != nil {
+			w.log.Error("upsert qualitative", "metric", metric, "symbol", symbol, "err", err)
+		}
+	}
+
+	// ── T1: qual_moat_proxy — gross margin stability + ROE level ─────────────
+	// A moat proxy is computed from two structural inputs:
+	//   1. Gross margin level (>40% suggests pricing power)
+	//   2. Gross margin std dev across N quarterly periods (stability signal)
+	//   3. ROE as a proxy for sustained profitability
+	// score 3/3 = strong_moat_proxy, 2/3 = moderate, 1/3 or 0 = weak
+	{
+		gpRows, _ := store.QueryMetricSeries(ctx, w.pool, symbol, "gross_profit_reported", cfg.QualMoatStabilityQuarters)
+		revRows, _ := store.QueryMetricSeries(ctx, w.pool, symbol, "revenue_reported", cfg.QualMoatStabilityQuarters)
+
+		gpMap := make(map[string]float64, len(gpRows))
+		revMap := make(map[string]float64, len(revRows))
+		for _, r := range gpRows {
+			if r.Value != nil {
+				gpMap[r.Period] = *r.Value
+			}
+		}
+		for _, r := range revRows {
+			if r.Value != nil {
+				revMap[r.Period] = *r.Value
+			}
+		}
+
+		var margins []float64
+		for period, gp := range gpMap {
+			if rev, ok := revMap[period]; ok && rev > 0 {
+				margins = append(margins, gp/rev*100)
+			}
+		}
+
+		if len(margins) >= 4 {
+			mean, std := meanStd(margins)
+
+			// Use TTM gross margin for current level if available.
+			currentMargin := mean
+			if gm, ok := latest["gross_margin_ttm"]; ok {
+				currentMargin = gm
+			}
+
+			moatScore := 0
+			if currentMargin >= 40 {
+				moatScore++
+			}
+			if std < cfg.QualMoatStableStdPP {
+				moatScore++
+			}
+			if roe, ok := latest["roe_ttm"]; ok && roe >= 15 {
+				moatScore++
+			}
+
+			var moatTier string
+			var moatVal float64
+			switch moatScore {
+			case 3:
+				moatTier = "strong_moat_proxy"
+				moatVal = 1.0
+			case 2:
+				moatTier = "moderate_moat_proxy"
+				moatVal = 0.5
+			default:
+				moatTier = "weak_moat_proxy"
+				moatVal = 0.0
+			}
+
+			upsert("qual_moat_proxy", ptr(moatVal), map[string]any{
+				"tier":               moatTier,
+				"gross_margin_mean":  round2(mean),
+				"gross_margin_std":   round2(std),
+				"current_margin":     round2(currentMargin),
+				"quarters_used":      len(margins),
+				"roe_ttm":            latest["roe_ttm"],
+				"stable_threshold":   fmt.Sprintf("std < %.1fpp", cfg.QualMoatStableStdPP),
+				"note":               "Structural proxy only — does not assess brand/patent/network effects. Tune QUAL_MOAT_STABLE_STD_PP.",
+			})
+		}
+	}
+
+	// ── T1: qual_insider_signal — SEC Form 4 cluster detection ───────────────
+	// Cluster buying (3+ distinct insiders in 90 days) is a high-conviction signal.
+	// Only open-market purchases (code='P') are counted as bullish.
+	// Sales are informational only — insiders sell for many reasons.
+	{
+		var buyerCount, sellerCount int
+		_ = w.pool.QueryRow(ctx, `
+			SELECT COUNT(DISTINCT insider_name)
+			FROM insider_transactions
+			WHERE symbol = $1
+			  AND ts > NOW() - ($2 * INTERVAL '1 day')
+			  AND transaction_code = 'P'
+		`, symbol, cfg.InsiderClusterWindowDays).Scan(&buyerCount)
+		_ = w.pool.QueryRow(ctx, `
+			SELECT COUNT(DISTINCT insider_name)
+			FROM insider_transactions
+			WHERE symbol = $1
+			  AND ts > NOW() - ($2 * INTERVAL '1 day')
+			  AND transaction_code = 'S'
+		`, symbol, cfg.InsiderClusterWindowDays).Scan(&sellerCount)
+
+		var insiderTier string
+		var insiderScore float64
+		switch {
+		case buyerCount >= cfg.InsiderClusterMinBuyers:
+			insiderTier = "cluster_buy"
+			insiderScore = 1.0
+		case buyerCount > 0:
+			insiderTier = "single_buy"
+			insiderScore = 0.5
+		case sellerCount >= cfg.InsiderClusterMinBuyers:
+			insiderTier = "cluster_sell"
+			insiderScore = -1.0
+		default:
+			insiderTier = "neutral"
+			insiderScore = 0.0
+		}
+
+		upsert("qual_insider_signal", ptr(insiderScore), map[string]any{
+			"tier":         insiderTier,
+			"buyer_count":  buyerCount,
+			"seller_count": sellerCount,
+			"window_days":  cfg.InsiderClusterWindowDays,
+			"min_buyers":   cfg.InsiderClusterMinBuyers,
+			"note":         fmt.Sprintf("cluster_buy = %d+ distinct insiders purchasing within %d days (SEC Form 4)", cfg.InsiderClusterMinBuyers, cfg.InsiderClusterWindowDays),
+		})
+	}
+
+	// ── T2: qual_news_sentiment — rolling average from Alpha Vantage scores ──
+	// Queries news_headlines.sentiment populated by data-fundamental/runNewsSentiment().
+	// Both 7-day and 30-day windows are computed; trend is inferred from the divergence.
+	for _, days := range []int{7, 30} {
+		var avgSentiment *float64
+		var rowCount int
+
+		var avg *float64
+		if err := w.pool.QueryRow(ctx, `
+			SELECT AVG(sentiment), COUNT(*)
+			FROM news_headlines
+			WHERE symbol = $1
+			  AND sentiment IS NOT NULL
+			  AND ts > NOW() - ($2 * INTERVAL '1 day')
+		`, symbol, days).Scan(&avg, &rowCount); err == nil && avg != nil {
+			avgSentiment = avg
+		}
+
+		metricName := fmt.Sprintf("qual_news_sentiment_%dd", days)
+
+		if avgSentiment == nil || rowCount == 0 {
+			upsert(metricName, nil, map[string]any{
+				"tier":  "insufficient_data",
+				"days":  days,
+				"note":  "No news_headlines rows with sentiment scores in window. Requires FUNDAMENTAL_ENABLE_NEWS_SENTIMENT=true.",
+			})
+			continue
+		}
+
+		var sentTier string
+		switch {
+		case *avgSentiment >= cfg.QualSentimentPositive:
+			sentTier = "positive"
+		case *avgSentiment <= cfg.QualSentimentNegative:
+			sentTier = "negative"
+		default:
+			sentTier = "neutral"
+		}
+
+		upsert(metricName, avgSentiment, map[string]any{
+			"tier":          sentTier,
+			"avg_sentiment": round2(*avgSentiment),
+			"article_count": rowCount,
+			"days":          days,
+			"thresholds":    fmt.Sprintf("positive >%.2f, negative <%.2f", cfg.QualSentimentPositive, cfg.QualSentimentNegative),
+			"source":        "Alpha Vantage NEWS_SENTIMENT ticker-specific scores",
+		})
+	}
+
+	// ── T2: qual_rd_intensity — R&D as % of quarterly revenue ────────────────
+	// High R&D investment signals a company building future products rather than
+	// harvesting its existing position. Thresholds vary by sector:
+	//   Tech: healthy 10–20%, warning <5%
+	//   Pharma: healthy 15–25%
+	//   Industrials: healthy 2–5%
+	// Configure QUAL_RD_HEALTHY_PCT and QUAL_RD_MODERATE_PCT for your watchlist.
+	{
+		rdExp, hasRD := latest["rd_expense_reported"]
+		revRep, hasRev := latest["revenue_reported"]
+
+		if hasRD && hasRev && revRep > 0 {
+			rdPct := rdExp / revRep * 100
+
+			var rdTier string
+			switch {
+			case rdPct >= cfg.QualRDHealthyPct:
+				rdTier = "investing_in_future"
+			case rdPct >= cfg.QualRDModeratePct:
+				rdTier = "moderate"
+			default:
+				rdTier = "harvesting"
+			}
+
+			upsert("qual_rd_intensity", ptr(rdPct), map[string]any{
+				"tier":         rdTier,
+				"rd_pct":       round2(rdPct),
+				"rd_expense_m": round2(rdExp),
+				"revenue_m":    round2(revRep),
+				"thresholds":   fmt.Sprintf("tech healthy >%.0f%%, moderate >%.0f%%", cfg.QualRDHealthyPct, cfg.QualRDModeratePct),
+				"note":         "Both figures from same quarterly XBRL period. Tune thresholds by sector via QUAL_RD_HEALTHY_PCT.",
+			})
+		}
+	}
+
+	w.log.Info("qualitative signals computed", "symbol", symbol)
+}
+
+// meanStd computes the mean and population standard deviation of a float64 slice.
+func meanStd(vals []float64) (mean, std float64) {
+	if len(vals) == 0 {
+		return 0, 0
+	}
+	for _, v := range vals {
+		mean += v
+	}
+	mean /= float64(len(vals))
+	for _, v := range vals {
+		d := v - mean
+		std += d * d
+	}
+	std = math.Sqrt(std / float64(len(vals)))
+	return
+}
+
+// round2 rounds a float64 to 2 decimal places for cleaner payload storage.
+func round2(f float64) float64 {
+	return math.Round(f*100) / 100
 }
 
 // ── Classification helpers ────────────────────────────────────────────────────

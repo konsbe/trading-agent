@@ -263,6 +263,85 @@ func (c *Client) Recommendation(ctx context.Context, symbol string) ([]map[strin
 	return items, nil
 }
 
+// InsiderTransactions fetches SEC Form 4 insider buy/sell records for a symbol.
+// Endpoint: GET /stock/insider-transactions?symbol=<sym>
+// Returns an array of transaction objects. Key fields:
+//
+//	transactionDate, name, transactionCode (P/S/A/F/M), change (shares), transactionPrice, filingDate
+//
+// Available on Finnhub free tier (limited to recent filings).
+func (c *Client) InsiderTransactions(ctx context.Context, symbol string) ([]map[string]any, error) {
+	if !c.HasToken() {
+		return nil, fmt.Errorf("finnhub token missing")
+	}
+	if err := c.Limiter.Wait(ctx); err != nil {
+		return nil, err
+	}
+	q := url.Values{}
+	q.Set("symbol", symbol)
+	q.Set("token", c.Token)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, base+"/stock/insider-transactions?"+q.Encode(), nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := c.HTTP.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("finnhub insider-transactions %s: %s", symbol, resp.Status)
+	}
+	// Response: {"data": [...], "symbol": "AAPL"}
+	var raw struct {
+		Data []map[string]any `json:"data"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
+		return nil, err
+	}
+	return raw.Data, nil
+}
+
+// InvestorOwnership fetches the top institutional holders for a symbol.
+// Endpoint: GET /stock/investor-ownership?symbol=<sym>&limit=<n>
+// Returns an array of holder objects sorted by shares (largest first). Key fields:
+//
+//	investorName, share (shares held), change (quarterly change), date, portfolioPercent
+//
+// Available on Finnhub free tier.
+func (c *Client) InvestorOwnership(ctx context.Context, symbol string, limit int) ([]map[string]any, error) {
+	if !c.HasToken() {
+		return nil, fmt.Errorf("finnhub token missing")
+	}
+	if err := c.Limiter.Wait(ctx); err != nil {
+		return nil, err
+	}
+	q := url.Values{}
+	q.Set("symbol", symbol)
+	q.Set("limit", fmt.Sprintf("%d", limit))
+	q.Set("token", c.Token)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, base+"/stock/investor-ownership?"+q.Encode(), nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := c.HTTP.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("finnhub investor-ownership %s: %s", symbol, resp.Status)
+	}
+	// Response: {"data": [...], "symbol": "AAPL"}
+	var raw struct {
+		Data []map[string]any `json:"data"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
+		return nil, err
+	}
+	return raw.Data, nil
+}
+
 // ─── Quote helpers ─────────────────────────────────────────────────────────────
 
 // StoreQuoteAsEquityBar builds a coarse bar from quote snapshot (uses current price as close).

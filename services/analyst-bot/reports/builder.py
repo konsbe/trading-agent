@@ -481,6 +481,38 @@ class ReportBuilder:
             snap.t2_health_score = _d_val("t2_health_score")
             snap.t2_health_tier = t2_health_p.get("tier")
 
+            # ── Qualitative signals ───────────────────────────────────────────
+            def _qual_payload(key: str) -> dict:
+                return derived.get(key, {}).get("payload") or {}
+
+            # Moat proxy
+            qual_moat_p = _qual_payload("qual_moat_proxy")
+            snap.qual_moat_proxy_tier = qual_moat_p.get("tier")
+            snap.qual_moat_margin_mean = qual_moat_p.get("gross_margin_mean")
+            snap.qual_moat_margin_std = qual_moat_p.get("gross_margin_std")
+
+            # Insider signal
+            qual_ins_p = _qual_payload("qual_insider_signal")
+            snap.qual_insider_signal = qual_ins_p.get("tier")
+            buyer_count = qual_ins_p.get("buyer_count")
+            seller_count = qual_ins_p.get("seller_count")
+            snap.qual_insider_buyer_count = int(buyer_count) if buyer_count is not None else None
+            snap.qual_insider_seller_count = int(seller_count) if seller_count is not None else None
+
+            # News sentiment
+            qual_s7_p = _qual_payload("qual_news_sentiment_7d")
+            snap.qual_news_sentiment_7d = qual_s7_p.get("avg_sentiment")
+            snap.qual_news_sentiment_7d_tier = qual_s7_p.get("tier")
+
+            qual_s30_p = _qual_payload("qual_news_sentiment_30d")
+            snap.qual_news_sentiment_30d = qual_s30_p.get("avg_sentiment")
+            snap.qual_news_sentiment_30d_tier = qual_s30_p.get("tier")
+
+            # R&D intensity
+            qual_rd_p = _qual_payload("qual_rd_intensity")
+            snap.qual_rd_intensity_pct = qual_rd_p.get("rd_pct")
+            snap.qual_rd_tier = qual_rd_p.get("tier")
+
             return snap
         except Exception as exc:
             log.warning("fundamental build failed symbol=%s: %s", symbol, exc)
