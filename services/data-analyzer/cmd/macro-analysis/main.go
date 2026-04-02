@@ -40,6 +40,7 @@ import (
 	"math"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -73,6 +74,19 @@ func main() {
 
 	w := &worker{cfg: cfg, pool: pool, log: log}
 
+	// Wait for data-equity to complete its initial FRED fetch before the first
+	// macro-analysis pass. Without a delay, macro-analysis runs immediately and
+	// finds empty macro_fred rows → stores "insufficient_data" stance.
+	// Controlled by DATA_MACRO_ANALYSIS_STARTUP_DELAY_SECS (default 120).
+	if delaySecs := macroStartupDelay(); delaySecs > 0 {
+		log.Info("waiting for data-equity FRED backfill", "delay_secs", delaySecs)
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(time.Duration(delaySecs) * time.Second):
+		}
+	}
+
 	log.Info("running initial macro analysis")
 	w.analyzeAll(ctx)
 
@@ -88,6 +102,18 @@ func main() {
 			w.analyzeAll(ctx)
 		}
 	}
+}
+
+func macroStartupDelay() int {
+	v := os.Getenv("DATA_MACRO_ANALYSIS_STARTUP_DELAY_SECS")
+	if v == "" {
+		return 120
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil || n < 0 {
+		return 120
+	}
+	return n
 }
 
 type worker struct {
