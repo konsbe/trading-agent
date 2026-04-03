@@ -18,11 +18,14 @@ from typing import Optional
 import asyncpg
 
 from db import cache as _cache
-from db.queries import fundamental, news, ohlcv, sentiment, technical
+from db.queries import fundamental, macro_intel, news, ohlcv, sentiment, technical
 from reports.models import (
     AlertEvent,
     DailyReport,
+    EconomicCalendarBrief,
+    EarningsCalendarBrief,
     FundamentalSnapshot,
+    MacroIntelSnapshot,
     MacroSnapshot,
     NewsHeadline,
     PriceSnapshot,
@@ -92,6 +95,7 @@ class ReportBuilder:
             sr = await self.build_symbol_report(sym, "crypto", use_cache=False)
             report.symbols.append(sr)
         report.macro = await self._build_macro()
+        report.macro_intel = await self._build_macro_intel(equity_symbols)
         return report
 
     async def scan_alerts(
@@ -793,6 +797,64 @@ class ReportBuilder:
 
         except Exception as exc:
             log.warning("macro build failed: %s", exc)
+        return snap
+
+    async def _build_macro_intel(self, equity_symbols: list[str]) -> MacroIntelSnapshot:
+        snap = MacroIntelSnapshot()
+        try:
+            for r in await macro_intel.upcoming_economic_events(
+                self._pool, hours=72, limit=10
+            ):
+                snap.economic_events.append(
+                    EconomicCalendarBrief(
+                        event_ts=r["event_ts"],
+                        country=r.get("country") or "",
+                        event_name=r.get("event_name") or "",
+                        impact=r.get("impact"),
+                    )
+                )
+            for r in await macro_intel.upcoming_earnings(
+                self._pool, equity_symbols, days=14, limit=16
+            ):
+                snap.earnings_events.append(
+                    EarningsCalendarBrief(
+                        earnings_date=r["earnings_date"],
+                        symbol=r.get("symbol") or "",
+                        quarter=r.get("quarter"),
+                        hour=r.get("hour"),
+                    )
+                )
+            g = await macro_intel.latest_gpr(self._pool)
+            if g:
+                snap.gpr_month = g["month_ts"]
+                if g.get("gpr_total") is not None:
+                    snap.gpr_total = float(g["gpr_total"])
+            gd = await macro_intel.latest_gdelt(self._pool, None)
+            if gd:
+                snap.gdelt_day = gd["day_ts"]
+                snap.gdelt_query_label = gd.get("query_label")
+                if gd.get("article_count") is not None:
+                    snap.gdelt_article_count = int(gd["article_count"])
+                if gd.get("avg_tone") is not None:
+                    snap.gdelt_avg_tone = float(gd["avg_tone"])
+            nar = await macro_intel.latest_narrative(self._pool, "fomc_statement")
+            if nar:
+                snap.narrative_kind = nar.get("doc_kind")
+                snap.narrative_at = nar.get("created_at")
+                if nar.get("llm_score") is not None:
+                    snap.narrative_score = float(nar["llm_score"])
+                snap.narrative_summary = nar.get("llm_summary")
+            for r in await macro_intel.macro_tagged_headlines(self._pool, limit=8):
+                snap.macro_headlines.append(
+                    NewsHeadline(
+                        headline=r["headline"],
+                        source=r["source"],
+                        url=r.get("url"),
+                        ts=r.get("ts"),
+                    )
+                )
+        except Exception as exc:
+            log.warning("macro intel build failed: %s", exc)
         return snap
 
     # ── Cache serialisation helpers ───────────────────────────────────────────

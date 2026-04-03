@@ -23,7 +23,8 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o /out/data-crypto ./cmd/data-crypto \
   && CGO_ENABLED=0 GOOS=linux go build -o /out/data-fundamental ./cmd/data-fundamental \
   && CGO_ENABLED=0 GOOS=linux go build -o /out/data-onchain ./cmd/data-onchain \
   && CGO_ENABLED=0 GOOS=linux go build -o /out/data-sentiment ./cmd/data-sentiment \
-  && CGO_ENABLED=0 GOOS=linux go build -o /out/data-technical ./cmd/data-technical
+  && CGO_ENABLED=0 GOOS=linux go build -o /out/data-technical ./cmd/data-technical \
+  && CGO_ENABLED=0 GOOS=linux go build -o /out/data-macro-intel ./cmd/data-macro-intel
 # data-technical: fetches daily/weekly OHLCV bars only (no computation).
 # Indicator computation lives in services/data-analyzer.
 
@@ -38,4 +39,5 @@ COPY --from=build /out/data-fundamental /app/data-fundamental
 COPY --from=build /out/data-onchain /app/data-onchain
 COPY --from=build /out/data-sentiment /app/data-sentiment
 COPY --from=build /out/data-technical /app/data-technical
+COPY --from=build /out/data-macro-intel /app/data-macro-intel
 USER nonroot:nonroot

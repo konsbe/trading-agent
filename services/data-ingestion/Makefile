@@ -13,6 +13,7 @@ build:
 	go build -o $(BIN)/data-onchain ./cmd/data-onchain
 	go build -o $(BIN)/data-sentiment ./cmd/data-sentiment
 	go build -o $(BIN)/data-technical ./cmd/data-technical
+	go build -o $(BIN)/data-macro-intel ./cmd/data-macro-intel
 
 docker-build:
 	docker build -t trading-agent/data-ingestion:latest .
@@ -34,3 +35,6 @@ run-sentiment: build
 
 run-technical: build
 	./$(BIN)/data-technical
+
+run-macro-intel: build
+	./$(BIN)/data-macro-intel

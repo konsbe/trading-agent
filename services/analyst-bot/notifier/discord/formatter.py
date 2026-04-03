@@ -21,6 +21,7 @@ from reports.models import (
     AlertEvent,
     DailyReport,
     FundamentalSnapshot,
+    MacroIntelSnapshot,
     MacroSnapshot,
     NewsHeadline,
     PriceSnapshot,
@@ -1287,8 +1288,83 @@ def macro_global_embed(macro: MacroSnapshot) -> Optional[discord.Embed]:
 
     sigs = f"{macro.gg_signals_used} signals" if macro.gg_signals_used else "partial data"
     embed.set_footer(
-        text=f"Global · {sigs} · FRED free data · see bot.md · TODO: PMI/GPR/COT"
+        text=f"Global · {sigs} · FRED · GPR/GDELT/calendars: Macro intel embed · see bot.md"
     )
+    return embed
+
+
+def macro_intel_embed(intel: MacroIntelSnapshot) -> Optional[discord.Embed]:
+    """Calendars, GPR, GDELT, optional FOMC narrative, macro RSS / Finnhub general headlines."""
+    has_any = (
+        intel.economic_events
+        or intel.earnings_events
+        or intel.gpr_total is not None
+        or intel.gdelt_day is not None
+        or intel.narrative_summary
+        or intel.macro_headlines
+    )
+    if not has_any:
+        return None
+
+    embed = discord.Embed(
+        title="Macro intel · calendars · geo · headlines",
+        color=COLOR_PURPLE,
+    )
+
+    cal_chunks: list[str] = []
+    for e in intel.economic_events[:8]:
+        ts = e.event_ts.strftime("%m-%d %H:%M UTC") if e.event_ts else ""
+        im = e.impact or "—"
+        cal_chunks.append(f"• `{ts}` **{e.country}** {e.event_name} ({im})")
+    for e in intel.earnings_events[:10]:
+        q = e.quarter or "?"
+        cal_chunks.append(f"• **{e.symbol}** {e.earnings_date} Q{q}")
+
+    if cal_chunks:
+        embed.add_field(
+            name="Calendars (next window)",
+            value=_trunc("\n".join(cal_chunks), 1020),
+            inline=False,
+        )
+
+    geo_parts: list[str] = []
+    if intel.gpr_month is not None and intel.gpr_total is not None:
+        geo_parts.append(
+            f"**GPR** ({intel.gpr_month}): {_num(intel.gpr_total, 2)}"
+        )
+    if intel.gdelt_article_count is not None or intel.gdelt_avg_tone is not None:
+        day = intel.gdelt_day or "—"
+        lbl = intel.gdelt_query_label or "—"
+        geo_parts.append(
+            f"**GDELT** {day} `{lbl}` — n={intel.gdelt_article_count or 0}, "
+            f"avg tone {_num(intel.gdelt_avg_tone, 3)}"
+        )
+    if geo_parts:
+        embed.add_field(
+            name="Geopolitical / news tone",
+            value=_trunc("\n".join(geo_parts), 1020),
+            inline=False,
+        )
+
+    narr_parts: list[str] = []
+    if intel.narrative_summary:
+        sc = _num(intel.narrative_score, 2) if intel.narrative_score is not None else "—"
+        narr_parts.append(f"**FOMC narrative** (score {sc}): {intel.narrative_summary}")
+    if intel.macro_headlines:
+        for h in intel.macro_headlines[:6]:
+            line = h.headline
+            if h.url:
+                line = f"{line} — {h.url}"
+            src = h.source.replace("rss_macro_", "RSS·").replace("finnhub_macro_general", "FH·general")
+            narr_parts.append(f"• [{src}] {_trunc(line, 200)}")
+    if narr_parts:
+        embed.add_field(
+            name="Narrative & macro headlines",
+            value=_trunc("\n".join(narr_parts), 1020),
+            inline=False,
+        )
+
+    embed.set_footer(text="data-macro-intel + narrative_scores · Finnhub tier may block economic calendar")
     return embed
 
 
@@ -1343,6 +1419,11 @@ def daily_report_embeds(report: DailyReport) -> list[discord.Embed]:
         gg_embed = macro_global_embed(report.macro)
         if gg_embed:
             embeds.append(gg_embed)
+
+    if report.macro_intel:
+        mi_embed = macro_intel_embed(report.macro_intel)
+        if mi_embed:
+            embeds.append(mi_embed)
 
     # Per-symbol compact summary
     for sr in report.symbols:

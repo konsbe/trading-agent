@@ -124,6 +124,25 @@ services:
     profiles: [ingestion]
     restart: on-failure
 
+  # Calendars (Finnhub), GPR CSV, GDELT doc tone, RSS macro feeds → macro_* tables + tagged news_headlines.
+  data-macro-intel:
+    build:
+      context: ../services/data-ingestion
+      dockerfile: Dockerfile
+    command: ["/app/data-macro-intel"]
+    env_file:
+      - path: ../.env
+        required: false
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@timescaledb:5432/trading?sslmode=disable
+    volumes:
+      - ${CORP_CA_PEM_PATH:-/dev/null}:/etc/ssl/extra/corp-ca.pem:ro
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+    profiles: [ingestion]
+    restart: on-failure
+
   # ── data-analyzer ──────────────────────────────────────────────────────────
   # Reads bars / fundamentals from TimescaleDB and writes computed indicators
   # and derived fundamental scores. No external API calls are made here.

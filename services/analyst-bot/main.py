@@ -61,7 +61,7 @@ async def start() -> None:
         analyze_cache_ttl=cfg.bot_cache_analyze_ttl,
     )
 
-    scheduler = build_scheduler(cfg, builder, notifiers=[])  # notifiers patched after bot creation
+    scheduler = build_scheduler(cfg, builder, notifiers=[], db_pool=db_pool)
 
     # ── Notifiers ─────────────────────────────────────────────────────────────
     # The Discord notifier needs the bot object, so we build the bot first with

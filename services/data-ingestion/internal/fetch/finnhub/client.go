@@ -372,3 +372,128 @@ func toFloat(v any) (float64, bool) {
 		return 0, false
 	}
 }
+
+// ─── Calendars (macro / event intelligence) ─────────────────────────────────
+
+// CalendarEconomic fetches macro economic calendar events in [from, to] (YYYY-MM-DD).
+// Endpoint: GET /calendar/economic?from=&to=
+// TODO [PAID]: Some Finnhub tiers restrict this endpoint — handle 403 gracefully.
+func (c *Client) CalendarEconomic(ctx context.Context, from, to string) ([]map[string]any, error) {
+	if !c.HasToken() {
+		return nil, fmt.Errorf("finnhub token missing")
+	}
+	if err := c.Limiter.Wait(ctx); err != nil {
+		return nil, err
+	}
+	q := url.Values{}
+	q.Set("from", from)
+	q.Set("to", to)
+	q.Set("token", c.Token)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, base+"/calendar/economic?"+q.Encode(), nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := c.HTTP.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("finnhub calendar-economic: %s", resp.Status)
+	}
+	var raw map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
+		return nil, err
+	}
+	return sliceMap(raw, "economicCalendar")
+}
+
+// CalendarEarnings fetches earnings calendar in [from, to]. Optional symbol filters to one ticker.
+// Endpoint: GET /calendar/earnings?from=&to=&symbol=
+func (c *Client) CalendarEarnings(ctx context.Context, from, to, symbol string) ([]map[string]any, error) {
+	if !c.HasToken() {
+		return nil, fmt.Errorf("finnhub token missing")
+	}
+	if err := c.Limiter.Wait(ctx); err != nil {
+		return nil, err
+	}
+	q := url.Values{}
+	q.Set("from", from)
+	q.Set("to", to)
+	if symbol != "" {
+		q.Set("symbol", symbol)
+	}
+	q.Set("token", c.Token)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, base+"/calendar/earnings?"+q.Encode(), nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := c.HTTP.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("finnhub calendar-earnings: %s", resp.Status)
+	}
+	var raw map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
+		return nil, err
+	}
+	out, err := sliceMap(raw, "earningsCalendar")
+	if err == nil && len(out) > 0 {
+		return out, nil
+	}
+	return sliceMap(raw, "data")
+}
+
+// MarketNews fetches Finnhub market news by category: general, forex, crypto, merger.
+func (c *Client) MarketNews(ctx context.Context, category string) ([]map[string]any, error) {
+	if !c.HasToken() {
+		return nil, fmt.Errorf("finnhub token missing")
+	}
+	if err := c.Limiter.Wait(ctx); err != nil {
+		return nil, err
+	}
+	if category == "" {
+		category = "general"
+	}
+	q := url.Values{}
+	q.Set("category", category)
+	q.Set("token", c.Token)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, base+"/news?"+q.Encode(), nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := c.HTTP.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("finnhub market news: %s", resp.Status)
+	}
+	var items []map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&items); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+func sliceMap(raw map[string]any, key string) ([]map[string]any, error) {
+	v, ok := raw[key]
+	if !ok {
+		return nil, nil
+	}
+	arr, ok := v.([]any)
+	if !ok {
+		return nil, nil
+	}
+	out := make([]map[string]any, 0, len(arr))
+	for _, x := range arr {
+		if m, ok := x.(map[string]any); ok {
+			out = append(out, m)
+		}
+	}
+	return out, nil
+}

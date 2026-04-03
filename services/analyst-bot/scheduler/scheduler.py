@@ -16,6 +16,8 @@ from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 
 if TYPE_CHECKING:
+    import asyncpg
+
     from config import BotConfig
     from notifier.base import BaseNotifier
     from reports.builder import ReportBuilder
@@ -27,6 +29,7 @@ def build_scheduler(
     cfg: "BotConfig",
     builder: "ReportBuilder",
     notifiers: "list[BaseNotifier]",
+    db_pool: "asyncpg.Pool | None" = None,
 ) -> AsyncIOScheduler:
     """
     Construct and configure the scheduler. Does NOT start it yet —
@@ -70,5 +73,34 @@ def build_scheduler(
         replace_existing=True,
     )
     log.info("alert scan scheduled every %ds", cfg.bot_alert_scan_interval)
+
+    if (
+        db_pool is not None
+        and cfg.bot_fomc_narrative_enable
+        and cfg.openai_api_key.strip()
+        and cfg.fomc_statement_url.strip()
+    ):
+        from scheduler.jobs.fomc_narrative import FomcNarrativeJob
+
+        fomc_job = FomcNarrativeJob(cfg, db_pool)
+        try:
+            parts = cfg.bot_fomc_narrative_cron.split()
+            scheduler.add_job(
+                fomc_job.run,
+                trigger=CronTrigger(
+                    minute=parts[0],
+                    hour=parts[1],
+                    day=parts[2],
+                    month=parts[3],
+                    day_of_week=parts[4],
+                    timezone="UTC",
+                ),
+                id="fomc_narrative",
+                name="FOMC narrative (OpenAI)",
+                replace_existing=True,
+            )
+            log.info("FOMC narrative scheduled: %s", cfg.bot_fomc_narrative_cron)
+        except Exception as exc:
+            log.error("failed to schedule FOMC narrative: %s", exc)
 
     return scheduler

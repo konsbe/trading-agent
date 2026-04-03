@@ -1311,6 +1311,21 @@ Embed order in `/report`: after **Inflation & Prices**. Same as other macro pane
 
 Uses **FRED only** today: `DTWEXBGS`, `DEXJPUS`, `CHNGDPNQDSMEI`, `FYFSD`, `GDP`. Computed by `macro-analysis` → `macro_derived` (`gg_*` metrics).
 
+### Macro intelligence embed (after Global & Geopolitical)
+
+Separate Discord embed **Macro intel · calendars · geo · headlines** — data from `data-macro-intel` and optional LLM rows:
+
+| Source | Tables / notes |
+|--------|----------------|
+| Economic calendar | `economic_calendar_events` (Finnhub; tier may block) |
+| Earnings calendar | `earnings_calendar_events` for symbols on your **equity watchlist** |
+| GPR | `geopolitical_risk_monthly` from `GPR_CSV_URL` |
+| GDELT | `gdelt_macro_daily` (aggregate tone for `MACRO_INTEL_GDELT_QUERY`) |
+| Macro headlines | `news_headlines` where `source` is `rss_macro_*` or `finnhub_macro_general` |
+| FOMC narrative | `narrative_scores` (`doc_kind=fomc_statement`) from optional **OpenAI** job |
+
+Configure the job with `BOT_FOMC_NARRATIVE_ENABLE=true`, `OPENAI_API_KEY`, `FOMC_STATEMENT_URL` (HTML page), and `BOT_FOMC_NARRATIVE_CRON` (cron, UTC). See root `.env.example`.
+
 ---
 
 ### Composite `gg_stance`
