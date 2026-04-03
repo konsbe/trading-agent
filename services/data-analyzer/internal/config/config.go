@@ -1348,8 +1348,8 @@ func LoadMarketOperations() (MarketOperations, error) {
 		Enabled:        boolEnv("MARKET_OPS_ENABLE", true),
 		PollInterval:   pollFor("MARKET_OPS_POLL_INTERVAL", time.Hour),
 		StartupDelay:   time.Duration(intEnv("MARKET_OPS_STARTUP_DELAY_SECS", 30)) * time.Second,
-		VIXLowMax:      floatEnv("MARKET_OPS_VIX_LOW_MAX", 15),
-		VIXNormalMax:   floatEnv("MARKET_OPS_VIX_NORMAL_MAX", 25),
-		VIXElevatedMax: floatEnv("MARKET_OPS_VIX_ELEVATED_MAX", 35),
+		VIXLowMax:      floatEnv("MARKET_OPS_VIX_LOW_MAX", 12),      // aligned with TECHNICAL_VIX_COMPLACENCY_THRESHOLD
+		VIXNormalMax:   floatEnv("MARKET_OPS_VIX_NORMAL_MAX", 20),   // aligned with TECHNICAL_VIX_ELEVATED_THRESHOLD
+		VIXElevatedMax: floatEnv("MARKET_OPS_VIX_ELEVATED_MAX", 35), // aligned with TECHNICAL_VIX_FEAR_THRESHOLD
 	}, nil
 }

@@ -100,9 +100,9 @@ class BotConfig(BaseSettings):
     bot_market_ops_atr_pct_elevated: float = 3.0
     bot_market_ops_volume_ratio_elevated: float = 1.8
     # VIX bands for market-ops display (align with MARKET_OPS_VIX_* on market-operations worker).
-    bot_market_ops_vix_low_max: float = 15.0
-    bot_market_ops_vix_normal_max: float = 25.0
-    bot_market_ops_vix_elevated_max: float = 35.0
+    bot_market_ops_vix_low_max: float = 12.0    # aligned with TECHNICAL_VIX_COMPLACENCY_THRESHOLD
+    bot_market_ops_vix_normal_max: float = 20.0  # aligned with TECHNICAL_VIX_ELEVATED_THRESHOLD
+    bot_market_ops_vix_elevated_max: float = 35.0  # aligned with TECHNICAL_VIX_FEAR_THRESHOLD
 
     # ── Optional FOMC / policy narrative (OpenAI → narrative_scores) ───────────
     bot_fomc_narrative_enable: bool = False
