@@ -926,6 +926,107 @@ func LoadGrowthCycle() GrowthCycle {
 	}
 }
 
+// ── InflationCycle ────────────────────────────────────────────────────────────
+
+// InflationCycle holds all thresholds for the inflation analysis pass in the
+// macro-analysis worker.  All values are configurable via .env.
+//
+// Data sources: all free FRED series.  No external APIs beyond FRED.
+//
+// TODO [PAID]:   Iron ore price — no free FRED equivalent; LME data is paid.
+// TODO [PAID]:   CME copper futures curve — spot PCOPPUSDM is free and sufficient for now.
+// TODO [SCRAPE]: EIA weekly oil inventory — no FRED equivalent; EIA.gov requires scraping.
+// TODO [PAID]:   BLS real-time CPI surprise vs consensus — Bloomberg/Refinitiv are paid.
+// TODO [LLM]:    Shelter CPI 18-month lag adjustment — requires forward-looking estimation.
+// TODO [FUTURE]: Migrate to Python + asyncpg once the LLM scoring layer is added.
+type InflationCycle struct {
+	PollInterval time.Duration
+
+	// ── CPI (CPIAUCSL — monthly, index level; YoY % computed) ────────────────
+	// Thresholds applied to headline CPI YoY %.
+	// Surprise vs consensus on CPI day = major bond and equity regime signal.
+	CPIGoldilocksMax float64 // YoY ≤ this = "goldilocks"     default 2.5
+	CPIAboveTarget   float64 // YoY ≤ this = "above_target"   default 4.0
+	CPIHot           float64 // YoY > this = "hot"             default 5.0
+
+	// ── Core CPI (CPILFESL — monthly, ex food & energy) ──────────────────────
+	CoreCPITarget float64 // YoY ≤ this = "at_target"    default 2.5
+	CoreCPIHot    float64 // YoY > this = "hot"           default 4.0
+
+	// ── Core PCE (PCEPILFE — monthly, the Fed's actual 2% target metric) ─────
+	// When Powell says "inflation," he means Core PCE.
+	// Core PCE typically runs 0.3–0.5pp BELOW CPI due to chain-weighting.
+	CorePCEAtTarget float64 // YoY ≤ this = "at_target"    default 2.2
+	CorePCEHawkish  float64 // YoY > this = "hawkish_bias"  default 3.0
+
+	// ── PPI (PPIFID — final demand; PPIACO — all commodities) ────────────────
+	// PPI leads CPI by 3–6 months; PPI-CPI spread signals corporate margin pressure.
+	PPISurge         float64 // YoY > this = "surge"         default 8.0
+	PPIElevated      float64 // YoY > this = "elevated"      default 4.0
+	PPICPISpreadWarn float64 // PPI-CPI spread > this = "margin_pressure"  default 3.0
+
+	// ── WTI Crude Oil (DCOILWTICO — daily, $/barrel) ─────────────────────────
+	// A $10/barrel move shifts US headline CPI by ~0.3–0.4pp.
+	// Energy sector earnings correlate directly with oil price.
+	WTIGoldilocksMin float64 // ≥ this = "goldilocks"          default 60
+	WTIGoldilocksMax float64 // ≤ this = "goldilocks"          default 80
+	WTIInflationary  float64 // > this = "inflationary_risk"   default 100
+	WTIStress        float64 // < this = "energy_sector_stress" default 50
+
+	// ── Wages: AHE (CES0500000003) and ECI (ECIALLCIV — quarterly) ───────────
+	// Wages are 60–70% of service sector costs; wage-price spiral is the
+	// primary channel through which wage growth embeds inflation.
+	// ECI is the Fed's preferred wage measure (less volatile than AHE).
+	WageTargetMax float64 // YoY ≤ this = "target_consistent"  default 3.5
+	WageElevated  float64 // YoY ≤ this = "elevated"            default 4.5
+	WageSpiral    float64 // YoY > this = "spiral_risk"         default 5.0
+
+	// ── Copper (PCOPPUSDM — monthly, $/metric ton) ────────────────────────────
+	// Global industrial demand barometer; China = 55% of consumption.
+	// Rising copper = global expansion; falling copper = global deceleration.
+	CopperExpansionYoY   float64 // YoY > this = "global_expansion"    default 10.0
+	CopperContractionYoY float64 // YoY < this = "global_contraction"  default -10.0
+
+	// ── Composite Inflation Stance score boundaries ────────────────────────────
+	InflationHotScore       float64 // weighted score > this = "hot"         default 0.4
+	InflationDeflationScore float64 // weighted score < this = "deflationary" default -0.4
+}
+
+func LoadInflationCycle() InflationCycle {
+	return InflationCycle{
+		PollInterval: pollFor("DATA_MACRO_INFLATION_POLL_INTERVAL", 12*time.Hour),
+
+		CPIGoldilocksMax: floatEnv("INFLATION_CPI_GOLDILOCKS_MAX", 2.5),
+		CPIAboveTarget:   floatEnv("INFLATION_CPI_ABOVE_TARGET", 4.0),
+		CPIHot:           floatEnv("INFLATION_CPI_HOT", 5.0),
+
+		CoreCPITarget: floatEnv("INFLATION_CORE_CPI_TARGET", 2.5),
+		CoreCPIHot:    floatEnv("INFLATION_CORE_CPI_HOT", 4.0),
+
+		CorePCEAtTarget: floatEnv("INFLATION_CORE_PCE_AT_TARGET", 2.2),
+		CorePCEHawkish:  floatEnv("INFLATION_CORE_PCE_HAWKISH", 3.0),
+
+		PPISurge:         floatEnv("INFLATION_PPI_SURGE", 8.0),
+		PPIElevated:      floatEnv("INFLATION_PPI_ELEVATED", 4.0),
+		PPICPISpreadWarn: floatEnv("INFLATION_PPI_CPI_SPREAD_WARNING", 3.0),
+
+		WTIGoldilocksMin: floatEnv("INFLATION_WTI_GOLDILOCKS_MIN", 60),
+		WTIGoldilocksMax: floatEnv("INFLATION_WTI_GOLDILOCKS_MAX", 80),
+		WTIInflationary:  floatEnv("INFLATION_WTI_INFLATIONARY", 100),
+		WTIStress:        floatEnv("INFLATION_WTI_STRESS", 50),
+
+		WageTargetMax: floatEnv("INFLATION_WAGE_TARGET_MAX", 3.5),
+		WageElevated:  floatEnv("INFLATION_WAGE_ELEVATED", 4.5),
+		WageSpiral:    floatEnv("INFLATION_WAGE_SPIRAL", 5.0),
+
+		CopperExpansionYoY:   floatEnv("INFLATION_COPPER_EXPANSION_YOY", 10.0),
+		CopperContractionYoY: floatEnv("INFLATION_COPPER_CONTRACTION_YOY", -10.0),
+
+		InflationHotScore:       floatEnv("INFLATION_HOT_SCORE", 0.4),
+		InflationDeflationScore: floatEnv("INFLATION_DEFLATION_SCORE", -0.4),
+	}
+}
+
 func LoadMacroAnalysis() (MacroAnalysis, error) {
 	b := LoadBase()
 	if b.DatabaseURL == "" {

@@ -684,7 +684,7 @@ class ReportBuilder:
             empl_p = await _md("gc_employment")
             snap.gc_payrolls_k = empl_p.get("payems_k")
             snap.gc_unemployment = empl_p.get("unrate_pct")
-            snap.gc_ahe_pct = empl_p.get("ahe_pct")
+            snap.gc_ahe_pct = empl_p.get("ahe_yoy_pct")  # YoY % change computed from level
             snap.gc_sahm_pp = empl_p.get("sahm_pp")
             snap.gc_empl_regime = empl_p.get("regime")
 
@@ -709,6 +709,52 @@ class ReportBuilder:
             snap.gc_stance = gc_stance_p.get("stance")
             snap.gc_score = gc_stance_p.get("value")
             snap.gc_signals_used = gc_stance_p.get("signals_used")
+
+            # ── Inflation & Prices ────────────────────────────────────────────
+            cpi_p = await _md("inf_cpi")
+            snap.inf_cpi_yoy = cpi_p.get("yoy_pct")
+            snap.inf_cpi_regime = cpi_p.get("regime")
+
+            core_cpi_p = await _md("inf_core_cpi")
+            snap.inf_core_cpi_yoy = core_cpi_p.get("yoy_pct")
+            snap.inf_core_cpi_regime = core_cpi_p.get("regime")
+
+            shelter_p = await _md("inf_shelter")
+            snap.inf_shelter_yoy = shelter_p.get("yoy_pct")
+            snap.inf_shelter_regime = shelter_p.get("regime")
+
+            core_pce_p = await _md("inf_core_pce")
+            snap.inf_core_pce_yoy = core_pce_p.get("core_pce_yoy")
+            snap.inf_core_pce_regime = core_pce_p.get("regime")
+            snap.inf_headline_pce_yoy = core_pce_p.get("headline_pce_yoy")
+
+            ppi_p = await _md("inf_ppi")
+            snap.inf_ppi_yoy = ppi_p.get("ppifid_yoy")
+            snap.inf_ppi_regime = ppi_p.get("regime")
+            snap.inf_ppi_cpi_spread = ppi_p.get("ppi_cpi_spread")
+            snap.inf_ppi_margin_signal = ppi_p.get("margin_signal")
+            snap.inf_ppiaco_yoy = ppi_p.get("ppiaco_yoy")
+
+            oil_p = await _md("inf_oil")
+            snap.inf_wti = oil_p.get("wti_usd")
+            snap.inf_brent = oil_p.get("brent_usd")
+            snap.inf_brent_wti_spread = oil_p.get("brent_wti_spread")
+            snap.inf_oil_regime = oil_p.get("regime")
+
+            wage_p = await _md("inf_wages")
+            snap.inf_ahe_yoy = wage_p.get("ahe_yoy_pct")
+            snap.inf_eci_yoy = wage_p.get("eci_yoy_pct")
+            snap.inf_wage_regime = wage_p.get("regime")
+
+            copper_p = await _md("inf_copper")
+            snap.inf_copper_yoy = copper_p.get("copper_yoy_pct")
+            snap.inf_copper_usd = copper_p.get("copper_usd_per_ton")
+            snap.inf_copper_regime = copper_p.get("regime")
+
+            inf_stance_p = await _md("inf_stance")
+            snap.inf_stance = inf_stance_p.get("stance")
+            snap.inf_score = inf_stance_p.get("value")
+            snap.inf_signals_used = inf_stance_p.get("signals_used")
 
         except Exception as exc:
             log.warning("macro build failed: %s", exc)

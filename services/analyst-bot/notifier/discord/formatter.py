@@ -1042,6 +1042,153 @@ def macro_growth_embed(macro: MacroSnapshot) -> Optional[discord.Embed]:
     return embed
 
 
+# ── Inflation & Prices embed ──────────────────────────────────────────────────
+
+def macro_inflation_embed(macro: MacroSnapshot) -> Optional[discord.Embed]:
+    """Inflation & Prices macro embed for the daily report.
+
+    Shows core inflation measures (CPI, Core PCE, PCE — Fed's target), PPI pipeline,
+    energy prices, wages, and copper as a global demand proxy.
+    Returns None when no inflation signals are available yet.
+    """
+    has_data = any([
+        macro.inf_stance,
+        macro.inf_cpi_yoy,
+        macro.inf_core_pce_yoy,
+        macro.inf_wti,
+    ])
+    if not has_data:
+        return None
+
+    STANCE_COLOR: dict[str, int] = {
+        "hot":              COLOR_RED,
+        "moderate":         COLOR_YELLOW,
+        "deflationary":     COLOR_BLUE,
+        "insufficient_data": COLOR_GREY,
+    }
+    STANCE_LABEL: dict[str, str] = {
+        "hot":               "🔴 Hot",
+        "moderate":          "🟡 Moderate",
+        "deflationary":      "🔵 Deflationary",
+        "insufficient_data": "⚪ Insufficient Data",
+    }
+    stance = macro.inf_stance or "insufficient_data"
+    stance_color = STANCE_COLOR.get(stance, COLOR_GREY)
+    stance_label = STANCE_LABEL.get(stance, f"⚪ {stance}")
+    score_str = f"{macro.inf_score:+.2f}" if macro.inf_score is not None else "+0.00"
+
+    embed = discord.Embed(
+        title=f"🌡️ Inflation & Prices — {stance_label} ({score_str})",
+        color=stance_color,
+    )
+
+    def _re(regime: Optional[str]) -> str:
+        """Map regime string → emoji prefix."""
+        if regime is None:
+            return "⚪"
+        GOOD = {"goldilocks", "at_target", "below_target", "normalizing",
+                "target_consistent", "soft", "deflationary", "low",
+                "margin_expansion", "global_expansion", "stable"}
+        WARN = {"rising", "above_target", "moderating", "hawkish_bias",
+                "elevated", "moderate", "slowing", "above_target", "neutral"}
+        BAD  = {"hot", "deflation_risk", "aggressive_tightening", "surge",
+                "inflationary_risk", "spiral_risk", "global_contraction",
+                "energy_sector_stress", "margin_pressure"}
+        if regime in GOOD:
+            return "🟢"
+        if regime in BAD:
+            return "🔴"
+        if regime in WARN:
+            return "🟡"
+        return "⚪"
+
+    def _fmt(regime: Optional[str]) -> str:
+        return (regime or "—").replace("_", " ")
+
+    def _pct(v: Optional[float], sign: bool = True) -> str:
+        if v is None:
+            return "—"
+        return f"{v:+.2f}%" if sign else f"{v:.2f}%"
+
+    def _usd(v: Optional[float]) -> str:
+        return f"${v:,.2f}" if v is not None else "—"
+
+    # ── Tier 1: Core Inflation (PCE is Fed target — most important) ───────────
+    t1_lines: list[str] = []
+
+    # Core PCE — Fed's actual 2% target (highest weight signal)
+    pce_e = _re(macro.inf_core_pce_regime)
+    pce_regime = _fmt(macro.inf_core_pce_regime)
+    pce_val = _pct(macro.inf_core_pce_yoy)
+    pce_target = " (Fed target 2.0%)" if macro.inf_core_pce_yoy is not None else ""
+    t1_lines.append(f"{pce_e} **Core PCE** — {pce_val} · {pce_regime}{pce_target}")
+
+    # Headline CPI
+    cpi_e = _re(macro.inf_cpi_regime)
+    cpi_val = _pct(macro.inf_cpi_yoy)
+    cpi_regime = _fmt(macro.inf_cpi_regime)
+    core_cpi_str = f" · Core {_pct(macro.inf_core_cpi_yoy)}" if macro.inf_core_cpi_yoy is not None else ""
+    t1_lines.append(f"{cpi_e} **CPI** — {cpi_val}{core_cpi_str} · {cpi_regime}")
+
+    # Shelter CPI (35% of CPI, ~18-month lag to market rents)
+    if macro.inf_shelter_yoy is not None:
+        sh_e = _re(macro.inf_shelter_regime)
+        sh_regime = _fmt(macro.inf_shelter_regime)
+        t1_lines.append(f"{sh_e} **Shelter CPI** — {_pct(macro.inf_shelter_yoy)} · {sh_regime} *(18m lag)*")
+
+    # ── PPI Pipeline (leads CPI 3–6 months) ──────────────────────────────────
+    t2_lines: list[str] = []
+
+    if macro.inf_ppi_yoy is not None:
+        ppi_e = _re(macro.inf_ppi_regime)
+        ppi_regime = _fmt(macro.inf_ppi_regime)
+        ppi_val = _pct(macro.inf_ppi_yoy)
+        spread_str = ""
+        if macro.inf_ppi_cpi_spread is not None:
+            margin = macro.inf_ppi_margin_signal or "neutral"
+            margin_e = "🔴" if margin == "margin_pressure" else ("🟢" if margin == "margin_expansion" else "🟡")
+            spread_str = f" · spread {macro.inf_ppi_cpi_spread:+.1f}pp {margin_e}"
+        t2_lines.append(f"{ppi_e} **PPI Final Demand** — {ppi_val} · {ppi_regime}{spread_str}")
+        if macro.inf_ppiaco_yoy is not None:
+            t2_lines.append(f"⚪ **PPI All Commodities** — {_pct(macro.inf_ppiaco_yoy)}")
+
+    # ── Energy ────────────────────────────────────────────────────────────────
+    if macro.inf_wti is not None:
+        oil_e = _re(macro.inf_oil_regime)
+        oil_regime = _fmt(macro.inf_oil_regime)
+        wti_str = f"WTI {_usd(macro.inf_wti)}"
+        brent_str = f" | Brent {_usd(macro.inf_brent)}" if macro.inf_brent is not None else ""
+        spread_str = f" | B-W {macro.inf_brent_wti_spread:+.2f}" if macro.inf_brent_wti_spread is not None else ""
+        t2_lines.append(f"{oil_e} **Oil** — {wti_str}{brent_str}{spread_str} · {oil_regime}")
+
+    # ── Wages (services inflation driver) ─────────────────────────────────────
+    t3_lines: list[str] = []
+
+    if macro.inf_ahe_yoy is not None:
+        wage_e = _re(macro.inf_wage_regime)
+        wage_regime = _fmt(macro.inf_wage_regime)
+        ahe_str = f"AHE {_pct(macro.inf_ahe_yoy)}"
+        eci_str = f" · ECI {_pct(macro.inf_eci_yoy)}" if macro.inf_eci_yoy is not None else ""
+        t3_lines.append(f"{wage_e} **Wages** — {ahe_str}{eci_str} · {wage_regime}")
+
+    # ── Copper (global industrial demand proxy) ───────────────────────────────
+    if macro.inf_copper_yoy is not None:
+        cu_e = _re(macro.inf_copper_regime)
+        cu_regime = _fmt(macro.inf_copper_regime)
+        cu_level = f" ({_usd(macro.inf_copper_usd)}/t)" if macro.inf_copper_usd is not None else ""
+        t3_lines.append(f"{cu_e} **Copper** — {_pct(macro.inf_copper_yoy)} YoY{cu_level} · {cu_regime}")
+
+    embed.add_field(name="Core Inflation — Tier 1", value="\n".join(t1_lines), inline=False)
+    if t2_lines:
+        embed.add_field(name="Pipeline & Energy — Tier 2", value="\n".join(t2_lines), inline=False)
+    if t3_lines:
+        embed.add_field(name="Wages & Commodities — Tier 3", value="\n".join(t3_lines), inline=False)
+
+    sigs = f"{macro.inf_signals_used} signals" if macro.inf_signals_used else "partial data"
+    embed.set_footer(text=f"Inflation · {sigs} · FRED free data · see bot.md for thresholds")
+    return embed
+
+
 # ── Daily report (summary embed per symbol) ───────────────────────────────────
 
 def daily_report_embeds(report: DailyReport) -> list[discord.Embed]:
@@ -1081,6 +1228,12 @@ def daily_report_embeds(report: DailyReport) -> list[discord.Embed]:
         gc_embed = macro_growth_embed(report.macro)
         if gc_embed:
             embeds.append(gc_embed)
+
+    # Inflation & Prices embed (follows Growth Cycle)
+    if report.macro:
+        inf_embed = macro_inflation_embed(report.macro)
+        if inf_embed:
+            embeds.append(inf_embed)
 
     # Per-symbol compact summary
     for sr in report.symbols:

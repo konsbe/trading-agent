@@ -75,7 +75,13 @@ func main() {
 	}
 	defer pool.Close()
 
-	w := &worker{cfg: cfg, growthCfg: config.LoadGrowthCycle(), pool: pool, log: log}
+	w := &worker{
+		cfg:          cfg,
+		growthCfg:    config.LoadGrowthCycle(),
+		inflationCfg: config.LoadInflationCycle(),
+		pool:         pool,
+		log:          log,
+	}
 
 	// Wait for data-equity to complete its initial FRED fetch before the first
 	// macro-analysis pass. Without a delay, macro-analysis runs immediately and
@@ -120,18 +126,19 @@ func macroStartupDelay() int {
 }
 
 type worker struct {
-	cfg        config.MacroAnalysis
-	growthCfg  config.GrowthCycle
-	pool       *pgxpool.Pool
-	log        *slog.Logger
+	cfg          config.MacroAnalysis
+	growthCfg    config.GrowthCycle
+	inflationCfg config.InflationCycle
+	pool         *pgxpool.Pool
+	log          *slog.Logger
 }
 
 func (w *worker) analyzeAll(ctx context.Context) {
 	w.analyzeMonetary(ctx)
 	w.analyzeGrowth(ctx)
-	// TODO [FUTURE]: w.analyzeInflation(ctx)  — CPI, Core PCE, PPI, OER
-	// TODO [FUTURE]: w.analyzeGlobal(ctx)     — China PMI, EM risk, global CBs
-	// TODO [FUTURE]: w.analyzeCycles(ctx)     — composite regime detection
+	w.analyzeInflation(ctx)
+	// TODO [FUTURE]: w.analyzeGlobal(ctx)  — ECB/BoE/BoJ rates, China PMI, EM stress
+	// TODO [FUTURE]: w.analyzeCycles(ctx)  — composite cross-panel regime detection
 }
 
 // analyzeMonetary computes all monetary-policy signals from FRED series stored
@@ -603,12 +610,16 @@ func (w *worker) analyzeGrowth(ctx context.Context) {
 		usedSignals++
 	}
 
-	// ── Tier 1: PMI — ISM Manufacturing (NAPM) ──────────────────────────────
-	// Monthly.  Values: >55 strong_expansion, >50 expansion, >45 slowing,
-	// >40 contraction, <40 severe_contraction.
-	// TODO [PAID]: Replace/supplement with S&P Global Markit PMI for higher frequency.
+	// ── Tier 1: PMI — ISM Manufacturing ──────────────────────────────────────
+	// TODO [PAID]: FRED series "NAPM" (ISM Manufacturing PMI) returns 400 Bad Request —
+	//   FRED has discontinued/restricted free access to ISM data.
+	//   Alternatives require a paid subscription:
+	//     - S&P Global (Markit) Manufacturing PMI — paid API
+	//     - ISM directly — requires ISM membership or paid data feed
+	//   The PMI signal is skipped; gc_pmi is stored as nil/no_data.
+	//   The composite gc_stance score is normalised over available signals only.
 	// TODO [PAID]: Add ISM Services PMI when an API feed is available.
-	pmiObs := fredSeries("NAPM", 12)
+	pmiObs := fredSeries("NAPM", 12) // NAPM is restricted on FRED — always returns empty
 	pmiRegime := "no_data"
 	var pmiScore float64
 	if len(pmiObs) > 0 {
@@ -652,23 +663,26 @@ func (w *worker) analyzeGrowth(ctx context.Context) {
 	}
 
 	// ── Tier 1: LEI — Conference Board Leading Economic Index (USSLIND) ──────
-	// Monthly level.  We compute 6-month change and annualise it.
-	// 3 consecutive declines ("rule of three") = classic recession warning.
-	// Note: FRED provides the composite index only; sub-components are paid.
+	// IMPORTANT: FRED USSLIND stores the month-over-month PERCENT CHANGE in the
+	// Conference Board LEI (e.g. -0.3, +0.2), NOT the index level.
+	// 6-month cumulative sum = sum of last 6 MoM changes.
+	// Rule of three: 3+ consecutive months with a NEGATIVE MoM value.
+	// Note: FRED provides the composite only; sub-components are paid.
 	leiObs := fredSeries("USSLIND", 12)
 	leiRegime := "no_data"
 	var leiScore float64
 	if len(leiObs) >= 2 {
-		lei := leiObs[0].Value
-		leiScore6m := 0.0
 		leiTrend := "stable"
-		if len(leiObs) >= 7 {
-			// 6-month annualised rate of change.
-			leiScore6m = ((lei/leiObs[6].Value) - 1) * 100
-			// Rule of 3: count consecutive monthly declines.
+		leiCumSum6m := 0.0
+		if len(leiObs) >= 6 {
+			// Cumulative sum of last 6 MoM % changes.
+			for i := 0; i < 6; i++ {
+				leiCumSum6m += leiObs[i].Value
+			}
+			// Rule of three: count consecutive months where MoM change < 0.
 			consecutiveDeclines := 0
-			for i := 0; i < len(leiObs)-1 && i < 6; i++ {
-				if leiObs[i].Value < leiObs[i+1].Value {
+			for i := 0; i < len(leiObs) && i < 6; i++ {
+				if leiObs[i].Value < 0 {
 					consecutiveDeclines++
 				} else {
 					break
@@ -676,9 +690,9 @@ func (w *worker) analyzeGrowth(ctx context.Context) {
 			}
 			if consecutiveDeclines >= 3 {
 				leiTrend = "rule_of_three_decline"
-			} else if leiScore6m > gc.LEIExpansionRate {
+			} else if leiCumSum6m > gc.LEIExpansionRate {
 				leiTrend = "expanding"
-			} else if leiScore6m < gc.LEIRecessionRate {
+			} else if leiCumSum6m < gc.LEIRecessionRate {
 				leiTrend = "recession_risk"
 			} else {
 				leiTrend = "slowing"
@@ -699,11 +713,13 @@ func (w *worker) analyzeGrowth(ctx context.Context) {
 			leiScore = 0.0
 		}
 		addScore(leiScore, 0.12)
-		upsert("gc_lei", ptr(lei), map[string]any{
-			"regime":            leiRegime,
-			"score":             leiScore,
-			"six_month_rate_pct": math.Round(leiScore6m*100) / 100,
-			"series":            "USSLIND",
+		// Store the cumulative 6m sum as the scalar value (unit: %).
+		upsert("gc_lei", ptr(leiCumSum6m), map[string]any{
+			"regime":             leiRegime,
+			"score":              leiScore,
+			"six_month_rate_pct": math.Round(leiCumSum6m*100) / 100,
+			"latest_mom_pct":     math.Round(leiObs[0].Value*100) / 100,
+			"series":             "USSLIND",
 		})
 	} else {
 		upsert("gc_lei", nil, map[string]any{"regime": leiRegime})
@@ -823,23 +839,35 @@ func (w *worker) analyzeGrowth(ctx context.Context) {
 	}
 
 	// ── Tier 2: Employment — Payrolls + Unemployment + AHE + Sahm Rule ───────
-	// PAYEMS: monthly net jobs added (thousands).
-	// UNRATE: unemployment rate (%).
-	// CES0500000003: avg hourly earnings all employees (%).
-	// SAHMREALTIME: Sahm Rule indicator — >= 0.5 = recession confirmed.
+	// PAYEMS: FRED stores the TOTAL nonfarm payrolls level (thousands of persons).
+	//   MoM change = payems[0] - payems[1] (thousands of jobs added/lost).
+	//   Thresholds are in thousands (gc.NFPStrong=200 means +200K/month).
+	// UNRATE: unemployment rate in % — used as direct value.
+	// CES0500000003: FRED stores AVERAGE HOURLY EARNINGS LEVEL in dollars/hour.
+	//   YoY % change = (ahe[0]/ahe[12] - 1) × 100.
+	// SAHMREALTIME: Sahm Rule indicator in pp — >= 0.5 = recession confirmed.
 	// TODO [PAID]: ADP National Employment Report — supplement monthly payrolls.
 	emplRegime := "no_data"
 	var emplScore float64
-	if nfp, ok := fredLatest("PAYEMS"); ok {
-		var unrate, ahe, sahm *float64
+	payemsObs := fredSeries("PAYEMS", 3)
+	if len(payemsObs) >= 2 {
+		// MoM change: latest level minus prior month level (thousands of jobs).
+		nfpChange := payemsObs[0].Value - payemsObs[1].Value
+
+		var unrate, sahm *float64
 		if v, ok2 := fredLatest("UNRATE"); ok2 {
 			unrate = ptr(v)
 		}
-		if v, ok2 := fredLatest("CES0500000003"); ok2 {
-			ahe = ptr(v)
-		}
 		if v, ok2 := fredLatest("SAHMREALTIME"); ok2 {
 			sahm = ptr(v)
+		}
+
+		// AHE: compute YoY % change from monthly level data.
+		var aheYoy *float64
+		aheObs := fredSeries("CES0500000003", 14)
+		if len(aheObs) >= 13 {
+			yoy := (aheObs[0].Value/aheObs[12].Value - 1) * 100
+			aheYoy = ptr(math.Round(yoy*100) / 100)
 		}
 
 		// Sahm rule overrides everything when triggered.
@@ -848,13 +876,13 @@ func (w *worker) analyzeGrowth(ctx context.Context) {
 			emplScore = -1.0
 		} else {
 			switch {
-			case nfp >= gc.NFPStrong:
+			case nfpChange >= gc.NFPStrong:
 				emplRegime = "strong"
 				emplScore = 1.0
-			case nfp >= gc.NFPModerate:
+			case nfpChange >= gc.NFPModerate:
 				emplRegime = "moderate"
 				emplScore = 0.3
-			case nfp >= 0:
+			case nfpChange >= 0:
 				emplRegime = "slowing"
 				emplScore = -0.3
 			default:
@@ -863,21 +891,21 @@ func (w *worker) analyzeGrowth(ctx context.Context) {
 			}
 		}
 		payload := map[string]any{
-			"regime":      emplRegime,
-			"score":       emplScore,
-			"payems_k":    nfp,
+			"regime":   emplRegime,
+			"score":    emplScore,
+			"payems_k": math.Round(nfpChange), // MoM change in thousands
 		}
 		if unrate != nil {
 			payload["unrate_pct"] = *unrate
 		}
-		if ahe != nil {
-			payload["ahe_pct"] = *ahe
+		if aheYoy != nil {
+			payload["ahe_yoy_pct"] = *aheYoy
 		}
 		if sahm != nil {
 			payload["sahm_pp"] = math.Round(*sahm*100) / 100
 		}
 		addScore(emplScore, 0.14)
-		upsert("gc_employment", ptr(nfp), payload)
+		upsert("gc_employment", ptr(nfpChange), payload)
 	} else {
 		upsert("gc_employment", nil, map[string]any{"regime": emplRegime})
 	}
@@ -1038,6 +1066,488 @@ func (w *worker) analyzeGrowth(ctx context.Context) {
 	w.log.Info("growth cycle analysis complete",
 		"stance", gcStance,
 		"score", fmt.Sprintf("%.3f", stanceScore),
+		"signals", usedSignals,
+	)
+}
+
+// ── Inflation & Prices Analysis ───────────────────────────────────────────────
+
+// analyzeInflation derives inflation signals from FRED series stored in macro_fred
+// and writes results to macro_derived.
+//
+// All signals are market-wide. The composite inf_stance score is the primary
+// output consumed by the analyst-bot daily-report embed.
+//
+// Tier 1 (Core inflation measures):
+//   CPI (CPIAUCSL), Core CPI (CPILFESL), Shelter CPI (CUSR0000SAH1),
+//   PCE (PCEPI), Core PCE (PCEPILFE — Fed's actual 2% target)
+//
+// PPI pipeline:
+//   PPI Final Demand (PPIFID), PPI All Commodities (PPIACO),
+//   PPI-CPI spread as corporate margin pressure signal
+//
+// Energy:
+//   WTI crude (DCOILWTICO), Brent crude (DCOILBRENTEU)
+//
+// Wages (services inflation driver):
+//   AHE (CES0500000003 — already fetched for Growth Cycle),
+//   ECI (ECIALLCIV — quarterly, Fed's preferred wage measure)
+//
+// Commodities / global demand:
+//   Copper (PCOPPUSDM — monthly)
+//
+// TODO [PAID]:   Iron ore — no free FRED equivalent; LME data is paid.
+// TODO [SCRAPE]: EIA weekly oil inventory — EIA.gov has no FRED equivalent.
+// TODO [PAID]:   CPI surprise vs consensus — Bloomberg/Refinitiv consensus required.
+// TODO [LLM]:    Shelter CPI 18-month lag adjustment to market rents.
+// TODO [FUTURE]: Add Brent-WTI spread as geopolitical risk / refinery margin signal.
+func (w *worker) analyzeInflation(ctx context.Context) {
+	ts := time.Now().UTC()
+	ic := w.inflationCfg
+
+	ptr := func(v float64) *float64 { return &v }
+
+	upsert := func(metric string, value *float64, payload any) {
+		if err := store.UpsertMacroDerived(ctx, w.pool, ts, metric, value, payload); err != nil {
+			w.log.Error("upsert inflation derived", "metric", metric, "err", err)
+		}
+	}
+
+	fredLatest := func(seriesID string) (float64, bool) {
+		v, _, ok := store.QueryMacroFredLatest(ctx, w.pool, seriesID)
+		return v, ok
+	}
+
+	fredSeries := func(seriesID string, n int) []store.MacroObs {
+		rows, err := store.QueryMacroFredSeries(ctx, w.pool, seriesID, n)
+		if err != nil {
+			return nil
+		}
+		return rows
+	}
+
+	// yoyPct computes YoY % change from a monthly level series.
+	// Requires at least 13 observations (current + 12 months ago).
+	yoyPct := func(seriesID string) (float64, bool) {
+		obs := fredSeries(seriesID, 14)
+		if len(obs) < 13 {
+			return 0, false
+		}
+		if obs[12].Value == 0 {
+			return 0, false
+		}
+		return (obs[0].Value/obs[12].Value - 1) * 100, true
+	}
+
+	clamp := func(v float64) float64 {
+		if v > 1 {
+			return 1
+		}
+		if v < -1 {
+			return -1
+		}
+		return v
+	}
+
+	type scored struct {
+		score  float64
+		weight float64
+	}
+	var scores []scored
+	usedSignals := 0
+
+	addScore := func(s, w float64) {
+		scores = append(scores, scored{clamp(s), w})
+		usedSignals++
+	}
+
+	// ── Tier 1: Headline CPI (CPIAUCSL) ──────────────────────────────────────
+	// FRED stores the CPI index level (base 1982–84=100). YoY % is computed.
+	// Positive score = inflationary pressure (bad for bonds, bad for growth stocks).
+	// Negative score = deflationary (bad for corporate revenues, good for bonds).
+	cpiRegime := "no_data"
+	var cpiScore float64
+	if cpiYoy, ok := yoyPct("CPIAUCSL"); ok {
+		switch {
+		case cpiYoy >= ic.CPIHot:
+			cpiRegime = "hot"
+			cpiScore = 1.0
+		case cpiYoy >= ic.CPIAboveTarget:
+			cpiRegime = "above_target"
+			cpiScore = 0.6
+		case cpiYoy >= ic.CPIGoldilocksMax:
+			cpiRegime = "rising"
+			cpiScore = 0.3
+		case cpiYoy >= 1.5:
+			cpiRegime = "goldilocks"
+			cpiScore = 0.0
+		case cpiYoy >= 0:
+			cpiRegime = "below_target"
+			cpiScore = -0.3
+		default:
+			cpiRegime = "deflation_risk"
+			cpiScore = -1.0
+		}
+		addScore(cpiScore, 0.20)
+		upsert("inf_cpi", ptr(cpiYoy), map[string]any{
+			"regime":   cpiRegime,
+			"score":    cpiScore,
+			"yoy_pct":  math.Round(cpiYoy*100) / 100,
+			"series":   "CPIAUCSL",
+		})
+	} else {
+		upsert("inf_cpi", nil, map[string]any{"regime": cpiRegime})
+	}
+
+	// ── Tier 1: Core CPI (CPILFESL — ex food & energy) ───────────────────────
+	coreCPIRegime := "no_data"
+	var coreCPIScore float64
+	if coreCPIYoy, ok := yoyPct("CPILFESL"); ok {
+		switch {
+		case coreCPIYoy >= ic.CoreCPIHot:
+			coreCPIRegime = "hot"
+			coreCPIScore = 1.0
+		case coreCPIYoy >= ic.CoreCPITarget:
+			coreCPIRegime = "above_target"
+			coreCPIScore = 0.5
+		case coreCPIYoy >= 2.0:
+			coreCPIRegime = "at_target"
+			coreCPIScore = 0.0
+		default:
+			coreCPIRegime = "below_target"
+			coreCPIScore = -0.3
+		}
+		addScore(coreCPIScore, 0.10)
+		upsert("inf_core_cpi", ptr(coreCPIYoy), map[string]any{
+			"regime":  coreCPIRegime,
+			"score":   coreCPIScore,
+			"yoy_pct": math.Round(coreCPIYoy*100) / 100,
+			"series":  "CPILFESL",
+		})
+	} else {
+		upsert("inf_core_cpi", nil, map[string]any{"regime": coreCPIRegime})
+	}
+
+	// ── Tier 1: Shelter CPI (CUSR0000SAH1) ────────────────────────────────────
+	// Shelter = 35% of headline CPI. Has an 18-month lag to actual market rents
+	// (OER is survey-based). When market rents peaked in 2022, shelter CPI peaked
+	// in 2023 — this is the longest-lasting structural inflation driver in a rate cycle.
+	// TODO [LLM]: Compare shelter CPI to real-time rental indices (Zillow, Apartments.com)
+	//   to estimate the forward path of OER and predict when shelter disinflation arrives.
+	shelterRegime := "no_data"
+	if shelterYoy, ok := yoyPct("CUSR0000SAH1"); ok {
+		switch {
+		case shelterYoy >= 5.0:
+			shelterRegime = "hot"
+		case shelterYoy >= 3.5:
+			shelterRegime = "elevated"
+		case shelterYoy >= 2.5:
+			shelterRegime = "moderating"
+		default:
+			shelterRegime = "normalizing"
+		}
+		upsert("inf_shelter", ptr(shelterYoy), map[string]any{
+			"regime":      shelterRegime,
+			"yoy_pct":     math.Round(shelterYoy*100) / 100,
+			"lag_note":    "shelter CPI lags market rents by ~18 months",
+			"cpi_weight":  "~35% of headline CPI",
+			"series":      "CUSR0000SAH1",
+		})
+	} else {
+		upsert("inf_shelter", nil, map[string]any{"regime": shelterRegime})
+	}
+
+	// ── Tier 1: Core PCE (PCEPILFE) — The Fed's actual 2% target ─────────────
+	// Core PCE is the primary Fed target. It typically runs 0.3–0.5pp below Core CPI
+	// due to chain-weighting (adjusts when consumers substitute cheaper alternatives).
+	// Core PCE persistently above 2.5% = Fed will NOT cut rates regardless of growth data.
+	corePCERegime := "no_data"
+	var corePCEScore float64
+	if corePCEYoy, ok := yoyPct("PCEPILFE"); ok {
+		switch {
+		case corePCEYoy >= ic.CorePCEHawkish:
+			corePCERegime = "aggressive_tightening"
+			corePCEScore = 1.0
+		case corePCEYoy >= ic.CorePCEAtTarget:
+			corePCERegime = "hawkish_bias"
+			corePCEScore = 0.5
+		case corePCEYoy >= 1.8:
+			corePCERegime = "at_target"
+			corePCEScore = 0.0
+		default:
+			corePCERegime = "below_target"
+			corePCEScore = -0.3
+		}
+		// Headline PCE for context.
+		var pcePctFull *float64
+		if pceYoy, ok2 := yoyPct("PCEPI"); ok2 {
+			v := math.Round(pceYoy*100) / 100
+			pcePctFull = &v
+		}
+		addScore(corePCEScore, 0.20) // highest weight — Fed's actual target
+		payload := map[string]any{
+			"regime":          corePCERegime,
+			"score":           corePCEScore,
+			"core_pce_yoy":   math.Round(corePCEYoy*100) / 100,
+			"fed_target":      2.0,
+			"series":          "PCEPILFE",
+		}
+		if pcePctFull != nil {
+			payload["headline_pce_yoy"] = *pcePctFull
+		}
+		upsert("inf_core_pce", ptr(corePCEYoy), payload)
+	} else {
+		upsert("inf_core_pce", nil, map[string]any{"regime": corePCERegime})
+	}
+
+	// ── PPI: Final Demand (PPIFID) + All Commodities (PPIACO) ────────────────
+	// PPI leads CPI by 3–6 months: falling PPI = disinflation in pipeline.
+	// PPI-CPI spread > 3pp = corporate margin pressure → watch for earnings misses.
+	ppiRegime := "no_data"
+	var ppiScore float64
+	var ppiCPISpread *float64
+	if ppiFidYoy, ok := yoyPct("PPIFID"); ok {
+		switch {
+		case ppiFidYoy >= ic.PPISurge:
+			ppiRegime = "surge"
+			ppiScore = 1.0
+		case ppiFidYoy >= ic.PPIElevated:
+			ppiRegime = "elevated"
+			ppiScore = 0.6
+		case ppiFidYoy >= 2.0:
+			ppiRegime = "moderate"
+			ppiScore = 0.2
+		case ppiFidYoy >= 0:
+			ppiRegime = "stable"
+			ppiScore = 0.0
+		default:
+			ppiRegime = "deflationary"
+			ppiScore = -0.8
+		}
+		payload := map[string]any{
+			"regime":          ppiRegime,
+			"score":           ppiScore,
+			"ppifid_yoy":      math.Round(ppiFidYoy*100) / 100,
+			"series":          "PPIFID",
+			"lead_months_cpi": "3–6 months",
+		}
+		// PPI-CPI spread (margin pressure signal).
+		if cpiYoy, ok2 := yoyPct("CPIAUCSL"); ok2 {
+			spread := ppiFidYoy - cpiYoy
+			ppiCPISpread = ptr(math.Round(spread*100) / 100)
+			payload["ppi_cpi_spread"] = *ppiCPISpread
+			if spread >= ic.PPICPISpreadWarn {
+				payload["margin_signal"] = "margin_pressure"
+			} else if spread <= -ic.PPICPISpreadWarn {
+				payload["margin_signal"] = "margin_expansion"
+			} else {
+				payload["margin_signal"] = "neutral"
+			}
+		}
+		// All-commodities PPI for breadth context.
+		if ppiacoYoy, ok2 := yoyPct("PPIACO"); ok2 {
+			payload["ppiaco_yoy"] = math.Round(ppiacoYoy*100) / 100
+		}
+		addScore(ppiScore, 0.10)
+		upsert("inf_ppi", ptr(ppiFidYoy), payload)
+	} else {
+		upsert("inf_ppi", nil, map[string]any{"regime": ppiRegime})
+	}
+
+	// ── Energy: WTI Crude Oil (DCOILWTICO — daily) ────────────────────────────
+	// A $10/barrel move shifts US headline CPI by ~0.3–0.4pp.
+	// DCOILWTICO is a daily series — we use the latest observation.
+	// Energy sector earnings correlate directly with oil price level.
+	// TODO [SCRAPE]: EIA weekly petroleum inventories — no FRED equivalent.
+	// TODO [PAID]:   CME WTI futures curve for contango/backwardation signal.
+	oilRegime := "no_data"
+	var oilScore float64
+	if wti, ok := fredLatest("DCOILWTICO"); ok {
+		switch {
+		case wti >= ic.WTIInflationary:
+			oilRegime = "inflationary_risk"
+			oilScore = 1.0
+		case wti >= ic.WTIGoldilocksMax:
+			oilRegime = "elevated"
+			oilScore = 0.5
+		case wti >= ic.WTIGoldilocksMin:
+			oilRegime = "goldilocks"
+			oilScore = 0.0
+		case wti >= ic.WTIStress:
+			oilRegime = "low"
+			oilScore = -0.3
+		default:
+			oilRegime = "energy_sector_stress"
+			oilScore = -0.8
+		}
+		payload := map[string]any{
+			"regime":  oilRegime,
+			"score":   oilScore,
+			"wti_usd": math.Round(wti*100) / 100,
+			"series":  "DCOILWTICO",
+		}
+		// Brent crude for spread context (Brent-WTI = geopolitical risk premium).
+		if brent, ok2 := fredLatest("DCOILBRENTEU"); ok2 {
+			payload["brent_usd"] = math.Round(brent*100) / 100
+			payload["brent_wti_spread"] = math.Round((brent-wti)*100) / 100
+			// TODO [FUTURE]: Flag Brent-WTI spread > $5 as elevated geopolitical risk premium.
+		}
+		addScore(oilScore, 0.15)
+		upsert("inf_oil", ptr(wti), payload)
+	} else {
+		upsert("inf_oil", nil, map[string]any{"regime": oilRegime})
+	}
+
+	// ── Wages: AHE YoY % (CES0500000003) + ECI YoY % (ECIALLCIV) ────────────
+	// Wages are 60–70% of service sector costs. Wage growth above 3.5% in a
+	// 2% inflation target regime creates wage-price spiral risk.
+	// AHE is in the monthly NFP release (high frequency, volatile).
+	// ECI is quarterly — the Fed's preferred wage measure (smoother, broader).
+	wageRegime := "no_data"
+	var wageScore float64
+	if aheYoy, ok := yoyPct("CES0500000003"); ok {
+		// ECI for supplementary context (quarterly, only ~4 points/year).
+		var eciYoy *float64
+		if eci, ok2 := yoyPct("ECIALLCIV"); ok2 {
+			v := math.Round(eci*100) / 100
+			eciYoy = &v
+		}
+		// Use AHE as the primary signal; ECI as context.
+		switch {
+		case aheYoy >= ic.WageSpiral:
+			wageRegime = "spiral_risk"
+			wageScore = 1.0
+		case aheYoy >= ic.WageElevated:
+			wageRegime = "elevated"
+			wageScore = 0.6
+		case aheYoy >= ic.WageTargetMax:
+			wageRegime = "above_target"
+			wageScore = 0.3
+		case aheYoy >= 2.0:
+			wageRegime = "target_consistent"
+			wageScore = 0.0
+		default:
+			wageRegime = "soft"
+			wageScore = -0.3
+		}
+		payload := map[string]any{
+			"regime":      wageRegime,
+			"score":       wageScore,
+			"ahe_yoy_pct": math.Round(aheYoy*100) / 100,
+			"series_ahe":  "CES0500000003",
+			"series_eci":  "ECIALLCIV",
+		}
+		if eciYoy != nil {
+			payload["eci_yoy_pct"] = *eciYoy
+		}
+		addScore(wageScore, 0.15)
+		upsert("inf_wages", ptr(aheYoy), payload)
+	} else {
+		upsert("inf_wages", nil, map[string]any{"regime": wageRegime})
+	}
+
+	// ── Commodities: Copper (PCOPPUSDM — monthly, $/metric ton) ──────────────
+	// Copper is used in virtually every industrial process (construction, EVs,
+	// electronics). China = 55% of global demand → copper is a real-time barometer
+	// of Chinese and global industrial activity.
+	// Rising copper + rising iron ore + rising AUD = global expansion signal.
+	// TODO [PAID]: Iron ore price — no free FRED equivalent; LME data is paid.
+	//   Alternative proxy: AUD/USD (DEXUSAL on FRED) as "liquid copper proxy".
+	copperRegime := "no_data"
+	var copperScore float64
+	if copperYoy, ok := yoyPct("PCOPPUSDM"); ok {
+		switch {
+		case copperYoy >= ic.CopperExpansionYoY:
+			copperRegime = "global_expansion"
+			copperScore = 0.8
+		case copperYoy >= 0:
+			copperRegime = "stable"
+			copperScore = 0.2
+		case copperYoy >= ic.CopperContractionYoY:
+			copperRegime = "slowing"
+			copperScore = -0.3
+		default:
+			copperRegime = "global_contraction"
+			copperScore = -0.8
+		}
+		// Latest level for context.
+		var copperLevel *float64
+		if lvl, ok2 := fredLatest("PCOPPUSDM"); ok2 {
+			copperLevel = ptr(math.Round(lvl))
+		}
+		payload := map[string]any{
+			"regime":         copperRegime,
+			"score":          copperScore,
+			"copper_yoy_pct": math.Round(copperYoy*100) / 100,
+			"series":         "PCOPPUSDM",
+		}
+		if copperLevel != nil {
+			payload["copper_usd_per_ton"] = *copperLevel
+		}
+		addScore(copperScore, 0.10)
+		upsert("inf_copper", ptr(copperYoy), payload)
+	} else {
+		upsert("inf_copper", nil, map[string]any{"regime": copperRegime})
+	}
+
+	// ── Composite Inflation Stance ─────────────────────────────────────────────
+	// Weighted mean of all scored signals.
+	// +1.0 = maximum inflation pressure (bonds sell off, Fed hawkish, defensives outperform).
+	// -1.0 = deflation risk (demand collapse, bonds rally, gold and cash outperform).
+	// Weights: Core PCE 0.20 (Fed target), CPI 0.20, Wages 0.15, Oil 0.15,
+	//          Core CPI 0.10, PPI 0.10, Copper 0.10 = total 1.00 when all available.
+	infStanceScore := 0.0
+	weightSum := 0.0
+	for _, s := range scores {
+		infStanceScore += s.score * s.weight
+		weightSum += s.weight
+	}
+	var infStance string
+	var infStanceScorePtr *float64
+	if usedSignals == 0 {
+		infStance = "insufficient_data"
+		upsert("inf_stance", nil, map[string]any{
+			"stance":  infStance,
+			"signals": 0,
+		})
+	} else {
+		if weightSum > 0 {
+			infStanceScore /= weightSum
+		}
+		switch {
+		case infStanceScore >= ic.InflationHotScore:
+			infStance = "hot"
+		case infStanceScore <= ic.InflationDeflationScore:
+			infStance = "deflationary"
+		default:
+			infStance = "moderate"
+		}
+		infStanceScorePtr = ptr(infStanceScore)
+		upsert("inf_stance", infStanceScorePtr, map[string]any{
+			"stance":          infStance,
+			"score":           math.Round(infStanceScore*1000) / 1000,
+			"signals_used":    usedSignals,
+			"cpi_regime":      cpiRegime,
+			"core_cpi_regime": coreCPIRegime,
+			"core_pce_regime": corePCERegime,
+			"ppi_regime":      ppiRegime,
+			"oil_regime":      oilRegime,
+			"wage_regime":     wageRegime,
+			"copper_regime":   copperRegime,
+		})
+	}
+
+	// Store PPI-CPI spread separately for the bot's margin pressure display.
+	if ppiCPISpread != nil {
+		upsert("inf_ppi_cpi_spread", ppiCPISpread, map[string]any{
+			"spread_ppt":     *ppiCPISpread,
+			"warning_thresh": ic.PPICPISpreadWarn,
+		})
+	}
+
+	w.log.Info("inflation analysis complete",
+		"stance", infStance,
+		"score", fmt.Sprintf("%.3f", infStanceScore),
 		"signals", usedSignals,
 	)
 }
