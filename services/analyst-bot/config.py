@@ -59,6 +59,12 @@ class BotConfig(BaseSettings):
     discord_daily_report_channel_id: Optional[int] = None
     discord_alerts_channel_id: Optional[int] = None
     discord_commands_channel_id: Optional[int] = None
+    discord_actions_channel_id: Optional[int] = None
+
+    # ── Actions channel (actionable guidance — fires after every alert) ───────
+    bot_actions_enabled: bool = True
+    bot_actions_min_confluence: int = 2
+    bot_actions_cooldown_secs: int = 14400
 
     # ── Telegram (future — not yet wired) ────────────────────────────────────
     telegram_bot_token: str = ""

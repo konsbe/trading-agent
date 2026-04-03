@@ -23,6 +23,7 @@ from discord.ext import commands
 
 from notifier.discord import formatter
 from reports.builder import ReportBuilder
+from reports.models import AlertEvent
 
 # Path to the lexicon file, relative to this file's location in the container.
 # Dockerfile copies the entire service dir to /app, so bot.md lands at /app/bot.md.
@@ -258,3 +259,223 @@ class CommandsCog(commands.Cog):
         await ctx.respond(embed=embeds[0])
         for embed in embeds[1:]:
             await ctx.followup.send(embed=embed)
+
+    # ── /alert <symbol> ───────────────────────────────────────────────────────
+    @discord.slash_command(
+        name="alert",
+        description="Show current alert status for a symbol (bypasses cooldown — live check)",
+    )
+    @discord.option("symbol", description="Ticker symbol (e.g. AAPL, BTCUSDT, USO)")
+    @discord.option("asset_type", description="Asset type", choices=["equity", "crypto"], default="equity")
+    async def alert_cmd(
+        self,
+        ctx: discord.ApplicationContext,
+        symbol: str,
+        asset_type: str = "equity",
+    ) -> None:
+        await ctx.defer()
+        symbol = symbol.upper().strip()
+        cfg = self.bot.cfg
+
+        # Auto-detect crypto
+        if symbol in {s.strip().upper() for s in cfg.crypto_symbols}:
+            asset_type = "crypto"
+
+        exchange = "binance" if asset_type == "crypto" else "equity"
+        interval = cfg.bot_crypto_interval if asset_type == "crypto" else cfg.bot_equity_interval
+
+        from db.queries import technical as tech_q
+        indicators = await tech_q.latest_indicators(self.bot.pool, symbol, exchange, interval)
+
+        if not indicators:
+            await ctx.respond(f"❌ No indicator data found for **{symbol}**.")
+            return
+
+        triggered: list[str] = []
+        clear: list[str] = []
+
+        # RSI
+        rsi_val = (indicators.get("rsi_14") or {}).get("value")
+        if rsi_val is not None:
+            rsi_str = f"RSI 14 = **{rsi_val:.1f}**"
+            if rsi_val < cfg.bot_rsi_oversold:
+                triggered.append(f"🔴 `rsi_oversold` — {rsi_str} (threshold < {cfg.bot_rsi_oversold})")
+            elif rsi_val > cfg.bot_rsi_overbought:
+                triggered.append(f"🔴 `rsi_overbought` — {rsi_str} (threshold > {cfg.bot_rsi_overbought})")
+            else:
+                clear.append(f"✅ RSI 14 = {rsi_val:.1f} (normal range {cfg.bot_rsi_oversold}–{cfg.bot_rsi_overbought})")
+
+        # BB Squeeze
+        sq_val = (indicators.get("bb_squeeze") or {}).get("value")
+        if sq_val is not None:
+            if sq_val >= 1.0:
+                triggered.append(f"🔴 `bb_squeeze` — Bollinger Squeeze **ACTIVE** (value={sq_val:.2f})")
+            else:
+                clear.append(f"✅ BB Squeeze inactive (value={sq_val:.2f})")
+
+        # Liquidity sweep
+        liq_key = next((k for k in indicators if k.startswith("liquidity_sweep")), None)
+        if liq_key:
+            liq_val = (indicators.get(liq_key) or {}).get("value")
+            last_sweep = ((indicators.get(liq_key) or {}).get("payload") or {}).get("last_sweep") or {}
+            kind = last_sweep.get("kind", "")
+            if liq_val and liq_val > 0:
+                dir_str = f" — last: `{kind}`" if kind else ""
+                triggered.append(f"🔴 `liquidity_sweep` — **{int(liq_val)} sweeps** detected{dir_str}")
+            else:
+                clear.append("✅ No liquidity sweeps detected")
+
+        # VIX (equity only)
+        if asset_type == "equity":
+            vix_payload = (indicators.get("vix_regime") or {}).get("payload") or {}
+            vix_val = (indicators.get("vix_regime") or {}).get("value")
+            regime = vix_payload.get("regime", "")
+            if vix_val is not None:
+                vix_str = f"VIX = **{vix_val:.1f}**  regime: `{regime}`"
+                if vix_val > cfg.bot_vix_alert_threshold:
+                    triggered.append(f"🔴 `vix_elevated` — {vix_str} (threshold > {cfg.bot_vix_alert_threshold})")
+                else:
+                    clear.append(f"✅ {vix_str}")
+
+        color = 0xFF4444 if triggered else 0x00B050
+        title = f"🔔 Alert Check — {symbol}"
+        embed = discord.Embed(title=title, color=color)
+
+        if triggered:
+            embed.add_field(
+                name=f"⚠️  Triggered ({len(triggered)})",
+                value="\n".join(triggered),
+                inline=False,
+            )
+        if clear:
+            embed.add_field(
+                name="✅ Within Range",
+                value="\n".join(clear),
+                inline=False,
+            )
+
+        embed.set_footer(text="Live check — no cooldown applied. Scheduled alerts respect 4-hour cooldown.")
+        await ctx.respond(embed=embed)
+
+    # ── /action <symbol> ──────────────────────────────────────────────────────
+    @discord.slash_command(
+        name="action",
+        description="Run the actions engine for a symbol right now and show the result",
+    )
+    @discord.option("symbol", description="Ticker symbol (e.g. AAPL, BTCUSDT, USO)")
+    @discord.option("asset_type", description="Asset type", choices=["equity", "crypto"], default="equity")
+    async def action_cmd(
+        self,
+        ctx: discord.ApplicationContext,
+        symbol: str,
+        asset_type: str = "equity",
+    ) -> None:
+        await ctx.defer()
+        symbol = symbol.upper().strip()
+        cfg = self.bot.cfg
+
+        # Auto-detect crypto
+        if symbol in {s.strip().upper() for s in cfg.crypto_symbols}:
+            asset_type = "crypto"
+
+        exchange = "binance" if asset_type == "crypto" else "equity"
+        interval = cfg.bot_crypto_interval if asset_type == "crypto" else cfg.bot_equity_interval
+
+        from db.queries import technical as tech_q, fundamental as fa_q
+        from db.queries import ohlcv
+        from actions import formatter as action_formatter
+        from actions.rules import rsi as rsi_rule, bb_squeeze as sq_rule, liquidity_sweep as liq_rule
+
+        indicators = await tech_q.latest_indicators(self.bot.pool, symbol, exchange, interval)
+        if not indicators:
+            await ctx.respond(f"❌ No indicator data found for **{symbol}**.")
+            return
+
+        try:
+            fa = await fa_q.latest_derived(self.bot.pool, symbol)
+        except Exception:
+            fa = {}
+
+        # Build macro context
+        macro: dict = {}
+        try:
+            vix_val = await ohlcv.latest_macro(self.bot.pool, "VIXCLS")
+            if vix_val is not None:
+                macro["vix"] = float(vix_val)
+                if float(vix_val) > 35:
+                    macro["vix_regime"] = "extreme_fear"
+                elif float(vix_val) > 20:
+                    macro["vix_regime"] = "elevated"
+                elif float(vix_val) < 12:
+                    macro["vix_regime"] = "complacency"
+                else:
+                    macro["vix_regime"] = "normal"
+        except Exception:
+            pass
+
+        # Determine which rules to evaluate based on live indicator state
+        _RULE_CHECKS = [
+            ("rsi_oversold",    lambda ind: (ind.get("rsi_14") or {}).get("value", 999) < cfg.bot_rsi_oversold,   rsi_rule.evaluate),
+            ("rsi_overbought",  lambda ind: (ind.get("rsi_14") or {}).get("value", 0) > cfg.bot_rsi_overbought,   rsi_rule.evaluate),
+            ("bb_squeeze",      lambda ind: ((ind.get("bb_squeeze") or {}).get("value") or 0) >= 1.0,             sq_rule.evaluate),
+            ("liquidity_sweep", lambda ind: ((ind.get(next((k for k in ind if k.startswith("liquidity_sweep")), "x")) or {}).get("value") or 0) > 0, liq_rule.evaluate),
+        ]
+
+        embeds: list[discord.Embed] = []
+        watch_results: list[str] = []
+
+        for kind, check_fn, rule_fn in _RULE_CHECKS:
+            if not check_fn(indicators):
+                continue
+            try:
+                action, reasons, confluence = rule_fn(
+                    symbol=symbol,
+                    alert_type=kind,
+                    indicators=indicators,
+                    fa=fa,
+                    macro=macro,
+                )
+            except Exception as exc:
+                watch_results.append(f"⚠️  `{kind}` rule error: {exc}")
+                continue
+
+            if action in ("WATCH", "HOLD_WATCH"):
+                watch_results.append(
+                    f"⚪ `{kind}` → **{action}** (confluence {confluence}/{cfg.bot_actions_min_confluence}) — insufficient signals for directed action"
+                )
+                continue
+
+            embed = action_formatter.build_action_embed(
+                symbol=symbol,
+                alert_type=kind,
+                action=action,
+                reasons=reasons,
+                confluence=confluence,
+                min_confluence=cfg.bot_actions_min_confluence,
+                indicators=indicators,
+                fa=fa,
+                macro=macro,
+            )
+            embeds.append(embed)
+
+        if not embeds and not watch_results:
+            await ctx.respond(f"ℹ️  **{symbol}** — no alert thresholds are currently breached. No action to evaluate.")
+            return
+
+        if embeds:
+            await ctx.respond(embed=embeds[0])
+            for embed in embeds[1:]:
+                await ctx.followup.send(embed=embed)
+            if watch_results:
+                await ctx.followup.send(
+                    "**Also evaluated (watch-only, not posted to #actions):**\n" + "\n".join(watch_results)
+                )
+        else:
+            # Only watch results — show them
+            watch_embed = discord.Embed(
+                title=f"ℹ️  Action Check — {symbol}",
+                description="\n".join(watch_results),
+                color=0x808080,
+            )
+            watch_embed.set_footer(text="All triggered rules produced WATCH/HOLD_WATCH — no directed action.")
+            await ctx.respond(embed=watch_embed)

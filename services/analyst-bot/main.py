@@ -94,6 +94,7 @@ async def start() -> None:
         bot=bot,
         daily_report_channel_id=cfg.discord_daily_report_channel_id,
         alerts_channel_id=cfg.discord_alerts_channel_id,
+        actions_channel_id=cfg.discord_actions_channel_id,
     )
 
     # Add all active notifiers here — Telegram, X, mail, etc. in the future.

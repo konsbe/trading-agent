@@ -31,10 +31,12 @@ class DiscordNotifier(BaseNotifier):
         bot: discord.Bot,
         daily_report_channel_id: Optional[int],
         alerts_channel_id: Optional[int],
+        actions_channel_id: Optional[int] = None,
     ) -> None:
         self._bot = bot
         self._daily_report_channel_id = daily_report_channel_id
         self._alerts_channel_id = alerts_channel_id
+        self._actions_channel_id = actions_channel_id
 
     @property
     def name(self) -> str:
@@ -70,6 +72,17 @@ class DiscordNotifier(BaseNotifier):
             log.info("alert sent kind=%s symbol=%s", alert.kind, alert.symbol)
         except Exception as exc:
             log.error("failed to send alert to Discord: %s", exc)
+
+    async def send_action(self, channel_id: Optional[int], embed: discord.Embed) -> None:
+        """Send an action embed to the #actions channel."""
+        channel = self._get_channel(channel_id or self._actions_channel_id)
+        if not channel:
+            log.debug("actions channel not found — action embed not sent")
+            return
+        try:
+            await channel.send(embed=embed)
+        except Exception as exc:
+            log.error("failed to send action to Discord: %s", exc)
 
     # ── Helpers ───────────────────────────────────────────────────────────────
 
