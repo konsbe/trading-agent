@@ -35,7 +35,7 @@ These appear on the price title and the trend field.
 `/analyze symbol:AAPL asset_type:equity` — Full deep-dive: price → technical → Tier 1 fundamentals → 🏦 Tier 2 balance sheet → 🔍 Tier 3 deep context → news
 `/report` — Triggers the daily market report on demand (same as the 07:00 scheduled job)
 `/dictionary` — Sends this glossary as paginated Discord embeds
-`/status` — Bot health: DB ✅/❌, Redis ✅/❌, scheduler jobs, configured symbols; macro-intel table row counts; latest **`mc_market_cycle`** / **`mc_macro_correlation`** timestamps in **`macro_derived`**
+`/status` — Bot health: DB ✅/❌, Redis ✅/❌, scheduler jobs, configured symbols; macro-intel table row counts; latest **`mc_market_cycle`** / **`mc_macro_correlation`** / **`aa_reference_snapshot`** timestamps in **`macro_derived`**
 `/ping` — Bot latency in milliseconds
 
 `asset_type` dropdown: `equity` for stocks/ETFs, `crypto` for crypto pairs. Defaults to `equity`.
@@ -1362,15 +1362,33 @@ The worker reads the **latest payloads** for stances/regimes already upserted in
 
 **Daily report:** Discord embed **Macro correlations** (after **Market cycle**). **Missing data** → grey card with rebuild/env hints.
 
+### Additional analysis embed (after Macro correlations)
+
+**Storage:** same **`macro_derived`** / **`macro_analysis`** source — **no new table**.  
+**Metric:** **`aa_reference_snapshot`** — end of **`macro-analysis`** when **`ADDITIONAL_ANALYSIS_ENABLE=true`** (default).
+
+**v1 scope** (from **`additional_analysis_reference.html`**; most tabs remain reference-only until new data feeds exist):
+
+| Block | What it is |
+|--------|------------|
+| **Bond–equity (60d)** | Pearson **ρ** of benchmark **daily log returns** vs **Δ FRED `DGS10`** (forward-filled). Regimes: `deflationary_hedge` / `inflationary_positive` / `transition_neutral`. |
+| **Oil–equity (60d)** | Same vs **Δ `DCOILWTICO`** (WTI). Regimes: `procyclical` / `decoupled` / `neutral_mixed`. |
+| **VIX–equity (60d)** | Same vs **Δ `VIXCLS`**. Regimes: `typical_fear_greed` / `unusual_positive` / `compressed_link`. |
+| **Month seasonality** | **Static almanac** per calendar month (tie-breaker only). |
+| **Presidential cycle** | **Year 1–4** of the US election cycle + short narrative. |
+| **HTML coverage** | Every tab from **`additional_analysis_reference.html`** is listed with **`live_*` / `needs_data` / `not_automated`** — honest scope (sentiment, flow, alt data, events, pairs are **not** computed yet). |
+
+**Daily report:** embed **Additional analysis · intermarket & calendars** (+ **HTML coverage** field). **Missing row** → grey card (rebuild **macro-analysis**; **`macro_fred`** needs **DGS10**, **DCOILWTICO**, **VIXCLS** per `.env.example` **FRED_SERIES_IDS**).
+
 ### `/analyze` context strip (after price)
 
-**Symbol reports** show the **price** embed first, then a compact **Context vs \<benchmark\>** embed when any of: benchmark **composite/price** phase or drawdown (`mc_market_cycle`), **macro correlation** regime (`mc_macro_correlation`), or (equities only) **20-session excess return vs benchmark** is available.
+**Symbol reports** show the **price** embed first, then a compact **Context vs \<benchmark\>** embed when any of: benchmark **composite/price** phase or drawdown (`mc_market_cycle`), **macro correlation** regime (`mc_macro_correlation`), a one-line **additional context** summary (`aa_reference_snapshot`: bond–equity ρ, month bias, cycle year), or (equities only) **20-session excess return vs benchmark** is available.
 
 - **Benchmark symbol** matches **`MARKET_CYCLE_SYMBOL`** on the bot (`market_cycle_symbol` in config, default **SPY**) so it stays aligned with the index used for **`mc_market_cycle`**.
 - **Crypto** symbols get benchmark + macro regime only (no vs-benchmark RS from `equity_ohlcv`).
 - Cached **`/analyze`** responses include **`analyze_context`** in the Redis payload (see `ReportBuilder._serialise_symbol_report`).
 
-Discord **`/status`** lists **latest `ts`** per metric for **`mc_market_cycle`** and **`mc_macro_correlation`** under **Macro derived (latest ts)** when the DB query succeeds.
+Discord **`/status`** lists **latest `ts`** for **`mc_market_cycle`**, **`mc_macro_correlation`**, and **`aa_reference_snapshot`** under **Macro derived (latest ts)** when the DB query succeeds.
 
 ---
 

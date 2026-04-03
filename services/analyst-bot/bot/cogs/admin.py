@@ -44,7 +44,8 @@ class AdminCog(commands.Cog):
                     inline=False,
                 )
             try:
-                mc_rows = await conn.fetch(
+                # Use the pool here — `conn` from the acquire() above is already released.
+                mc_rows = await self.bot.pool.fetch(
                     """
                     SELECT metric, MAX(ts) AS latest
                     FROM macro_derived
@@ -53,7 +54,7 @@ class AdminCog(commands.Cog):
                     GROUP BY metric
                     ORDER BY metric
                     """,
-                    ["mc_market_cycle", "mc_macro_correlation"],
+                    ["mc_market_cycle", "mc_macro_correlation", "aa_reference_snapshot"],
                 )
                 if mc_rows:
                     mc_lines = [

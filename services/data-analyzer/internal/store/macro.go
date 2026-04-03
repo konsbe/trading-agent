@@ -38,6 +38,29 @@ func QueryMacroFredLatest(ctx context.Context, pool *pgxpool.Pool, seriesID stri
 
 // QueryMacroFredSeries returns the last `limit` observations (newest-first) for
 // a FRED series. Use this for trend / period-over-period comparisons.
+// QueryMacroFredRangeAsc returns FRED observations for seriesID with ts in [from, to], oldest first.
+func QueryMacroFredRangeAsc(ctx context.Context, pool *pgxpool.Pool, seriesID string, from, to time.Time) ([]MacroObs, error) {
+	rows, err := pool.Query(ctx,
+		`SELECT ts, value FROM macro_fred
+		 WHERE series_id = $1 AND ts >= $2 AND ts <= $3
+		 ORDER BY ts ASC`,
+		seriesID, from, to)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var result []MacroObs
+	for rows.Next() {
+		var o MacroObs
+		if err := rows.Scan(&o.TS, &o.Value); err != nil {
+			return nil, err
+		}
+		result = append(result, o)
+	}
+	return result, rows.Err()
+}
+
 func QueryMacroFredSeries(ctx context.Context, pool *pgxpool.Pool, seriesID string, limit int) ([]MacroObs, error) {
 	rows, err := pool.Query(ctx,
 		`SELECT ts, value FROM macro_fred

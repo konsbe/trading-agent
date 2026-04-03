@@ -1403,6 +1403,117 @@ def macro_macro_correlation_embed(macro: MacroSnapshot) -> Optional[discord.Embe
     return embed
 
 
+def macro_additional_analysis_embed(macro: MacroSnapshot) -> Optional[discord.Embed]:
+    """aa_reference_snapshot: bond–equity correlation, static month seasonality, presidential cycle."""
+    add = macro.additional
+    if add is None:
+        return discord.Embed(
+            title="📚 Additional analysis — data missing",
+            description=(
+                "No **`aa_reference_snapshot`** in **`macro_derived`** yet.\n\n"
+                "• Rebuild & restart **`macro-analysis`** (additional-analysis pass).\n"
+                "• **`ADDITIONAL_ANALYSIS_ENABLE=true`** (default) · needs **`equity_ohlcv`** for "
+                "`MARKET_CYCLE_SYMBOL` and **`macro_fred`** **DGS10**, **DCOILWTICO**, **VIXCLS**.\n\n"
+                "_Full HTML includes sentiment/flow/alt data — only automatable slices are computed._"
+            ),
+            color=COLOR_GREY,
+        )
+
+    embed = discord.Embed(
+        title="📚 Additional analysis · intermarket & calendars",
+        description=(
+            "_Reference doc tabs: live vs **needs_data** is listed under **HTML coverage** below._"
+        ),
+        color=COLOR_PURPLE,
+    )
+
+    if add.bond_equity_insufficient:
+        embed.add_field(
+            name="Bond–equity (60d rolling)",
+            value="Insufficient overlapping **SPY** (or benchmark) bars and **DGS10** — check ingestion.",
+            inline=False,
+        )
+    elif add.bond_equity_corr_60d is not None:
+        obs = add.bond_equity_observations
+        obs_s = f"{obs} obs" if obs is not None else "—"
+        reg = (add.bond_equity_regime or "—").replace("_", " ")
+        embed.add_field(
+            name="Bond–equity (60d rolling)",
+            value=(
+                f"ρ ≈ **{_num(add.bond_equity_corr_60d, 3)}** · regime **{reg}** ({obs_s})\n"
+                f"{_trunc(add.bond_equity_label or '', 900)}"
+            ),
+            inline=False,
+        )
+
+    if add.oil_equity_insufficient:
+        embed.add_field(
+            name="Oil–equity (60d rolling)",
+            value="Insufficient **DCOILWTICO** or bars for this window.",
+            inline=False,
+        )
+    elif add.oil_equity_corr_60d is not None:
+        reg = (add.oil_equity_regime or "—").replace("_", " ")
+        embed.add_field(
+            name="Oil–equity (60d · WTI)",
+            value=(
+                f"ρ ≈ **{_num(add.oil_equity_corr_60d, 3)}** · **{reg}**\n"
+                f"{_trunc(add.oil_equity_label or '', 900)}"
+            ),
+            inline=False,
+        )
+
+    if add.vix_equity_insufficient:
+        embed.add_field(
+            name="VIX–equity (60d rolling)",
+            value="Insufficient **VIXCLS** or bars for this window.",
+            inline=False,
+        )
+    elif add.vix_equity_corr_60d is not None:
+        reg = (add.vix_equity_regime or "—").replace("_", " ")
+        embed.add_field(
+            name="VIX–equity (60d)",
+            value=(
+                f"ρ ≈ **{_num(add.vix_equity_corr_60d, 3)}** · **{reg}**\n"
+                f"{_trunc(add.vix_equity_label or '', 900)}"
+            ),
+            inline=False,
+        )
+
+    if add.seasonality_month_name:
+        embed.add_field(
+            name="Month seasonality (almanac)",
+            value=_trunc(
+                f"**{add.seasonality_month_name}** — **{add.seasonality_bias or '—'}**\n"
+                f"{add.seasonality_note or ''}\n"
+                "_Static reference tilt — tie-breaker only._",
+                1020,
+            ),
+            inline=False,
+        )
+
+    if add.presidential_cycle_year is not None:
+        pl = (add.presidential_label or "—").replace("_", " ")
+        embed.add_field(
+            name="Presidential cycle",
+            value=_trunc(
+                f"Year **{add.presidential_cycle_year}** of 4 — **{pl}**\n{add.presidential_note or ''}",
+                1020,
+            ),
+            inline=False,
+        )
+
+    if add.reference_coverage_lines:
+        embed.add_field(
+            name="HTML coverage (automation status)",
+            value=_trunc("\n".join(f"• {ln}" for ln in add.reference_coverage_lines[:10]), 1020),
+            inline=False,
+        )
+
+    embed.set_footer(text="aa_reference_snapshot · ADDITIONAL_ANALYSIS_* · additional_analysis_reference.html")
+    return embed
+
+
 def analyze_context_embed(ctx: AnalyzeContextSnapshot) -> Optional[discord.Embed]:
     """Compact backdrop for /analyze: benchmark cycle, macro regime, optional vs-benchmark RS."""
     if not (
@@ -1410,6 +1521,7 @@ def analyze_context_embed(ctx: AnalyzeContextSnapshot) -> Optional[discord.Embed
         or ctx.benchmark_price_phase
         or ctx.macro_corr_regime
         or ctx.rs_20d_vs_benchmark_pct is not None
+        or ctx.additional_summary_line
     ):
         return None
 
@@ -1444,7 +1556,14 @@ def analyze_context_embed(ctx: AnalyzeContextSnapshot) -> Optional[discord.Embed
             inline=False,
         )
 
-    embed.set_footer(text="mc_market_cycle · mc_macro_correlation · equity_ohlcv")
+    if ctx.additional_summary_line:
+        embed.add_field(
+            name="Additional context",
+            value=_trunc(ctx.additional_summary_line, 1020),
+            inline=False,
+        )
+
+    embed.set_footer(text="mc_market_cycle · mc_macro_correlation · aa_reference_snapshot · equity_ohlcv")
     return embed
 
 
@@ -1590,6 +1709,11 @@ def daily_report_embeds(report: DailyReport) -> list[discord.Embed]:
         mcc_embed = macro_macro_correlation_embed(report.macro)
         if mcc_embed:
             embeds.append(mcc_embed)
+
+    if report.macro:
+        aa_embed = macro_additional_analysis_embed(report.macro)
+        if aa_embed:
+            embeds.append(aa_embed)
 
     if report.macro_intel:
         mi_embed = macro_intel_embed(report.macro_intel)
