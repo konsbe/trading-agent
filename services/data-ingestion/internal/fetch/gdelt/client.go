@@ -3,11 +3,14 @@
 package gdelt
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/konsbe/trading-agent/services/data-ingestion/internal/httpclient"
@@ -43,6 +46,7 @@ func (c *Client) FetchArtList(ctx context.Context, query string, maxRecords int,
 	if maxRecords <= 0 {
 		maxRecords = 100
 	}
+	// GDELT requires STARTDATETIME/ENDDATETIME as YYYYMMDDHHMMSS (14 digits), not 12.
 	end := time.Now().UTC()
 	start := end.Add(-lookback)
 	q := url.Values{}
@@ -50,8 +54,8 @@ func (c *Client) FetchArtList(ctx context.Context, query string, maxRecords int,
 	q.Set("mode", "ArtList")
 	q.Set("format", "json")
 	q.Set("maxrecords", fmt.Sprintf("%d", maxRecords))
-	q.Set("STARTDATETIME", start.Format("200601021504"))
-	q.Set("ENDDATETIME", end.Format("200601021504"))
+	q.Set("STARTDATETIME", start.Format("20060102150405"))
+	q.Set("ENDDATETIME", end.Format("20060102150405"))
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, docAPI+"?"+q.Encode(), nil)
 	if err != nil {
@@ -62,14 +66,30 @@ func (c *Client) FetchArtList(ctx context.Context, query string, maxRecords int,
 		return nil, err
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("gdelt: %s", resp.Status)
-	}
-	var out ArtListResult
-	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
 		return nil, err
 	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("gdelt: %s — %s", resp.Status, trimErrBody(body))
+	}
+	b := bytes.TrimSpace(body)
+	if len(b) == 0 || b[0] != '{' {
+		return nil, fmt.Errorf("gdelt: non-JSON body: %s", trimErrBody(body))
+	}
+	var out ArtListResult
+	if err := json.Unmarshal(b, &out); err != nil {
+		return nil, fmt.Errorf("gdelt json: %w", err)
+	}
 	return &out, nil
+}
+
+func trimErrBody(b []byte) string {
+	s := strings.TrimSpace(string(b))
+	if len(s) > 240 {
+		return s[:240] + "…"
+	}
+	return s
 }
 
 // AggregateTone returns count, average tone, average Goldstein scale.

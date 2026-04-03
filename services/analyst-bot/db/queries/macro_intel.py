@@ -13,6 +13,34 @@ from typing import Optional
 
 import asyncpg
 
+# For /status — table names match migration 006_macro_intel.sql + news_headlines.
+_MACRO_INTEL_COUNTS: list[tuple[str, str]] = [
+    ("economic_calendar_events", "SELECT COUNT(*) FROM economic_calendar_events"),
+    ("earnings_calendar_events", "SELECT COUNT(*) FROM earnings_calendar_events"),
+    ("geopolitical_risk_monthly", "SELECT COUNT(*) FROM geopolitical_risk_monthly"),
+    ("gdelt_macro_daily", "SELECT COUNT(*) FROM gdelt_macro_daily"),
+    ("narrative_scores", "SELECT COUNT(*) FROM narrative_scores"),
+    (
+        "macro_news_headlines",
+        """
+        SELECT COUNT(*) FROM news_headlines
+        WHERE source LIKE 'rss_macro_%' OR source = 'finnhub_macro_general'
+        """,
+    ),
+]
+
+
+async def ingestion_health_snapshot(pool: asyncpg.Pool) -> dict[str, str]:
+    """Row counts for macro-intel-related tables. Use /status in Discord."""
+    out: dict[str, str] = {}
+    for label, sql in _MACRO_INTEL_COUNTS:
+        try:
+            n = await pool.fetchval(sql)
+            out[label] = str(int(n))
+        except Exception:
+            out[label] = "n/a"
+    return out
+
 
 async def upcoming_economic_events(
     pool: asyncpg.Pool,

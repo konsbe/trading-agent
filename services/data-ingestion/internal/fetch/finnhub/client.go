@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/konsbe/trading-agent/services/data-ingestion/internal/httpclient"
@@ -398,14 +400,14 @@ func (c *Client) CalendarEconomic(ctx context.Context, from, to string) ([]map[s
 		return nil, err
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("finnhub calendar-economic: %s", resp.Status)
-	}
-	var raw map[string]any
-	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
 		return nil, err
 	}
-	return sliceMap(raw, "economicCalendar")
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("finnhub calendar-economic: %s — %s", resp.Status, trimAPIErr(body))
+	}
+	return decodeCalendarEventsJSON(body, "economicCalendar")
 }
 
 // CalendarEarnings fetches earnings calendar in [from, to]. Optional symbol filters to one ticker.
@@ -433,18 +435,52 @@ func (c *Client) CalendarEarnings(ctx context.Context, from, to, symbol string) 
 		return nil, err
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("finnhub calendar-earnings: %s", resp.Status)
-	}
-	var raw map[string]any
-	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
 		return nil, err
 	}
-	out, err := sliceMap(raw, "earningsCalendar")
-	if err == nil && len(out) > 0 {
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("finnhub calendar-earnings: %s — %s", resp.Status, trimAPIErr(body))
+	}
+	out, err := decodeCalendarEventsJSON(body, "earningsCalendar")
+	if err != nil {
+		return nil, err
+	}
+	if len(out) > 0 {
 		return out, nil
 	}
-	return sliceMap(raw, "data")
+	return decodeCalendarEventsJSON(body, "data")
+}
+
+// decodeCalendarEventsJSON accepts either { "economicCalendar": [...] } or a raw JSON array.
+func decodeCalendarEventsJSON(body []byte, objectArrayKey string) ([]map[string]any, error) {
+	var raw map[string]any
+	if err := json.Unmarshal(body, &raw); err != nil {
+		var asArr []map[string]any
+		if err2 := json.Unmarshal(body, &asArr); err2 != nil {
+			return nil, fmt.Errorf("calendar json: %w", err)
+		}
+		return asArr, nil
+	}
+	out, _ := sliceMap(raw, objectArrayKey)
+	if len(out) > 0 {
+		return out, nil
+	}
+	// Some error payloads are objects without the expected key — return empty, not nil decode error.
+	if objectArrayKey == "earningsCalendar" {
+		if alt, _ := sliceMap(raw, "data"); len(alt) > 0 {
+			return alt, nil
+		}
+	}
+	return out, nil
+}
+
+func trimAPIErr(b []byte) string {
+	s := strings.TrimSpace(string(b))
+	if len(s) > 200 {
+		return s[:200] + "…"
+	}
+	return s
 }
 
 // MarketNews fetches Finnhub market news by category: general, forex, crypto, merger.

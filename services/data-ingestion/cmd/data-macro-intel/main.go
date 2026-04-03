@@ -104,14 +104,22 @@ func runEconomicCalendar(ctx context.Context, log *slog.Logger, pool *pgxpool.Po
 		return
 	}
 	for _, m := range items {
-		eventName, _ := m["event"].(string)
+		eventName := firstNonEmpty(
+			finnhubString(m["event"]),
+			finnhubString(m["name"]),
+			finnhubString(m["indicator"]),
+			finnhubString(m["eventName"]),
+		)
 		if eventName == "" {
 			continue
 		}
 		country, _ := m["country"].(string)
 		impact, _ := m["impact"].(string)
 		unit, _ := m["unit"].(string)
-		eventTS := parseFinnhubTime(m)
+		eventTS, ok := parseEconomicEventTime(m)
+		if !ok {
+			continue
+		}
 		act := finnhubFloat(m["actual"])
 		est := finnhubFloat(m["estimate"])
 		prev := finnhubFloat(m["prev"])
@@ -248,23 +256,48 @@ func runGDELT(ctx context.Context, log *slog.Logger, pool *pgxpool.Pool, c *gdel
 	log.Info("gdelt daily aggregate", "articles", n, "avg_tone", avgT)
 }
 
-func parseFinnhubTime(m map[string]any) time.Time {
+// parseEconomicEventTime resolves Finnhub economic calendar timestamps. Missing/invalid time → ok=false
+// (avoids storing all events at "now").
+func parseEconomicEventTime(m map[string]any) (time.Time, bool) {
 	if t, ok := m["time"].(float64); ok {
 		sec := int64(t)
 		if sec > 1e12 {
 			sec /= 1000
 		}
-		return time.Unix(sec, 0).UTC()
+		return time.Unix(sec, 0).UTC(), true
 	}
-	if s, ok := m["time"].(string); ok {
-		layouts := []string{"2006-01-02 15:04:05", "2006-01-02T15:04:05", time.RFC3339, "2006-01-02"}
+	if s, ok := m["time"].(string); ok && strings.TrimSpace(s) != "" {
+		layouts := []string{
+			time.RFC3339, "2006-01-02 15:04:05", "2006-01-02T15:04:05",
+			"2006-01-02T15:04:05Z07:00", "2006-01-02",
+		}
 		for _, ly := range layouts {
-			if tt, err := time.Parse(ly, s); err == nil {
-				return tt.UTC()
+			if tt, err := time.Parse(ly, strings.TrimSpace(s)); err == nil {
+				return tt.UTC(), true
 			}
 		}
 	}
-	return time.Now().UTC()
+	if ds, ok := m["date"].(string); ok {
+		ds = strings.TrimSpace(ds)
+		if ds == "" {
+			return time.Time{}, false
+		}
+		for _, ly := range []string{"2006-01-02", "2006-01-02 15:04:05"} {
+			if d, err := time.Parse(ly, ds); err == nil {
+				return d.UTC(), true
+			}
+		}
+	}
+	return time.Time{}, false
+}
+
+func firstNonEmpty(ss ...string) string {
+	for _, s := range ss {
+		if strings.TrimSpace(s) != "" {
+			return strings.TrimSpace(s)
+		}
+	}
+	return ""
 }
 
 func finnhubFloat(v any) *float64 {

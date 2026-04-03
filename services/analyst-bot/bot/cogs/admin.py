@@ -1,7 +1,7 @@
 """
 Admin cog — operational commands for bot operators.
 
-/status  — Show bot health: DB connectivity, Redis, scheduler jobs, symbols configured
+/status  — DB, Redis, scheduler, symbols, and macro-intel table row counts
 /ping    — Latency check
 """
 import logging
@@ -27,6 +27,22 @@ class AdminCog(commands.Cog):
             async with self.bot.pool.acquire() as conn:
                 await conn.fetchval("SELECT 1")
             embed.add_field(name="Database", value="✅ Connected", inline=True)
+            try:
+                from db.queries import macro_intel as _mi
+
+                counts = await _mi.ingestion_health_snapshot(self.bot.pool)
+                lines = [f"`{k}`: {v}" for k, v in counts.items()]
+                embed.add_field(
+                    name="Macro intel tables (rows)",
+                    value="\n".join(lines)[:1020],
+                    inline=False,
+                )
+            except Exception as mi_exc:
+                embed.add_field(
+                    name="Macro intel tables",
+                    value=f"⚠️ {mi_exc}",
+                    inline=False,
+                )
         except Exception as exc:
             embed.add_field(name="Database", value=f"❌ {exc}", inline=True)
 
