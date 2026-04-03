@@ -904,7 +904,7 @@ def macro_growth_embed(macro: MacroSnapshot) -> Optional[discord.Embed]:
     Returns None when no growth signals are available yet.
     """
     has_data = any([
-        macro.gc_stance,
+        macro.gc_stance and macro.gc_stance != "insufficient_data",
         macro.gc_pmi,
         macro.gc_gdp_ann_pct,
         macro.gc_payrolls_k,
@@ -1052,7 +1052,7 @@ def macro_inflation_embed(macro: MacroSnapshot) -> Optional[discord.Embed]:
     Returns None when no inflation signals are available yet.
     """
     has_data = any([
-        macro.inf_stance,
+        macro.inf_stance and macro.inf_stance != "insufficient_data",
         macro.inf_cpi_yoy,
         macro.inf_core_pce_yoy,
         macro.inf_wti,

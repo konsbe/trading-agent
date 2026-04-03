@@ -73,7 +73,7 @@ class BotConfig(BaseSettings):
     bot_report_on_startup: bool = True
     # Seconds to wait after on_ready before sending the startup report.
     # Gives the scheduler and connection pool time to fully settle.
-    bot_report_on_startup_delay: int = 5
+    bot_report_on_startup_delay: int = 30
 
     # ── Alert thresholds ─────────────────────────────────────────────────────
     bot_rsi_oversold: float = 30.0
