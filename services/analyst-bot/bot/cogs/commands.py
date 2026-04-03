@@ -9,6 +9,7 @@ Commands:
   /price      <symbol> [asset_type]  — Latest price bar
   /signals    <symbol> [asset_type]  — Key signals summary (fast, one embed)
   /analyze    <symbol> [asset_type]  — Full TA + FA + sentiment (multi-embed)
+  /marketops  [symbol] [asset_type]  — Vol regime (VIX) + Module 5 coverage; optional symbol execution strip
   /report                            — Trigger the daily report on-demand
   /dictionary                        — Glossary of every symbol & label the bot uses
 """
@@ -87,6 +88,20 @@ def _dictionary_embeds() -> list[discord.Embed]:
     return embeds
 
 log = logging.getLogger(__name__)
+
+
+def _marketops_asset_type(symbol: Optional[str], asset_type: str, cfg) -> str:
+    """Default slash choice is equity — infer crypto for configured / USDT-style pairs."""
+    if not symbol or asset_type != "equity":
+        return asset_type
+    sym = symbol.strip().upper()
+    if sym in {s.strip().upper() for s in cfg.crypto_symbols}:
+        return "crypto"
+    for suf in ("USDT", "USDC", "BUSD", "PERP"):
+        if sym.endswith(suf) and len(sym) > len(suf):
+            return "crypto"
+    return asset_type
+
 
 class CommandsCog(commands.Cog):
     def __init__(self, bot) -> None:
@@ -187,6 +202,35 @@ class CommandsCog(commands.Cog):
         await ctx.respond(embed=embeds[0])
         for embed in embeds[1:10]:  # max 10 embeds
             await ctx.followup.send(embed=embed)
+
+    @discord.slash_command(
+        name="marketops",
+        description="Market operations: VIX regime + HTML automation status; optional symbol ATR% / volume context",
+    )
+    @discord.option(
+        "symbol",
+        description="Optional ticker — adds per-symbol execution strip (e.g. AAPL, BTCUSDT)",
+        required=False,
+        default=None,
+    )
+    @discord.option(
+        "asset_type",
+        description="When symbol is set (default equity); BTCUSDT / BOT_CRYPTO_SYMBOLS auto-use crypto",
+        choices=["equity", "crypto"],
+        default="equity",
+    )
+    async def marketops_cmd(
+        self,
+        ctx: discord.ApplicationContext,
+        symbol: Optional[str] = None,
+        asset_type: str = "equity",
+    ) -> None:
+        await ctx.defer(ephemeral=False)
+        sym = symbol.strip().upper() if symbol else None
+        at = _marketops_asset_type(sym, asset_type, self.bot.cfg)
+        mo = await self.bot.builder.build_market_ops_view(sym, at)
+        embed = formatter.market_ops_command_embed(mo, sym)
+        await ctx.respond(embed=embed)
 
     @discord.slash_command(name="report", description="Generate the daily market report right now")
     async def report_cmd(self, ctx: discord.ApplicationContext) -> None:

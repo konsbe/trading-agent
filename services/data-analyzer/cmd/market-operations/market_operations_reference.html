@@ -1,0 +1,2162 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Market Operations — Module 5</title>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Epilogue:wght@300;400;500;600;700;800&family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Inconsolata:wght@300;400;500&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --bg: #fffeee;
+            --bg2: #fffeee;
+            --bg3: #fffeee;
+            --bg4: #fffeee;
+            --bg5: #1c2029;
+            --border: #181b23;
+            --border2: #1f2330;
+            --border3: #273040;
+            --text: #060709;
+            --text2: #060709;
+            --text3: #384050;
+            --v1: #e879f9;
+            --v1d: #1a0520;
+            --v1b: #f0abfc;
+            --v2: #34d399;
+            --v2d: #002818;
+            --v2b: #6ee7b7;
+            --v3: #f59e0b;
+            --v3d: #1c1200;
+            --v3b: #fcd34d;
+            --v4: #60a5fa;
+            --v4d: #0a1a30;
+            --v4b: #93c5fd;
+            --v5: #fb7185;
+            --v5d: #200810;
+            --v5b: #fda4af;
+        }
+
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0
+        }
+
+        body {
+            font-family: 'Epilogue', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            font-size: 14px;
+            line-height: 1.6;
+            min-height: 100vh
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background: radial-gradient(ellipse 50% 25% at 0% 50%, rgba(232, 121, 249, .04) 0%, transparent 60%), radial-gradient(ellipse 40% 20% at 100% 20%, rgba(52, 211, 153, .04) 0%, transparent 60%);
+            pointer-events: none;
+            z-index: 0
+        }
+
+        /* HEADER */
+        .hdr {
+            padding: 44px 36px 28px;
+            border-bottom: 1px solid var(--border2);
+            position: relative;
+            z-index: 1
+        }
+
+        .eye {
+            font-family: 'Inconsolata', monospace;
+            font-size: 10px;
+            letter-spacing: .2em;
+            text-transform: uppercase;
+            color: var(--v1);
+            margin-bottom: 10px;
+            opacity: .8
+        }
+
+        .hdr h1 {
+            font-size: 38px;
+            font-weight: 800;
+            line-height: .95;
+            letter-spacing: -.03em;
+            margin-bottom: 8px
+        }
+
+        .hdr h1 .it {
+            font-family: 'Cormorant Garamond', serif;
+            font-style: italic;
+            font-weight: 400;
+            font-size: 44px;
+            color: var(--v1)
+        }
+
+        .hdr-sub {
+            font-size: 13px;
+            color: var(--text2);
+            font-weight: 300;
+            margin-top: 8px
+        }
+
+        /* NAV */
+        .nav {
+            display: flex;
+            padding: 0 36px;
+            border-bottom: 1px solid var(--border2);
+            overflow-x: auto;
+            position: relative;
+            z-index: 1
+        }
+
+        .nav::-webkit-scrollbar {
+            height: 2px
+        }
+
+        .nav::-webkit-scrollbar-thumb {
+            background: var(--border3)
+        }
+
+        .ntab {
+            padding: 12px 18px;
+            font-size: 10px;
+            font-family: 'Inconsolata', monospace;
+            font-weight: 500;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+            cursor: pointer;
+            border: none;
+            background: none;
+            color: var(--text3);
+            border-bottom: 2px solid transparent;
+            transition: all .14s;
+            white-space: nowrap;
+            flex-shrink: 0
+        }
+
+        .ntab:hover {
+            color: var(--text2)
+        }
+
+        .ntab.active {
+            border-bottom-color: var(--v1);
+            color: var(--v1)
+        }
+
+        /* The tab accent color changes per section */
+        .ntab[data-sec="pos"].active {
+            color: var(--v1);
+            border-bottom-color: var(--v1)
+        }
+
+        .ntab[data-sec="vol"].active {
+            color: var(--v2);
+            border-bottom-color: var(--v2)
+        }
+
+        .ntab[data-sec="liq"].active {
+            color: var(--v3);
+            border-bottom-color: var(--v3)
+        }
+
+        .ntab[data-sec="risk"].active {
+            color: var(--v4);
+            border-bottom-color: var(--v4)
+        }
+
+        .ntab[data-sec="mkt"].active {
+            color: var(--v5);
+            border-bottom-color: var(--v5)
+        }
+
+        /* PANELS */
+        .panel {
+            display: none;
+            padding: 26px 36px 56px;
+            position: relative;
+            z-index: 1
+        }
+
+        .panel.active {
+            display: block
+        }
+
+        /* SECTION ACCENT LINE */
+        .panel[id="panel-pos"] .sacc {
+            border-color: var(--v1d);
+            color: var(--v1b)
+        }
+
+        .panel[id="panel-vol"] .sacc {
+            border-color: var(--v2d);
+            color: var(--v2b)
+        }
+
+        .panel[id="panel-liq"] .sacc {
+            border-color: var(--v3d);
+            color: var(--v3b)
+        }
+
+        .panel[id="panel-risk"] .sacc {
+            border-color: var(--v4d);
+            color: var(--v4b)
+        }
+
+        .panel[id="panel-mkt"] .sacc {
+            border-color: var(--v5d);
+            color: var(--v5b)
+        }
+
+        /* TIER */
+        .tier {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            margin: 26px 0 10px
+        }
+
+        .tier:first-of-type {
+            margin-top: 0
+        }
+
+        .tier-txt {
+            font-family: 'Inconsolata', monospace;
+            font-size: 9px;
+            letter-spacing: .12em;
+            text-transform: uppercase;
+            color: var(--text3);
+            white-space: nowrap
+        }
+
+        .tier-line {
+            flex: 1;
+            height: 1px;
+            background: var(--border2)
+        }
+
+        /* ITEMS */
+        .item {
+            border: 1px solid var(--border);
+            border-radius: 9px;
+            margin-bottom: 6px;
+            overflow: hidden;
+            background: var(--bg2);
+            transition: border-color .12s
+        }
+
+        .item:hover {
+            border-color: var(--border2)
+        }
+
+        .ihd {
+            display: flex;
+            gap: 12px;
+            align-items: flex-start;
+            padding: 12px 16px;
+            cursor: pointer;
+            user-select: none
+        }
+
+        .inum {
+            font-family: 'Inconsolata', monospace;
+            font-size: 10px;
+            color: var(--text3);
+            min-width: 26px;
+            padding-top: 2px;
+            flex-shrink: 0
+        }
+
+        .imeta {
+            flex: 1
+        }
+
+        .iname {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text);
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 7px;
+            line-height: 1.3;
+            letter-spacing: -.01em
+        }
+
+        .iline {
+            font-size: 11px;
+            color: var(--text2);
+            margin-top: 2px;
+            font-weight: 300
+        }
+
+        .tag {
+            font-size: 9px;
+            font-family: 'Inconsolata', monospace;
+            font-weight: 500;
+            padding: 2px 7px;
+            border-radius: 3px;
+            letter-spacing: .04em;
+            text-transform: uppercase;
+            flex-shrink: 0
+        }
+
+        .tp {
+            background: var(--v1d);
+            color: var(--v1b)
+        }
+
+        .tv {
+            background: var(--v2d);
+            color: var(--v2b)
+        }
+
+        .tl {
+            background: var(--v3d);
+            color: var(--v3b)
+        }
+
+        .tr {
+            background: var(--v4d);
+            color: var(--v4b)
+        }
+
+        .tm {
+            background: var(--v5d);
+            color: var(--v5b)
+        }
+
+        .chv {
+            font-size: 9px;
+            color: var(--text3);
+            flex-shrink: 0;
+            margin-top: 4px;
+            transition: transform .18s
+        }
+
+        .item.open .chv {
+            transform: rotate(180deg)
+        }
+
+        /* BODY */
+        .ibody {
+            display: none;
+            padding: 0 16px 16px;
+            border-top: 1px solid var(--border)
+        }
+
+        .item.open .ibody {
+            display: block
+        }
+
+        .desc {
+            font-size: 12px;
+            color: var(--text2);
+            line-height: 1.68;
+            padding: 10px 0 8px;
+            font-weight: 300
+        }
+
+        .g2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 7px;
+            margin-top: 4px
+        }
+
+        .g3 {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 7px;
+            margin-top: 4px
+        }
+
+        .card {
+            background: var(--bg3);
+            border: 1px solid var(--border2);
+            border-radius: 6px;
+            padding: 10px 12px
+        }
+
+        .card.full {
+            grid-column: 1/-1
+        }
+
+        .clbl {
+            font-family: 'Inconsolata', monospace;
+            font-size: 8px;
+            letter-spacing: .1em;
+            text-transform: uppercase;
+            color: var(--text3);
+            margin-bottom: 5px
+        }
+
+        .ctxt {
+            font-size: 11px;
+            color: var(--text);
+            line-height: 1.55;
+            font-weight: 300
+        }
+
+        .ctxt a {
+            color: var(--v4);
+            text-decoration: none;
+            font-family: 'Inconsolata', monospace;
+            font-size: 10px
+        }
+
+        .ctxt a:hover {
+            text-decoration: underline
+        }
+
+        .formula {
+            font-family: 'Inconsolata', monospace;
+            font-size: 10px;
+            color: var(--v3b);
+            background: var(--bg4);
+            padding: 7px 11px;
+            border-radius: 4px;
+            border-left: 2px solid var(--v3d);
+            margin-top: 7px;
+            line-height: 1.6
+        }
+
+        .rngs {
+            display: flex;
+            flex-direction: column;
+            gap: 4px
+        }
+
+        .rr {
+            display: flex;
+            align-items: flex-start;
+            gap: 7px
+        }
+
+        .rd {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            flex-shrink: 0;
+            margin-top: 4px
+        }
+
+        .dg {
+            background: var(--v2)
+        }
+
+        .da {
+            background: var(--v3)
+        }
+
+        .dr {
+            background: var(--v5)
+        }
+
+        .rt {
+            font-size: 11px;
+            color: var(--text2)
+        }
+
+        .srcs {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            margin-top: 5px
+        }
+
+        .src {
+            font-family: 'Inconsolata', monospace;
+            font-size: 9px;
+            padding: 3px 8px;
+            border-radius: 3px;
+            background: var(--bg4);
+            border: 1px solid var(--border2);
+            color: var(--text2)
+        }
+
+        .src.p {
+            border-color: var(--border3);
+            color: var(--v4b)
+        }
+
+        /* INTRO */
+        .pintro {
+            font-size: 13px;
+            color: var(--text2);
+            line-height: 1.7;
+            margin-bottom: 22px;
+            max-width: 740px;
+            font-weight: 300
+        }
+
+        /* VOL REGIME MATRIX */
+        .vregimes {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+            margin-top: 0
+        }
+
+        .vr {
+            border-radius: 8px;
+            padding: 12px;
+            border: 1px solid var(--border2);
+            background: var(--bg2)
+        }
+
+        .vr-name {
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: -.01em;
+            margin-bottom: 6px
+        }
+
+        .vr-stat {
+            font-size: 11px;
+            color: var(--text2);
+            line-height: 1.7;
+            font-weight: 300
+        }
+
+        .vr-stat b {
+            color: var(--text);
+            font-weight: 500
+        }
+
+        /* RISK TABLE */
+        .rtable {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 11px;
+            margin-top: 0
+        }
+
+        .rtable thead th {
+            font-family: 'Inconsolata', monospace;
+            font-size: 8px;
+            letter-spacing: .1em;
+            text-transform: uppercase;
+            color: var(--text3);
+            padding: 7px 10px;
+            border-bottom: 1px solid var(--border3);
+            text-align: left;
+            font-weight: 500
+        }
+
+        .rtable tbody td {
+            padding: 8px 10px;
+            border-bottom: 1px solid var(--border);
+            vertical-align: top;
+            color: var(--text2);
+            line-height: 1.5
+        }
+
+        .rtable tbody tr:hover td {
+            background: var(--bg3)
+        }
+
+        .rtable tbody td:first-child {
+            color: var(--text);
+            font-weight: 600;
+            font-size: 12px
+        }
+
+        .cv {
+            color: var(--v2);
+            font-weight: 600
+        }
+
+        .cr {
+            color: var(--v5);
+            font-weight: 600
+        }
+
+        .cw {
+            color: var(--v3);
+            font-weight: 600
+        }
+
+        .mono {
+            font-family: 'Inconsolata', monospace;
+            font-size: 10px
+        }
+
+        /* POSITION SIZING CALC */
+        .calc-box {
+            background: var(--bg3);
+            border: 1px solid var(--border2);
+            border-radius: 8px;
+            padding: 14px 16px;
+            margin-top: 10px
+        }
+
+        .calc-title {
+            font-family: 'Inconsolata', monospace;
+            font-size: 10px;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+            color: var(--v4b);
+            margin-bottom: 10px;
+            opacity: .8
+        }
+
+        .calc-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 5px 0;
+            border-bottom: 1px solid var(--border);
+            font-size: 12px
+        }
+
+        .calc-row:last-child {
+            border-bottom: none;
+            font-weight: 600;
+            color: var(--v2);
+            padding-top: 8px;
+            margin-top: 4px
+        }
+
+        .calc-label {
+            color: var(--text2);
+            font-weight: 300
+        }
+
+        .calc-val {
+            font-family: 'Inconsolata', monospace;
+            color: var(--text)
+        }
+
+        /* LIQUIDITY FLOW CHART */
+        .lflow {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            margin-top: 8px
+        }
+
+        .lf-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 7px 10px;
+            border-radius: 6px;
+            background: var(--bg3);
+            border: 1px solid var(--border)
+        }
+
+        .lf-arrow {
+            font-size: 16px;
+            color: var(--text3)
+        }
+
+        .lf-label {
+            font-size: 11px;
+            font-weight: 500;
+            flex: 1
+        }
+
+        .lf-note {
+            font-size: 10px;
+            color: var(--text2);
+            font-family: 'Inconsolata', monospace
+        }
+
+        /* MKT STRUCTURE */
+        .mkt-participants {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            margin-top: 8px
+        }
+
+        .mp-card {
+            background: var(--bg3);
+            border: 1px solid var(--border2);
+            border-radius: 7px;
+            padding: 11px 12px
+        }
+
+        .mp-name {
+            font-size: 12px;
+            font-weight: 700;
+            margin-bottom: 5px;
+            letter-spacing: -.01em
+        }
+
+        .mp-body {
+            font-size: 11px;
+            color: var(--text2);
+            line-height: 1.55;
+            font-weight: 300
+        }
+
+        /* HIDDEN */
+        .hidden {
+            display: none !important
+        }
+
+        ::-webkit-scrollbar {
+            width: 5px;
+            height: 4px
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg)
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border3);
+            border-radius: 3px
+        }
+
+        @media(max-width:720px) {
+            .hdr {
+                padding: 26px 16px 20px
+            }
+
+            .hdr h1 {
+                font-size: 26px
+            }
+
+            .hdr h1 .it {
+                font-size: 30px
+            }
+
+            .nav {
+                padding: 0 16px
+            }
+
+            .panel {
+                padding: 18px 16px 36px
+            }
+
+            .g2,
+            .g3,
+            .vregimes,
+            .mkt-participants {
+                grid-template-columns: 1fr
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="hdr">
+        <div class="eye">Trading System · Module 5</div>
+        <h1>Market <span class="it">Operations</span></h1>
+        <div class="hdr-sub">Positioning · Volatility Regimes · Liquidity Flows · Risk &amp; Execution · Market
+            Structure — the five disciplines that determine whether analysis translates into profit</div>
+    </div>
+    <nav class="nav">
+        <button class="ntab active" data-sec="pos" onclick="sw('pos')">Positioning</button>
+        <button class="ntab" data-sec="vol" onclick="sw('vol')">Volatility Regimes</button>
+        <button class="ntab" data-sec="liq" onclick="sw('liq')">Liquidity Flows</button>
+        <button class="ntab" data-sec="risk" onclick="sw('risk')">Risk &amp; Execution</button>
+        <button class="ntab" data-sec="mkt" onclick="sw('mkt')">Market Structure</button>
+    </nav>
+
+    <!-- ══════════════════════════════
+     POSITIONING
+══════════════════════════════ -->
+    <div class="panel active" id="panel-pos">
+        <p class="pintro">Positioning analysis maps WHO is positioned WHERE across every major participant type. It is
+            the most powerful contrarian tool available — when everyone is already positioned the same way, there is no
+            one left to push prices further in that direction. The crowded trade always unwinds eventually, and the
+            unwind is violent.</p>
+
+        <div class="tier">
+            <div class="tier-line"></div><span class="tier-txt">Tier 1 — Institutional &amp; systematic
+                positioning</span>
+            <div class="tier-line"></div>
+        </div>
+
+        <div class="item">
+            <div class="ihd" onclick="tog(this.parentElement)">
+                <span class="inum">01</span>
+                <div class="imeta">
+                    <div class="iname">CFTC COT — Speculative vs. Commercial Positioning <span
+                            class="tag tp">Positioning</span></div>
+                    <div class="iline">The definitive weekly snapshot of what large speculators and commercial hedgers
+                        are doing in futures markets</div>
+                </div><span class="chv">▼</span>
+            </div>
+            <div class="ibody">
+                <div class="desc">The Commitments of Traders (COT) report classifies futures participants into
+                    Commercial (hedgers — producers and consumers who use futures to manage real business risk) and
+                    Non-Commercial (large speculators — hedge funds and CTA trend followers). Commercials are the "smart
+                    money" — they know their industry best. When commercials are at extreme net long positions AND specs
+                    are at extreme net short — it is a strong contrarian bullish setup. The reverse is equally reliable.
+                    The Disaggregated COT separates managed money (hedge funds) from swap dealers, giving even more
+                    granular insight.</div>
+                <div class="g2">
+                    <div class="card">
+                        <div class="clbl">Extreme positioning thresholds</div>
+                        <div class="rngs">
+                            <div class="rr">
+                                <div class="rd dg"></div><span class="rt">Specs at 3-year net short extreme +
+                                    Commercials net long: strong contrarian buy</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd dg"></div><span class="rt">Managed money at extreme long with <10% bears:
+                                        crowded — exit risk rising</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd dr"></div><span class="rt">Specs at 3-year net long extreme + Commercials
+                                    net short: strong contrarian sell</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="clbl">Data sources</div>
+                        <div class="srcs">
+                            <span class="src p">CFTC.gov: cftc.gov/MarketReports/CommitmentsofTraders</span>
+                            <span class="src p">Released every Friday (data as of Tuesday)</span>
+                            <span class="src">Barchart COT data: barchart.com/commitment-of-traders</span>
+                            <span class="src">Quandl/Nasdaq Data Link (historical COT)</span>
+                            <span class="src">Moore Research Center: mrci.com</span>
+                        </div>
+                    </div>
+                    <div class="card full">
+                        <div class="clbl">Most useful COT markets for your system</div>
+                        <div class="ctxt">S&amp;P 500 futures (equity market sentiment) · 10-Year Treasury futures (rate
+                            direction sentiment) · Gold futures (inflation/fear positioning) · Crude oil futures (energy
+                            directional positioning) · USD Index futures (dollar sentiment) · EUR/USD (policy divergence
+                            positioning). Track the 3-year percentile rank of speculative net position — above 90th
+                            percentile = crowded long, below 10th = crowded short.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="item">
+            <div class="ihd" onclick="tog(this.parentElement)">
+                <span class="inum">02</span>
+                <div class="imeta">
+                    <div class="iname">CTA &amp; Trend Follower Positioning <span class="tag tp">Positioning</span>
+                    </div>
+                    <div class="iline">Commodity Trading Advisors manage $300B+ and move in lockstep — their crowding
+                        creates violent reversals</div>
+                </div><span class="chv">▼</span>
+            </div>
+            <div class="ibody">
+                <div class="desc">CTAs are systematic trend-following funds that use price momentum to determine
+                    positions. They have no fundamental view — they buy what is going up and sell what is going down.
+                    When all CTAs are maximally long an asset, the slightest trend reversal triggers simultaneous
+                    selling from hundreds of funds following identical signals. This creates momentum crashes and
+                    violent air pockets in the price. Deutsche Bank and Goldman Sachs publish monthly CTA positioning
+                    estimates. The key insight: when CTA positioning is extreme AND the trend is starting to exhaust
+                    (per your TA signals), the reversal will be fast and severe.</div>
+                <div class="g2">
+                    <div class="card">
+                        <div class="clbl">CTA positioning signals</div>
+                        <div class="rngs">
+                            <div class="rr">
+                                <div class="rd dr"></div><span class="rt">CTAs max long + RSI divergence + declining
+                                    momentum: high reversal risk</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd dg"></div><span class="rt">CTAs max short + price stabilizing + VIX
+                                    declining: short squeeze fuel</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd da"></div><span class="rt">CTAs neutral: trend not established yet, wait
+                                    for confirmation</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="clbl">Data sources</div>
+                        <div class="srcs">
+                            <span class="src p">Deutsche Bank CTA positioning (via Bloomberg or client reports)</span>
+                            <span class="src p">Goldman Sachs Prime Services positioning (institutional)</span>
+                            <span class="src">CFTC Managed Money COT section (proxy)</span>
+                            <span class="src">SocGen CTA index: sgcib.com</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="item">
+            <div class="ihd" onclick="tog(this.parentElement)">
+                <span class="inum">03</span>
+                <div class="imeta">
+                    <div class="iname">Risk Parity &amp; Volatility-Targeting Fund Positioning <span
+                            class="tag tp">Positioning</span></div>
+                    <div class="iline">Vol-targeting funds mechanically sell when volatility rises — understanding this
+                        prevents being on the wrong side of forced selling</div>
+                </div><span class="chv">▼</span>
+            </div>
+            <div class="ibody">
+                <div class="desc">Risk parity funds (Bridgewater, AQR) allocate based on volatility contribution — when
+                    asset volatility rises, they must sell to maintain target risk. Volatility-targeting strategies
+                    (common in pension funds and insurance) do the same. This creates a reflexive feedback loop: a small
+                    price drop raises volatility → vol-targeting funds sell → this pushes price lower → volatility rises
+                    further → more selling. Understanding when these funds are forced to reduce positions explains why
+                    corrections sometimes accelerate suddenly without obvious fundamental cause. VIX spikes above 20
+                    from below 15 typically trigger significant forced selling from these strategies.</div>
+                <div class="g2">
+                    <div class="card">
+                        <div class="clbl">Vol-targeting trigger levels</div>
+                        <div class="rngs">
+                            <div class="rr">
+                                <div class="rd dg"></div><span class="rt">VIX below 15 + rising for 30 days:
+                                    vol-targeting funds near max equity exposure</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd da"></div><span class="rt">VIX 15→20 rapid spike: early forced selling
+                                    beginning, reduce risk</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd dr"></div><span class="rt">VIX 20→30+ rapid: mechanical selling cascade —
+                                    expect overshoot, then opportunity</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="clbl">Data sources</div>
+                        <div class="srcs">
+                            <span class="src p">CBOE VIX: cboe.com (real-time)</span>
+                            <span class="src p">FRED: VIXCLS (daily VIX close)</span>
+                            <span class="src">Deutsche Bank vol-targeting exposure estimates</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="item">
+            <div class="ihd" onclick="tog(this.parentElement)">
+                <span class="inum">04</span>
+                <div class="imeta">
+                    <div class="iname">Hedge Fund Net Long/Short Ratio (Prime Brokerage Data) <span
+                            class="tag tp">Positioning</span></div>
+                    <div class="iline">Aggregate hedge fund equity exposure — when all are long, there is no marginal
+                        buyer left</div>
+                </div><span class="chv">▼</span>
+            </div>
+            <div class="ibody">
+                <div class="desc">Prime brokerage desks (Goldman Sachs, Morgan Stanley, JPMorgan) aggregate their hedge
+                    fund clients' gross and net exposure. When hedge fund net long exposure reaches multi-year highs
+                    (above 60–65% net long for equity long/short funds), the market is "crowded" — any catalyst forces
+                    simultaneous de-grossing (selling longs and covering shorts), creating rapid price declines.
+                    Conversely, at maximum net short (below 30%), a positive surprise forces aggressive short covering.
+                    Goldman's HF Trend Monitor and MS Prime Brokerage are the authoritative sources.</div>
+                <div class="g2">
+                    <div class="card">
+                        <div class="clbl">Exposure thresholds</div>
+                        <div class="rngs">
+                            <div class="rr">
+                                <div class="rd dg"></div><span class="rt">HF net long &lt;30%: defensive, contrarian
+                                    bullish setup</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd da"></div><span class="rt">HF net long 40–55%: neutral, normal allocation
+                                    range</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd dr"></div><span class="rt">HF net long &gt;65%: crowded, de-grossing
+                                    risk, reduce new longs</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="clbl">Data sources</div>
+                        <div class="srcs">
+                            <span class="src p">Goldman Sachs Prime Brokerage (client access)</span>
+                            <span class="src p">Morgan Stanley Prime Brokerage (client access)</span>
+                            <span class="src">AAII Sentiment (retail proxy): aaii.com/sentimentsurvey</span>
+                            <span class="src">NAAIM Exposure Index (active manager proxy):
+                                naaim.org/resources/naaim-exposure-index</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="item">
+            <div class="ihd" onclick="tog(this.parentElement)">
+                <span class="inum">05</span>
+                <div class="imeta">
+                    <div class="iname">Dealer Positioning &amp; Gamma Walls <span class="tag tp">Positioning</span>
+                    </div>
+                    <div class="iline">Where options market makers are positioned mechanically determines whether they
+                        amplify or dampen price moves</div>
+                </div><span class="chv">▼</span>
+            </div>
+            <div class="ibody">
+                <div class="desc">Options dealers take the opposite side of retail and institutional options trades.
+                    Their hedging activity creates mechanical price forces. A "gamma wall" is a strike with enormous
+                    open interest — dealers hedging near this level create a gravitational effect, pinning price nearby.
+                    Above the gamma wall (dealers long gamma) = low vol environment, market makers actively stabilize
+                    price. Below the gamma wall (dealers short gamma) = high vol environment, market makers amplify
+                    moves in both directions. Identifying the current gamma wall on S&amp;P 500 options tells you
+                    whether to expect a rangebound or explosive market in the near term.</div>
+                <div class="g2">
+                    <div class="card">
+                        <div class="clbl">Gamma environment classification</div>
+                        <div class="rngs">
+                            <div class="rr">
+                                <div class="rd dg"></div><span class="rt">Long gamma / above gamma wall: price pinned,
+                                    sell vol, buy dips near pin</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd da"></div><span class="rt">Near gamma flip (zero GEX): any direction
+                                    possible, reduce size</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd dr"></div><span class="rt">Short gamma / below gamma wall: explosive
+                                    moves, widen stops, reduce position size</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="clbl">Data sources</div>
+                        <div class="srcs">
+                            <span class="src p">SqueezeMetrics: squeezemetrics.com (free daily GEX)</span>
+                            <span class="src p">SpotGamma: spotgamma.com (detailed, paid)</span>
+                            <span class="src">Unusual Whales GEX dashboard</span>
+                            <span class="src">Polygon.io options chain (build custom)</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ══════════════════════════════
+     VOLATILITY REGIMES
+══════════════════════════════ -->
+    <div class="panel" id="panel-vol">
+        <p class="pintro">Volatility regime is not just a measure of risk — it is a fundamental market condition that
+            determines which strategies work, how large to size positions, where to place stops, and whether to be
+            offensive or defensive. Everything in your system must be calibrated to the current vol regime.</p>
+
+        <div class="tier">
+            <div class="tier-line"></div><span class="tier-txt">The four volatility regimes — complete framework</span>
+            <div class="tier-line"></div>
+        </div>
+
+        <div class="vregimes">
+            <div class="vr" style="border-color:rgba(52,211,153,.2)">
+                <div class="vr-name" style="color:var(--v2)">Regime 1: Low Vol / Compression</div>
+                <div class="vr-stat">
+                    <b>VIX:</b> &lt;15<br>
+                    <b>ATR % of price:</b> &lt;1%/day<br>
+                    <b>BB Width:</b> at multi-month low<br>
+                    <b>Realized vol:</b> &lt;10% annualized<br>
+                    <b>GEX:</b> high positive<br><br>
+                    <b>Strategy:</b> Trend-following works. Tight stops viable. Sell options premium (vol is cheap to
+                    buy but expensive to sell = be the seller). Accumulate positions. Expect breakout
+                    approaching.<br><br>
+                    <b>Position size:</b> Normal to large (1–2×)<br>
+                    <b>Stop distance:</b> 1.5× ATR
+                </div>
+            </div>
+            <div class="vr" style="border-color:rgba(245,158,11,.2)">
+                <div class="vr-name" style="color:var(--v3)">Regime 2: Normal / Trending</div>
+                <div class="vr-stat">
+                    <b>VIX:</b> 15–25<br>
+                    <b>ATR % of price:</b> 1–2%/day<br>
+                    <b>BB Width:</b> normal expansion<br>
+                    <b>Realized vol:</b> 10–20% annualized<br>
+                    <b>GEX:</b> moderate positive<br><br>
+                    <b>Strategy:</b> All strategies viable. Best environment for trend-following momentum. Technical
+                    signals most reliable here. Standard risk rules apply.<br><br>
+                    <b>Position size:</b> Normal (1×)<br>
+                    <b>Stop distance:</b> 2× ATR
+                </div>
+            </div>
+            <div class="vr" style="border-color:rgba(251,113,133,.2)">
+                <div class="vr-name" style="color:var(--v5)">Regime 3: Elevated / Choppy</div>
+                <div class="vr-stat">
+                    <b>VIX:</b> 25–35<br>
+                    <b>ATR % of price:</b> 2–4%/day<br>
+                    <b>BB Width:</b> wide, expanding<br>
+                    <b>Realized vol:</b> 20–35% annualized<br>
+                    <b>GEX:</b> near zero or slightly negative<br><br>
+                    <b>Strategy:</b> Reduce position sizes 30–50%. Widen stops to avoid whipsaws. Mean reversion works
+                    better than trend following. Be defensive. No new aggressive longs.<br><br>
+                    <b>Position size:</b> Reduced (0.5×)<br>
+                    <b>Stop distance:</b> 2.5–3× ATR
+                </div>
+            </div>
+            <div class="vr" style="border-color:rgba(251,113,133,.4)">
+                <div class="vr-name" style="color:var(--v5)">Regime 4: Crisis / Spike</div>
+                <div class="vr-stat">
+                    <b>VIX:</b> &gt;35<br>
+                    <b>ATR % of price:</b> &gt;4%/day<br>
+                    <b>BB Width:</b> extreme expansion<br>
+                    <b>Realized vol:</b> &gt;35% annualized<br>
+                    <b>GEX:</b> deeply negative<br><br>
+                    <b>Strategy:</b> Circuit breaker — go to minimum exposure (20% deployed). Do not add to losing
+                    positions. Wait for VIX to peak and begin sustained decline before re-entering. Overshoots in both
+                    directions are normal.<br><br>
+                    <b>Position size:</b> Minimum (0.2×)<br>
+                    <b>Stop distance:</b> N/A — reduce first
+                </div>
+            </div>
+        </div>
+
+        <div class="tier">
+            <div class="tier-line"></div><span class="tier-txt">Volatility measurement tools</span>
+            <div class="tier-line"></div>
+        </div>
+
+        <div class="item">
+            <div class="ihd" onclick="tog(this.parentElement)">
+                <span class="inum">01</span>
+                <div class="imeta">
+                    <div class="iname">VIX Futures Curve (Term Structure) — Contango vs. Backwardation <span
+                            class="tag tv">Vol Regime</span></div>
+                    <div class="iline">The shape of VIX futures tells you more than the spot VIX level alone</div>
+                </div><span class="chv">▼</span>
+            </div>
+            <div class="ibody">
+                <div class="desc">VIX futures have different prices for different expiration months. Contango =
+                    near-month VIX futures cheaper than far-month (normal, benign) — means the market expects volatility
+                    to be higher in the future than now. Backwardation = near-month more expensive than far-month
+                    (inverted, stressed) — means near-term fear exceeds long-term concern. Backwardation is the most
+                    reliable signal that a VIX spike is at or near its peak, because fear is being front-loaded. When
+                    backwardation appears after a spike AND VIX begins declining from its peak, it is often the best
+                    risk-on re-entry signal available.</div>
+                <div class="g2">
+                    <div class="card">
+                        <div class="clbl">Term structure interpretation</div>
+                        <div class="rngs">
+                            <div class="rr">
+                                <div class="rd dg"></div><span class="rt">Deep contango (M2/M1 ratio &gt;1.08): calm
+                                    market, good for short vol strategies</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd da"></div><span class="rt">Flat structure: transitioning regime,
+                                    uncertainty</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd dr"></div><span class="rt">Backwardation (M1 &gt; M2): fear spike —
+                                    near-term peak likely, not yet re-entry</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd dg"></div><span class="rt">Backwardation → returning to contango: VIX has
+                                    peaked — start re-entering risk</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="clbl">Data sources</div>
+                        <div class="srcs">
+                            <span class="src p">CBOE VIX futures: cboe.com/tradable_products/vix/vix_futures</span>
+                            <span class="src p">VIXcentral.com (free term structure chart, daily)</span>
+                            <span class="src">Barchart VIX futures chain</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="item">
+            <div class="ihd" onclick="tog(this.parentElement)">
+                <span class="inum">02</span>
+                <div class="imeta">
+                    <div class="iname">Realized vs. Implied Volatility Spread (Variance Risk Premium) <span
+                            class="tag tv">Vol Regime</span></div>
+                    <div class="iline">The persistent gap between what vol costs and what actually occurs — the most
+                        stable edge in options markets</div>
+                </div><span class="chv">▼</span>
+            </div>
+            <div class="ibody">
+                <div class="desc">Implied volatility (VIX) consistently overstates realized volatility by 3–5 volatility
+                    points on average over time — this "variance risk premium" (VRP) is one of the most documented and
+                    persistent anomalies in finance. Selling options premium (selling volatility) when implied vol is
+                    high relative to realized vol captures this premium. For your system: when VIX is elevated relative
+                    to the trailing 20-day realized volatility of the S&amp;P 500, options are expensive — this signals
+                    fear is elevated and a contrarian equity long position has better odds.</div>
+                <div class="formula">VRP = IV (VIX) − Realized Vol (20-day HV) &nbsp;|&nbsp; If VRP &gt;5 points:
+                    options expensive, market fearful</div>
+                <div class="g2">
+                    <div class="card">
+                        <div class="clbl">VRP signals</div>
+                        <div class="rngs">
+                            <div class="rr">
+                                <div class="rd dg"></div><span class="rt">VRP &gt;8 pts (IV much above realized):
+                                    extreme fear priced in, contrarian buy</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd da"></div><span class="rt">VRP 3–8 pts: normal premium, neutral</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd dr"></div><span class="rt">VRP negative (IV below realized): market
+                                    underpricing risk — buy protection</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="clbl">Data sources</div>
+                        <div class="srcs">
+                            <span class="src p">VIX: FRED VIXCLS series</span>
+                            <span class="src p">Calculate 20-day HV from yfinance SPY daily returns</span>
+                            <span class="src">OptionMetrics: optionmetrics.com (institutional)</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="item">
+            <div class="ihd" onclick="tog(this.parentElement)">
+                <span class="inum">03</span>
+                <div class="imeta">
+                    <div class="iname">VVIX — Volatility of Volatility <span class="tag tv">Vol Regime</span></div>
+                    <div class="iline">The VIX of the VIX — measures how uncertain the market is about its own
+                        uncertainty</div>
+                </div><span class="chv">▼</span>
+            </div>
+            <div class="ibody">
+                <div class="desc">VVIX measures the expected volatility of VIX itself over the next 30 days — derived
+                    from VIX options. When VVIX is elevated (above 100–110), the market is not just fearful but
+                    uncertain about HOW fearful to be — a signal that the situation is genuinely unclear. VVIX leads VIX
+                    spikes — a sudden VVIX surge often precedes a VIX spike by 1–5 trading days, giving early warning.
+                    Conversely, VVIX declining from elevated levels while VIX remains high is a signal the worst of the
+                    vol event may be passing.</div>
+                <div class="g2">
+                    <div class="card">
+                        <div class="clbl">VVIX thresholds</div>
+                        <div class="rngs">
+                            <div class="rr">
+                                <div class="rd dg"></div><span class="rt">VVIX &lt;80: calm, vol regime stable, normal
+                                    strategy operation</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd da"></div><span class="rt">VVIX 80–100: elevated uncertainty, reduce
+                                    position size 20%</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd dr"></div><span class="rt">VVIX &gt;110: vol event imminent or underway —
+                                    circuit breaker mode</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="clbl">Data sources</div>
+                        <div class="srcs">
+                            <span class="src p">CBOE VVIX: cboe.com/tradable_products/vix/vvix</span>
+                            <span class="src p">Yahoo Finance: ^VVIX symbol</span>
+                            <span class="src">TradingView: VVIX chart</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="item">
+            <div class="ihd" onclick="tog(this.parentElement)">
+                <span class="inum">04</span>
+                <div class="imeta">
+                    <div class="iname">Correlation Regime — Average Stock Correlation <span class="tag tv">Vol
+                            Regime</span></div>
+                    <div class="iline">When stocks become highly correlated, individual stock analysis loses its value —
+                        the macro overwhelms everything</div>
+                </div><span class="chv">▼</span>
+            </div>
+            <div class="ibody">
+                <div class="desc">The implied correlation index (CBOE COR3M) measures the expected average correlation
+                    between S&amp;P 500 stocks over the next 3 months. In crisis periods, correlations spike toward 1.0
+                    — all stocks move together (diversification fails). In normal markets, correlations are lower —
+                    individual stock selection adds value. When correlation is high, your FA and TA stock-picking skills
+                    are irrelevant; the macro regime is the only thing that matters. This is when to reduce to
+                    macro/sector ETFs and abandon individual stock positions.</div>
+                <div class="g2">
+                    <div class="card">
+                        <div class="clbl">Correlation regime thresholds</div>
+                        <div class="rngs">
+                            <div class="rr">
+                                <div class="rd dg"></div><span class="rt">Avg correlation &lt;0.3: stock-picking regime,
+                                    FA/TA add full value</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd da"></div><span class="rt">Avg correlation 0.3–0.6: mixed — macro matters
+                                    more, reduce single-stock risk</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd dr"></div><span class="rt">Avg correlation &gt;0.7: macro dominates — use
+                                    sector ETFs, not individual stocks</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="clbl">Data sources</div>
+                        <div class="srcs">
+                            <span class="src p">CBOE Implied Correlation: cboe.com/us/indices/dashboard/COR3M</span>
+                            <span class="src">Calculate 60-day rolling pairwise correlation from yfinance</span>
+                            <span class="src">Portfoliovisualizer.com (free correlation matrix tool)</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ══════════════════════════════
+     LIQUIDITY FLOWS
+══════════════════════════════ -->
+    <div class="panel" id="panel-liq">
+        <p class="pintro">Liquidity is the oxygen of financial markets. When liquidity is abundant, asset prices inflate
+            and risk is rewarded. When liquidity drains, even fundamentally sound investments fall — because forced
+            sellers need to raise cash regardless of price. Understanding liquidity flows is understanding the true
+            driver of market cycles.</p>
+
+        <div class="tier">
+            <div class="tier-line"></div><span class="tier-txt">Tier 1 — Global liquidity framework</span>
+            <div class="tier-line"></div>
+        </div>
+
+        <div class="item">
+            <div class="ihd" onclick="tog(this.parentElement)">
+                <span class="inum">01</span>
+                <div class="imeta">
+                    <div class="iname">Global Liquidity Cycle (G4 Central Bank Balance Sheets) <span
+                            class="tag tl">Liquidity</span></div>
+                    <div class="iline">The aggregate of Fed + ECB + BoJ + PBOC balance sheets is the single best
+                        predictor of global risk asset performance</div>
+                </div><span class="chv">▼</span>
+            </div>
+            <div class="ibody">
+                <div class="desc">Michael Howell (CrossBorder Capital) pioneered the Global Liquidity Index — the sum of
+                    major central bank balance sheets adjusted for USD exchange rates. This measure has an 80%+
+                    correlation with global equity markets over 6–12 month horizons. When global liquidity is expanding
+                    (central banks adding assets), risk assets rise. When contracting (QT, rate hikes), they fall. The
+                    lag is typically 3–9 months. The 2020–2021 bull market and the 2022 bear market were both almost
+                    entirely explained by the expansion and then contraction of global liquidity.</div>
+                <div class="lflow">
+                    <div class="lf-row"><span class="lf-arrow">↑</span><span class="lf-label">CB balance sheets expand
+                            (QE)</span><span class="lf-note">→ excess reserves created → hunt for yield → risk assets
+                            up</span></div>
+                    <div class="lf-row"><span class="lf-arrow">→</span><span class="lf-label">Banks lend excess
+                            reserves</span><span class="lf-note">→ money multiplier → broader M2 expansion → more risk
+                            capacity</span></div>
+                    <div class="lf-row"><span class="lf-arrow">→</span><span class="lf-label">Private credit
+                            expansion</span><span class="lf-note">→ corporate borrowing, M&A, buybacks → equity prices
+                            rise</span></div>
+                    <div class="lf-row"><span class="lf-arrow">↓</span><span class="lf-label">QT begins / rates
+                            rise</span><span class="lf-note">→ reserves drain → credit tightens → risk assets
+                            fall</span></div>
+                    <div class="lf-row"><span class="lf-arrow">→</span><span class="lf-label">Margin calls, forced
+                            selling</span><span class="lf-note">→ liquidation amplifies decline → liquidity
+                            crisis</span></div>
+                </div>
+                <div class="g2" style="margin-top:10px">
+                    <div class="card">
+                        <div class="clbl">Data sources</div>
+                        <div class="srcs">
+                            <span class="src p">FRED: WALCL (Fed), ECB balance sheet (ecb.europa.eu), BoJ
+                                (boj.or.jp)</span>
+                            <span class="src p">CrossBorder Capital: crossbordercapital.com (paid, institutional)</span>
+                            <span class="src">Calculate manually: sum WALCL + ECB total assets + BoJ total assets
+                                (convert all to USD)</span>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="clbl">Automation approach</div>
+                        <div class="ctxt">Pull FRED WALCL weekly. Scrape ECB weekly financial statements. Convert BoJ to
+                            USD using FRED DEXJPUS. Sum and track YoY rate of change. Signal: Global liquidity YoY above
+                            +10% = bullish bias. Below −5% = bearish. Enter this into your macro regime classifier.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="item">
+            <div class="ihd" onclick="tog(this.parentElement)">
+                <span class="inum">02</span>
+                <div class="imeta">
+                    <div class="iname">Fund Flow Data (Equity &amp; Bond Fund Inflows/Outflows) <span
+                            class="tag tl">Liquidity</span></div>
+                    <div class="iline">Where retail and institutional money is actually moving week-to-week — a
+                        real-time demand signal</div>
+                </div><span class="chv">▼</span>
+            </div>
+            <div class="ibody">
+                <div class="desc">ICI (Investment Company Institute) publishes weekly mutual fund and ETF flow data.
+                    EPFR Global tracks fund flows across equity, bond, and commodity funds globally. Sustained outflows
+                    from equity funds during a market decline accelerate the selling. Conversely, record inflows into
+                    equity funds at market peaks signal retail "buying the top." Sector fund flows reveal institutional
+                    rotation in real-time — money flowing into energy ETFs signals institutional conviction on the
+                    energy trade before price confirms it. The most actionable flows are large, sustained, and in
+                    sectors rather than broad market funds.</div>
+                <div class="g2">
+                    <div class="card">
+                        <div class="clbl">Flow interpretation rules</div>
+                        <div class="rngs">
+                            <div class="rr">
+                                <div class="rd dg"></div><span class="rt">Record equity outflows during selloff: retail
+                                    capitulation — contrarian buy</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd dg"></div><span class="rt">Sustained sector inflows (3+ weeks):
+                                    institutional conviction building</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd dr"></div><span class="rt">Record equity inflows at market highs: retail
+                                    euphoria — contrarian sell</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd dr"></div><span class="rt">Bond fund outflows accelerating: rising rate
+                                    fear spreading beyond equities</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="clbl">Data sources</div>
+                        <div class="srcs">
+                            <span class="src p">ICI (Investment Company Institute): ici.org/research/stats/flows
+                                (weekly, free)</span>
+                            <span class="src p">ETF.com flows: etf.com/etfanalytics/etf-fund-flows-tool</span>
+                            <span class="src">EPFR Global: epfrglobal.com (institutional, paid)</span>
+                            <span class="src">Morningstar fund flows: morningstar.com</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="item">
+            <div class="ihd" onclick="tog(this.parentElement)">
+                <span class="inum">03</span>
+                <div class="imeta">
+                    <div class="iname">Repo Market &amp; Money Market Conditions <span class="tag tl">Liquidity</span>
+                    </div>
+                    <div class="iline">The plumbing of the financial system — when repo markets seize, nothing else
+                        matters</div>
+                </div><span class="chv">▼</span>
+            </div>
+            <div class="ibody">
+                <div class="desc">The repo (repurchase agreement) market is where banks and institutions borrow
+                    short-term cash using Treasuries as collateral. It is the foundation of financial system liquidity.
+                    When repo rates spike suddenly above the Fed Funds rate (as in September 2019 when overnight repo
+                    hit 10%), it signals a shortage of available cash in the banking system — the plumbing is stressed.
+                    SOFR (Secured Overnight Financing Rate) replaced LIBOR as the primary benchmark rate. Sudden SOFR
+                    spikes signal near-term liquidity stress and require immediate risk reduction.</div>
+                <div class="g2">
+                    <div class="card">
+                        <div class="clbl">Stress indicators</div>
+                        <div class="rngs">
+                            <div class="rr">
+                                <div class="rd dg"></div><span class="rt">SOFR near Fed Funds rate: normal, ample
+                                    liquidity</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd da"></div><span class="rt">SOFR + 20bps above FFR: mild stress, monitor
+                                    closely</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd dr"></div><span class="rt">SOFR spike &gt;100bps above FFR: plumbing
+                                    stressed — immediate risk reduction</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="clbl">Data sources</div>
+                        <div class="srcs">
+                            <span class="src p">NY Fed SOFR: newyorkfed.org/markets/reference-rates/sofr</span>
+                            <span class="src p">FRED: SOFR (daily SOFR)</span>
+                            <span class="src">FRED: FEDFUNDS (compare to SOFR)</span>
+                            <span class="src">FRED: RRPTTLD (Fed reverse repo usage — excess reserves indicator)</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="item">
+            <div class="ihd" onclick="tog(this.parentElement)">
+                <span class="inum">04</span>
+                <div class="imeta">
+                    <div class="iname">Treasury General Account (TGA) &amp; Fed Reverse Repo (RRP) <span
+                            class="tag tl">Liquidity</span></div>
+                    <div class="iline">Two government balance sheet items that directly add or drain liquidity from the
+                        financial system</div>
+                </div><span class="chv">▼</span>
+            </div>
+            <div class="ibody">
+                <div class="desc">The Treasury General Account (TGA) is the US government's checking account at the Fed.
+                    When the TGA declines (government spending more than it receives), money flows into the private
+                    banking system — adding liquidity. When it rises (government issuing debt faster than spending), it
+                    drains liquidity. The Fed's Reverse Repo Facility (RRP) is where money market funds park excess cash
+                    — when RRP declines, that cash is released into the financial system (bullish for risk assets). The
+                    TGA + RRP combined balance is a critical liquidity indicator that most investors ignore.</div>
+                <div class="g2">
+                    <div class="card">
+                        <div class="clbl">Liquidity impact</div>
+                        <div class="rngs">
+                            <div class="rr">
+                                <div class="rd dg"></div><span class="rt">TGA falling + RRP falling: double liquidity
+                                    injection → bullish for risk assets</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd da"></div><span class="rt">One rising, one falling: offsetting, neutral
+                                    net effect</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd dr"></div><span class="rt">TGA rising rapidly: government draining
+                                    liquidity from banks → headwind</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="clbl">Data sources</div>
+                        <div class="srcs">
+                            <span class="src p">FRED: WTREGEN (Treasury General Account balance)</span>
+                            <span class="src p">FRED: RRPTTLD (Fed Reverse Repo total)</span>
+                            <span class="src">Treasury.gov daily cash balance statements</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="item">
+            <div class="ihd" onclick="tog(this.parentElement)">
+                <span class="inum">05</span>
+                <div class="imeta">
+                    <div class="iname">Cross-Border Capital Flows &amp; EM Liquidity <span
+                            class="tag tl">Liquidity</span></div>
+                    <div class="iline">International money movement driven by interest rate differentials, currency
+                        expectations, and risk appetite</div>
+                </div><span class="chv">▼</span>
+            </div>
+            <div class="ibody">
+                <div class="desc">Capital flows from lower-yielding to higher-yielding markets (carry trade). When the
+                    Fed raises rates faster than other central banks, USD strengthens and capital flows into US assets,
+                    draining liquidity from EM markets. The Treasury International Capital (TIC) report (monthly, 6-week
+                    lag) shows foreign purchases and sales of US securities. Foreign central banks selling US Treasuries
+                    (as China did 2013–2016) puts upward pressure on US yields. Conversely, large foreign buying caps
+                    yields. EM capital flow reversals are the most violent — billions can leave an EM country in days
+                    when sentiment shifts.</div>
+                <div class="g2">
+                    <div class="card">
+                        <div class="clbl">Data sources</div>
+                        <div class="srcs">
+                            <span class="src p">US TIC data: treasury.gov/resource-center/data-chart-center/tic</span>
+                            <span class="src p">IIF Capital Flows Tracker: iif.com (institutional)</span>
+                            <span class="src">EPFR EM fund flows (institutional)</span>
+                            <span class="src">World Bank BOP data: data.worldbank.org</span>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="clbl">EM warning signals</div>
+                        <div class="rngs">
+                            <div class="rr">
+                                <div class="rd dr"></div><span class="rt">EM currency -5%+ in a month: capital flight
+                                    beginning</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd dr"></div><span class="rt">EM FX reserves declining rapidly: central bank
+                                    defending currency</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd dg"></div><span class="rt">Stabilizing EM currencies + rising EM fund
+                                    inflows: EM recovery</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ══════════════════════════════
+     RISK & EXECUTION
+══════════════════════════════ -->
+    <div class="panel" id="panel-risk">
+        <p class="pintro">Risk and execution is where analysis meets reality. Every mistake in this layer directly costs
+            money — either through excessive losses, poor entry/exit prices, or transaction costs that erode an
+            otherwise valid edge. This is the most practically important section for your system's profitability.</p>
+
+        <div class="tier">
+            <div class="tier-line"></div><span class="tier-txt">Position sizing — the master risk control</span>
+            <div class="tier-line"></div>
+        </div>
+
+        <div class="item">
+            <div class="ihd" onclick="tog(this.parentElement)">
+                <span class="inum">01</span>
+                <div class="imeta">
+                    <div class="iname">Complete Position Sizing Framework <span class="tag tr">Risk</span></div>
+                    <div class="iline">The single most important determinant of long-term trading survival — more
+                        important than entry signal quality</div>
+                </div><span class="chv">▼</span>
+            </div>
+            <div class="ibody">
+                <div class="desc">Position sizing determines how much capital is at risk on each trade. The system
+                    should calculate position size automatically from four inputs: account size, risk per trade
+                    percentage, stop loss distance, and current volatility regime multiplier. The ATR-based method is
+                    the most robust because it automatically adjusts for different stock volatilities — a position in a
+                    2% ATR stock is correctly smaller than one in a 0.5% ATR stock with the same dollar risk.</div>
+                <div class="calc-box">
+                    <div class="calc-title">Position sizing calculator — example ($100,000 account)</div>
+                    <div class="calc-row"><span class="calc-label">Account size</span><span
+                            class="calc-val">$100,000</span></div>
+                    <div class="calc-row"><span class="calc-label">Risk per trade (low-risk strategy: 1%)</span><span
+                            class="calc-val">$1,000</span></div>
+                    <div class="calc-row"><span class="calc-label">Stock price</span><span
+                            class="calc-val">$150.00</span></div>
+                    <div class="calc-row"><span class="calc-label">ATR (14-day)</span><span
+                            class="calc-val">$3.50</span></div>
+                    <div class="calc-row"><span class="calc-label">Stop distance (2× ATR)</span><span
+                            class="calc-val">$7.00</span></div>
+                    <div class="calc-row"><span class="calc-label">Vol regime multiplier (Regime 2: Normal)</span><span
+                            class="calc-val">1.0×</span></div>
+                    <div class="calc-row"><span class="calc-label">Shares = Risk$ / Stop Distance</span><span
+                            class="calc-val">$1,000 / $7.00 = 142 shares</span></div>
+                    <div class="calc-row"><span class="calc-label">Position value = 142 × $150</span><span
+                            class="calc-val">$21,300 (21.3% of account)</span></div>
+                    <div class="calc-row"><span class="calc-label">Maximum position cap (5% hard limit)</span><span
+                            class="calc-val">Apply cap → $5,000 max → 33 shares</span></div>
+                </div>
+                <div class="g2" style="margin-top:8px">
+                    <div class="card">
+                        <div class="clbl">Risk % by strategy type</div>
+                        <div class="rngs">
+                            <div class="rr">
+                                <div class="rd dg"></div><span class="rt">Low-risk rotation strategy: 0.75–1% per
+                                    trade</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd da"></div><span class="rt">High-risk concentrated strategy: 1.5–2% per
+                                    trade</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd dr"></div><span class="rt">Never exceed 2% risk per single trade —
+                                    ever</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="clbl">Vol regime adjustments</div>
+                        <div class="rngs">
+                            <div class="rr">
+                                <div class="rd dg"></div><span class="rt">Regime 1 (VIX &lt;15): 1.2× normal size</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd da"></div><span class="rt">Regime 2 (VIX 15–25): 1.0× normal size</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd dr"></div><span class="rt">Regime 3 (VIX 25–35): 0.5× normal size</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd dr"></div><span class="rt">Regime 4 (VIX &gt;35): 0.2× — minimum
+                                    positions only</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="item">
+            <div class="ihd" onclick="tog(this.parentElement)">
+                <span class="inum">02</span>
+                <div class="imeta">
+                    <div class="iname">Portfolio-Level Risk Metrics (VaR, Expected Shortfall, Max Drawdown) <span
+                            class="tag tr">Risk</span></div>
+                    <div class="iline">Measuring the risk of the entire portfolio — not just individual positions</div>
+                </div><span class="chv">▼</span>
+            </div>
+            <div class="ibody">
+                <div class="desc">Value at Risk (VaR) estimates the maximum loss expected over a period at a given
+                    confidence level. Expected Shortfall (CVaR) measures the average loss in the worst scenarios — more
+                    useful than VaR because it captures tail risk. Maximum Drawdown tracks the largest peak-to-trough
+                    decline in portfolio value. These metrics must be tracked at the portfolio level (not per-position)
+                    and must account for correlation between positions — ten positions that all fall together in a
+                    risk-off event are not ten independent risks.</div>
+                <div class="formula">VaR(95%) = Portfolio × 1.645 × σ (daily) &nbsp;|&nbsp; Expected Shortfall = mean
+                    loss in worst 5% of scenarios &nbsp;|&nbsp; Drawdown = (Peak − Trough) / Peak</div>
+                <div class="g2">
+                    <div class="card">
+                        <div class="clbl">Portfolio risk limits</div>
+                        <div class="rngs">
+                            <div class="rr">
+                                <div class="rd dg"></div><span class="rt">Daily VaR(95%) &lt;1% of portfolio: acceptable
+                                    risk level</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd da"></div><span class="rt">Daily VaR(95%) 1–2%: elevated — review
+                                    concentration</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd dr"></div><span class="rt">Daily VaR(95%) &gt;2%: too much risk — reduce
+                                    immediately</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd dr"></div><span class="rt">Drawdown from peak &gt;12%: circuit breaker —
+                                    cut to 50% exposure</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd dr"></div><span class="rt">Drawdown &gt;20%: full stop — reassess entire
+                                    system before resuming</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="clbl">Data sources &amp; tools</div>
+                        <div class="srcs">
+                            <span class="src p">QuantStats Python library (portfolio tearsheets, VaR, Sharpe,
+                                drawdown)</span>
+                            <span class="src p">PyPortfolioOpt: portfolio optimization in Python</span>
+                            <span class="src">Portfolio Visualizer: portfoliovisualizer.com (free, no code)</span>
+                            <span class="src">Riskfolio-Lib: Python risk/portfolio management</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="item">
+            <div class="ihd" onclick="tog(this.parentElement)">
+                <span class="inum">03</span>
+                <div class="imeta">
+                    <div class="iname">Execution Quality — Slippage, Spread &amp; Market Impact <span
+                            class="tag tr">Risk</span></div>
+                    <div class="iline">Transaction costs are a hidden strategy killer — especially at higher trading
+                        frequencies</div>
+                </div><span class="chv">▼</span>
+            </div>
+            <div class="ibody">
+                <div class="desc">Transaction costs = commission + bid-ask spread + market impact (slippage from your
+                    own order moving the price). For large-cap liquid stocks, total cost is 2–5bps per side (negligible
+                    for monthly rebalancing). For small-cap or illiquid stocks, it can be 20–100bps per side —
+                    destroying the alpha before you even capture it. Your position size should never exceed 10% of the
+                    stock's average daily volume, and entering/exiting should always be done over multiple days for
+                    large positions. Market impact scales approximately with the square root of order size divided by
+                    ADV.</div>
+                <div class="g2">
+                    <div class="card">
+                        <div class="clbl">Liquidity requirements</div>
+                        <div class="rngs">
+                            <div class="rr">
+                                <div class="rd dg"></div><span class="rt">ADV &gt;20× your intended position size:
+                                    liquid, execute in one order</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd da"></div><span class="rt">ADV 5–20× position: split over 2–3 days using
+                                    VWAP orders</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd dr"></div><span class="rt">ADV &lt;5× position: too illiquid — reduce
+                                    size or skip the trade</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="clbl">Execution algorithms</div>
+                        <div class="ctxt">
+                            <b>TWAP</b>: splits order equally over time — good when you need to complete by end of
+                            day.<br>
+                            <b>VWAP</b>: weights execution by volume — best for daily rebalances. IBKR and Alpaca both
+                            offer VWAP orders.<br>
+                            <b>Market order</b>: immediate but full slippage cost. Use only for small positions in
+                            highly liquid stocks.<br>
+                            <b>Limit order</b>: no slippage but may not fill. Use for entries where price level matters.
+                        </div>
+                    </div>
+                    <div class="card full">
+                        <div class="clbl">Broker APIs with algorithmic order types</div>
+                        <div class="srcs">
+                            <span class="src p">Interactive Brokers TWS API: interactivebrokers.com (TWAP, VWAP
+                                built-in)</span>
+                            <span class="src p">Alpaca Markets: alpaca.markets (free paper trading, simple API)</span>
+                            <span class="src">TD Ameritrade thinkorswim API: schwab.com</span>
+                            <span class="src">Tradier API: tradier.com</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="item">
+            <div class="ihd" onclick="tog(this.parentElement)">
+                <span class="inum">04</span>
+                <div class="imeta">
+                    <div class="iname">Performance Metrics — What to Track &amp; How to Evaluate <span
+                            class="tag tr">Risk</span></div>
+                    <div class="iline">The right metrics distinguish a good process from lucky outcomes — and a bad
+                        process from bad luck</div>
+                </div><span class="chv">▼</span>
+            </div>
+            <div class="ibody">
+                <div class="desc">Track these performance metrics on every strategy, every month. The most important is
+                    not total return — it is risk-adjusted return (Sharpe/Sortino). A strategy that returns 20% with a
+                    25% max drawdown is worse than one returning 12% with a 6% max drawdown. The Calmar Ratio (annual
+                    return / max drawdown) is the most practical metric for a systematic strategy.</div>
+                <div class="g2">
+                    <div class="card">
+                        <div class="clbl">Core performance metrics</div>
+                        <div class="ctxt" style="font-family:'Inconsolata',monospace;font-size:10px;line-height:1.9">
+                            <b>Sharpe Ratio</b>: (Return − Risk-free) / StdDev. &gt;1.0 good, &gt;1.5 excellent<br>
+                            <b>Sortino Ratio</b>: Like Sharpe but only penalizes downside vol. &gt;2.0 target<br>
+                            <b>Calmar Ratio</b>: Annual return / Max Drawdown. &gt;1.0 good<br>
+                            <b>Win Rate</b>: % of trades profitable. 40% is fine with 1:2 R/R<br>
+                            <b>Profit Factor</b>: Gross profit / Gross loss. &gt;1.5 target<br>
+                            <b>Expectancy</b>: (Win% × Avg Win) − (Loss% × Avg Loss). Must be positive<br>
+                            <b>Max Drawdown</b>: Largest peak-to-trough. &lt;15% target for low-risk strategy
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="clbl">Tools</div>
+                        <div class="srcs">
+                            <span class="src p">QuantStats: pip install quantstats (automatic tearsheets)</span>
+                            <span class="src p">Pyfolio: portfolio performance analytics</span>
+                            <span class="src">Backtrader built-in analyzers</span>
+                            <span class="src">Alpaca dashboard (live strategy tracking)</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ══════════════════════════════
+     MARKET STRUCTURE
+══════════════════════════════ -->
+    <div class="panel" id="panel-mkt">
+        <p class="pintro">Market structure describes the architecture of price formation — who participates, how orders
+            are routed and filled, and the mechanical forces that shape intraday price behavior. Understanding this
+            prevents costly mistakes and reveals systematic patterns invisible to those who only read charts.</p>
+
+        <div class="tier">
+            <div class="tier-line"></div><span class="tier-txt">Who makes the market — participant types &amp; their
+                behavior</span>
+            <div class="tier-line"></div>
+        </div>
+
+        <div class="mkt-participants">
+            <div class="mp-card" style="border-color:rgba(251,113,133,.2)">
+                <div class="mp-name" style="color:var(--v5)">Market Makers (HFT)</div>
+                <div class="mp-body">Post continuous bid/ask quotes, profit from the spread. They hedge instantly — they
+                    have no directional view. Provide liquidity but withdraw it in crises, causing bid-ask spreads to
+                    blow out. HFTs account for 50–60% of US equity volume. Their presence compresses spreads in normal
+                    markets. Their absence in crises amplifies volatility.</div>
+            </div>
+            <div class="mp-card" style="border-color:rgba(96,165,250,.2)">
+                <div class="mp-name" style="color:var(--v4)">Institutional Investors</div>
+                <div class="mp-body">Pension funds, mutual funds, insurance companies. Move slowly — rebalance
+                    monthly/quarterly. Use dark pools and algorithmic execution (VWAP) to minimize market impact. Create
+                    systematic flows at month/quarter end. Their quarterly rebalancing drives predictable flows that can
+                    be front-run.</div>
+            </div>
+            <div class="mp-card" style="border-color:rgba(232,121,249,.2)">
+                <div class="mp-name" style="color:var(--v1)">Options Dealers</div>
+                <div class="mp-body">Take the opposite side of all options trades. Hedge their delta exposure
+                    continuously. Create the gamma wall effect. Their hedging is mechanical and predictable — it
+                    amplifies moves in negative gamma environments and dampens them in positive gamma. The
+                    fastest-growing structural force in modern equity markets.</div>
+            </div>
+            <div class="mp-card" style="border-color:rgba(52,211,153,.2)">
+                <div class="mp-name" style="color:var(--v2)">Hedge Funds (L/S Equity)</div>
+                <div class="mp-body">Sophisticated, fast-moving, leverage-driven. Respond to new information quickly.
+                    Their crowding (too many in same position) creates the violent unwinds. Their prime broker reports
+                    show aggregate positioning. When they de-gross (forced selling of longs AND covering of shorts)
+                    during risk events, all correlations go to 1.</div>
+            </div>
+            <div class="mp-card" style="border-color:rgba(245,158,11,.2)">
+                <div class="mp-name" style="color:var(--v3)">CTA / Systematic Funds</div>
+                <div class="mp-body">Follow price trends mechanically — no fundamental view. Add fuel to existing
+                    trends. Their positioning is largely derivable from recent price trends. When trends reverse, they
+                    all exit simultaneously. Responsible for momentum crashes. Their signals are delayed by design —
+                    they follow, not lead.</div>
+            </div>
+            <div class="mp-card" style="border-color:var(--border2)">
+                <div class="mp-name" style="color:var(--text)">Retail Investors</div>
+                <div class="mp-body">Small individually but massive collectively — especially since 2020. React to news
+                    and social media. Use zero-commission apps (Robinhood). Buy calls at market open, pushing prices up;
+                    often trapped by afternoon reversals. Their activity is most visible in meme stocks and heavily
+                    Tweeted/Reddit-mentioned names. Mostly noise for individual stocks, but systematic at extremes.
+                </div>
+            </div>
+        </div>
+
+        <div class="tier">
+            <div class="tier-line"></div><span class="tier-txt">Key structural mechanics</span>
+            <div class="tier-line"></div>
+        </div>
+
+        <div class="item">
+            <div class="ihd" onclick="tog(this.parentElement)">
+                <span class="inum">01</span>
+                <div class="imeta">
+                    <div class="iname">Pre-Market &amp; After-Hours Price Discovery <span class="tag tm">Mkt
+                            Structure</span></div>
+                    <div class="iline">Extended-hours trading is thin, volatile, and often reverses at the open —
+                        understand what it signals vs. what it doesn't</div>
+                </div><span class="chv">▼</span>
+            </div>
+            <div class="ibody">
+                <div class="desc">Pre-market (4am–9:30am ET) and after-hours (4pm–8pm ET) trading is thin — often 5–10%
+                    of regular session volume. Spreads are wide and liquidity is poor. Major news (earnings, macro data,
+                    geopolitical events) causes large moves in extended hours that often partially reverse at the
+                    regular session open as institutional volume provides real price discovery. Earnings released
+                    after-hours will gap up or down at next open — the gap size relative to the options-implied move
+                    tells you whether the market overshot or undershot its expectation.</div>
+                <div class="g2">
+                    <div class="card">
+                        <div class="clbl">Extended hours rules</div>
+                        <div class="rngs">
+                            <div class="rr">
+                                <div class="rd da"></div><span class="rt">Pre-market gap: don't chase — wait for first
+                                    15 minutes of regular session to confirm direction</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd dg"></div><span class="rt">Gap above implied move on earnings: stock
+                                    exceeded expectations — momentum trade valid</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd dr"></div><span class="rt">Gap below implied move (beat but small gap):
+                                    expectations already priced in</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="clbl">Data sources</div>
+                        <div class="srcs">
+                            <span class="src p">Polygon.io (pre/after-hours data via API)</span>
+                            <span class="src">Yahoo Finance (pre/post market quotes, free)</span>
+                            <span class="src">IBKR TWS (real-time extended hours)</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="item">
+            <div class="ihd" onclick="tog(this.parentElement)">
+                <span class="inum">02</span>
+                <div class="imeta">
+                    <div class="iname">Opening Auction &amp; First 30-Minute Price Discovery <span class="tag tm">Mkt
+                            Structure</span></div>
+                    <div class="iline">The opening auction sets the day's reference price — the first 30 minutes reveals
+                        institutional intentions</div>
+                </div><span class="chv">▼</span>
+            </div>
+            <div class="ibody">
+                <div class="desc">The NYSE and Nasdaq opening auctions aggregate all pre-market orders and execute them
+                    at a single opening price. A stock opening significantly above its pre-market high signals
+                    institutional buying at the open (institutions often submit orders to the opening auction). The
+                    first 30 minutes of trading is the highest-volume period — institutional desks are executing their
+                    morning orders. The direction and volume of the first 30 minutes relative to VWAP gives the best
+                    read on institutional bias for the day. Your system should never execute new position entries in the
+                    first 15 minutes — wait for price discovery to stabilize.</div>
+                <div class="g2">
+                    <div class="card">
+                        <div class="clbl">First 30-minute rules</div>
+                        <div class="rngs">
+                            <div class="rr">
+                                <div class="rd da"></div><span class="rt">Never enter new positions in first 15 minutes
+                                    — let price discover</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd dg"></div><span class="rt">Strong open above VWAP + volume above average:
+                                    institutional buying, bullish day bias</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd dr"></div><span class="rt">Gap open fading immediately: sellers in
+                                    control — do not buy the gap</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="clbl">Intraday volume pattern</div>
+                        <div class="ctxt">Volume is U-shaped: highest at open (9:30–10:30am), lowest midday (12–2pm),
+                            high again into close (3–4pm). Execute orders in the middle of the day for minimum market
+                            impact on larger positions. Avoid entering/exiting near the open or close where spreads are
+                            widest and HFTs are most active.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="item">
+            <div class="ihd" onclick="tog(this.parentElement)">
+                <span class="inum">03</span>
+                <div class="imeta">
+                    <div class="iname">Bid-Ask Spread &amp; Order Book Depth <span class="tag tm">Mkt Structure</span>
+                    </div>
+                    <div class="iline">The cost hidden inside every trade — widens in crises, reveals liquidity quality
+                    </div>
+                </div><span class="chv">▼</span>
+            </div>
+            <div class="ibody">
+                <div class="desc">The bid-ask spread is the difference between the highest price a buyer will pay and
+                    the lowest price a seller will accept. For large-cap liquid stocks (AAPL, MSFT), this is 1 cent —
+                    negligible. For small-caps or low-liquidity stocks, it can be 0.5–2% of price — a massive hidden
+                    cost that erodes returns. The order book shows the stack of limit orders at each price level above
+                    and below the current price. A thick order book with many shares at each level = liquid. A thin
+                    order book = your market order moves the price significantly.</div>
+                <div class="g2">
+                    <div class="card">
+                        <div class="clbl">Spread quality thresholds</div>
+                        <div class="rngs">
+                            <div class="rr">
+                                <div class="rd dg"></div><span class="rt">Spread &lt;0.05% of price: highly liquid,
+                                    market orders acceptable</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd da"></div><span class="rt">Spread 0.05–0.2%: moderate, use limit orders
+                                    for entries</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd dr"></div><span class="rt">Spread &gt;0.5%: illiquid — adds 1%+ per round
+                                    trip, strategy edge may be wiped out</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="clbl">Data sources</div>
+                        <div class="srcs">
+                            <span class="src p">Polygon.io Level 2 data (bid/ask, real-time)</span>
+                            <span class="src p">IBKR TWS (full order book depth, Level 2)</span>
+                            <span class="src">CBOE BZX order book</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="item">
+            <div class="ihd" onclick="tog(this.parentElement)">
+                <span class="inum">04</span>
+                <div class="imeta">
+                    <div class="iname">Circuit Breakers &amp; Market-Wide Halt Mechanisms <span class="tag tm">Mkt
+                            Structure</span></div>
+                    <div class="iline">Mandatory trading halts designed to prevent crash spirals — your system must
+                        handle these gracefully</div>
+                </div><span class="chv">▼</span>
+            </div>
+            <div class="ibody">
+                <div class="desc">Market-wide circuit breakers (implemented after 1987) halt trading when the S&amp;P
+                    500 drops a defined percentage from the prior day's close. Individual stock circuit breakers (Limit
+                    Up-Limit Down, LULD) pause trading when a stock moves more than 5–10% in 5 minutes. Your system must
+                    handle these gracefully: orders will not fill during halts, and prices may gap significantly when
+                    trading resumes. Build halt detection into your execution layer — if an order is pending and a halt
+                    occurs, the system must not assume the order filled.</div>
+                <div class="g2">
+                    <div class="card">
+                        <div class="clbl">Market-wide circuit breaker levels (S&amp;P 500)</div>
+                        <div class="rngs">
+                            <div class="rr">
+                                <div class="rd da"></div><span class="rt">Level 1: −7% → 15-minute halt (before 3:25pm
+                                    ET)</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd da"></div><span class="rt">Level 2: −13% → 15-minute halt (before 3:25pm
+                                    ET)</span>
+                            </div>
+                            <div class="rr">
+                                <div class="rd dr"></div><span class="rt">Level 3: −20% → market closes for the rest of
+                                    the day</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="clbl">LULD bands (individual stocks)</div>
+                        <div class="ctxt">S&amp;P 500 stocks: ±5% from 5-min reference price triggers 5-min pause. Other
+                            stocks: ±10%. Very low-priced stocks: ±20%. During the pause, new orders can be submitted
+                            but not executed. System must detect halt status before submitting orders. Polygon.io
+                            provides halt event data in real-time via WebSocket feed.</div>
+                    </div>
+                    <div class="card full">
+                        <div class="clbl">System requirements for halt handling</div>
+                        <div class="ctxt">1. Subscribe to Polygon.io halt events WebSocket. 2. On halt detection: cancel
+                            all pending orders for that ticker. 3. Do not submit new orders until halt is lifted and
+                            first 2 minutes of post-halt trading completes. 4. Log all halt events with timestamps for
+                            backtest calibration. 5. After halt: re-evaluate position logic with updated price — do not
+                            blindly re-submit prior order.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="tier">
+            <div class="tier-line"></div><span class="tier-txt">Portfolio-level market structure rules</span>
+            <div class="tier-line"></div>
+        </div>
+        <table class="rtable">
+            <thead>
+                <tr>
+                    <th>Rule</th>
+                    <th>Threshold</th>
+                    <th>Action required</th>
+                    <th>Rationale</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Max single position size</td>
+                    <td class="mono">5% of portfolio</td>
+                    <td>Hard cap — system will not execute orders that breach this</td>
+                    <td>One blow-up cannot destroy the account</td>
+                </tr>
+                <tr>
+                    <td>Max sector concentration</td>
+                    <td class="mono">25% of portfolio</td>
+                    <td>Sector ETF allocation capped, individual stock within sector capped separately</td>
+                    <td>Sector event cannot cause portfolio ruin</td>
+                </tr>
+                <tr>
+                    <td>Minimum stock liquidity</td>
+                    <td class="mono">ADV ≥ 20× position size</td>
+                    <td>Filter stocks below this ADV from the universe entirely</td>
+                    <td>Ensures exit is always possible within 1 trading day</td>
+                </tr>
+                <tr>
+                    <td>Maximum correlated positions</td>
+                    <td class="mono">Portfolio correlation &lt;0.6 avg</td>
+                    <td>If avg pairwise correlation exceeds 0.6, reduce to fewer, less correlated positions</td>
+                    <td>Diversification only works when correlations are low</td>
+                </tr>
+                <tr>
+                    <td>Drawdown circuit breaker</td>
+                    <td class="mono">−12% from peak</td>
+                    <td>Automatically reduce all positions to 50%. Human review before re-engaging</td>
+                    <td>Prevents emotional doubling-down into a losing system</td>
+                </tr>
+                <tr>
+                    <td>VIX circuit breaker</td>
+                    <td class="mono">VIX &gt;35</td>
+                    <td>No new long positions opened. Existing positions held with wider stops.</td>
+                    <td>Vol regime 4 has non-linear risk — normal models break down</td>
+                </tr>
+                <tr>
+                    <td>Pre-earnings exposure</td>
+                    <td class="mono">3 days before earnings</td>
+                    <td>Reduce position by 50% if single-stock earnings risk exceeds 3% of portfolio</td>
+                    <td>Binary event risk cannot be modeled — size appropriately</td>
+                </tr>
+                <tr>
+                    <td>Post-earnings re-entry</td>
+                    <td class="mono">After first 30min post-release</td>
+                    <td>Only re-enter after price has stabilized and direction confirmed</td>
+                    <td>Gap fills and reversals are common in first 30 minutes</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+function sw(id){
+  const ids=['pos','vol','liq','risk','mkt'];
+  document.querySelectorAll('.ntab').forEach((t,i)=>t.classList.toggle('active',ids[i]===id));
+  document.querySelectorAll('.panel').forEach(p=>p.classList.toggle('active',p.id==='panel-'+id));
+}
+function tog(el){el.classList.toggle('open')}
+    </script>
+</body>
+
+</html>

@@ -1324,3 +1324,32 @@ func LoadFundamentalAnalysis() (FundamentalAnalysis, error) {
 		QualMoatStableStdPP:       floatEnv("QUAL_MOAT_STABLE_STD_PP", 5),
 	}, nil
 }
+
+// MarketOperations configures the market-operations worker (market_operations_reference.html).
+type MarketOperations struct {
+	Base Base
+
+	Enabled        bool
+	PollInterval   time.Duration
+	StartupDelay   time.Duration
+	VIXLowMax      float64 // below = low_vol
+	VIXNormalMax   float64 // below = normal
+	VIXElevatedMax float64 // below = elevated; else stress
+}
+
+// LoadMarketOperations reads MARKET_OPS_* env vars.
+func LoadMarketOperations() (MarketOperations, error) {
+	b := LoadBase()
+	if b.DatabaseURL == "" {
+		return MarketOperations{}, fmt.Errorf("DATABASE_URL is required")
+	}
+	return MarketOperations{
+		Base:           b,
+		Enabled:        boolEnv("MARKET_OPS_ENABLE", true),
+		PollInterval:   pollFor("MARKET_OPS_POLL_INTERVAL", time.Hour),
+		StartupDelay:   time.Duration(intEnv("MARKET_OPS_STARTUP_DELAY_SECS", 30)) * time.Second,
+		VIXLowMax:      floatEnv("MARKET_OPS_VIX_LOW_MAX", 15),
+		VIXNormalMax:   floatEnv("MARKET_OPS_VIX_NORMAL_MAX", 25),
+		VIXElevatedMax: floatEnv("MARKET_OPS_VIX_ELEVATED_MAX", 35),
+	}, nil
+}

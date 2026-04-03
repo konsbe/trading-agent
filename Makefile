@@ -31,7 +31,7 @@ help:
 	@echo ""
 	@echo "━━━ Logs ━━━"
 	@echo "  log-services            All ingestion containers"
-	@echo "  log-analyzer            Both analyzer containers (technical-analysis + fundamental-analysis)"
+	@echo "  log-analyzer            Analyzer workers (technical, fundamental, macro-analysis, market-operations)"
 	@echo "  log-bot                 analyst-bot (Discord bot)"
 	@echo "  log-technical           data-technical (OHLCV bar fetcher)"
 	@echo "  log-fundamental         data-fundamental (Finnhub fundamentals fetcher)"
@@ -116,7 +116,7 @@ log-services:
 	  data-crypto data-equity data-fundamental data-onchain data-sentiment data-technical data-macro-intel
 
 log-analyzer:
-	$(COMPOSE) logs -f technical-analysis fundamental-analysis
+	$(COMPOSE) logs -f technical-analysis fundamental-analysis macro-analysis market-operations
 
 log-technical:
 	$(COMPOSE) logs -f data-technical

@@ -204,6 +204,22 @@ services:
     profiles: [analyzer]
     restart: on-failure
 
+  market-operations:
+    build:
+      context: ../services/data-analyzer
+      dockerfile: Dockerfile
+    command: ["/app/market-operations"]
+    env_file:
+      - path: ../.env
+        required: false
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@timescaledb:5432/trading?sslmode=disable
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+    profiles: [analyzer]
+    restart: on-failure
+
   # ── analyst-bot ────────────────────────────────────────────────────────────
   # Discord bot + scheduler. Reads from TimescaleDB and Redis — no API calls.
   # Start with: make up-bot  (or docker compose --profile bot up -d analyst-bot)

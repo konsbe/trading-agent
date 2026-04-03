@@ -93,6 +93,17 @@ class BotConfig(BaseSettings):
     bot_news_headlines_limit: int = 5
     bot_report_max_symbols: int = 10
 
+    # ── Market operations (mo_reference_snapshot + per-symbol ATR% / volume vs median) ─
+    bot_market_ops_enable: bool = True
+    bot_market_ops_volume_lookback: int = 60
+    bot_market_ops_atr_period: int = 14
+    bot_market_ops_atr_pct_elevated: float = 3.0
+    bot_market_ops_volume_ratio_elevated: float = 1.8
+    # VIX bands for market-ops display (align with MARKET_OPS_VIX_* on market-operations worker).
+    bot_market_ops_vix_low_max: float = 15.0
+    bot_market_ops_vix_normal_max: float = 25.0
+    bot_market_ops_vix_elevated_max: float = 35.0
+
     # ── Optional FOMC / policy narrative (OpenAI → narrative_scores) ───────────
     bot_fomc_narrative_enable: bool = False
     bot_fomc_narrative_cron: str = "0 18 * * 3"  # Wednesday 18:00 UTC (tune around FOMC)

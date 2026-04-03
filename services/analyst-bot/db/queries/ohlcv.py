@@ -6,9 +6,36 @@ schema so a single helper handles both.
 """
 from __future__ import annotations
 
-from typing import Optional
+import json
+import logging
+from typing import Any, Optional
 
 import asyncpg
+
+log = logging.getLogger(__name__)
+
+
+def _merge_macro_derived_row(row: Any) -> Optional[dict]:
+    """Merge macro_derived value + JSONB payload into one flat dict, or None if unusable."""
+    try:
+        result: dict = {}
+        if row["value"] is not None:
+            result["value"] = float(row["value"])
+        pl = row["payload"]
+        if pl is not None:
+            payload = pl
+            if isinstance(payload, (bytes, bytearray)):
+                payload = payload.decode("utf-8")
+            if isinstance(payload, str):
+                parsed = json.loads(payload)
+                if isinstance(parsed, dict):
+                    result.update(parsed)
+            elif isinstance(payload, dict):
+                result.update(payload)
+        return result if result else None
+    except (TypeError, ValueError, json.JSONDecodeError) as exc:
+        log.debug("macro_derived row merge skip: %s", exc)
+        return None
 
 
 async def latest_bar(
@@ -76,38 +103,61 @@ async def recent_bars(
 
 async def latest_macro(pool: asyncpg.Pool, series_id: str) -> Optional[float]:
     """Return the most recent value for a FRED series (e.g. VIXCLS, DGS10)."""
-    row = await pool.fetchrow(
-        "SELECT value FROM macro_fred WHERE series_id = $1 ORDER BY ts DESC LIMIT 1",
-        series_id,
-    )
-    return float(row["value"]) if row else None
-
-
-async def latest_macro_derived(pool: asyncpg.Pool, metric: str) -> Optional[dict]:
-    """Return the most recent payload dict for a macro_derived metric.
-
-    The macro-analysis worker stores computed signals (yield curve regime,
-    mp_stance, …) in macro_derived. This helper merges the scalar `value`
-    and the JSONB `payload` into a single flat dict for the builder.
-
-    Returns None if the metric has not been computed yet.
-    """
-    import json
-
-    row = await pool.fetchrow(
-        """SELECT value, payload FROM macro_derived
-           WHERE metric = $1 AND source = 'macro_analysis'
-           ORDER BY ts DESC LIMIT 1""",
-        metric,
-    )
-    if not row:
+    try:
+        row = await pool.fetchrow(
+            "SELECT value FROM macro_fred WHERE series_id = $1 ORDER BY ts DESC LIMIT 1",
+            series_id,
+        )
+        if not row or row["value"] is None:
+            return None
+        return float(row["value"])
+    except (TypeError, ValueError) as exc:
+        log.warning("latest_macro skip series_id=%s: %s", series_id, exc)
         return None
-    result: dict = {}
-    if row["value"] is not None:
-        result["value"] = float(row["value"])
-    if row["payload"]:
-        result.update(json.loads(row["payload"]))
-    return result
+
+
+async def latest_macro_derived(
+    pool: asyncpg.Pool,
+    metric: str,
+    *,
+    source: str = "macro_analysis",
+    lookback_rows: int = 24,
+) -> Optional[dict]:
+    """Return the newest *usable* merged row for a macro_derived metric.
+
+    Merges scalar ``value`` and JSONB ``payload`` into one flat dict.
+
+    Walks up to ``lookback_rows`` newest rows (``ORDER BY ts DESC``). The single
+    latest row can be NULL/empty (bad upsert) while older rows are valid; Discord
+    ``/status`` only shows ``MAX(ts)`` and would still look healthy.
+
+    Use source='market_operations' for mo_reference_snapshot (market-ops worker).
+
+    Returns None if the metric has not been computed yet or no row merges cleanly.
+    """
+    lim = max(1, min(int(lookback_rows), 100))
+    rows = await pool.fetch(
+        """SELECT value, payload FROM macro_derived
+           WHERE metric = $1 AND source = $2
+           ORDER BY ts DESC
+           LIMIT $3""",
+        metric,
+        source,
+        lim,
+    )
+    if not rows:
+        return None
+    for row in rows:
+        merged = _merge_macro_derived_row(row)
+        if merged:
+            return merged
+    log.warning(
+        "latest_macro_derived no usable rows metric=%s source=%s (checked %d)",
+        metric,
+        source,
+        len(rows),
+    )
+    return None
 
 
 async def rel_return_vs_benchmark_excess_pct(

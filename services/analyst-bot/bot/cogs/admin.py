@@ -56,13 +56,27 @@ class AdminCog(commands.Cog):
                     """,
                     ["mc_market_cycle", "mc_macro_correlation", "aa_reference_snapshot"],
                 )
+                lines_derived: list[str] = []
                 if mc_rows:
-                    mc_lines = [
+                    lines_derived.extend(
                         f"`{r['metric']}`: {r['latest']}" for r in mc_rows
-                    ]
+                    )
+                mo_one = await self.bot.pool.fetchrow(
+                    """
+                    SELECT metric, MAX(ts) AS latest
+                    FROM macro_derived
+                    WHERE source = 'market_operations' AND metric = 'mo_reference_snapshot'
+                    GROUP BY metric
+                    """
+                )
+                if mo_one:
+                    lines_derived.append(
+                        f"`{mo_one['metric']}` (market_operations): {mo_one['latest']}"
+                    )
+                if lines_derived:
                     embed.add_field(
                         name="Macro derived (latest ts)",
-                        value="\n".join(mc_lines)[:1020],
+                        value="\n".join(lines_derived)[:1020],
                         inline=False,
                     )
             except Exception as mc_exc:
