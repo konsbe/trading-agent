@@ -1342,6 +1342,8 @@ Use Discord **`/status`** (ephemeral) to see **row counts** for macro-intel tabl
 
 Implements the **live** slice of `macro_analysis_reference.html` **Market Cycles** (drawdown bands + 200DMA row). Historical episode **tables** in that HTML stay reference-only unless you add a static dataset later.
 
+If **`mc_market_cycle`** is missing from the DB, the bot still shows a grey **“Market cycle — data missing”** card with fix steps (rebuild `macro-analysis`, ingest SPY daily bars, env).
+
 ---
 
 ### Composite `gg_stance`

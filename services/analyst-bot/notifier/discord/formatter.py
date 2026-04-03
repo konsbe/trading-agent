@@ -1297,7 +1297,18 @@ def macro_market_cycle_embed(macro: MacroSnapshot) -> Optional[discord.Embed]:
     """mc_market_cycle: index drawdown, 200DMA, composite phase vs gc/mp/inf/gg."""
     mc = macro.market_cycle
     if mc is None:
-        return None
+        return discord.Embed(
+            title="📉 Market cycle — data missing",
+            description=(
+                "The daily report did not load **`mc_market_cycle`** from `macro_derived`.\n\n"
+                "• Rebuild & restart **`macro-analysis`** (Docker image with market-cycle code).\n"
+                "• Ensure **`SPY`** (or `MARKET_CYCLE_SYMBOL`) has **≥200** **`1Day`** rows in **`equity_ohlcv`** "
+                "(add SPY to technical ingestion if needed).\n"
+                "• Check **`MARKET_CYCLE_ENABLE`** on the worker (default **true**).\n\n"
+                "_If you turned market cycle off on purpose, you can ignore this card._"
+            ),
+            color=COLOR_GREY,
+        )
 
     title_phase = (mc.composite_phase or "market_cycle").replace("_", " ").title()
     embed = discord.Embed(
