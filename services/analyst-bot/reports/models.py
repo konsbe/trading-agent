@@ -279,6 +279,28 @@ class MacroIntelSnapshot:
     macro_headlines: list[NewsHeadline] = field(default_factory=list)
 
 
+@dataclass
+class MarketCycleSnapshot:
+    """SPY/index drawdown + 200DMA + composite phase (macro-analysis mc_market_cycle)."""
+
+    symbol: str = "SPY"
+    close: Optional[float] = None
+    drawdown_pct: Optional[float] = None  # % from peak high (negative)
+    pct_vs_sma200: Optional[float] = None
+    sma200: Optional[float] = None
+    price_phase: Optional[str] = None
+    crash_warning: bool = False
+    days_off_peak: Optional[int] = None
+    composite_phase: Optional[str] = None
+    composite_label: Optional[str] = None
+    composite_score: Optional[float] = None
+    gc_stance: Optional[str] = None
+    mp_stance: Optional[str] = None
+    inf_stance: Optional[str] = None
+    gg_stance: Optional[str] = None
+    bars_used: Optional[int] = None
+
+
 # ── Macro ─────────────────────────────────────────────────────────────────────
 
 @dataclass
@@ -444,6 +466,9 @@ class MacroSnapshot:
     gg_stance: Optional[str] = None               # "benign"|"moderate"|"elevated_stress"|"insufficient_data"
     gg_score: Optional[float] = None              # -1 benign … +1 elevated global stress
     gg_signals_used: Optional[int] = None
+
+    # ── Market cycle (equity index + macro blend — mc_market_cycle) ───────────
+    market_cycle: Optional[MarketCycleSnapshot] = None
 
 
 # ── Composite symbol report ───────────────────────────────────────────────────

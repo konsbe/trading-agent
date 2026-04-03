@@ -27,6 +27,7 @@ from reports.models import (
     FundamentalSnapshot,
     MacroIntelSnapshot,
     MacroSnapshot,
+    MarketCycleSnapshot,
     NewsHeadline,
     PriceSnapshot,
     SentimentSnapshot,
@@ -794,6 +795,33 @@ class ReportBuilder:
             snap.gg_stance = gg_stance_p.get("stance")
             snap.gg_score = gg_stance_p.get("value")
             snap.gg_signals_used = gg_stance_p.get("signals_used")
+
+            mc_p = await _md("mc_market_cycle")
+            if mc_p:
+                inp = mc_p.get("inputs") if isinstance(mc_p.get("inputs"), dict) else {}
+
+                def _instr(k: str) -> Optional[str]:
+                    v = inp.get(k)
+                    return str(v) if v is not None and v != "" else None
+
+                snap.market_cycle = MarketCycleSnapshot(
+                    symbol=str(mc_p.get("symbol") or "SPY"),
+                    close=float(mc_p["close"]) if mc_p.get("close") is not None else None,
+                    drawdown_pct=float(mc_p["drawdown_pct"]) if mc_p.get("drawdown_pct") is not None else None,
+                    pct_vs_sma200=float(mc_p["pct_vs_sma200"]) if mc_p.get("pct_vs_sma200") is not None else None,
+                    sma200=float(mc_p["sma200"]) if mc_p.get("sma200") is not None else None,
+                    price_phase=mc_p.get("price_phase") if isinstance(mc_p.get("price_phase"), str) else None,
+                    crash_warning=bool(mc_p.get("crash_warning")),
+                    days_off_peak=int(mc_p["days_off_peak"]) if mc_p.get("days_off_peak") is not None else None,
+                    composite_phase=mc_p.get("composite_phase") if isinstance(mc_p.get("composite_phase"), str) else None,
+                    composite_label=mc_p.get("composite_label") if isinstance(mc_p.get("composite_label"), str) else None,
+                    composite_score=float(mc_p["value"]) if mc_p.get("value") is not None else None,
+                    gc_stance=_instr("gc_stance"),
+                    mp_stance=_instr("mp_stance"),
+                    inf_stance=_instr("inf_stance"),
+                    gg_stance=_instr("gg_stance"),
+                    bars_used=int(mc_p["bars_used"]) if mc_p.get("bars_used") is not None else None,
+                )
 
         except Exception as exc:
             log.warning("macro build failed: %s", exc)

@@ -1311,7 +1311,7 @@ Embed order in `/report`: after **Inflation & Prices**. Same as other macro pane
 
 Uses **FRED only** today: `DTWEXBGS`, `DEXJPUS`, `CHNGDPNQDSMEI`, `FYFSD`, `GDP`. Computed by `macro-analysis` → `macro_derived` (`gg_*` metrics).
 
-### Macro intelligence embed (after Global & Geopolitical)
+    ### Macro intelligence embed (after Global & Geopolitical)
 
 Separate Discord embed **Macro intel · calendars · geo · headlines** — data from `data-macro-intel` and optional LLM rows:
 
@@ -1327,6 +1327,20 @@ Separate Discord embed **Macro intel · calendars · geo · headlines** — data
 Configure the job with `BOT_FOMC_NARRATIVE_ENABLE=true`, `OPENAI_API_KEY`, `FOMC_STATEMENT_URL` (HTML page), and `BOT_FOMC_NARRATIVE_CRON` (cron, UTC). See root `.env.example`.
 
 Use Discord **`/status`** (ephemeral) to see **row counts** for macro-intel tables (`economic_calendar_events`, `gdelt_macro_daily`, etc.) — useful when a section is empty (Finnhub tier limits, missing `GPR_CSV_URL`, or worker not rebuilt).
+
+### Market cycle embed (after Global & Geopolitical)
+
+**Metric:** `mc_market_cycle` from **macro-analysis** (reads `equity_ohlcv` for **SPY** by default, blends **gc/mp/inf/gg** stances).
+
+| Field | Meaning |
+|--------|---------|
+| **Composite phase** | Rule-based headline: e.g. `bull_macro_aligned`, `late_cycle_stretched`, `correction_risk`, `bear_structural`, `crash_panic` |
+| **Score** | −1 (stress) … +1 (constructive) — not a trade signal, a compact regime index |
+| **Price phase** | From drawdown vs ~252d peak high: pullback / correction / bear / crash velocity / bull / `below_sma` |
+| **vs 200DMA** | % above/below simple 200-day close average |
+| **Crash velocity flag** | True if drop vs 10d high or 5-bar return exceeds configured thresholds (`MARKET_CYCLE_*`) |
+
+Implements the **live** slice of `macro_analysis_reference.html` **Market Cycles** (drawdown bands + 200DMA row). Historical episode **tables** in that HTML stay reference-only unless you add a static dataset later.
 
 ---
 
