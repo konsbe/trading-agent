@@ -1288,8 +1288,59 @@ def macro_global_embed(macro: MacroSnapshot) -> Optional[discord.Embed]:
 
     sigs = f"{macro.gg_signals_used} signals" if macro.gg_signals_used else "partial data"
     embed.set_footer(
-        text=f"Global · {sigs} · FRED · GPR/GDELT/calendars: Macro intel embed · see bot.md"
+        text=f"Global · {sigs} · FRED · Market cycle + Macro intel embeds · see bot.md"
     )
+    return embed
+
+
+def macro_market_cycle_embed(macro: MacroSnapshot) -> Optional[discord.Embed]:
+    """mc_market_cycle: index drawdown, 200DMA, composite phase vs gc/mp/inf/gg."""
+    mc = macro.market_cycle
+    if mc is None:
+        return None
+
+    title_phase = (mc.composite_phase or "market_cycle").replace("_", " ").title()
+    embed = discord.Embed(
+        title=f"📉 Market cycle — {title_phase}",
+        color=COLOR_YELLOW,
+    )
+    sc = _num(mc.composite_score, 2) if mc.composite_score is not None else "—"
+    embed.add_field(
+        name="Composite",
+        value=f"**{mc.composite_phase or '—'}** · score **{sc}** (−1 stress … +1 constructive)",
+        inline=False,
+    )
+    if mc.composite_label:
+        embed.add_field(name="Interpretation", value=_trunc(mc.composite_label, 1020), inline=False)
+
+    dd = _num(mc.drawdown_pct, 2) if mc.drawdown_pct is not None else "—"
+    vsma = _num(mc.pct_vs_sma200, 2) if mc.pct_vs_sma200 is not None else "—"
+    crash = "⚠️ **yes** (fast move vs recent highs)" if mc.crash_warning else "no"
+    mech = "\n".join(
+        [
+            f"Symbol **{mc.symbol}** · price phase **{mc.price_phase or '—'}**",
+            f"Drawdown from **{mc.days_off_peak or '—'}**d peak: **{dd}%**",
+            f"vs **200DMA**: **{vsma}%** · SMA200 {_num(mc.sma200, 2)} · close {_num(mc.close, 2)}",
+            f"Crash velocity flag: {crash}",
+        ]
+    )
+    embed.add_field(name="Index (reference HTML thresholds)", value=mech, inline=False)
+
+    parts = []
+    if mc.gc_stance:
+        parts.append(f"Growth **{mc.gc_stance}**")
+    if mc.mp_stance:
+        parts.append(f"Policy **{mc.mp_stance}**")
+    if mc.inf_stance:
+        parts.append(f"Inflation **{mc.inf_stance}**")
+    if mc.gg_stance:
+        parts.append(f"Global **{mc.gg_stance}**")
+    embed.add_field(
+        name="Blended inputs",
+        value=" · ".join(parts) if parts else "—",
+        inline=False,
+    )
+    embed.set_footer(text=f"mc_market_cycle · {mc.bars_used or '?'} daily bars · MARKET_CYCLE_* in .env")
     return embed
 
 
@@ -1425,6 +1476,11 @@ def daily_report_embeds(report: DailyReport) -> list[discord.Embed]:
         gg_embed = macro_global_embed(report.macro)
         if gg_embed:
             embeds.append(gg_embed)
+
+    if report.macro:
+        mcy_embed = macro_market_cycle_embed(report.macro)
+        if mcy_embed:
+            embeds.append(mcy_embed)
 
     if report.macro_intel:
         mi_embed = macro_intel_embed(report.macro_intel)

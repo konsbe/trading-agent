@@ -1085,6 +1085,43 @@ func LoadGlobalGeopolitical() GlobalGeopolitical {
 	}
 }
 
+// MarketCycle configures SPY/index drawdown + 200DMA + composite phase (macro_analysis_reference.html).
+type MarketCycle struct {
+	Enabled    bool
+	Symbol     string
+	Interval   string
+	FetchLimit int
+	MinBars    int
+	// Drawdown thresholds as negative fractions (e.g. -0.03 = −3% from peak high).
+	PullbackPct          float64
+	CorrectionPct        float64
+	BearPct              float64
+	CrashVs10DHighPct    float64
+	CrashVs5BarPct       float64
+	BullExtendedSMAPct   float64
+	PeakLookback         int
+	SMAPeriod            int
+}
+
+// LoadMarketCycle reads MARKET_CYCLE_* env vars.
+func LoadMarketCycle() MarketCycle {
+	return MarketCycle{
+		Enabled:            boolEnv("MARKET_CYCLE_ENABLE", true),
+		Symbol:             strEnvDefault("MARKET_CYCLE_SYMBOL", "SPY"),
+		Interval:           strEnvDefault("MARKET_CYCLE_INTERVAL", "1Day"),
+		FetchLimit:         intEnv("MARKET_CYCLE_FETCH_LIMIT", 320),
+		MinBars:            intEnv("MARKET_CYCLE_MIN_BARS", 200),
+		PullbackPct:        floatEnv("MARKET_CYCLE_PULLBACK_PCT", -0.03),
+		CorrectionPct:      floatEnv("MARKET_CYCLE_CORRECTION_PCT", -0.10),
+		BearPct:            floatEnv("MARKET_CYCLE_BEAR_PCT", -0.20),
+		CrashVs10DHighPct:  floatEnv("MARKET_CYCLE_CRASH_10D_HIGH_PCT", -0.12),
+		CrashVs5BarPct:     floatEnv("MARKET_CYCLE_CRASH_5BAR_PCT", -0.10),
+		BullExtendedSMAPct: floatEnv("MARKET_CYCLE_BULL_EXTENDED_SMA_PCT", 0.05),
+		PeakLookback:       intEnv("MARKET_CYCLE_PEAK_LOOKBACK", 252),
+		SMAPeriod:          intEnv("MARKET_CYCLE_SMA_PERIOD", 200),
+	}
+}
+
 func LoadMacroAnalysis() (MacroAnalysis, error) {
 	b := LoadBase()
 	if b.DatabaseURL == "" {

@@ -44,6 +44,10 @@
 //   gg_fiscal         Federal surplus/deficit (FYFSD) + deficit % of nominal GDP (GDP, SAAR)
 //   gg_stance         Composite global-financial-conditions stress score
 //
+// Market cycle (analyzeMarketCycles) — equity_ohlcv + macro stances:
+//   mc_market_cycle   SPY (configurable) drawdown vs peak, 200DMA %, crash heuristics,
+//                     composite phase blending gc/mp/inf/gg (see macro_analysis_reference.html Market Cycles)
+//
 // TODO [PAID]:    ICE DXY, real-time FX — FRED DTWEXBGS is weekly broad goods index.
 // TODO [PAID]:    China official / Caixin PMI — NBS/Caixin; EM stress (JPM EMBI+) paid.
 // TODO [SCRAPE]:  USTR tariffs, PBOC announcements, CBO outlook — no clean API.
@@ -71,6 +75,7 @@ import (
 	"github.com/konsbe/trading-agent/services/data-analyzer/internal/config"
 	"github.com/konsbe/trading-agent/services/data-analyzer/internal/db"
 	"github.com/konsbe/trading-agent/services/data-analyzer/internal/logx"
+	"github.com/konsbe/trading-agent/services/data-analyzer/internal/marketcycle"
 	"github.com/konsbe/trading-agent/services/data-analyzer/internal/store"
 )
 
@@ -98,6 +103,7 @@ func main() {
 		growthCfg:    config.LoadGrowthCycle(),
 		inflationCfg: config.LoadInflationCycle(),
 		globalCfg:    config.LoadGlobalGeopolitical(),
+		cycleCfg:     config.LoadMarketCycle(),
 		pool:         pool,
 		log:          log,
 	}
@@ -149,6 +155,7 @@ type worker struct {
 	growthCfg    config.GrowthCycle
 	inflationCfg config.InflationCycle
 	globalCfg    config.GlobalGeopolitical
+	cycleCfg     config.MarketCycle
 	pool         *pgxpool.Pool
 	log          *slog.Logger
 }
@@ -158,7 +165,7 @@ func (w *worker) analyzeAll(ctx context.Context) {
 	w.analyzeGrowth(ctx)
 	w.analyzeInflation(ctx)
 	w.analyzeGlobal(ctx)
-	// TODO [FUTURE]: w.analyzeCycles(ctx) — composite cross-panel regime detection
+	w.analyzeMarketCycles(ctx)
 }
 
 // analyzeMonetary computes all monetary-policy signals from FRED series stored
@@ -1840,5 +1847,82 @@ func (w *worker) analyzeGlobal(ctx context.Context) {
 		"stance", ggStance,
 		"score", fmt.Sprintf("%.3f", ggScore),
 		"signals", usedSignals,
+	)
+}
+
+// analyzeMarketCycles reads equity_ohlcv (default SPY 1Day), computes drawdown vs peak,
+// 200-day MA distance, crash heuristics, and blends with gc/mp/inf/gg stances → mc_market_cycle.
+func (w *worker) analyzeMarketCycles(ctx context.Context) {
+	if !w.cycleCfg.Enabled {
+		return
+	}
+	ts := time.Now().UTC()
+	cfg := w.cycleCfg
+	ptr := func(v float64) *float64 { return &v }
+	upsert := func(metric string, value *float64, payload any) {
+		if err := store.UpsertMacroDerived(ctx, w.pool, ts, metric, value, payload); err != nil {
+			w.log.Error("upsert macro derived", "metric", metric, "err", err)
+		}
+	}
+
+	bars, err := store.QueryEquityOHLCVAsc(ctx, w.pool, cfg.Symbol, cfg.Interval, cfg.FetchLimit)
+	if err != nil {
+		w.log.Error("market cycle equity bars", "symbol", cfg.Symbol, "err", err)
+		return
+	}
+	th := marketcycle.Thresholds{
+		PullbackPct:        cfg.PullbackPct,
+		CorrectionPct:      cfg.CorrectionPct,
+		BearPct:            cfg.BearPct,
+		CrashVs10DHighPct:  cfg.CrashVs10DHighPct,
+		CrashVs5BarPct:     cfg.CrashVs5BarPct,
+		BullExtendedSMAPct: cfg.BullExtendedSMAPct,
+		PeakLookback:       cfg.PeakLookback,
+		SMAPeriod:          cfg.SMAPeriod,
+	}
+	pr := marketcycle.AnalyzePrice(cfg.Symbol, bars, th)
+
+	gc, _ := store.QueryMacroPayloadString(ctx, w.pool, "gc_stance", "stance")
+	mp, _ := store.QueryMacroPayloadString(ctx, w.pool, "mp_stance", "stance")
+	inf, _ := store.QueryMacroPayloadString(ctx, w.pool, "inf_stance", "stance")
+	gg, _ := store.QueryMacroPayloadString(ctx, w.pool, "gg_stance", "stance")
+	comp := marketcycle.BuildComposite(pr, gc, mp, inf, gg)
+
+	payload := map[string]any{
+		"symbol":              pr.Symbol,
+		"interval":            cfg.Interval,
+		"bars_used":           len(bars),
+		"min_bars_expected":   cfg.MinBars,
+		"close":               marketcycle.Round2(pr.Close),
+		"peak_high":           marketcycle.Round2(pr.PeakHigh),
+		"peak_ts":             pr.PeakTS.UTC().Format(time.RFC3339),
+		"drawdown_pct":        marketcycle.Round2(pr.DrawdownPct * 100),
+		"days_off_peak":       pr.DaysOffPeak,
+		"sma200":              marketcycle.Round2(pr.SMA200),
+		"has_sma200":          pr.HasSMA200,
+		"pct_vs_sma200":       marketcycle.Round2(pr.PctVsSMA200),
+		"price_phase":         pr.Phase,
+		"crash_warning":       pr.CrashWarning,
+		"composite_phase":     comp.Phase,
+		"composite_label":     comp.Label,
+		"inputs": map[string]any{
+			"gc_stance": gc,
+			"mp_stance": mp,
+			"inf_stance": inf,
+			"gg_stance": gg,
+		},
+		"reference": "macro_analysis_reference.html — Market Cycles panel",
+	}
+	if len(bars) < cfg.MinBars {
+		payload["note"] = fmt.Sprintf("fewer than %d bars — price_phase may be insufficient_data", cfg.MinBars)
+	}
+
+	upsert("mc_market_cycle", ptr(comp.Score), payload)
+	w.log.Info("market cycle complete",
+		"symbol", cfg.Symbol,
+		"composite", comp.Phase,
+		"price_phase", pr.Phase,
+		"dd_pct", fmt.Sprintf("%.2f", pr.DrawdownPct*100),
+		"vs_sma200", fmt.Sprintf("%.2f", pr.PctVsSMA200),
 	)
 }

@@ -2691,7 +2691,10 @@
     <div class="panel" id="panel-cycles">
         <p class="cycle-intro">These are the definitive historical benchmarks for every phase of the market cycle. Every
             number here is based on documented historical episodes. Use these as your system's reference values for
-            market phase classification, risk regime detection, and portfolio adjustment triggers.</p>
+            market phase classification, risk regime detection, and portfolio adjustment triggers.
+            <strong>Live implementation:</strong> the macro-analysis worker maps drawdown / 200DMA / crash velocity + macro stances
+            to <code>mc_market_cycle</code> (Discord &quot;Market cycle&quot; embed). This panel remains the full reference;
+            the historical events table is display-only unless you add a dataset.</p>
 
         <div class="tier">
             <div class="tier-line"></div><span class="tier-txt">Downside market phases — definitions, thresholds &amp;
