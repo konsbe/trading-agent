@@ -41,7 +41,7 @@ def build_scheduler(
     scheduler = AsyncIOScheduler(timezone="UTC")
 
     daily_job = DailyReportJob(cfg, builder, notifiers)
-    alert_job = AlertScanJob(cfg, builder, notifiers)
+    alert_job = AlertScanJob(cfg, builder, notifiers, pool=db_pool)
 
     # Daily market report — cron from .env (default 07:00 UTC)
     try:
