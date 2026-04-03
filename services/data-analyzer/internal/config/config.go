@@ -1122,6 +1122,18 @@ func LoadMarketCycle() MarketCycle {
 	}
 }
 
+// MacroCorrelation enables mc_macro_correlation (cross-metric regime label after other macro passes).
+type MacroCorrelation struct {
+	Enabled bool
+}
+
+// LoadMacroCorrelation reads MARKET_MACRO_CORR_* env vars.
+func LoadMacroCorrelation() MacroCorrelation {
+	return MacroCorrelation{
+		Enabled: boolEnv("MARKET_MACRO_CORR_ENABLE", true),
+	}
+}
+
 func LoadMacroAnalysis() (MacroAnalysis, error) {
 	b := LoadBase()
 	if b.DatabaseURL == "" {

@@ -59,6 +59,7 @@ async def start() -> None:
         news_limit=cfg.bot_news_headlines_limit,
         price_cache_ttl=cfg.bot_cache_price_ttl,
         analyze_cache_ttl=cfg.bot_cache_analyze_ttl,
+        benchmark_symbol=cfg.market_cycle_symbol,
     )
 
     scheduler = build_scheduler(cfg, builder, notifiers=[], db_pool=db_pool)

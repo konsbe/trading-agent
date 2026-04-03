@@ -3097,6 +3097,9 @@
 
     <!-- ═══════════════════════════════
      MACRO CORRELATIONS
+     Live worker output: macro-analysis upserts mc_macro_correlation (regime + score + flags)
+     into macro_derived after gc/mp/inf/gg passes and mc_market_cycle. Analyst-bot shows it
+     on /report and a compact strip on /analyze (see services/analyst-bot/bot.md).
 ═══════════════════════════════ -->
     <div class="panel" id="panel-corr">
         <p class="corr-intro">The most important macro transmission chains — how one variable causes moves in another
