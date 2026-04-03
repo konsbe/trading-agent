@@ -2,12 +2,14 @@
 
 The `data-analyzer` service processes raw data stored by `data-ingestion` workers and derives **signals** — scored, classified, and structured outputs ready for the `analyst-bot` to consume. It never calls any external API. All inputs come from TimescaleDB.
 
-It contains two independent analysis services:
+It ships several analysis binaries in one Docker image:
 
 | Service | Binary | Reads from | Writes to |
 |---|---|---|---|
 | `technical-analysis` | `cmd/technical-analysis` | `equity_ohlcv`, `crypto_ohlcv`, `macro_fred` | `technical_indicators` |
 | `fundamental-analysis` | `cmd/fundamental-analysis` | `equity_fundamentals` (raw metrics) | `equity_fundamentals` (derived period) |
+| `macro-analysis` | `cmd/macro-analysis` | `macro_fred`, `equity_ohlcv` | `macro_derived` (`source = macro_analysis`) |
+| `market-operations` | `cmd/market-operations` | `macro_fred` (VIXCLS) | `macro_derived` (`source = market_operations`, metric `mo_reference_snapshot`) |
 
 ---
 
@@ -548,6 +550,24 @@ The third binary in the same Docker image as technical/fundamental analysis. Rea
 **Env (additional slice):** `ADDITIONAL_ANALYSIS_ENABLE`, `ADDITIONAL_ANALYSIS_CORR_WINDOW` (default 60), `ADDITIONAL_ANALYSIS_MIN_CORR_OBS` (default 40), `ADDITIONAL_ANALYSIS_MAX_BARS` (default 180). Benchmark symbol/interval follow **`MARKET_CYCLE_*`**.
 
 **Not in v1:** options flow, GEX, dark pool, alt data, pairs trading — those remain reference-only in the HTML until separate ingestion exists.
+
+---
+
+## `market-operations` worker (Module 5 snapshot)
+
+Separate binary from **`macro-analysis`**. Writes **`mo_reference_snapshot`** to **`macro_derived`** with **`source = market_operations`** (same table, different `source` for clarity).
+
+| Field (payload) | Meaning |
+|---|---|
+| `global.vix`, `global.vix_regime`, `global.vix_label` | Latest **VIXCLS** from **`macro_fred`** + bands (`MARKET_OPS_VIX_*_MAX`) |
+| `reference_modules` | Maps each tab of **`market_operations_reference.html`** to **`partial_live` / `needs_data` / `not_automated`** |
+| `disclaimer` | Static reminder: context only |
+
+**Per-symbol execution strip** (ATR% of price, volume vs median, flags) is **not** written by this worker — the **analyst-bot** computes it at read time from **`technical_indicators`** + OHLCV using **`BOT_MARKET_OPS_*`**.
+
+**Env:** `MARKET_OPS_ENABLE`, `MARKET_OPS_POLL_INTERVAL` (default `1h`), `MARKET_OPS_STARTUP_DELAY_SECS`, `MARKET_OPS_VIX_LOW_MAX`, `MARKET_OPS_VIX_NORMAL_MAX`, `MARKET_OPS_VIX_ELEVATED_MAX`.
+
+**Package layout:** `internal/marketops`.
 
 ---
 

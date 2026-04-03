@@ -60,6 +60,14 @@ async def start() -> None:
         price_cache_ttl=cfg.bot_cache_price_ttl,
         analyze_cache_ttl=cfg.bot_cache_analyze_ttl,
         benchmark_symbol=cfg.market_cycle_symbol,
+        market_ops_enable=cfg.bot_market_ops_enable,
+        market_ops_volume_lookback=cfg.bot_market_ops_volume_lookback,
+        market_ops_atr_period=cfg.bot_market_ops_atr_period,
+        market_ops_atr_pct_elevated=cfg.bot_market_ops_atr_pct_elevated,
+        market_ops_volume_ratio_elevated=cfg.bot_market_ops_volume_ratio_elevated,
+        market_ops_vix_low_max=cfg.bot_market_ops_vix_low_max,
+        market_ops_vix_normal_max=cfg.bot_market_ops_vix_normal_max,
+        market_ops_vix_elevated_max=cfg.bot_market_ops_vix_elevated_max,
     )
 
     scheduler = build_scheduler(cfg, builder, notifiers=[], db_pool=db_pool)

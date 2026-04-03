@@ -24,6 +24,7 @@ from reports.models import (
     FundamentalSnapshot,
     MacroIntelSnapshot,
     MacroSnapshot,
+    MarketOpsSlice,
     NewsHeadline,
     PriceSnapshot,
     SentimentSnapshot,
@@ -728,6 +729,12 @@ def symbol_report_embeds(report: SymbolReport) -> list[discord.Embed]:
         ce = analyze_context_embed(report.analyze_context)
         if ce:
             embeds.append(ce)
+    if report.market_ops:
+        moe = market_ops_analyze_embed(
+            report.market_ops, report.symbol, report.asset_type
+        )
+        if moe:
+            embeds.append(moe)
     if report.technical:
         embeds.append(technical_embed(
             report.technical,
@@ -1567,6 +1574,127 @@ def analyze_context_embed(ctx: AnalyzeContextSnapshot) -> Optional[discord.Embed
     return embed
 
 
+def market_ops_analyze_embed(mo: MarketOpsSlice, symbol: str, asset_type: str) -> Optional[discord.Embed]:
+    """Global VIX regime + per-symbol ATR% / volume vs median on /analyze."""
+    has = (
+        mo.global_vix is not None
+        or mo.global_vix_regime
+        or mo.atr_pct is not None
+        or mo.volume_vs_median_ratio is not None
+        or mo.flags
+        or mo.asset_execution_note
+    )
+    if not has:
+        return None
+
+    embed = discord.Embed(
+        title=f"⚙️ Market ops — {symbol}",
+        description="_Regime + execution context — not entry/exit prices or advice._",
+        color=COLOR_PURPLE,
+    )
+    if mo.global_vix is not None or mo.global_vix_regime:
+        gv = _num(mo.global_vix, 1) if mo.global_vix is not None else "—"
+        rg = (mo.global_vix_regime or "—").replace("_", " ")
+        vix_lbl = "VIX (US equities — risk backdrop)"
+        if asset_type == "crypto":
+            vix_lbl = "VIX (US equities index — crypto risk backdrop)"
+        embed.add_field(
+            name=vix_lbl,
+            value=f"**{gv}** · **{rg}**"
+            + (f"\n{_trunc(mo.global_vix_label or '', 600)}" if mo.global_vix_label else ""),
+            inline=False,
+        )
+    sym_lines: list[str] = []
+    if mo.atr_pct is not None:
+        sym_lines.append(f"ATR% of price (≈{asset_type} bar): **{_num(mo.atr_pct, 3)}%**")
+    if mo.volume_vs_median_ratio is not None:
+        lb = mo.volume_lookback_bars or "—"
+        sym_lines.append(
+            f"Volume vs median (last **{lb}** bars): **{_num(mo.volume_vs_median_ratio, 2)}×**"
+        )
+    if mo.flags:
+        sym_lines.append("Flags: **" + "**, **".join(mo.flags) + "**")
+    if sym_lines:
+        embed.add_field(name="This symbol (liquidity / noise)", value="\n".join(sym_lines), inline=False)
+    if mo.asset_execution_note:
+        embed.add_field(
+            name="Asset note",
+            value=_trunc(mo.asset_execution_note, 1020),
+            inline=False,
+        )
+    embed.set_footer(text="mo_reference_snapshot · MARKET_OPS_* · market_operations_reference.html")
+    return embed
+
+
+def market_ops_command_embed(mo: Optional[MarketOpsSlice], symbol: Optional[str] = None) -> discord.Embed:
+    """Discord view for /marketops (global + optional symbol strip)."""
+    title = "⚙️ Market operations"
+    if symbol:
+        title += f" — {symbol}"
+    embed = discord.Embed(
+        title=title,
+        description="_Module 5 reference context. Not buy/sell advice._",
+        color=COLOR_PURPLE,
+    )
+    if not mo:
+        embed.add_field(
+            name="Status",
+            value="Market ops disabled (`BOT_MARKET_OPS_ENABLE=false`) or failed to load.",
+            inline=False,
+        )
+        return embed
+
+    if mo.global_as_of:
+        embed.add_field(name="Snapshot as of", value=f"`{mo.global_as_of}`", inline=True)
+
+    if mo.global_vix is not None or mo.global_vix_regime:
+        gv = _num(mo.global_vix, 1) if mo.global_vix is not None else "—"
+        rg = (mo.global_vix_regime or "—").replace("_", " ")
+        embed.add_field(
+            name="VIX regime",
+            value=f"**{gv}** · {rg}",
+            inline=True,
+        )
+    if mo.global_vix_label:
+        embed.add_field(
+            name="Read",
+            value=_trunc(mo.global_vix_label, 1020),
+            inline=False,
+        )
+
+    if mo.reference_coverage_lines:
+        embed.add_field(
+            name="HTML coverage (automation status)",
+            value=_trunc("\n".join(f"• {ln}" for ln in mo.reference_coverage_lines[:12]), 1020),
+            inline=False,
+        )
+
+    if symbol and (
+        mo.atr_pct is not None
+        or mo.volume_vs_median_ratio is not None
+        or mo.flags
+        or mo.asset_execution_note
+    ):
+        sl: list[str] = []
+        if mo.atr_pct is not None:
+            sl.append(f"ATR%: **{_num(mo.atr_pct, 3)}%**")
+        if mo.volume_vs_median_ratio is not None:
+            sl.append(f"Vol vs median: **{_num(mo.volume_vs_median_ratio, 2)}×**")
+        if mo.flags:
+            sl.append("Flags: **" + "**, **".join(mo.flags) + "**")
+        if mo.asset_execution_note:
+            sl.append(_trunc(mo.asset_execution_note, 400))
+        embed.add_field(name=f"Symbol · {symbol}", value="\n".join(sl), inline=False)
+
+    ft = "mo_reference_snapshot · /marketops · market_operations_reference.html"
+    if mo.global_vix is not None and mo.vix_from_macro_fred:
+        ft = "Live VIX from macro_fred · " + ft
+    elif mo.global_vix is not None:
+        ft = "VIX from TA benchmark / snapshot · " + ft
+    embed.set_footer(text=ft)
+    return embed
+
+
 def macro_intel_embed(intel: MacroIntelSnapshot) -> Optional[discord.Embed]:
     """Calendars, GPR, GDELT, optional FOMC narrative, macro RSS / Finnhub general headlines."""
     has_any = (
@@ -1674,6 +1802,24 @@ def daily_report_embeds(report: DailyReport) -> list[discord.Embed]:
             macro_parts.append(f"EUR/USD: **{report.macro.dexuseu:.4f}**")
         if macro_parts:
             header.add_field(name="Macro", value=" | ".join(macro_parts), inline=False)
+
+    has_equity_ta_vix = any(
+        sr.asset_type == "equity"
+        and sr.technical
+        and sr.technical.vix_regime
+        for sr in report.symbols
+    )
+    has_mo_vix_band = any(
+        sr.market_ops and sr.market_ops.global_vix_regime for sr in report.symbols
+    )
+    if has_equity_ta_vix and has_mo_vix_band:
+        header.set_footer(
+            text=(
+                "TA vix_regime (symbol footer) and Market ops VIX band use different "
+                "thresholds — same spot VIX can look \"normal\" in one line and "
+                "\"elevated\" in the other. See bot.md (VIX Regime + daily symbols)."
+            )
+        )
     embeds.append(header)
 
     # Monetary Policy embed (appears once per report, immediately after header)
@@ -1783,6 +1929,26 @@ def daily_report_embeds(report: DailyReport) -> list[discord.Embed]:
             n = sr.news[0]
             headline = n.headline[:100] + ("…" if len(n.headline) > 100 else "")
             embed.add_field(name="Latest News", value=headline, inline=False)
+
+        if sr.market_ops and (
+            sr.market_ops.atr_pct is not None
+            or sr.market_ops.volume_vs_median_ratio is not None
+            or sr.market_ops.flags
+        ):
+            mo_parts: list[str] = []
+            if sr.market_ops.global_vix_regime:
+                mo_parts.append(f"VIX regime: {sr.market_ops.global_vix_regime.replace('_', ' ')}")
+            if sr.market_ops.atr_pct is not None:
+                mo_parts.append(f"ATR% {_num(sr.market_ops.atr_pct, 2)}")
+            if sr.market_ops.volume_vs_median_ratio is not None:
+                mo_parts.append(f"Vol×median {_num(sr.market_ops.volume_vs_median_ratio, 2)}")
+            if sr.market_ops.flags:
+                mo_parts.append(", ".join(sr.market_ops.flags))
+            embed.add_field(
+                name="Market ops",
+                value=_trunc(" · ".join(mo_parts), 1020),
+                inline=False,
+            )
 
         if sr.technical and sr.technical.vix_regime and sr.asset_type == "equity":
             embed.set_footer(text=f"VIX: {_regime_emoji(sr.technical.vix_regime)} {sr.technical.vix_regime}")

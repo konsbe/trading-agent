@@ -30,6 +30,7 @@ from reports.models import (
     MacroIntelSnapshot,
     MacroSnapshot,
     MarketCycleSnapshot,
+    MarketOpsSlice,
     NewsHeadline,
     PriceSnapshot,
     SentimentSnapshot,
@@ -130,6 +131,15 @@ class ReportBuilder:
         price_cache_ttl: int = 300,
         analyze_cache_ttl: int = 600,
         benchmark_symbol: str = "SPY",
+        *,
+        market_ops_enable: bool = True,
+        market_ops_volume_lookback: int = 60,
+        market_ops_atr_period: int = 14,
+        market_ops_atr_pct_elevated: float = 3.0,
+        market_ops_volume_ratio_elevated: float = 1.8,
+        market_ops_vix_low_max: float = 15.0,
+        market_ops_vix_normal_max: float = 25.0,
+        market_ops_vix_elevated_max: float = 35.0,
     ) -> None:
         self._pool = pool
         self._equity_interval = equity_interval
@@ -138,6 +148,14 @@ class ReportBuilder:
         self._price_cache_ttl = price_cache_ttl
         self._analyze_cache_ttl = analyze_cache_ttl
         self._benchmark_symbol = (benchmark_symbol or "SPY").strip().upper() or "SPY"
+        self._market_ops_enable = market_ops_enable
+        self._market_ops_volume_lookback = max(5, market_ops_volume_lookback)
+        self._market_ops_atr_period = max(1, market_ops_atr_period)
+        self._market_ops_atr_pct_elevated = market_ops_atr_pct_elevated
+        self._market_ops_volume_ratio_elevated = market_ops_volume_ratio_elevated
+        self._market_ops_vix_low_max = market_ops_vix_low_max
+        self._market_ops_vix_normal_max = market_ops_vix_normal_max
+        self._market_ops_vix_elevated_max = market_ops_vix_elevated_max
 
     # ── Public entry points ───────────────────────────────────────────────────
 
@@ -162,11 +180,29 @@ class ReportBuilder:
         report.sentiment = await self._build_sentiment(symbol)
         report.news = await self._build_news(symbol, asset_type)
         report.analyze_context = await self._build_analyze_context(symbol, asset_type)
+        report.market_ops = await self._build_market_ops_slice(
+            symbol, asset_type, report.price, report.technical
+        )
 
         if use_cache:
             await _cache.set(cache_key, self._serialise_symbol_report(report), self._analyze_cache_ttl)
 
         return report
+
+    async def build_market_ops_view(
+        self,
+        symbol: Optional[str] = None,
+        asset_type: str = "equity",
+    ) -> Optional[MarketOpsSlice]:
+        """Latest global snapshot; optional per-symbol execution strip for /marketops."""
+        if not self._market_ops_enable:
+            return None
+        sym = symbol.strip().upper() if symbol else None
+        price = await self._build_price(sym, asset_type) if sym else None
+        tech = await self._build_technical(sym, asset_type) if sym else None
+        return await self._build_market_ops_slice(
+            sym or "", asset_type, price, tech, include_symbol=bool(sym)
+        )
 
     async def build_daily_report(
         self,
@@ -686,9 +722,278 @@ class ReportBuilder:
             log.warning("news build failed symbol=%s: %s", symbol, exc)
             return []
 
+    def _fill_market_ops_global(self, mo: MarketOpsSlice, raw: dict) -> None:
+        if isinstance(raw.get("as_of"), str):
+            mo.global_as_of = raw["as_of"]
+        g = raw.get("global")
+        if isinstance(g, dict):
+            if g.get("vix") is not None:
+                try:
+                    mo.global_vix = float(g["vix"])
+                    mo.vix_from_macro_fred = True
+                except (TypeError, ValueError):
+                    pass
+            if isinstance(g.get("vix_regime"), str):
+                mo.global_vix_regime = g["vix_regime"]
+            if isinstance(g.get("vix_label"), str):
+                mo.global_vix_label = g["vix_label"]
+        mods = raw.get("reference_modules")
+        if isinstance(mods, dict):
+            for k in sorted(mods.keys()):
+                ent = mods[k]
+                if isinstance(ent, dict):
+                    mo.reference_coverage_lines.append(
+                        f"{k}: {ent.get('status', '—')} — {ent.get('hint', '')}"
+                    )
+
+    def _classify_vix_market_ops(self, vix: float) -> tuple[str, str]:
+        """Match market-operations worker bands (MARKET_OPS_VIX_*)."""
+        lo, nm, el = (
+            self._market_ops_vix_low_max,
+            self._market_ops_vix_normal_max,
+            self._market_ops_vix_elevated_max,
+        )
+        if vix < lo:
+            return (
+                "low",
+                f"VIX {vix:.1f} — complacency risk; vol spikes can surprise trend strategies.",
+            )
+        if vix < nm:
+            return "normal", f"VIX {vix:.1f} — typical range; baseline sizing rules."
+        if vix < el:
+            return (
+                "elevated",
+                f"VIX {vix:.1f} — elevated fear; wider noise band, size with care.",
+            )
+        return (
+            "stress",
+            f"VIX {vix:.1f} — stress regime; prioritize liquidity and gap risk.",
+        )
+
+    async def _hydrate_market_ops_vix(self, mo: MarketOpsSlice) -> None:
+        """Prefer live macro_fred VIXCLS; if missing, use benchmark TA vix_regime (same source as TA embed)."""
+        fv: Optional[float] = None
+        from_fred = False
+        try:
+            v = await ohlcv.latest_macro(self._pool, "VIXCLS")
+            if v is not None:
+                fv = float(v)
+                from_fred = True
+        except (TypeError, ValueError, Exception) as exc:
+            log.debug("market ops VIX from macro_fred: %s", exc)
+
+        if fv is None:
+            try:
+                ind = await technical.latest_indicators(
+                    self._pool,
+                    self._benchmark_symbol,
+                    "equity",
+                    self._equity_interval,
+                )
+                vr = ind.get("vix_regime") or {}
+                if vr.get("value") is not None:
+                    fv = float(vr["value"])
+            except (TypeError, ValueError, Exception) as exc:
+                log.debug("market ops VIX TA fallback: %s", exc)
+
+        if fv is None:
+            return
+        mo.global_vix = fv
+        mo.vix_from_macro_fred = from_fred
+        reg, lbl = self._classify_vix_market_ops(fv)
+        mo.global_vix_regime = reg
+        if from_fred:
+            mo.global_vix_label = lbl
+        else:
+            mo.global_vix_label = (
+                lbl
+                + f" — _Same source as TA **vix_regime** (**{self._benchmark_symbol}**). "
+                "**macro_fred** has no **VIXCLS** — run **data-equity** FRED._"
+            )
+
+    async def _build_market_ops_slice(
+        self,
+        symbol: str,
+        asset_type: str,
+        price: Optional[PriceSnapshot],
+        tech: Optional[TechnicalSnapshot],
+        *,
+        include_symbol: bool = True,
+    ) -> Optional[MarketOpsSlice]:
+        if not self._market_ops_enable:
+            return None
+        from statistics import median
+
+        mo = MarketOpsSlice()
+        try:
+            raw = await ohlcv.latest_macro_derived(
+                self._pool,
+                "mo_reference_snapshot",
+                source="market_operations",
+            )
+            if raw:
+                self._fill_market_ops_global(mo, raw)
+        except Exception as exc:
+            log.warning("market ops global load failed: %s", exc)
+
+        await self._hydrate_market_ops_vix(mo)
+
+        if not include_symbol or not symbol:
+            return mo
+
+        table = "equity_ohlcv" if asset_type == "equity" else "crypto_ohlcv"
+        interval = self._equity_interval if asset_type == "equity" else self._crypto_interval
+        try:
+            bars = await ohlcv.recent_bars(
+                self._pool,
+                symbol,
+                table,
+                interval,
+                self._market_ops_volume_lookback,
+            )
+        except Exception as exc:
+            log.warning("market ops bars failed symbol=%s: %s", symbol, exc)
+            bars = []
+
+        if len(bars) >= 5:
+            vols = [float(b["volume"]) for b in bars if b.get("volume") is not None]
+            if vols:
+                med_v = float(median(vols))
+                last_v = vols[-1]
+                mo.volume_lookback_bars = len(vols)
+                if med_v > 0:
+                    mo.volume_vs_median_ratio = round(last_v / med_v, 2)
+
+        close = float(price.close) if price and price.close is not None else None
+        if close is None and bars:
+            try:
+                close = float(bars[-1]["close"])
+            except (TypeError, ValueError, KeyError):
+                close = None
+
+        atr_val: Optional[float] = None
+        if tech and tech.atr is not None:
+            atr_val = float(tech.atr)
+        else:
+            try:
+                ex = "equity" if asset_type == "equity" else "binance"
+                ind = await technical.latest_indicators(
+                    self._pool, symbol, ex, interval
+                )
+                ik = f"atr_{self._market_ops_atr_period}"
+                row = ind.get(ik) or {}
+                if row.get("value") is not None:
+                    atr_val = float(row["value"])
+            except Exception as exc:
+                log.debug("market ops atr fetch symbol=%s: %s", symbol, exc)
+
+        if atr_val is not None:
+            mo.atr = atr_val
+        if atr_val is not None and close and close > 0:
+            mo.atr_pct = round(100.0 * atr_val / close, 3)
+
+        if mo.atr_pct is not None and mo.atr_pct >= self._market_ops_atr_pct_elevated:
+            mo.flags.append("atr_pct_elevated")
+        if (
+            mo.volume_vs_median_ratio is not None
+            and mo.volume_vs_median_ratio >= self._market_ops_volume_ratio_elevated
+        ):
+            mo.flags.append("volume_vs_median_elevated")
+
+        if asset_type == "equity":
+            mo.asset_execution_note = (
+                "US equities: RTH liquidity; gaps on news/earnings — see market_operations_reference.html."
+            )
+        else:
+            mo.asset_execution_note = (
+                "Crypto: 24/7; funding/OI not wired — microstructure differs from US equity sessions."
+            )
+
+        return mo
+
     async def _build_macro(self) -> MacroSnapshot:
         snap = MacroSnapshot()
         try:
+            async def _md(metric: str) -> dict:
+                return await ohlcv.latest_macro_derived(self._pool, metric) or {}
+
+            # mc_* / aa_* before FRED — latest_macro used to do float(NULL) and abort
+            # the whole try before we reached macro_derived (daily grey cards vs /analyze).
+            mc_p = await _md("mc_market_cycle")
+            if mc_p:
+                try:
+                    inp = mc_p.get("inputs") if isinstance(mc_p.get("inputs"), dict) else {}
+
+                    def _mc_instr(k: str) -> Optional[str]:
+                        v = inp.get(k)
+                        return str(v) if v is not None and v != "" else None
+
+                    def _mc_f(key: str) -> Optional[float]:
+                        if mc_p.get(key) is None:
+                            return None
+                        try:
+                            return float(mc_p[key])
+                        except (TypeError, ValueError):
+                            return None
+
+                    def _mc_i(key: str) -> Optional[int]:
+                        if mc_p.get(key) is None:
+                            return None
+                        try:
+                            return int(mc_p[key])
+                        except (TypeError, ValueError):
+                            return None
+
+                    snap.market_cycle = MarketCycleSnapshot(
+                        symbol=str(mc_p.get("symbol") or "SPY"),
+                        close=_mc_f("close"),
+                        drawdown_pct=_mc_f("drawdown_pct"),
+                        pct_vs_sma200=_mc_f("pct_vs_sma200"),
+                        sma200=_mc_f("sma200"),
+                        price_phase=mc_p.get("price_phase")
+                        if isinstance(mc_p.get("price_phase"), str)
+                        else None,
+                        crash_warning=bool(mc_p.get("crash_warning")),
+                        days_off_peak=_mc_i("days_off_peak"),
+                        composite_phase=mc_p.get("composite_phase")
+                        if isinstance(mc_p.get("composite_phase"), str)
+                        else None,
+                        composite_label=mc_p.get("composite_label")
+                        if isinstance(mc_p.get("composite_label"), str)
+                        else None,
+                        composite_score=_mc_f("value"),
+                        gc_stance=_mc_instr("gc_stance"),
+                        mp_stance=_mc_instr("mp_stance"),
+                        inf_stance=_mc_instr("inf_stance"),
+                        gg_stance=_mc_instr("gg_stance"),
+                        bars_used=_mc_i("bars_used"),
+                    )
+                except Exception as mc_exc:
+                    log.warning("macro market_cycle parse failed (daily embed fallback): %s", mc_exc)
+
+            corr_p = await _md("mc_macro_correlation")
+            if corr_p:
+                try:
+                    r = corr_p.get("regime")
+                    if isinstance(r, str):
+                        snap.macro_corr_regime = r
+                    if corr_p.get("score") is not None:
+                        snap.macro_corr_score = float(corr_p["score"])
+                    lbl = corr_p.get("label")
+                    if isinstance(lbl, str):
+                        snap.macro_corr_label = lbl
+                    fl = corr_p.get("flags")
+                    if isinstance(fl, list):
+                        snap.macro_corr_flags = [str(x) for x in fl if x is not None][:12]
+                except (TypeError, ValueError) as c_exc:
+                    log.warning("macro mc_macro_correlation parse failed: %s", c_exc)
+
+            aa_p = await _md("aa_reference_snapshot")
+            if aa_p:
+                add = _parse_additional_snapshot(aa_p)
+                if add:
+                    snap.additional = add
+
             # ── Raw FRED values ────────────────────────────────────────────────
             snap.vix = await ohlcv.latest_macro(self._pool, "VIXCLS")
             snap.dgs10 = await ohlcv.latest_macro(self._pool, "DGS10")
@@ -700,7 +1005,6 @@ class ReportBuilder:
             snap.breakeven_10y = await ohlcv.latest_macro(self._pool, "T10YIE")
             snap.breakeven_5y = await ohlcv.latest_macro(self._pool, "T5YIE")
 
-            # HY/IG spreads: FRED series is in % — convert to bps for display
             hy_raw = await ohlcv.latest_macro(self._pool, "BAMLH0A0HYM2")
             ig_raw = await ohlcv.latest_macro(self._pool, "BAMLC0A0CM")
             snap.hy_spread = hy_raw * 100 if hy_raw is not None else None
@@ -709,9 +1013,20 @@ class ReportBuilder:
             m2 = await ohlcv.latest_macro(self._pool, "M2SL")
             snap.m2_billions = m2
 
-            # ── Computed signals from macro_derived ───────────────────────────
-            async def _md(metric: str) -> dict:
-                return await ohlcv.latest_macro_derived(self._pool, metric) or {}
+            # Daily header "Macro" strip: same VIX fallback as market ops when FRED has no VIXCLS.
+            if snap.vix is None:
+                try:
+                    ind = await technical.latest_indicators(
+                        self._pool,
+                        self._benchmark_symbol,
+                        "equity",
+                        self._equity_interval,
+                    )
+                    vr = ind.get("vix_regime") or {}
+                    if vr.get("value") is not None:
+                        snap.vix = float(vr["value"])
+                except (TypeError, ValueError, Exception) as exc:
+                    log.debug("macro snapshot VIX TA fallback: %s", exc)
 
             rate_p = await _md("mp_rate")
             snap.mp_rate_regime = rate_p.get("regime")
@@ -739,7 +1054,11 @@ class ReportBuilder:
             snap.inflation_expectations_regime = be_p.get("regime")
 
             m2_p = await _md("mp_m2_supply")
-            snap.m2_yoy_pct = float(m2_p["yoy_pct"]) if m2_p.get("yoy_pct") is not None else None
+            if m2_p.get("yoy_pct") is not None:
+                try:
+                    snap.m2_yoy_pct = float(m2_p["yoy_pct"])
+                except (TypeError, ValueError):
+                    snap.m2_yoy_pct = None
             snap.m2_regime = m2_p.get("regime")
 
             stance_p = await _md("mp_stance")
@@ -882,53 +1201,6 @@ class ReportBuilder:
             snap.gg_stance = gg_stance_p.get("stance")
             snap.gg_score = gg_stance_p.get("value")
             snap.gg_signals_used = gg_stance_p.get("signals_used")
-
-            mc_p = await _md("mc_market_cycle")
-            if mc_p:
-                inp = mc_p.get("inputs") if isinstance(mc_p.get("inputs"), dict) else {}
-
-                def _instr(k: str) -> Optional[str]:
-                    v = inp.get(k)
-                    return str(v) if v is not None and v != "" else None
-
-                snap.market_cycle = MarketCycleSnapshot(
-                    symbol=str(mc_p.get("symbol") or "SPY"),
-                    close=float(mc_p["close"]) if mc_p.get("close") is not None else None,
-                    drawdown_pct=float(mc_p["drawdown_pct"]) if mc_p.get("drawdown_pct") is not None else None,
-                    pct_vs_sma200=float(mc_p["pct_vs_sma200"]) if mc_p.get("pct_vs_sma200") is not None else None,
-                    sma200=float(mc_p["sma200"]) if mc_p.get("sma200") is not None else None,
-                    price_phase=mc_p.get("price_phase") if isinstance(mc_p.get("price_phase"), str) else None,
-                    crash_warning=bool(mc_p.get("crash_warning")),
-                    days_off_peak=int(mc_p["days_off_peak"]) if mc_p.get("days_off_peak") is not None else None,
-                    composite_phase=mc_p.get("composite_phase") if isinstance(mc_p.get("composite_phase"), str) else None,
-                    composite_label=mc_p.get("composite_label") if isinstance(mc_p.get("composite_label"), str) else None,
-                    composite_score=float(mc_p["value"]) if mc_p.get("value") is not None else None,
-                    gc_stance=_instr("gc_stance"),
-                    mp_stance=_instr("mp_stance"),
-                    inf_stance=_instr("inf_stance"),
-                    gg_stance=_instr("gg_stance"),
-                    bars_used=int(mc_p["bars_used"]) if mc_p.get("bars_used") is not None else None,
-                )
-
-            corr_p = await _md("mc_macro_correlation")
-            if corr_p:
-                r = corr_p.get("regime")
-                if isinstance(r, str):
-                    snap.macro_corr_regime = r
-                if corr_p.get("score") is not None:
-                    snap.macro_corr_score = float(corr_p["score"])
-                lbl = corr_p.get("label")
-                if isinstance(lbl, str):
-                    snap.macro_corr_label = lbl
-                fl = corr_p.get("flags")
-                if isinstance(fl, list):
-                    snap.macro_corr_flags = [str(x) for x in fl if x is not None][:12]
-
-            aa_p = await _md("aa_reference_snapshot")
-            if aa_p:
-                add = _parse_additional_snapshot(aa_p)
-                if add:
-                    snap.additional = add
 
         except Exception as exc:
             log.warning("macro build failed: %s", exc)
@@ -1125,6 +1397,45 @@ class ReportBuilder:
                 if isinstance(ac.get("additional_summary_line"), str)
                 else None,
             )
+        mo_data = data.get("market_ops")
+        market_ops: Optional[MarketOpsSlice] = None
+        if isinstance(mo_data, dict):
+            mflags = mo_data.get("flags") or []
+            if not isinstance(mflags, list):
+                mflags = []
+            mlines = mo_data.get("reference_coverage_lines") or []
+            if not isinstance(mlines, list):
+                mlines = []
+            market_ops = MarketOpsSlice(
+                global_as_of=mo_data.get("global_as_of")
+                if isinstance(mo_data.get("global_as_of"), str)
+                else None,
+                global_vix=float(mo_data["global_vix"])
+                if mo_data.get("global_vix") is not None
+                else None,
+                global_vix_regime=mo_data.get("global_vix_regime")
+                if isinstance(mo_data.get("global_vix_regime"), str)
+                else None,
+                global_vix_label=mo_data.get("global_vix_label")
+                if isinstance(mo_data.get("global_vix_label"), str)
+                else None,
+                reference_coverage_lines=[str(x) for x in mlines],
+                atr=float(mo_data["atr"]) if mo_data.get("atr") is not None else None,
+                atr_pct=float(mo_data["atr_pct"])
+                if mo_data.get("atr_pct") is not None
+                else None,
+                volume_vs_median_ratio=float(mo_data["volume_vs_median_ratio"])
+                if mo_data.get("volume_vs_median_ratio") is not None
+                else None,
+                volume_lookback_bars=int(mo_data["volume_lookback_bars"])
+                if mo_data.get("volume_lookback_bars") is not None
+                else None,
+                flags=[str(x) for x in mflags],
+                asset_execution_note=mo_data.get("asset_execution_note")
+                if isinstance(mo_data.get("asset_execution_note"), str)
+                else None,
+                vix_from_macro_fred=bool(mo_data.get("vix_from_macro_fred")),
+            )
         return SymbolReport(
             symbol=data["symbol"],
             asset_type=data["asset_type"],
@@ -1134,4 +1445,5 @@ class ReportBuilder:
             sentiment=sent,
             news=news_list,
             analyze_context=analyze_ctx,
+            market_ops=market_ops,
         )

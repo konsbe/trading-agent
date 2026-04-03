@@ -525,6 +525,31 @@ class AnalyzeContextSnapshot:
     additional_summary_line: Optional[str] = None
 
 
+# ── Market operations (mo_reference_snapshot + per-symbol execution context) ─
+
+@dataclass
+class MarketOpsSlice:
+    """Global vol regime from market-ops worker + per-symbol liquidity/vol proxies.
+
+    Not investment advice — execution and regime context only (see market_operations_reference.html).
+    """
+
+    global_as_of: Optional[str] = None
+    global_vix: Optional[float] = None
+    global_vix_regime: Optional[str] = None
+    global_vix_label: Optional[str] = None
+    #: True only when global_vix came from macro_fred VIXCLS (not TA / snapshot-only).
+    vix_from_macro_fred: bool = False
+    reference_coverage_lines: list[str] = field(default_factory=list)
+
+    atr: Optional[float] = None
+    atr_pct: Optional[float] = None
+    volume_vs_median_ratio: Optional[float] = None
+    volume_lookback_bars: Optional[int] = None
+    flags: list[str] = field(default_factory=list)
+    asset_execution_note: Optional[str] = None
+
+
 # ── Composite symbol report ───────────────────────────────────────────────────
 
 @dataclass
@@ -538,6 +563,7 @@ class SymbolReport:
     sentiment: Optional[SentimentSnapshot] = None
     news: list[NewsHeadline] = field(default_factory=list)
     analyze_context: Optional[AnalyzeContextSnapshot] = None
+    market_ops: Optional[MarketOpsSlice] = None
 
 
 # ── Daily report (full market run) ───────────────────────────────────────────

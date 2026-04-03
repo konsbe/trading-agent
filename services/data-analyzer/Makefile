@@ -10,6 +10,7 @@ build:
 	go build -o $(BIN)/technical-analysis ./cmd/technical-analysis
 	go build -o $(BIN)/fundamental-analysis ./cmd/fundamental-analysis
 	go build -o $(BIN)/macro-analysis ./cmd/macro-analysis
+	go build -o $(BIN)/market-operations ./cmd/market-operations
 
 docker-build:
 	docker build -t trading-agent/data-analyzer:latest .

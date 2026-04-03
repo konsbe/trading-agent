@@ -8,10 +8,70 @@ macro-tagged news_headlines rows.
 from __future__ import annotations
 
 import json
+import re
+import unicodedata
 from datetime import date, datetime, timedelta, timezone
 from typing import Optional
 
 import asyncpg
+
+# Zero-width / bidi marks that often differ between duplicate RSS ingests
+_ZW_RE = re.compile(r"[\u200b-\u200f\ufeff\u202a-\u202e]")
+
+
+def _normalize_macro_headline_key(headline: Optional[str]) -> str:
+    """Unicode-safe collapse for duplicate detection (invisible chars, dash variants)."""
+    if not headline or not isinstance(headline, str):
+        return ""
+    s = unicodedata.normalize("NFKC", headline)
+    s = _ZW_RE.sub("", s)
+    for a, b in (
+        ("\u2013", "-"),
+        ("\u2014", "-"),
+        ("\u2212", "-"),
+    ):
+        s = s.replace(a, b)
+    return " ".join(s.strip().lower().split())
+
+
+def _macro_url_dedupe_key(url: str) -> str:
+    """Treat near-identical Google News article URLs as one story."""
+    u = (url or "").strip()
+    if not u:
+        return ""
+    base = u.split("?", 1)[0].split("#", 1)[0]
+    if "news.google.com" in base.lower() and "/articles/" in base:
+        try:
+            i = base.lower().index("/articles/")
+            tail = base[i + len("/articles/") :]
+            if len(tail) >= 32:
+                return f"gnews:{tail[:56]}"
+        except ValueError:
+            pass
+    return base
+
+
+def _dedupe_macro_headline_rows(rows: list[dict], *, limit: int) -> list[dict]:
+    """Keep newest-first order; skip rows that repeat the same headline or canonical URL."""
+    seen_headlines: set[str] = set()
+    seen_url_keys: set[str] = set()
+    out: list[dict] = []
+    for r in rows:
+        hk = _normalize_macro_headline_key(r.get("headline"))
+        url = (r.get("url") or "").strip() if r.get("url") else ""
+        uk = _macro_url_dedupe_key(url)
+        if hk and hk in seen_headlines:
+            continue
+        if uk and uk in seen_url_keys:
+            continue
+        if hk:
+            seen_headlines.add(hk)
+        if uk:
+            seen_url_keys.add(uk)
+        out.append(r)
+        if len(out) >= limit:
+            break
+    return out
 
 # For /status — table names match migration 006_macro_intel.sql + news_headlines.
 _MACRO_INTEL_COUNTS: list[tuple[str, str]] = [
@@ -147,6 +207,8 @@ async def latest_narrative(
 
 
 async def macro_tagged_headlines(pool: asyncpg.Pool, limit: int = 8) -> list[dict]:
+    """Macro-tagged RSS/Finnhub rows, deduplicated by headline and URL (newest wins)."""
+    cap = min(max(limit * 6, 24), 120)
     rows = await pool.fetch(
         """
         SELECT ts, source, headline, url
@@ -155,9 +217,10 @@ async def macro_tagged_headlines(pool: asyncpg.Pool, limit: int = 8) -> list[dic
         ORDER BY ts DESC
         LIMIT $1
         """,
-        limit,
+        cap,
     )
-    return [dict(r) for r in rows]
+    raw = [dict(r) for r in rows]
+    return _dedupe_macro_headline_rows(raw, limit=limit)
 
 
 async def insert_narrative_score(

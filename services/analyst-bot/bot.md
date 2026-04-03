@@ -32,10 +32,11 @@ These appear on the price title and the trend field.
 
 `/price symbol:AAPL asset_type:equity` — Latest OHLCV bar (open, high, low, close, volume)
 `/signals symbol:AAPL asset_type:equity` — Fast one-embed snapshot of the most actionable signals
-`/analyze symbol:AAPL asset_type:equity` — Full deep-dive: price → technical → Tier 1 fundamentals → 🏦 Tier 2 balance sheet → 🔍 Tier 3 deep context → news
+`/analyze symbol:AAPL asset_type:equity` — Full deep-dive: price → **Context vs benchmark** → **Market ops** (VIX regime + ATR% / volume vs median) → technical → Tier 1 fundamentals → 🏦 Tier 2 balance sheet → 🔍 Tier 3 deep context → news
+`/marketops [symbol] [asset_type]` — **Module 5** snapshot: VIX regime + HTML automation coverage; optional symbol adds ATR% and volume-vs-median context. **Not** entry/exit prices. With **default `asset_type:equity`**, symbols in **`BOT_CRYPTO_SYMBOLS`** or ending in **`USDT`/`USDC`/`BUSD`/`PERP`** are treated as **crypto** so pairs like **BTCUSDT** get the right execution note and OHLCV table. **Typo:** the command is **`/marketops`**, not `/matketops`.
 `/report` — Triggers the daily market report on demand (same as the 07:00 scheduled job)
 `/dictionary` — Sends this glossary as paginated Discord embeds
-`/status` — Bot health: DB ✅/❌, Redis ✅/❌, scheduler jobs, configured symbols; macro-intel table row counts; latest **`mc_market_cycle`** / **`mc_macro_correlation`** / **`aa_reference_snapshot`** timestamps in **`macro_derived`**
+`/status` — Bot health: DB ✅/❌, Redis ✅/❌, scheduler jobs, configured symbols; macro-intel table row counts; latest **`mc_market_cycle`** / **`mc_macro_correlation`** / **`aa_reference_snapshot`** (`source=macro_analysis`) and **`mo_reference_snapshot`** (`source=market_operations`) timestamps in **`macro_derived`**
 `/ping` — Bot latency in milliseconds
 
 `asset_type` dropdown: `equity` for stocks/ETFs, `crypto` for crypto pairs. Defaults to `equity`.
@@ -119,6 +120,8 @@ The VIX (CBOE Volatility Index) measures expected market volatility. Sourced fro
 Thresholds configurable via `TECHNICAL_VIX_FEAR_THRESHOLD`, `TECHNICAL_VIX_ELEVATED_THRESHOLD`, `TECHNICAL_VIX_COMPLACENCY_THRESHOLD`.
 
 Example: `VIX Regime: ⚠️ elevated (VIX 25.2)`
+
+**Daily symbol summaries:** the per-symbol **footer** uses this TA **`vix_regime`** (e.g. elevated when VIX is 20–35 with default thresholds). The **Market ops** line on the same embed uses **Module 5** bands (`BOT_MARKET_OPS_VIX_*`, default “normal” while VIX &lt; 25). So one print of VIX can show **normal** in Market ops and **elevated** in the footer — both are intentional, not a data bug.
 
 ### Pivots (Classic Pivot Points)
 
@@ -1386,9 +1389,13 @@ The worker reads the **latest payloads** for stances/regimes already upserted in
 
 - **Benchmark symbol** matches **`MARKET_CYCLE_SYMBOL`** on the bot (`market_cycle_symbol` in config, default **SPY**) so it stays aligned with the index used for **`mc_market_cycle`**.
 - **Crypto** symbols get benchmark + macro regime only (no vs-benchmark RS from `equity_ohlcv`).
-- Cached **`/analyze`** responses include **`analyze_context`** in the Redis payload (see `ReportBuilder._serialise_symbol_report`).
+- Cached **`/analyze`** responses include **`analyze_context`** and **`market_ops`** in the Redis payload (see `ReportBuilder._serialise_symbol_report`).
 
-Discord **`/status`** lists **latest `ts`** for **`mc_market_cycle`**, **`mc_macro_correlation`**, and **`aa_reference_snapshot`** under **Macro derived (latest ts)** when the DB query succeeds.
+### Market ops embed (after context strip)
+
+When **`BOT_MARKET_OPS_ENABLE`** is true, **`/analyze`** adds **⚙️ Market ops — \<symbol\>**: **VIX** level and regime use **`macro_fred`** **`VIXCLS`** when present; if FRED has no row, the bot falls back to the same **`technical_indicators.vix_regime`** value as the TA embed (**`MARKET_CYCLE_SYMBOL`**, e.g. **SPY**) and says so in the label — fix the root cause by running **data-equity** FRED. **`mo_reference_snapshot`** still supplies **`reference_modules`**. Also **ATR%** and **volume vs median** over **`BOT_MARKET_OPS_VOLUME_LOOKBACK`** bars. Flags **`atr_pct_elevated`** / **`volume_vs_median_elevated`** use **`BOT_MARKET_OPS_ATR_PCT_ELEVATED`** and **`BOT_MARKET_OPS_VOLUME_RATIO_ELEVATED`**. This is **execution and noise context** — not positioning (COT), not buy/sell levels.
+
+Discord **`/status`** lists **latest `ts`** for **`mc_market_cycle`**, **`mc_macro_correlation`**, **`aa_reference_snapshot`**, and **`mo_reference_snapshot`** under **Macro derived (latest ts)** when the DB queries succeed.
 
 ---
 

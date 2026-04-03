@@ -85,13 +85,13 @@ func QueryMacroFredSeries(ctx context.Context, pool *pgxpool.Pool, seriesID stri
 
 const upsertMacroDerivedSQL = `
 INSERT INTO macro_derived (ts, metric, value, payload, source)
-VALUES ($1, $2, $3, $4, 'macro_analysis')
+VALUES ($1, $2, $3, $4, $5)
 ON CONFLICT (metric, source, ts) DO UPDATE SET
     value   = EXCLUDED.value,
     payload = EXCLUDED.payload`
 
-// UpsertMacroDerived persists one computed macro signal to macro_derived.
-// source is hard-coded to "macro_analysis" to match the constraint.
+// UpsertMacroDerived persists one computed macro signal to macro_derived
+// with source = "macro_analysis" (macro-analysis worker).
 func UpsertMacroDerived(
 	ctx context.Context,
 	pool *pgxpool.Pool,
@@ -100,6 +100,23 @@ func UpsertMacroDerived(
 	value *float64,
 	payload any,
 ) error {
+	return UpsertMacroDerivedSource(ctx, pool, ts, metric, value, payload, "macro_analysis")
+}
+
+// UpsertMacroDerivedSource writes macro_derived with an explicit source
+// (e.g. "market_operations" for the market-ops worker).
+func UpsertMacroDerivedSource(
+	ctx context.Context,
+	pool *pgxpool.Pool,
+	ts time.Time,
+	metric string,
+	value *float64,
+	payload any,
+	source string,
+) error {
+	if source == "" {
+		source = "macro_analysis"
+	}
 	var jb []byte
 	if payload != nil {
 		var err error
@@ -112,7 +129,7 @@ func UpsertMacroDerived(
 	if value != nil {
 		v = *value
 	}
-	_, err := pool.Exec(ctx, upsertMacroDerivedSQL, ts, metric, v, jb)
+	_, err := pool.Exec(ctx, upsertMacroDerivedSQL, ts, metric, v, jb, source)
 	return err
 }
 
