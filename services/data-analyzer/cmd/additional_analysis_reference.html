@@ -1,0 +1,1261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Additional Analysis Types — Complete Reference</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Fira+Code:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#fffeee;--bg2:#fffeee;--bg3:#fffeee;--bg4:#fffeee;--bg5:#1f232b;
+  --border:#0e0e0e;--border2:#222730;--border3:#2a3040;
+  --text:#07080a;--text2:#07080a;--text3:#07080a;
+  --a1:#00d4aa;--a1d:#002a22;--a1b:#4de8cc;
+  --a2:#ff6b6b;--a2d:#2a0a0a;--a2b:#ff9999;
+  --a3:#ffd166;--a3d:#2a1e00;--a3b:#ffe599;
+  --a4:#7b68ee;--a4d:#120f2a;--a4b:#a99cff;
+  --a5:#06b6d4;--a5d:#001a20;--a5b:#67e8f9;
+  --a6:#f472b6;--a6d:#200a18;--a6b:#f9a8d4;
+  --a7:#fb923c;--a7d:#201008;--a7b:#fdba74;
+  --a8:#a3e635;--a8d:#102000;--a8b:#bef264;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.6;min-height:100vh}
+body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse 60% 30% at 20% 0%,rgba(0,212,170,.04) 0%,transparent 60%),radial-gradient(ellipse 40% 20% at 80% 100%,rgba(123,104,238,.04) 0%,transparent 60%);pointer-events:none;z-index:0}
+.hdr{padding:44px 36px 30px;border-bottom:1px solid var(--border2);position:relative;z-index:1}
+.hdr-eye{font-family:'Fira Code',monospace;font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--a1);margin-bottom:10px;opacity:.8}
+.hdr h1{font-family:'Playfair Display',serif;font-size:40px;font-weight:700;line-height:1;letter-spacing:-.02em;margin-bottom:6px}
+.hdr h1 em{font-style:italic;color:var(--a1)}
+.hdr-sub{font-size:13px;color:var(--text2);font-weight:300;margin-top:8px}
+.nav{display:flex;padding:0 36px;border-bottom:1px solid var(--border2);overflow-x:auto;position:relative;z-index:1}
+.nav::-webkit-scrollbar{height:2px}
+.nav::-webkit-scrollbar-thumb{background:var(--border3)}
+.ntab{padding:12px 16px;font-size:10px;font-family:'Fira Code',monospace;font-weight:500;letter-spacing:.07em;text-transform:uppercase;cursor:pointer;border:none;background:none;color:var(--text3);border-bottom:2px solid transparent;transition:all .14s;white-space:nowrap;flex-shrink:0}
+.ntab:hover{color:var(--text2)}
+.ntab.active{color:var(--a1);border-bottom-color:var(--a1)}
+.panel{display:none;padding:26px 36px 52px;position:relative;z-index:1}
+.panel.active{display:block}
+/* ANALYSIS MODULE CARDS */
+.module{border:1px solid var(--border2);border-radius:10px;margin-bottom:8px;overflow:hidden;background:var(--bg2);transition:border-color .12s}
+.module:hover{border-color:var(--border3)}
+.module.open{border-color:var(--a1d)}
+.mhd{display:flex;gap:12px;align-items:flex-start;padding:13px 16px;cursor:pointer;user-select:none}
+.mnum{font-family:'Fira Code',monospace;font-size:10px;color:var(--text3);min-width:26px;padding-top:2px;flex-shrink:0}
+.module.open .mnum{color:var(--a1)}
+.mmeta{flex:1}
+.mname{font-size:13px;font-weight:600;color:var(--text);display:flex;flex-wrap:wrap;align-items:center;gap:7px;line-height:1.3;letter-spacing:-.01em}
+.mline{font-size:11px;color:var(--text2);margin-top:2px;font-weight:300}
+.tag{font-size:9px;font-family:'Fira Code',monospace;font-weight:500;padding:2px 7px;border-radius:3px;letter-spacing:.04em;text-transform:uppercase;flex-shrink:0}
+.chv{font-size:9px;color:var(--text3);flex-shrink:0;margin-top:4px;transition:transform .18s}
+.module.open .chv{transform:rotate(180deg);color:var(--a1)}
+.mbody{display:none;padding:0 16px 16px;border-top:1px solid var(--border)}
+.module.open .mbody{display:block}
+.desc{font-size:12px;color:var(--text2);line-height:1.68;padding:10px 0 8px;font-weight:300}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:4px}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;margin-top:4px}
+.card{background:var(--bg3);border:1px solid var(--border2);border-radius:6px;padding:10px 12px}
+.card.full{grid-column:1/-1}
+.clbl{font-family:'Fira Code',monospace;font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:var(--a1);margin-bottom:5px;opacity:.7}
+.ctxt{font-size:11px;color:var(--text);line-height:1.55;font-weight:300}
+.ctxt a{color:var(--a1);text-decoration:none;font-family:'Fira Code',monospace;font-size:10px}
+.ctxt a:hover{text-decoration:underline}
+.formula{font-family:'Fira Code',monospace;font-size:10px;color:var(--a1b);background:var(--bg4);padding:7px 11px;border-radius:4px;border-left:2px solid var(--a1d);margin-top:7px;line-height:1.6}
+.rngs{display:flex;flex-direction:column;gap:4px}
+.rr{display:flex;align-items:flex-start;gap:7px}
+.rd{width:6px;height:6px;border-radius:50%;flex-shrink:0;margin-top:4px}
+.dg{background:var(--a1)}.da{background:var(--a3)}.dr{background:var(--a2)}
+.rt{font-size:11px;color:var(--text2)}
+.srcs{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px}
+.src{font-family:'Fira Code',monospace;font-size:9px;padding:3px 8px;border-radius:3px;background:var(--bg4);border:1px solid var(--border2);color:var(--text2)}
+.src.p{border-color:var(--a1d);color:var(--a1b)}
+/* TIER */
+.tier{display:flex;align-items:center;gap:14px;margin:24px 0 10px}
+.tier:first-of-type{margin-top:0}
+.tier-txt{font-family:'Fira Code',monospace;font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--text3);white-space:nowrap}
+.tier-line{flex:1;height:1px;background:var(--border2)}
+/* INTRO */
+.panel-intro{font-size:13px;color:var(--text2);line-height:1.7;margin-bottom:22px;max-width:740px;font-weight:300}
+/* FACTOR TABLE */
+.ftable{width:100%;border-collapse:collapse;font-size:11px;margin-top:0}
+.ftable thead th{font-family:'Fira Code',monospace;font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);padding:7px 10px;border-bottom:1px solid var(--border3);text-align:left;font-weight:500}
+.ftable tbody td{padding:8px 10px;border-bottom:1px solid var(--border);vertical-align:top;color:var(--text2);line-height:1.5}
+.ftable tbody tr:hover td{background:var(--bg3)}
+.ftable tbody td:first-child{color:var(--text);font-weight:600;font-size:12px}
+.cp{color:var(--a1);font-weight:600}.cn{color:var(--a2);font-weight:600}.cw{color:var(--a3);font-weight:600}
+/* INTERMARKET MATRIX */
+.imatrix{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;margin-top:10px}
+.imatrix-cell{border-radius:5px;padding:8px 6px;text-align:center;font-size:10px;line-height:1.4}
+.imatrix-hdr{background:var(--bg4);font-family:'Fira Code',monospace;font-size:9px;font-weight:500;color:var(--text2);border:1px solid var(--border2)}
+.im-pp{background:rgba(0,212,170,.15);color:var(--a1b);border:1px solid rgba(0,212,170,.2);font-size:9px}
+.im-pn{background:rgba(255,107,107,.15);color:var(--a2b);border:1px solid rgba(255,107,107,.2);font-size:9px}
+.im-neu{background:var(--bg4);color:var(--text3);border:1px solid var(--border);font-size:9px}
+/* SEASONALITY */
+.month-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:5px;margin-top:10px}
+.month-card{border-radius:6px;padding:8px 6px;text-align:center;border:1px solid var(--border2)}
+.mc-name{font-size:10px;font-weight:600;margin-bottom:4px}
+.mc-bias{font-size:9px;font-family:'Fira Code',monospace;padding:2px 5px;border-radius:3px;display:inline-block;margin-bottom:3px}
+.mc-note{font-size:9px;color:var(--text3);line-height:1.3}
+.bias-bull{background:rgba(0,212,170,.15);color:var(--a1b)}
+.bias-bear{background:rgba(255,107,107,.15);color:var(--a2b)}
+.bias-neu{background:var(--bg4);color:var(--text3)}
+.mc-bull{background:rgba(0,212,170,.06);border-color:rgba(0,212,170,.2)}
+.mc-bear{background:rgba(255,107,107,.06);border-color:rgba(255,107,107,.2)}
+.mc-neu{background:var(--bg3)}
+/* TAG COLORS by type */
+.t1{background:var(--a1d);color:var(--a1b)}
+.t2{background:var(--a2d);color:var(--a2b)}
+.t3{background:var(--a3d);color:var(--a3b)}
+.t4{background:var(--a4d);color:var(--a4b)}
+.t5{background:var(--a5d);color:var(--a5b)}
+.t6{background:var(--a6d);color:var(--a6b)}
+.t7{background:var(--a7d);color:var(--a7b)}
+.t8{background:var(--a8d);color:var(--a8b)}
+.hidden{display:none!important}
+::-webkit-scrollbar{width:5px;height:4px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--border3);border-radius:3px}
+@media(max-width:720px){
+  .hdr{padding:26px 16px 20px}.hdr h1{font-size:28px}
+  .nav{padding:0 16px}.panel{padding:18px 16px 36px}
+  .g2,.g3,.imatrix{grid-template-columns:1fr}.month-grid{grid-template-columns:repeat(3,1fr)}
+}
+</style>
+</head>
+<body>
+<div class="hdr">
+  <div class="hdr-eye">Trading System · Module 4</div>
+  <h1>Additional <em>Analysis</em> Types</h1>
+  <div class="hdr-sub">Sentiment · Factor · Intermarket · Flow · Seasonality · Alternative Data · Event-Driven · Relative Value — all with data sources &amp; strategy ranges</div>
+</div>
+<nav class="nav">
+  <button class="ntab active" onclick="sw('sentiment')">Sentiment</button>
+  <button class="ntab" onclick="sw('factor')">Factor Analysis</button>
+  <button class="ntab" onclick="sw('intermarket')">Intermarket</button>
+  <button class="ntab" onclick="sw('flow')">Flow &amp; Microstructure</button>
+  <button class="ntab" onclick="sw('seasonality')">Seasonality</button>
+  <button class="ntab" onclick="sw('altdata')">Alternative Data</button>
+  <button class="ntab" onclick="sw('eventdriven')">Event-Driven</button>
+  <button class="ntab" onclick="sw('relval')">Relative Value</button>
+</nav>
+
+<!-- ══════════════════════════════
+     SENTIMENT ANALYSIS
+══════════════════════════════ -->
+<div class="panel active" id="panel-sentiment">
+  <p class="panel-intro">Sentiment analysis quantifies the psychological state of market participants — where they are on the fear/greed spectrum and how that positioning creates contrarian opportunities. Extreme readings in sentiment indicators are among the most reliable reversal signals in all of trading.</p>
+
+  <div class="tier"><div class="tier-line"></div><span class="tier-txt">Tier 1 — Options market sentiment</span><div class="tier-line"></div></div>
+
+  <div class="module">
+    <div class="mhd" onclick="tog(this.parentElement)">
+      <span class="mnum">01</span>
+      <div class="mmeta">
+        <div class="mname">Put/Call Ratio (PCR) <span class="tag t1">Sentiment</span><span class="tag t5">Options</span></div>
+        <div class="mline">Ratio of put options bought vs. call options — the most direct measure of hedging demand and fear</div>
+      </div><span class="chv">▼</span>
+    </div>
+    <div class="mbody">
+      <div class="desc">The PCR = put volume / call volume. Above 1.0 means more puts than calls being bought — elevated fear or hedging. The equity-only PCR (excluding index options which are institutionally driven) is the cleanest retail sentiment signal. Extreme readings are contrarian: when everyone is buying puts (PCR very high), the market is already pricing in the fear and a bounce often follows. VIX and PCR together provide the most complete options sentiment picture.</div>
+      <div class="g2">
+        <div class="card">
+          <div class="clbl">Contrarian signal thresholds (equity-only PCR)</div>
+          <div class="rngs">
+            <div class="rr"><div class="rd dg"></div><span class="rt">PCR &gt;1.2: extreme fear — contrarian bullish signal</span></div>
+            <div class="rr"><div class="rd dg"></div><span class="rt">PCR 0.9–1.2: elevated anxiety, market near-term bottom</span></div>
+            <div class="rr"><div class="rd da"></div><span class="rt">PCR 0.6–0.9: normal range, no clear signal</span></div>
+            <div class="rr"><div class="rd dr"></div><span class="rt">PCR &lt;0.5: excessive complacency — contrarian bearish</span></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="clbl">Data sources</div>
+          <div class="srcs">
+            <span class="src p">CBOE: cboe.com/data/historical-options-data</span>
+            <span class="src p">Barchart.com (daily PCR, free)</span>
+            <span class="src">Market Chameleon: marketchameleon.com</span>
+            <span class="src">Polygon.io options chain API</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="module">
+    <div class="mhd" onclick="tog(this.parentElement)">
+      <span class="mnum">02</span>
+      <div class="mmeta">
+        <div class="mname">Implied Volatility Skew &amp; Term Structure <span class="tag t1">Sentiment</span><span class="tag t5">Options</span></div>
+        <div class="mline">How the market prices risk asymmetrically across strikes and time — the options market's true fear signal</div>
+      </div><span class="chv">▼</span>
+    </div>
+    <div class="mbody">
+      <div class="desc">IV Skew measures the difference in implied volatility between out-of-the-money puts and calls. Normally, OTM puts trade at higher IV than OTM calls (negative skew) because institutions pay a premium for downside protection. When skew steepens sharply, fear is rising. When skew flattens unusually, complacency is extreme. Term structure shows IV across different expirations — normally upward sloping (longer = more uncertainty). An inverted term structure (near-term IV above long-term) signals acute near-term fear.</div>
+      <div class="g2">
+        <div class="card">
+          <div class="clbl">Skew interpretation</div>
+          <div class="rngs">
+            <div class="rr"><div class="rd dr"></div><span class="rt">Steep negative skew (puts much more expensive than calls): extreme fear, often near bottom</span></div>
+            <div class="rr"><div class="rd da"></div><span class="rt">Normal skew: modest put premium, healthy hedging activity</span></div>
+            <div class="rr"><div class="rd dr"></div><span class="rt">Flat/positive skew: call premium exceeds put — retail call buying frenzy, bubble signal</span></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="clbl">Data sources</div>
+          <div class="srcs">
+            <span class="src p">CBOE SKEW Index: cboe.com</span>
+            <span class="src p">Polygon.io options chain (IV by strike)</span>
+            <span class="src">Market Chameleon IV skew charts</span>
+            <span class="src">Interactive Brokers TWS (term structure)</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="module">
+    <div class="mhd" onclick="tog(this.parentElement)">
+      <span class="mnum">03</span>
+      <div class="mmeta">
+        <div class="mname">Short Interest &amp; Days-to-Cover <span class="tag t1">Sentiment</span></div>
+        <div class="mline">How much of the float is being bet against — and how long it would take shorts to exit</div>
+      </div><span class="chv">▼</span>
+    </div>
+    <div class="mbody">
+      <div class="desc">Short Interest = shares sold short / total float. Days-to-Cover (Short Ratio) = shares short / average daily volume. High short interest creates two conditions: (1) contrarian opportunity if the short thesis is wrong — forced covering amplifies upside (short squeeze), (2) warning signal if shorts are correct — informed money is betting against the company. Context determines which. High DTC (above 10) means a squeeze could run for many days as shorts cannot exit quickly.</div>
+      <div class="g2">
+        <div class="card">
+          <div class="clbl">Signal thresholds</div>
+          <div class="rngs">
+            <div class="rr"><div class="rd dg"></div><span class="rt">Short interest &gt;20% float + strong catalyst = squeeze setup</span></div>
+            <div class="rr"><div class="rd dg"></div><span class="rt">Days-to-cover &gt;10: powerful squeeze potential if triggered</span></div>
+            <div class="rr"><div class="rd da"></div><span class="rt">Short interest 5–15%: moderate, monitor for trend changes</span></div>
+            <div class="rr"><div class="rd dr"></div><span class="rt">Short interest rising rapidly (&gt;5pp in one reporting period): institutional concern signal</span></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="clbl">Data sources</div>
+          <div class="srcs">
+            <span class="src p">FINRA short interest (bi-monthly): finra.org/investors/learn-to-invest/advanced-investing/short-sale-statistics</span>
+            <span class="src p">Shortvolume.com (daily estimates)</span>
+            <span class="src">Yahoo Finance (statistics tab)</span>
+            <span class="src">Finviz (short float %)</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="module">
+    <div class="mhd" onclick="tog(this.parentElement)">
+      <span class="mnum">04</span>
+      <div class="mmeta">
+        <div class="mname">Margin Debt &amp; Leverage Levels <span class="tag t1">Sentiment</span></div>
+        <div class="mline">Total borrowed money used to buy stocks — peaks before major market tops, crashes before bottoms</div>
+      </div><span class="chv">▼</span>
+    </div>
+    <div class="mbody">
+      <div class="desc">Margin debt is money borrowed from brokers to buy securities. It amplifies both gains and losses. When margin debt peaks and starts declining, the forced liquidation of leveraged positions creates cascading selling. The rate of change matters more than the absolute level — a rapid decline in margin debt signals forced deleveraging. NYSE margin debt data is published monthly with a 1-month lag. In 2000 and 2007, margin debt peaked near equity market tops.</div>
+      <div class="g2">
+        <div class="card">
+          <div class="clbl">Strategy signals</div>
+          <div class="rngs">
+            <div class="rr"><div class="rd dr"></div><span class="rt">Margin debt at all-time high + PCR low + VIX low: major top risk</span></div>
+            <div class="rr"><div class="rd dr"></div><span class="rt">Margin debt declining rapidly: forced selling underway — avoid buying</span></div>
+            <div class="rr"><div class="rd dg"></div><span class="rt">Margin debt at cycle lows: leverage washed out — better risk/reward for entry</span></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="clbl">Data sources</div>
+          <div class="srcs">
+            <span class="src p">FINRA margin statistics (monthly): finra.org/investors/learn-to-invest/advanced-investing/margin-statistics</span>
+            <span class="src">Yardeni Research: yardeni.com (charts)</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="module">
+    <div class="mhd" onclick="tog(this.parentElement)">
+      <span class="mnum">05</span>
+      <div class="mmeta">
+        <div class="mname">IPO Activity &amp; SPAC Issuance as Cycle Indicators <span class="tag t1">Sentiment</span></div>
+        <div class="mline">Frothy issuance activity historically marks late-cycle euphoria — a cycle top indicator</div>
+      </div><span class="chv">▼</span>
+    </div>
+    <div class="mbody">
+      <div class="desc">When IPO markets are hot and companies of questionable quality go public at extreme valuations, it signals peak investor risk appetite. The 1999–2000 dot-com peak had 547 IPOs in one year, many of money-losing companies. The 2020–2021 SPAC mania (more than 1,000 SPACs formed) was the most extreme modern example of late-cycle froth — the SPAC index lost over 70% from peak to trough. Conversely, a dried-up IPO market signals peak pessimism and often coincides with equity troughs.</div>
+      <div class="g2">
+        <div class="card">
+          <div class="clbl">Contrarian signals</div>
+          <div class="rngs">
+            <div class="rr"><div class="rd dr"></div><span class="rt">IPO market red-hot, SPACs booming, average IPO pops &gt;50% on day one: late cycle</span></div>
+            <div class="rr"><div class="rd dg"></div><span class="rt">IPO market frozen, companies withdrawing listings: pessimism peak, often near bottom</span></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="clbl">Data sources</div>
+          <div class="srcs">
+            <span class="src p">Renaissance Capital: renaissancecapital.com/review</span>
+            <span class="src">SEC EDGAR S-1 filings monitor</span>
+            <span class="src">SPAC Research: spacresearch.com</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════
+     FACTOR ANALYSIS
+══════════════════════════════ -->
+<div class="panel" id="panel-factor">
+  <p class="panel-intro">Factor analysis is the academic underpinning of systematic investing. Five factors have produced statistically significant excess returns over decades across multiple markets and time periods. These are the building blocks of your scoring engine — your system implicitly uses all five.</p>
+
+  <div class="tier"><div class="tier-line"></div><span class="tier-txt">The five academically validated return factors</span><div class="tier-line"></div></div>
+
+  <div class="module">
+    <div class="mhd" onclick="tog(this.parentElement)">
+      <span class="mnum">01</span>
+      <div class="mmeta">
+        <div class="mname">Quality Factor <span class="tag t2">Factor</span></div>
+        <div class="mline">High ROIC, strong margins, low debt, consistent earnings — the most durable factor across all regimes</div>
+      </div><span class="chv">▼</span>
+    </div>
+    <div class="mbody">
+      <div class="desc">Quality stocks are companies with high return on equity, stable earnings growth, low debt, and strong free cash flow conversion. They tend to outperform in late-cycle and recessionary environments because their businesses are resilient. Quality is the factor most aligned with Warren Buffett's approach. It is the most regime-independent factor — it works in bull and bear markets, though it shines brightest when conditions deteriorate.</div>
+      <div class="g2">
+        <div class="card">
+          <div class="clbl">Construction metrics</div>
+          <div class="ctxt">High gross profitability (Novy-Marx) · High ROIC · Low accruals (earnings quality) · Low leverage · Stable earnings (low EPS volatility) · High interest coverage · Consistent FCF generation</div>
+        </div>
+        <div class="card">
+          <div class="clbl">Historical performance</div>
+          <div class="rngs">
+            <div class="rr"><div class="rd dg"></div><span class="rt">Annual alpha vs. market: +2 to +4% historically</span></div>
+            <div class="rr"><div class="rd dg"></div><span class="rt">Best regime: late cycle + recession (defensive quality)</span></div>
+            <div class="rr"><div class="rd da"></div><span class="rt">Worst regime: early bull (low-quality rallies hardest off bottom)</span></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="clbl">Data sources &amp; ETF proxies</div>
+          <div class="srcs">
+            <span class="src p">QUAL ETF (iShares MSCI USA Quality Factor)</span>
+            <span class="src">Simfin API (calculate ROIC, margins)</span>
+            <span class="src">Ken French data library: mba.tuck.dartmouth.edu/pages/faculty/ken.french/data_library.html</span>
+          </div>
+        </div>
+        <div class="card">
+          <div class="clbl">Your system link</div>
+          <div class="ctxt">Your QntFA scoring layer IS the quality factor. ROIC, FCF yield, margin trend, D/E — these are exactly the quality factor metrics. Ensure your composite score overweights quality in late-cycle macro regimes.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="module">
+    <div class="mhd" onclick="tog(this.parentElement)">
+      <span class="mnum">02</span>
+      <div class="mmeta">
+        <div class="mname">Momentum Factor <span class="tag t2">Factor</span></div>
+        <div class="mline">Stocks that have outperformed recently tend to continue outperforming — the strongest factor by Sharpe ratio</div>
+      </div><span class="chv">▼</span>
+    </div>
+    <div class="mbody">
+      <div class="desc">The momentum factor (Jegadeesh-Titman, 1993) is one of the most robust in finance — it has been documented in 40+ countries and 200+ years of data. Buy the top-performing stocks of the past 12 months (excluding the most recent month to avoid short-term reversal). Sell or avoid the bottom performers. The 12-1 momentum (12-month return minus most recent month) is the standard construction. Momentum crashes occur in sudden market reversals (March 2009, March 2020) — it is the factor with the highest Sharpe ratio but also the worst tail behavior.</div>
+      <div class="g2">
+        <div class="card">
+          <div class="clbl">Construction methodology</div>
+          <div class="ctxt">Rank all stocks by 12-month total return (excluding most recent month). Long top quintile. In your system: track 12-1 momentum score for each stock in universe. Weight it heavily in trending macro regimes (ADX &gt;25 equivalent at macro level).</div>
+        </div>
+        <div class="card">
+          <div class="clbl">Historical performance</div>
+          <div class="rngs">
+            <div class="rr"><div class="rd dg"></div><span class="rt">Annual alpha: +5 to +9% in trending markets</span></div>
+            <div class="rr"><div class="rd dg"></div><span class="rt">Best regime: trending bull markets, clear macro direction</span></div>
+            <div class="rr"><div class="rd dr"></div><span class="rt">Crash risk: −40% drawdowns in sudden reversals (momentum crash)</span></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="clbl">ETF proxies &amp; data</div>
+          <div class="srcs">
+            <span class="src p">MTUM ETF (iShares MSCI USA Momentum)</span>
+            <span class="src p">Calculate from Polygon.io / yfinance price data</span>
+            <span class="src">AQR momentum data: aqr.com/insights/datasets</span>
+          </div>
+        </div>
+        <div class="card">
+          <div class="clbl">Momentum crash protection</div>
+          <div class="ctxt">When VIX spikes above 30 AND momentum factor draws down &gt;10% in one month, momentum is in a crash regime — reduce momentum weight to near zero until VIX normalizes below 25. This single rule dramatically improves momentum factor risk-adjusted returns.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="module">
+    <div class="mhd" onclick="tog(this.parentElement)">
+      <span class="mnum">03</span>
+      <div class="mmeta">
+        <div class="mname">Value Factor <span class="tag t2">Factor</span></div>
+        <div class="mline">Cheap stocks outperform expensive ones over the long run — but requires patience and regime awareness</div>
+      </div><span class="chv">▼</span>
+    </div>
+    <div class="mbody">
+      <div class="desc">The value factor (Fama-French, 1992) buys stocks with low price-to-book ratios and sells expensive ones. Modern implementations use composite value scores (P/E, P/B, EV/EBITDA, P/FCF) rather than just P/B. Value had a lost decade 2010–2020 as growth dominated, then staged a powerful reversal in 2022 when rates rose. Value works best when rates are rising (discounts expensive cash flows more), economic growth is robust, and inflation is moderate to high. Requires a minimum 3–5 year time horizon to capture the premium.</div>
+      <div class="g2">
+        <div class="card">
+          <div class="clbl">Best construction for your system</div>
+          <div class="ctxt">Use composite value: equal weight P/E (vs sector median), EV/EBITDA (vs sector median), FCF yield, P/B. Rank universe. Top quintile = value stocks. Combine with quality filter (eliminate value traps by requiring ROIC &gt; 8%).</div>
+        </div>
+        <div class="card">
+          <div class="clbl">Regime performance</div>
+          <div class="rngs">
+            <div class="rr"><div class="rd dg"></div><span class="rt">Best: rising inflation + rising rates (2022 example)</span></div>
+            <div class="rr"><div class="rd dg"></div><span class="rt">Good: early-mid economic recovery</span></div>
+            <div class="rr"><div class="rd dr"></div><span class="rt">Worst: falling rates + low inflation (2010–2020)</span></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="clbl">ETF proxies &amp; data</div>
+          <div class="srcs">
+            <span class="src p">VLUE ETF (iShares MSCI USA Value Factor)</span>
+            <span class="src p">IVE ETF (iShares S&amp;P 500 Value)</span>
+            <span class="src">Ken French HML factor data library</span>
+          </div>
+        </div>
+        <div class="card">
+          <div class="clbl">Value trap avoidance</div>
+          <div class="ctxt">The biggest failure mode: buying cheap stocks that deserved to be cheap. Filter: (1) ROIC must be above 8%, (2) revenue must not be in sustained decline (&gt;2 years), (3) debt must be manageable (Net Debt/EBITDA &lt;4×). Cheap + deteriorating = value trap. Cheap + stable/improving = genuine value.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="module">
+    <div class="mhd" onclick="tog(this.parentElement)">
+      <span class="mnum">04</span>
+      <div class="mmeta">
+        <div class="mname">Low Volatility Factor <span class="tag t2">Factor</span></div>
+        <div class="mline">Low-risk stocks have historically delivered higher risk-adjusted returns than high-risk stocks — the "volatility anomaly"</div>
+      </div><span class="chv">▼</span>
+    </div>
+    <div class="mbody">
+      <div class="desc">Counter-intuitive to standard finance theory (which says higher risk = higher return). In practice, low-beta stocks have delivered better risk-adjusted returns over long periods. This "low volatility anomaly" exists because institutional investors are constrained to benchmark-relative mandates and chase high-beta for career reasons, causing low-beta stocks to be systematically underpriced. Best for capital preservation in late cycle and bear markets. Tends to lag in strong bull markets.</div>
+      <div class="g2">
+        <div class="card">
+          <div class="clbl">Construction</div>
+          <div class="ctxt">Rank universe by trailing 12-month realized volatility (daily returns standard deviation). Long bottom quintile (lowest volatility). Alternatively: rank by beta vs. S&amp;P 500 — long stocks with beta &lt;0.8. For your system: use ATR / price (normalized volatility) as a scoring metric.</div>
+        </div>
+        <div class="card">
+          <div class="clbl">ETF proxies</div>
+          <div class="srcs">
+            <span class="src p">USMV ETF (iShares MSCI Min Volatility)</span>
+            <span class="src p">SPLV ETF (Invesco S&amp;P 500 Low Vol)</span>
+            <span class="src">Calculate beta from yfinance data</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="module">
+    <div class="mhd" onclick="tog(this.parentElement)">
+      <span class="mnum">05</span>
+      <div class="mmeta">
+        <div class="mname">Size Factor (Small Cap Premium) <span class="tag t2">Factor</span></div>
+        <div class="mline">Small caps have historically outperformed large caps over full cycles — but with much higher volatility</div>
+      </div><span class="chv">▼</span>
+    </div>
+    <div class="mbody">
+      <div class="desc">The size factor (Fama-French SMB — Small Minus Big) documents that small capitalization stocks generate excess returns over large caps over long periods. The premium compensates for liquidity risk, information asymmetry, and higher business risk. The size premium is strongest in early economic recovery phases and in low-rate environments. For your beginner strategy (large-cap focus), this factor is noted but not actively exploited until the system is more mature.</div>
+      <div class="g2">
+        <div class="card">
+          <div class="clbl">Best regimes for small caps</div>
+          <div class="rngs">
+            <div class="rr"><div class="rd dg"></div><span class="rt">Early recovery: small caps typically lead by +10–15% in first year</span></div>
+            <div class="rr"><div class="rd dg"></div><span class="rt">Falling rates: small caps (more domestic, more floating rate debt) benefit most</span></div>
+            <div class="rr"><div class="rd dr"></div><span class="rt">Rising rates + strong USD: small caps underperform (higher debt costs)</span></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="clbl">ETF proxies &amp; data</div>
+          <div class="srcs">
+            <span class="src p">IWM ETF (Russell 2000 Small Cap)</span>
+            <span class="src">IJR ETF (S&amp;P 600 Small Cap)</span>
+            <span class="src">Ken French SMB factor data</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tier"><div class="tier-line"></div><span class="tier-txt">Factor correlation &amp; regime performance matrix</span><div class="tier-line"></div></div>
+  <table class="ftable">
+    <thead><tr><th>Factor</th><th>Bull market (early)</th><th>Bull market (late)</th><th>Bear market</th><th>Rising rates</th><th>Falling rates</th><th>Best combined with</th></tr></thead>
+    <tbody>
+      <tr><td>Quality</td><td class="cw">Moderate</td><td class="cp">Strong</td><td class="cp">Very strong</td><td class="cp">Strong</td><td class="cw">Moderate</td><td>Value (quality value = best combo)</td></tr>
+      <tr><td>Momentum</td><td class="cp">Very strong</td><td class="cp">Strong</td><td class="cn">Weak/crash risk</td><td class="cp">Strong</td><td class="cp">Strong</td><td>Quality (quality momentum = lower crash risk)</td></tr>
+      <tr><td>Value</td><td class="cp">Strong</td><td class="cw">Moderate</td><td class="cn">Weak</td><td class="cp">Very strong</td><td class="cn">Weak</td><td>Quality (eliminates value traps)</td></tr>
+      <tr><td>Low Volatility</td><td class="cn">Lags bull</td><td class="cp">Strong</td><td class="cp">Very strong</td><td class="cw">Moderate</td><td class="cp">Strong</td><td>Quality (defensive quality)</td></tr>
+      <tr><td>Size (small)</td><td class="cp">Very strong</td><td class="cw">Moderate</td><td class="cn">Weak</td><td class="cn">Weak</td><td class="cp">Very strong</td><td>Momentum (small-cap momentum)</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ══════════════════════════════
+     INTERMARKET ANALYSIS
+══════════════════════════════ -->
+<div class="panel" id="panel-intermarket">
+  <p class="panel-intro">Intermarket analysis studies how bonds, equities, commodities, and currencies interact. These relationships are not always stable — regime changes alter correlations fundamentally. Understanding when correlations break down is as important as knowing when they hold.</p>
+
+  <div class="tier"><div class="tier-line"></div><span class="tier-txt">The four markets &amp; their traditional relationships</span><div class="tier-line"></div></div>
+
+  <div class="module">
+    <div class="mhd" onclick="tog(this.parentElement)">
+      <span class="mnum">01</span>
+      <div class="mmeta">
+        <div class="mname">Bond-Equity Correlation &amp; Regime Shifts <span class="tag t3">Intermarket</span></div>
+        <div class="mline">The most important inter-market relationship — and the one that changed fundamentally in 2022</div>
+      </div><span class="chv">▼</span>
+    </div>
+    <div class="mbody">
+      <div class="desc">From 2000–2021, bonds and equities were negatively correlated (bonds rose when equities fell) — the foundation of the 60/40 portfolio. In 2022, this correlation turned sharply positive (both fell simultaneously) as inflation forced central banks to hike rates. This was the most damaging year for 60/40 since 1937. The bond-equity correlation is NEGATIVE in deflationary recessions (bonds are safe haven) and POSITIVE in inflationary recessions (bonds also sell off). Understanding which regime you're in determines whether bonds actually hedge your equity exposure.</div>
+      <div class="g2">
+        <div class="card">
+          <div class="clbl">Correlation regimes</div>
+          <div class="rngs">
+            <div class="rr"><div class="rd dg"></div><span class="rt">Deflationary environment: bonds negative corr with equities (−0.5 to −0.8). 60/40 works.</span></div>
+            <div class="rr"><div class="rd dr"></div><span class="rt">Inflationary environment: bonds positive corr with equities (+0.3 to +0.6). 60/40 fails.</span></div>
+            <div class="rr"><div class="rd da"></div><span class="rt">Transition zone (inflation falling toward target): correlation uncertain, monitor CPI trend.</span></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="clbl">Data sources</div>
+          <div class="srcs">
+            <span class="src p">FRED API: DGS10 vs SPY — calculate 60-day rolling correlation</span>
+            <span class="src">TradingView: ratio charts and correlation tool</span>
+            <span class="src">Calculate with pandas .corr() on yfinance data</span>
+          </div>
+        </div>
+        <div class="card full">
+          <div class="clbl">System application</div>
+          <div class="ctxt">Your system should track the 60-day rolling bond-equity correlation. When it turns positive (above +0.3 for 30+ days), the macro regime classification should shift to "inflationary" and reduce bond holdings as a hedge while increasing cash and real assets. This single variable has enormous portfolio construction implications.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="module">
+    <div class="mhd" onclick="tog(this.parentElement)">
+      <span class="mnum">02</span>
+      <div class="mmeta">
+        <div class="mname">Commodity-Equity Lead-Lag Relationship <span class="tag t3">Intermarket</span></div>
+        <div class="mline">Commodities are an inflation early warning system — they typically lead equity sector rotation by months</div>
+      </div><span class="chv">▼</span>
+    </div>
+    <div class="mbody">
+      <div class="desc">Rising commodity prices signal inflationary pressure building in the pipeline, typically 3–6 months before it appears in CPI. This gives your system advance warning to rotate from growth into value/energy/materials. The CRB (Commodity Research Bureau) index is the broadest commodity benchmark. Copper specifically leads global industrial equity performance. Gold vs. copper ratio (gold rising relative to copper) signals fear/deflation; copper rising relative to gold signals confidence/inflation.</div>
+      <div class="g2">
+        <div class="card">
+          <div class="clbl">Key intermarket ratios</div>
+          <div class="ctxt">
+            <b>Gold/Copper ratio rising</b> → deflationary fear, buy bonds/gold, sell industrials<br><br>
+            <b>Gold/Copper ratio falling</b> → inflationary growth, buy cyclicals/commodities, reduce gold<br><br>
+            <b>CRB index rising &gt;10% YoY</b> → commodity inflation entering pipeline, watch CPI in 3–6M
+          </div>
+        </div>
+        <div class="card">
+          <div class="clbl">Data sources</div>
+          <div class="srcs">
+            <span class="src p">FRED: PCOPPUSDM (copper) and GOLDAMGBD228NLBM (gold)</span>
+            <span class="src p">Refinitiv CRB Index via TradingView</span>
+            <span class="src">Calculate ratio in Python from FRED data</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="module">
+    <div class="mhd" onclick="tog(this.parentElement)">
+      <span class="mnum">03</span>
+      <div class="mmeta">
+        <div class="mname">Currency-Equity Intermarket Relationships <span class="tag t3">Intermarket</span></div>
+        <div class="mline">Specific currency pairs are proxies for risk appetite, commodity demand, and EM health</div>
+      </div><span class="chv">▼</span>
+    </div>
+    <div class="mbody">
+      <div class="desc">Certain currency pairs act as leading indicators for specific equity sectors and markets. AUD/USD tracks China demand and commodity equities. USD/JPY tracks the global carry trade and risk appetite. EUR/USD reflects Fed-ECB policy divergence. The correlation between these pairs and equity sectors provides additional confirmation signals that are independent of both fundamental and technical analysis.</div>
+      <div class="g2">
+        <div class="card">
+          <div class="clbl">Currency-equity lead relationships</div>
+          <div class="ctxt">
+            <b>AUD/USD rising</b> → Copper miners, iron ore, materials stocks bullish (China demand proxy)<br><br>
+            <b>USD/JPY rising</b> → Carry trade intact, risk-on, EM equities supported<br><br>
+            <b>USD/JPY falling rapidly</b> → Carry unwind, global risk-off, reduce all risk assets<br><br>
+            <b>USD weakening broadly</b> → EM equities, gold, commodities all bullish simultaneously
+          </div>
+        </div>
+        <div class="card">
+          <div class="clbl">Data sources</div>
+          <div class="srcs">
+            <span class="src p">FRED: DEXJPUS, DEXUSAL, DEXUSEU</span>
+            <span class="src p">Polygon.io forex API</span>
+            <span class="src">TradingView forex charts</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tier"><div class="tier-line"></div><span class="tier-txt">Intermarket correlation matrix (normal regime)</span><div class="tier-line"></div></div>
+  <div class="imatrix">
+    <div class="imatrix-cell imatrix-hdr"></div>
+    <div class="imatrix-cell imatrix-hdr">Equities</div>
+    <div class="imatrix-cell imatrix-hdr">Bonds</div>
+    <div class="imatrix-cell imatrix-hdr">Commodities</div>
+    <div class="imatrix-cell imatrix-hdr">USD</div>
+    <div class="imatrix-cell imatrix-hdr">Equities</div>
+    <div class="imatrix-cell im-pp">1.0</div>
+    <div class="imatrix-cell im-pn">−0.6 (deflationary)<br>+0.4 (inflationary)</div>
+    <div class="imatrix-cell im-pp">+0.4 to +0.6</div>
+    <div class="imatrix-cell im-pn">−0.3 to −0.5</div>
+    <div class="imatrix-cell imatrix-hdr">Bonds (Treasuries)</div>
+    <div class="imatrix-cell im-pn">−0.6 / +0.4</div>
+    <div class="imatrix-cell im-pp">1.0</div>
+    <div class="imatrix-cell im-pn">−0.3 to −0.5</div>
+    <div class="imatrix-cell im-pp">+0.2 to +0.4</div>
+    <div class="imatrix-cell imatrix-hdr">Commodities (CRB)</div>
+    <div class="imatrix-cell im-pp">+0.4 to +0.6</div>
+    <div class="imatrix-cell im-pn">−0.3 to −0.5</div>
+    <div class="imatrix-cell im-pp">1.0</div>
+    <div class="imatrix-cell im-pn">−0.6 to −0.8</div>
+    <div class="imatrix-cell imatrix-hdr">USD (DXY)</div>
+    <div class="imatrix-cell im-pn">−0.3 to −0.5</div>
+    <div class="imatrix-cell im-pp">+0.2 to +0.4</div>
+    <div class="imatrix-cell im-pn">−0.6 to −0.8</div>
+    <div class="imatrix-cell im-pp">1.0</div>
+  </div>
+  <p style="font-size:11px;color:var(--text3);margin-top:8px;font-family:'Fira Code',monospace">* Correlations are regime-dependent and shift materially in inflationary vs. deflationary environments. Recalculate rolling 60-day correlation in your system monthly.</p>
+</div>
+
+<!-- ══════════════════════════════
+     FLOW & MICROSTRUCTURE
+══════════════════════════════ -->
+<div class="panel" id="panel-flow">
+  <p class="panel-intro">Flow analysis and market microstructure study how actual orders move markets — the mechanics beneath price. As options markets now represent a force that can drive underlying equity prices on a daily basis, understanding flow is no longer optional for serious systematic traders.</p>
+
+  <div class="module">
+    <div class="mhd" onclick="tog(this.parentElement)">
+      <span class="mnum">01</span>
+      <div class="mmeta">
+        <div class="mname">Unusual Options Activity (UOA) <span class="tag t4">Flow</span></div>
+        <div class="mline">Large, unusual options orders that suggest informed money is positioning for a specific move</div>
+      </div><span class="chv">▼</span>
+    </div>
+    <div class="mbody">
+      <div class="desc">UOA occurs when options volume massively exceeds open interest in a specific strike, or when a large single-ticket order is placed in a normally quiet expiration. These are often (not always) informed trades — insiders, fund managers, or speculators with a strong thesis. The key filters: (1) volume &gt; 10× open interest at that strike, (2) order is a market buy (urgency), (3) out of the money, (4) short-dated expiration. When multiple unusual options prints stack up in the same direction on the same stock in a short window, the signal strengthens considerably.</div>
+      <div class="g2">
+        <div class="card">
+          <div class="clbl">Quality filters for UOA</div>
+          <div class="rngs">
+            <div class="rr"><div class="rd dg"></div><span class="rt">Volume &gt;10× OI + market buy + OTM + 30-60 DTE: highest conviction</span></div>
+            <div class="rr"><div class="rd dg"></div><span class="rt">Sweep order across multiple exchanges simultaneously: institutional urgency</span></div>
+            <div class="rr"><div class="rd da"></div><span class="rt">Large block but on ask: could be hedge, not directional</span></div>
+            <div class="rr"><div class="rd dr"></div><span class="rt">Volume only slightly above OI: background noise, ignore</span></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="clbl">Data sources</div>
+          <div class="srcs">
+            <span class="src p">Unusual Whales: unusualwhales.com (free tier)</span>
+            <span class="src p">Market Chameleon: marketchameleon.com</span>
+            <span class="src">Barchart.com unusual options activity</span>
+            <span class="src">Polygon.io options API (build custom scanner)</span>
+            <span class="src">Tradytics.com (options flow)</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="module">
+    <div class="mhd" onclick="tog(this.parentElement)">
+      <span class="mnum">02</span>
+      <div class="mmeta">
+        <div class="mname">Gamma Exposure (GEX) &amp; Dealer Hedging <span class="tag t4">Flow</span></div>
+        <div class="mline">How options market maker hedging mechanically amplifies or dampens equity price moves</div>
+      </div><span class="chv">▼</span>
+    </div>
+    <div class="mbody">
+      <div class="desc">When options dealers sell calls, they buy the underlying stock to hedge (positive gamma = they buy rallies and sell dips = dampens volatility). When dealers are short gamma (sold puts), they must sell the underlying as it falls — amplifying downtrends. Gamma exposure maps tell you whether the market is in a "pinned" regime (high positive gamma, low vol, price stays near large OI strikes) or a "unstable" regime (negative gamma, explosive moves likely). This mechanistic force has grown dramatically as options volumes have surged — on SPX, options now drive equity prices more than the reverse.</div>
+      <div class="g2">
+        <div class="card">
+          <div class="clbl">GEX regimes</div>
+          <div class="rngs">
+            <div class="rr"><div class="rd dg"></div><span class="rt">High positive GEX: market "pinned" near major strikes, low vol expected, sell vol</span></div>
+            <div class="rr"><div class="rd da"></div><span class="rt">GEX near zero: neutral, no mechanical vol suppression or amplification</span></div>
+            <div class="rr"><div class="rd dr"></div><span class="rt">Negative GEX: dealer short gamma, moves are amplified — expect explosive vol</span></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="clbl">Data sources</div>
+          <div class="srcs">
+            <span class="src p">SqueezeMetrics (free GEX data): squeezemetrics.com</span>
+            <span class="src p">SpotGamma: spotgamma.com</span>
+            <span class="src">Unusual Whales GEX tracker</span>
+            <span class="src">Calculate from Polygon.io options chain (complex)</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="module">
+    <div class="mhd" onclick="tog(this.parentElement)">
+      <span class="mnum">03</span>
+      <div class="mmeta">
+        <div class="mname">Dark Pool Prints &amp; Block Trades <span class="tag t4">Flow</span></div>
+        <div class="mline">Institutional-size trades executed off-exchange — where the real money moves</div>
+      </div><span class="chv">▼</span>
+    </div>
+    <div class="mbody">
+      <div class="desc">Dark pools are private exchanges where institutional investors trade large blocks without revealing their orders to the public market before execution. Dark pool volume as a % of total volume above 40–50% signals heavy institutional activity. A large dark pool print at a specific price level that subsequently becomes support signals institutional accumulation at that price. Dark pool data is reported with a delay and requires careful interpretation — they can be buys or sells and are often used to reduce market impact of large orders over days or weeks.</div>
+      <div class="g2">
+        <div class="card">
+          <div class="clbl">Data sources</div>
+          <div class="srcs">
+            <span class="src p">FINRA dark pool data: otctransparency.finra.org</span>
+            <span class="src p">Unusual Whales dark pool tab</span>
+            <span class="src">Shortvolume.com (dark pool % of volume)</span>
+            <span class="src">Tradytics dark pool tracker</span>
+          </div>
+        </div>
+        <div class="card">
+          <div class="clbl">Interpretation rules</div>
+          <div class="ctxt">Dark pool print at a price that becomes repeated support = institutional buyer at that level. Combine with OBV rising: if OBV rising while dark pool volume is elevated, institutions are accumulating. Dark pool % of volume rising while price falls = sellers being absorbed — potential bottom formation.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="module">
+    <div class="mhd" onclick="tog(this.parentElement)">
+      <span class="mnum">04</span>
+      <div class="mmeta">
+        <div class="mname">Options Max Pain &amp; OpEx Effects <span class="tag t4">Flow</span></div>
+        <div class="mline">The price at which the maximum number of options expire worthless — gravitational pull near expiration</div>
+      </div><span class="chv">▼</span>
+    </div>
+    <div class="mbody">
+      <div class="desc">Max Pain is the strike price at which the combined value of all in-the-money options (calls and puts) is minimized — theoretically the price at which option sellers (typically market makers) pay out the least. Some argue this creates a gravitational pull as expiration approaches. Monthly options expiration (third Friday) and quarterly OPEX create systematic price patterns. The week before OPEX is often volatile; OPEX week itself often sees price pinning near major strikes. This effect is most pronounced in individual stocks with high options OI concentration.</div>
+      <div class="g2">
+        <div class="card">
+          <div class="clbl">OpEx calendar effects</div>
+          <div class="rngs">
+            <div class="rr"><div class="rd da"></div><span class="rt">Week before monthly OpEx: elevated vol, directional moves</span></div>
+            <div class="rr"><div class="rd da"></div><span class="rt">OpEx Friday: price often pins near max pain level into close</span></div>
+            <div class="rr"><div class="rd dg"></div><span class="rt">Week after OpEx: often directional — new positioning being established</span></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="clbl">Data sources</div>
+          <div class="srcs">
+            <span class="src p">Maximum Pain calculator: maxpain.com</span>
+            <span class="src p">Market Chameleon (max pain by stock)</span>
+            <span class="src">Calculate from Polygon.io options OI data</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════
+     SEASONALITY
+══════════════════════════════ -->
+<div class="panel" id="panel-seasonality">
+  <p class="panel-intro">Seasonality patterns are statistically significant tendencies that persist over decades. They are not deterministic — they are probabilistic tilts that, combined with other signals, improve the odds. Never trade seasonality alone, but always check it as a tie-breaker or confirmation layer.</p>
+
+  <div class="module">
+    <div class="mhd" onclick="tog(this.parentElement)">
+      <span class="mnum">01</span>
+      <div class="mmeta">
+        <div class="mname">Monthly Seasonality (S&amp;P 500 Historical Averages) <span class="tag t5">Seasonality</span></div>
+        <div class="mline">Average S&amp;P 500 monthly returns since 1950 — statistically significant biases</div>
+      </div><span class="chv">▼</span>
+    </div>
+    <div class="mbody">
+      <div class="desc">Based on 70+ years of S&amp;P 500 data. April, November, and December are the strongest months historically. September is the worst month by a wide margin (the "September Effect"). The "Best 6 Months" (November–April) vs. "Worst 6 Months" (May–October) is the empirical basis of "Sell in May" — though this pattern weakens in strong bull markets and macro can easily override it.</div>
+      <div class="month-grid">
+        <div class="month-card mc-bull"><div class="mc-name">Jan</div><div class="mc-bias bias-bull">+1.1%</div><div class="mc-note">January Effect: small caps lead</div></div>
+        <div class="month-card mc-neu"><div class="mc-name">Feb</div><div class="mc-bias bias-neu">+0.1%</div><div class="mc-note">Often choppy, no clear bias</div></div>
+        <div class="month-card mc-bull"><div class="mc-name">Mar</div><div class="mc-bias bias-bull">+1.3%</div><div class="mc-note">Quarter-end rebalancing flows</div></div>
+        <div class="month-card mc-bull"><div class="mc-name">Apr</div><div class="mc-bias bias-bull">+1.5%</div><div class="mc-note">Strongest month historically</div></div>
+        <div class="month-card mc-neu"><div class="mc-name">May</div><div class="mc-bias bias-neu">+0.2%</div><div class="mc-note">"Sell in May" transition month</div></div>
+        <div class="month-card mc-bear"><div class="mc-name">Jun</div><div class="mc-bias bias-neu">+0.0%</div><div class="mc-note">Flat on average, choppy</div></div>
+        <div class="month-card mc-bull"><div class="mc-name">Jul</div><div class="mc-bias bias-bull">+1.3%</div><div class="mc-note">Mid-year rally common</div></div>
+        <div class="month-card mc-bear"><div class="mc-name">Aug</div><div class="mc-bias bias-bear">−0.1%</div><div class="mc-note">Low liquidity, volatile</div></div>
+        <div class="month-card mc-bear"><div class="mc-name">Sep</div><div class="mc-bias bias-bear">−0.7%</div><div class="mc-note">Worst month — "September Effect"</div></div>
+        <div class="month-card mc-bull"><div class="mc-name">Oct</div><div class="mc-bias bias-bull">+0.9%</div><div class="mc-note">Often reversal month — crashes here but also recoveries</div></div>
+        <div class="month-card mc-bull"><div class="mc-name">Nov</div><div class="mc-bias bias-bull">+1.7%</div><div class="mc-note">2nd strongest. Seasonal buying begins.</div></div>
+        <div class="month-card mc-bull"><div class="mc-name">Dec</div><div class="mc-bias bias-bull">+1.5%</div><div class="mc-note">Santa Rally. Window dressing. Tax-loss selling reversal.</div></div>
+      </div>
+      <div class="g2" style="margin-top:10px">
+        <div class="card">
+          <div class="clbl">Data sources</div>
+          <div class="srcs">
+            <span class="src p">Stock Almanac: stocktradersalmanac.com</span>
+            <span class="src">Calculate from yfinance S&amp;P 500 monthly returns since 1950</span>
+            <span class="src">Equityclock.com (seasonal charts for any stock)</span>
+          </div>
+        </div>
+        <div class="card">
+          <div class="clbl">How to use in your system</div>
+          <div class="ctxt">Add a seasonality score to your monthly composite (small weight: 5–10%). Score +1 in historically strong months (Apr, Nov, Dec), −1 in weak months (Sep), 0 otherwise. Never override a strong fundamental/technical signal with seasonality alone — use it as a confirmation or tiebreaker only.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="module">
+    <div class="mhd" onclick="tog(this.parentElement)">
+      <span class="mnum">02</span>
+      <div class="mmeta">
+        <div class="mname">Presidential Election Cycle <span class="tag t5">Seasonality</span></div>
+        <div class="mline">4-year US election cycle creates statistically significant patterns in equity markets</div>
+      </div><span class="chv">▼</span>
+    </div>
+    <div class="mbody">
+      <div class="desc">Year 2 (midterm year) of a presidential term is historically the weakest for equities, often producing corrections as policy uncertainty peaks and the president's party typically loses congressional seats. Year 3 (pre-election) is historically the strongest — the incumbent administration stimulates the economy to improve re-election prospects. Year 4 (election year) is typically positive but volatile around the election itself. Since 1950, the S&amp;P 500 has never had a negative return in year 3 of the presidential cycle.</div>
+      <div class="g2">
+        <div class="card">
+          <div class="clbl">Historical cycle averages (S&amp;P 500)</div>
+          <div class="rngs">
+            <div class="rr"><div class="rd da"></div><span class="rt">Year 1 (post-election): +6.7% avg — policy honeymoon</span></div>
+            <div class="rr"><div class="rd dr"></div><span class="rt">Year 2 (midterm): +5.4% avg but volatile, often corrects first</span></div>
+            <div class="rr"><div class="rd dg"></div><span class="rt">Year 3 (pre-election): +16.4% avg — strongest year historically</span></div>
+            <div class="rr"><div class="rd dg"></div><span class="rt">Year 4 (election): +6.6% avg — positive but choppy pre-election</span></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="clbl">Data sources</div>
+          <div class="srcs">
+            <span class="src p">Stock Trader's Almanac (annual publication)</span>
+            <span class="src">Yardeni Research: yardeni.com</span>
+            <span class="src">Calculate from yfinance historical S&amp;P returns</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="module">
+    <div class="mhd" onclick="tog(this.parentElement)">
+      <span class="mnum">03</span>
+      <div class="mmeta">
+        <div class="mname">Options Expiration (OpEx) &amp; Quarter-End Flows <span class="tag t5">Seasonality</span></div>
+        <div class="mline">Systematic mechanical flows around key calendar dates create repeatable price patterns</div>
+      </div><span class="chv">▼</span>
+    </div>
+    <div class="mbody">
+      <div class="desc">Monthly OpEx (3rd Friday): price pinning near max pain levels. Week before: elevated vol. Week after: often directional as new positioning establishes. Quarterly OpEx (March, June, September, December — "triple witching"): largest of all, involves equity options, index options, AND futures expiring simultaneously — creates the highest volatility of any regular calendar event. Quarter-end (last 3 days): large fund rebalancing — window dressing boosts recent winners, sells laggards. Month-end: pension fund rebalancing creates systematic equity/bond flows predictable from prior month performance.</div>
+      <div class="g2">
+        <div class="card">
+          <div class="clbl">Key calendar dates to automate</div>
+          <div class="ctxt">Monthly OpEx: 3rd Friday of each month. Triple witching (quarterly OpEx): 3rd Friday of Mar/Jun/Sep/Dec. Month-end: last 2 trading days. Quarter-end: last 3 trading days. FOMC blackout period: 10 days before each FOMC meeting — Fed governors cannot speak publicly, reducing one source of volatility.</div>
+        </div>
+        <div class="card">
+          <div class="clbl">Data sources</div>
+          <div class="srcs">
+            <span class="src p">CBOE calendar: cboe.com/trading-resources/calendars</span>
+            <span class="src p">Fed FOMC calendar: federalreserve.gov/monetarypolicy/fomccalendars.htm</span>
+            <span class="src">Investing.com economic calendar (all events)</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════
+     ALTERNATIVE DATA
+══════════════════════════════ -->
+<div class="panel" id="panel-altdata">
+  <p class="panel-intro">Alternative data provides information about business conditions before it appears in official financial statements. Hedge funds have used these signals for years — many are now accessible to sophisticated retail and systematic traders. These inputs feed your qualitative scoring layer.</p>
+
+  <div class="module">
+    <div class="mhd" onclick="tog(this.parentElement)">
+      <span class="mnum">01</span>
+      <div class="mmeta">
+        <div class="mname">Web Traffic &amp; App Download Data <span class="tag t6">Alt Data</span></div>
+        <div class="mline">Real-time business activity signals before quarterly earnings — user engagement is a leading revenue indicator</div>
+      </div><span class="chv">▼</span>
+    </div>
+    <div class="mbody">
+      <div class="desc">Web traffic to a company's website and app download rankings provide real-time signals of user engagement and growth trends weeks before quarterly earnings. A sudden spike in web traffic to an e-commerce site before earnings likely signals strong revenue. Declining app downloads for a subscription company signal churn risk. Sensor Tower and SimilarWeb are the primary data providers. These signals had major alpha before becoming widely known — they are now somewhat crowded but still useful for directional confirmation.</div>
+      <div class="g2">
+        <div class="card"><div class="clbl">Data sources</div>
+          <div class="srcs">
+            <span class="src p">SimilarWeb: similarweb.com (free estimates)</span>
+            <span class="src p">Sensor Tower: sensortower.com (app data)</span>
+            <span class="src">Google Trends: trends.google.com (free, search interest)</span>
+            <span class="src">Semrush: semrush.com (web traffic analytics)</span>
+            <span class="src">App Annie: data.ai</span>
+          </div>
+        </div>
+        <div class="card"><div class="clbl">Application in system</div>
+          <div class="ctxt">For consumer-facing companies in your universe: track 3-month trend in SimilarWeb visits and Sensor Tower app ranking before earnings. Rising +10%+ = bullish signal for upcoming quarter. Feed to LLM layer for structured output: {"web_traffic_trend": "accelerating", "signal": "bullish", "confidence": 0.7}.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="module">
+    <div class="mhd" onclick="tog(this.parentElement)">
+      <span class="mnum">02</span>
+      <div class="mmeta">
+        <div class="mname">Job Posting Data <span class="tag t6">Alt Data</span></div>
+        <div class="mline">Corporate hiring intentions are forward-looking — job postings predict revenue growth 1–2 quarters ahead</div>
+      </div><span class="chv">▼</span>
+    </div>
+    <div class="mbody">
+      <div class="desc">Companies hire ahead of expected growth and freeze hiring before downturns — making job postings a leading indicator of future revenue and capex. LinkedIn job postings, Indeed trends, and Lightcast data provide this signal. A tech company suddenly posting 200% more ML engineer roles is signaling an AI investment ramp before it appears in financial results. Mass layoff announcements (WARN Act filings) signal the opposite — cost-cutting before a revenue miss.</div>
+      <div class="g2">
+        <div class="card"><div class="clbl">Data sources</div>
+          <div class="srcs">
+            <span class="src p">LinkedIn job trends (observable manually)</span>
+            <span class="src p">Indeed hiring trends: indeed.com/hiring-lab</span>
+            <span class="src">JOLTS (Job Openings and Labor Turnover Survey): FRED JTSJOL</span>
+            <span class="src">Lightcast: lightcast.io (paid, institutional)</span>
+            <span class="src">WARN Act filings: dol.gov/agencies/eta/layoffs</span>
+          </div>
+        </div>
+        <div class="card"><div class="clbl">Signal interpretation</div>
+          <div class="rngs">
+            <div class="rr"><div class="rd dg"></div><span class="rt">Job postings up &gt;30% YoY: growth acceleration signal</span></div>
+            <div class="rr"><div class="rd dr"></div><span class="rt">Mass layoff WARN filing: cost-cutting, earnings risk</span></div>
+            <div class="rr"><div class="rd da"></div><span class="rt">Hiring freeze (flat postings): cautious mgmt, uncertainty</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="module">
+    <div class="mhd" onclick="tog(this.parentElement)">
+      <span class="mnum">03</span>
+      <div class="mmeta">
+        <div class="mname">Satellite &amp; Shipping Data <span class="tag t6">Alt Data</span></div>
+        <div class="mline">Physical world activity measured from space and shipping databases — the original alternative data</div>
+      </div><span class="chv">▼</span>
+    </div>
+    <div class="mbody">
+      <div class="desc">Satellite imagery of retail parking lots (counting cars = foot traffic = revenue proxy), oil storage tanks (measuring shadow levels = supply signal), shipping vessel tracking (cargo volumes = trade activity), and agricultural field analysis (crop yield estimates) were among the first alternative data sources used by hedge funds. Container shipping rates (Shanghai Containerized Freight Index) are a real-time supply chain and inflation signal freely available online.</div>
+      <div class="g2">
+        <div class="card"><div class="clbl">Free accessible proxies</div>
+          <div class="srcs">
+            <span class="src p">Shanghai Containerized Freight Index (SCFI): en.sse.net.cn</span>
+            <span class="src p">Vessel tracking: marinetraffic.com (free)</span>
+            <span class="src">EIA crude oil storage: eia.gov (weekly)</span>
+            <span class="src">Baltic Dry Index: FRED DBDI series</span>
+          </div>
+        </div>
+        <div class="card"><div class="clbl">Institutional data providers</div>
+          <div class="srcs">
+            <span class="src">SpaceKnow: spaceknow.com</span>
+            <span class="src">Orbital Insight: orbitalinsight.com</span>
+            <span class="src">RS Metrics: rsmetrics.com</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="module">
+    <div class="mhd" onclick="tog(this.parentElement)">
+      <span class="mnum">04</span>
+      <div class="mmeta">
+        <div class="mname">Social Media &amp; Search Trend Sentiment <span class="tag t6">Alt Data</span></div>
+        <div class="mline">Real-time public sentiment that can drive retail-dominated stocks and flag emerging trends</div>
+      </div><span class="chv">▼</span>
+    </div>
+    <div class="mbody">
+      <div class="desc">Reddit (WallStreetBets), Twitter/X, StockTwits, and Google Trends data measure retail sentiment and emerging narrative momentum. Google Trends for a company's product name rising sharply = consumer interest increasing before it shows in revenue. WallStreetBets mention count surging = retail attention, potential squeeze conditions. Social sentiment is most predictive for small-to-mid cap consumer stocks where retail investor participation is high. For large caps and macro, it is mostly noise.</div>
+      <div class="g2">
+        <div class="card"><div class="clbl">Data sources</div>
+          <div class="srcs">
+            <span class="src p">Google Trends: trends.google.com (free API)</span>
+            <span class="src p">Reddit API: reddit.com/dev/api</span>
+            <span class="src">StockTwits API: stocktwits.com/developers</span>
+            <span class="src">Twitter/X API (elevated access required)</span>
+            <span class="src">Swaggy Stocks: swaggy.stocks.com (WSB analysis)</span>
+          </div>
+        </div>
+        <div class="card"><div class="clbl">Signal quality note</div>
+          <div class="ctxt">Social sentiment is the noisiest alt data signal. Use it as a 5% weight or less in your composite. It is most useful as an extreme contrarian indicator: when retail sentiment (WSB, StockTwits) is 90%+ bullish on a stock, it often marks a short-term top. When 90%+ bearish, a short-term bottom. Do not follow the crowd — fade the extremes.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════
+     EVENT-DRIVEN
+══════════════════════════════ -->
+<div class="panel" id="panel-eventdriven">
+  <p class="panel-intro">Event-driven analysis identifies specific corporate or market events that create time-limited, repeatable trading opportunities independent of broader market conditions. These are the clearest examples of an identifiable edge with a defined catalyst and timeline.</p>
+
+  <div class="module">
+    <div class="mhd" onclick="tog(this.parentElement)">
+      <span class="mnum">01</span>
+      <div class="mmeta">
+        <div class="mname">Merger Arbitrage (Risk Arb) <span class="tag t7">Event-Driven</span></div>
+        <div class="mline">Capturing the spread between current acquisition target price and deal price — a near risk-free return with tail risk</div>
+      </div><span class="chv">▼</span>
+    </div>
+    <div class="mbody">
+      <div class="desc">When a company announces it will acquire another at $X per share, the target typically trades at a discount to $X (the "spread") — reflecting deal failure risk. Merger arb = buy the target at market price, capturing the spread when the deal closes. Return = spread / time to close. The risk is deal failure (regulatory block, financing failure, target rejection) — which typically causes the target to fall 20–40% back to pre-deal levels. The strategy requires careful assessment of deal certainty: strategic logic, regulatory environment, financing terms, and competing bidder probability.</div>
+      <div class="g2">
+        <div class="card">
+          <div class="clbl">Return expectations</div>
+          <div class="rngs">
+            <div class="rr"><div class="rd dg"></div><span class="rt">Cash deals (certain): spread 1–3%, annualized 6–15% if closes in 3–6 months</span></div>
+            <div class="rr"><div class="rd da"></div><span class="rt">Stock-for-stock: more complex, need to hedge acquirer stock</span></div>
+            <div class="rr"><div class="rd dr"></div><span class="rt">Regulatory risk (antitrust): spread widens sharply if risk rises</span></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="clbl">Data sources</div>
+          <div class="srcs">
+            <span class="src p">SEC 8-K filings: sec.gov (merger announcements)</span>
+            <span class="src p">Bloomberg Merger Arbitrage (if available)</span>
+            <span class="src">Merger Arbitrage Monitor: mergerarbitragemonitor.com</span>
+            <span class="src">Dealogic: dealogic.com</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="module">
+    <div class="mhd" onclick="tog(this.parentElement)">
+      <span class="mnum">02</span>
+      <div class="mmeta">
+        <div class="mname">Spin-offs &amp; Corporate Restructurings <span class="tag t7">Event-Driven</span></div>
+        <div class="mline">Spin-offs historically outperform the market by 10–15% in the first 2 years — a documented anomaly</div>
+      </div><span class="chv">▼</span>
+    </div>
+    <div class="mbody">
+      <div class="desc">When a company spins off a division, the new entity is often sold by passive investors who received the shares without wanting them (index funds rebalancing), creating temporary undervaluation. Joel Greenblatt's "You Can Be a Stock Market Genius" documented this effect extensively. The parent company also often outperforms after a spin-off as management focuses on the core business. Spin-offs with high insider ownership and operating in niche markets with strong growth are the best candidates.</div>
+      <div class="g2">
+        <div class="card">
+          <div class="clbl">What to look for</div>
+          <div class="rngs">
+            <div class="rr"><div class="rd dg"></div><span class="rt">High insider ownership at spinco: management confidence</span></div>
+            <div class="rr"><div class="rd dg"></div><span class="rt">Parent wanted to divest (not showcase) spun unit: potential hidden gem</span></div>
+            <div class="rr"><div class="rd dg"></div><span class="rt">Spinco in faster-growing industry than parent: focus premium</span></div>
+            <div class="rr"><div class="rd dr"></div><span class="rt">Parent loading spinco with debt before separation: avoid</span></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="clbl">Data sources</div>
+          <div class="srcs">
+            <span class="src p">Spinoffresearch.com</span>
+            <span class="src p">SEC Form 10 filings (spinoff registration)</span>
+            <span class="src">Edge by Ascendiant: spin-off tracker</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="module">
+    <div class="mhd" onclick="tog(this.parentElement)">
+      <span class="mnum">03</span>
+      <div class="mmeta">
+        <div class="mname">Index Inclusion &amp; Rebalancing <span class="tag t7">Event-Driven</span></div>
+        <div class="mline">Predictable forced buying when stocks are added to major indices — front-run the mandatory rebalance</div>
+      </div><span class="chv">▼</span>
+    </div>
+    <div class="mbody">
+      <div class="desc">When a stock is added to the S&amp;P 500, all S&amp;P 500 index funds must buy it — creating predictable demand. S&amp;P 500 additions are announced ~3 trading days before the actual inclusion date. Historically, stocks gain 3–7% on the announcement and continue rising into inclusion. After inclusion, the "index addition premium" often reverses. Russell index reconstitution (annual in June) is the largest forced rebalancing event — small/mid cap stocks near the cutoff experience extreme volatility around reconstitution.</div>
+      <div class="g2">
+        <div class="card">
+          <div class="clbl">Strategy approach</div>
+          <div class="rngs">
+            <div class="rr"><div class="rd dg"></div><span class="rt">Buy S&amp;P 500 addition announcement: capture 3–5 day run-up</span></div>
+            <div class="rr"><div class="rd dr"></div><span class="rt">Sell on or before actual inclusion date: premium reversal begins</span></div>
+            <div class="rr"><div class="rd dg"></div><span class="rt">Russell "add" candidates identified in May: buy before June rebalance</span></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="clbl">Data sources</div>
+          <div class="srcs">
+            <span class="src p">S&amp;P Dow Jones Indices press releases: spglobal.com/spdji/en/announcements</span>
+            <span class="src p">FTSE Russell: ftserussell.com/research-insights/russell-reconstitution</span>
+            <span class="src">Index IQ: indexiq.com</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="module">
+    <div class="mhd" onclick="tog(this.parentElement)">
+      <span class="mnum">04</span>
+      <div class="mmeta">
+        <div class="mname">Earnings Season Patterns &amp; Pre-Announcement Drift <span class="tag t7">Event-Driven</span></div>
+        <div class="mline">Stocks with positive estimate revision trends drift upward before earnings — a systematic tradeable pattern</div>
+      </div><span class="chv">▼</span>
+    </div>
+    <div class="mbody">
+      <div class="desc">Post-Earnings Announcement Drift (PEAD): stocks that beat earnings estimates continue to drift in the direction of the surprise for weeks afterward — one of the most documented market anomalies. Pre-earnings drift: stocks with rising EPS revisions tend to trend upward in the 30–60 days before their earnings date. "Buy the rumor, sell the news" applies most in highly anticipated events where price has already moved significantly into the announcement. The implied move (derived from options IV) defines the expected reaction range.</div>
+      <div class="g2">
+        <div class="card">
+          <div class="clbl">Key signals</div>
+          <div class="rngs">
+            <div class="rr"><div class="rd dg"></div><span class="rt">Rising EPS revisions + rising RS line 30 days pre-earnings: bullish setup</span></div>
+            <div class="rr"><div class="rd dg"></div><span class="rt">Beat + raise guidance: PEAD trade — continue holding, drift continues</span></div>
+            <div class="rr"><div class="rd da"></div><span class="rt">Beat estimates but guide down: often sells off despite beat</span></div>
+            <div class="rr"><div class="rd dr"></div><span class="rt">Large move into earnings: "sell the news" — reduce before announcement</span></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="clbl">Data sources</div>
+          <div class="srcs">
+            <span class="src p">Earnings Whispers: earningswhispers.com</span>
+            <span class="src p">Yahoo Finance earnings calendar</span>
+            <span class="src">Seeking Alpha earnings analysis</span>
+            <span class="src">Estimate revision data: Finviz, Zacks</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════
+     RELATIVE VALUE
+══════════════════════════════ -->
+<div class="panel" id="panel-relval">
+  <p class="panel-intro">Relative value analysis identifies mispricings between related securities — it is market-neutral in theory, capturing the spread between two instruments rather than a directional bet on the market. It is the foundation of many hedge fund strategies.</p>
+
+  <div class="module">
+    <div class="mhd" onclick="tog(this.parentElement)">
+      <span class="mnum">01</span>
+      <div class="mmeta">
+        <div class="mname">Pairs Trading (Statistical Arbitrage) <span class="tag t8">Rel. Value</span></div>
+        <div class="mline">Long one correlated stock, short another — profit from the spread mean-reverting</div>
+      </div><span class="chv">▼</span>
+    </div>
+    <div class="mbody">
+      <div class="desc">Two stocks in the same sector that historically move together will occasionally diverge. The strategy: when the spread (ratio or price difference) moves 2+ standard deviations from its historical mean, go long the underperformer and short the outperformer — betting the spread will revert. Classic pairs: Coke/Pepsi, Goldman/Morgan Stanley, ExxonMobil/Chevron. The key risk: pairs can stop being correlated when a fundamental divergence occurs (one company's business changes structurally). The system must distinguish temporary vs. permanent divergences.</div>
+      <div class="g2">
+        <div class="card">
+          <div class="clbl">Entry signal</div>
+          <div class="rngs">
+            <div class="rr"><div class="rd dg"></div><span class="rt">Spread &gt;2 StdDev from 1-year mean: enter the trade</span></div>
+            <div class="rr"><div class="rd dg"></div><span class="rt">Cointegration confirmed (ADF test p &lt;0.05): pair is mean-reverting</span></div>
+            <div class="rr"><div class="rd da"></div><span class="rt">Spread 1–2 StdDev: watch, not yet ready to enter</span></div>
+            <div class="rr"><div class="rd dr"></div><span class="rt">Fundamental divergence (earnings growth diverging): abandon pair</span></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="clbl">Implementation tools</div>
+          <div class="srcs">
+            <span class="src p">Python: statsmodels (cointegration test)</span>
+            <span class="src p">yfinance for price data</span>
+            <span class="src">Quantopian Zipline / QuantConnect for backtesting</span>
+            <span class="src">pandas .corr() for rolling correlation monitoring</span>
+          </div>
+        </div>
+        <div class="card full">
+          <div class="clbl">Python pseudo-code structure</div>
+          <div class="ctxt" style="font-family:'Fira Code',monospace;font-size:10px;line-height:1.8">
+            # Step 1: Test cointegration<br>
+            from statsmodels.tsa.stattools import coint<br>
+            score, pvalue, _ = coint(stock_a, stock_b)<br>
+            # If pvalue &lt; 0.05: pair is cointegrated (mean-reverting)<br><br>
+            # Step 2: Calculate spread z-score<br>
+            spread = stock_a - hedge_ratio * stock_b<br>
+            z_score = (spread - spread.mean()) / spread.std()<br>
+            # Entry: z_score &gt; 2 → short A, long B<br>
+            # Exit: z_score returns to 0
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="module">
+    <div class="mhd" onclick="tog(this.parentElement)">
+      <span class="mnum">02</span>
+      <div class="mmeta">
+        <div class="mname">Sector vs. Sector Relative Value <span class="tag t8">Rel. Value</span></div>
+        <div class="mline">Identifying which sectors are cheap relative to each other on a normalized basis — the rotation framework</div>
+      </div><span class="chv">▼</span>
+    </div>
+    <div class="mbody">
+      <div class="desc">Rather than comparing individual stocks, compare entire sectors. Technology vs. Financials P/E spread, Energy vs. Utilities EV/EBITDA spread, Growth vs. Value relative performance. When a sector trades at historically wide discount to its typical relative valuation, the mean reversion trade is to overweight the cheap sector and underweight the expensive one. This is the core of your rotation strategy — expressed as cross-sector relative value.</div>
+      <div class="g2">
+        <div class="card">
+          <div class="clbl">Key cross-sector ratios to track</div>
+          <div class="ctxt">
+            XLK/XLV (Tech vs. Healthcare): growth vs. defensive<br>
+            XLE/XLU (Energy vs. Utilities): inflation sensitivity<br>
+            XLF/XLK (Financials vs. Tech): value vs. growth<br>
+            IWM/SPY (Small vs. Large): risk appetite and cycle position<br>
+            GLD/SPY (Gold vs. Equities): risk-off ratio
+          </div>
+        </div>
+        <div class="card">
+          <div class="clbl">Data sources</div>
+          <div class="srcs">
+            <span class="src p">SPDR Sector ETFs: ssga.com/us/en/individual/etfs/fund-finder.html</span>
+            <span class="src p">TradingView ratio charts (XLK/XLV etc.)</span>
+            <span class="src">yfinance for all ETF price data</span>
+            <span class="src">Finviz sector heat maps</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="module">
+    <div class="mhd" onclick="tog(this.parentElement)">
+      <span class="mnum">03</span>
+      <div class="mmeta">
+        <div class="mname">Capital Structure Arbitrage <span class="tag t8">Rel. Value</span></div>
+        <div class="mline">Trading the same company's equity vs. debt when they are mispriced relative to each other</div>
+      </div><span class="chv">▼</span>
+    </div>
+    <div class="mbody">
+      <div class="desc">When a company's credit risk (reflected in bond yields/CDS spreads) diverges sharply from what equity implied volatility suggests, a relative value opportunity exists. Example: equity options imply low vol (market complacent) but CDS spreads are widening (credit market concerned) — go long the CDS (buy protection) and sell equity vol (sell puts). This is an advanced institutional strategy but the signal it provides — watching for divergence between equity and credit markets for the same company — is accessible to any trader through public data.</div>
+      <div class="g2">
+        <div class="card">
+          <div class="clbl">Accessible version for your system</div>
+          <div class="ctxt">When stock price is near 52-week high (equity market unconcerned) but: (1) the company's bonds are trading at wide spreads, or (2) short interest is rising rapidly, or (3) credit rating agencies have issued downgrades — this is a capital structure divergence signal. Reduce equity exposure or implement a hedge.</div>
+        </div>
+        <div class="card">
+          <div class="clbl">Data sources</div>
+          <div class="srcs">
+            <span class="src p">FRED: credit spread data by sector</span>
+            <span class="src">FINRA TRACE bond data: finra.org/investors/learn-to-invest/types-investments/bonds/bond-data</span>
+            <span class="src">Moody's/S&amp;P ratings changes</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function sw(id){
+  const ids=['sentiment','factor','intermarket','flow','seasonality','altdata','eventdriven','relval'];
+  document.querySelectorAll('.ntab').forEach((t,i)=>t.classList.toggle('active',ids[i]===id));
+  document.querySelectorAll('.panel').forEach(p=>p.classList.toggle('active',p.id==='panel-'+id));
+}
+function tog(el){el.classList.toggle('open')}
+</script>
+</body>
+</html>

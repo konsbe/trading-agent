@@ -21,6 +21,7 @@ from db import cache as _cache
 from db.queries import fundamental, macro_intel, news, ohlcv, sentiment, technical
 from reports.models import (
     AlertEvent,
+    AnalyzeContextSnapshot,
     DailyReport,
     EconomicCalendarBrief,
     EarningsCalendarBrief,
@@ -47,6 +48,7 @@ class ReportBuilder:
         news_limit: int = 5,
         price_cache_ttl: int = 300,
         analyze_cache_ttl: int = 600,
+        benchmark_symbol: str = "SPY",
     ) -> None:
         self._pool = pool
         self._equity_interval = equity_interval
@@ -54,6 +56,7 @@ class ReportBuilder:
         self._news_limit = news_limit
         self._price_cache_ttl = price_cache_ttl
         self._analyze_cache_ttl = analyze_cache_ttl
+        self._benchmark_symbol = (benchmark_symbol or "SPY").strip().upper() or "SPY"
 
     # ── Public entry points ───────────────────────────────────────────────────
 
@@ -77,6 +80,7 @@ class ReportBuilder:
             report.fundamental = await self._build_fundamental(symbol)
         report.sentiment = await self._build_sentiment(symbol)
         report.news = await self._build_news(symbol)
+        report.analyze_context = await self._build_analyze_context(symbol, asset_type)
 
         if use_cache:
             await _cache.set(cache_key, self._serialise_symbol_report(report), self._analyze_cache_ttl)
@@ -823,9 +827,78 @@ class ReportBuilder:
                     bars_used=int(mc_p["bars_used"]) if mc_p.get("bars_used") is not None else None,
                 )
 
+            corr_p = await _md("mc_macro_correlation")
+            if corr_p:
+                r = corr_p.get("regime")
+                if isinstance(r, str):
+                    snap.macro_corr_regime = r
+                if corr_p.get("score") is not None:
+                    snap.macro_corr_score = float(corr_p["score"])
+                lbl = corr_p.get("label")
+                if isinstance(lbl, str):
+                    snap.macro_corr_label = lbl
+                fl = corr_p.get("flags")
+                if isinstance(fl, list):
+                    snap.macro_corr_flags = [str(x) for x in fl if x is not None][:12]
+
         except Exception as exc:
             log.warning("macro build failed: %s", exc)
         return snap
+
+    async def _build_analyze_context(
+        self, symbol: str, asset_type: str
+    ) -> Optional[AnalyzeContextSnapshot]:
+        ctx = AnalyzeContextSnapshot(benchmark_symbol=self._benchmark_symbol)
+        has_any = False
+        try:
+            mc = await ohlcv.latest_macro_derived(self._pool, "mc_market_cycle")
+            if mc:
+                pp = mc.get("price_phase")
+                if isinstance(pp, str):
+                    ctx.benchmark_price_phase = pp
+                    has_any = True
+                cp = mc.get("composite_phase")
+                if isinstance(cp, str):
+                    ctx.benchmark_composite_phase = cp
+                    has_any = True
+                if mc.get("drawdown_pct") is not None:
+                    ctx.benchmark_drawdown_pct = float(mc["drawdown_pct"])
+                    has_any = True
+
+            corr = await ohlcv.latest_macro_derived(self._pool, "mc_macro_correlation")
+            if corr:
+                r = corr.get("regime")
+                if isinstance(r, str):
+                    ctx.macro_corr_regime = r
+                    has_any = True
+                if corr.get("score") is not None:
+                    ctx.macro_corr_score = float(corr["score"])
+                    has_any = True
+                lbl = corr.get("label")
+                if isinstance(lbl, str):
+                    ctx.macro_corr_label = lbl
+                    has_any = True
+                fl = corr.get("flags")
+                if isinstance(fl, list):
+                    ctx.macro_corr_flags = [str(x) for x in fl if x is not None][:10]
+                    if ctx.macro_corr_flags:
+                        has_any = True
+
+            if asset_type == "equity":
+                rs = await ohlcv.rel_return_vs_benchmark_excess_pct(
+                    self._pool,
+                    symbol,
+                    self._benchmark_symbol,
+                    self._equity_interval,
+                    bars=20,
+                )
+                if rs is not None:
+                    ctx.rs_20d_vs_benchmark_pct = rs
+                    has_any = True
+        except Exception as exc:
+            log.warning("analyze context build failed: %s", exc)
+            return None
+        return ctx if has_any else None
 
     async def _build_macro_intel(self, equity_symbols: list[str]) -> MacroIntelSnapshot:
         snap = MacroIntelSnapshot()
@@ -922,6 +995,37 @@ class ReportBuilder:
         s = data.get("sentiment")
         sent = SentimentSnapshot(**{**s, "ts": _ts(s.get("ts"))}) if s else None
         news_list = [NewsHeadline(**{**n, "ts": _ts(n.get("ts"))}) for n in data.get("news", [])]
+        ac = data.get("analyze_context")
+        analyze_ctx: Optional[AnalyzeContextSnapshot] = None
+        if isinstance(ac, dict):
+            mflags = ac.get("macro_corr_flags") or []
+            if not isinstance(mflags, list):
+                mflags = []
+            analyze_ctx = AnalyzeContextSnapshot(
+                benchmark_symbol=str(ac.get("benchmark_symbol") or "SPY"),
+                benchmark_price_phase=ac.get("benchmark_price_phase")
+                if isinstance(ac.get("benchmark_price_phase"), str)
+                else None,
+                benchmark_composite_phase=ac.get("benchmark_composite_phase")
+                if isinstance(ac.get("benchmark_composite_phase"), str)
+                else None,
+                benchmark_drawdown_pct=float(ac["benchmark_drawdown_pct"])
+                if ac.get("benchmark_drawdown_pct") is not None
+                else None,
+                rs_20d_vs_benchmark_pct=float(ac["rs_20d_vs_benchmark_pct"])
+                if ac.get("rs_20d_vs_benchmark_pct") is not None
+                else None,
+                macro_corr_regime=ac.get("macro_corr_regime")
+                if isinstance(ac.get("macro_corr_regime"), str)
+                else None,
+                macro_corr_score=float(ac["macro_corr_score"])
+                if ac.get("macro_corr_score") is not None
+                else None,
+                macro_corr_label=ac.get("macro_corr_label")
+                if isinstance(ac.get("macro_corr_label"), str)
+                else None,
+                macro_corr_flags=[str(x) for x in mflags],
+            )
         return SymbolReport(
             symbol=data["symbol"],
             asset_type=data["asset_type"],
@@ -930,4 +1034,5 @@ class ReportBuilder:
             fundamental=fund,
             sentiment=sent,
             news=news_list,
+            analyze_context=analyze_ctx,
         )

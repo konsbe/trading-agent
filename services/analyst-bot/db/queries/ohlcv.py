@@ -108,3 +108,29 @@ async def latest_macro_derived(pool: asyncpg.Pool, metric: str) -> Optional[dict
     if row["payload"]:
         result.update(json.loads(row["payload"]))
     return result
+
+
+async def rel_return_vs_benchmark_excess_pct(
+    pool: asyncpg.Pool,
+    symbol: str,
+    benchmark: str = "SPY",
+    interval: str = "1Day",
+    bars: int = 20,
+) -> Optional[float]:
+    """Excess % return of `symbol` over `benchmark` over ~`bars` sessions.
+
+    Each leg uses its own last `bars+1` daily closes (independent calendars).
+    Returns None if either series lacks data or symbol equals benchmark.
+    """
+    if symbol.upper() == benchmark.upper():
+        return None
+    need = bars + 1
+    a = await recent_bars(pool, symbol, "equity_ohlcv", interval, need)
+    b = await recent_bars(pool, benchmark, "equity_ohlcv", interval, need)
+    if len(a) < need or len(b) < need:
+        return None
+    ca = [float(x["close"]) for x in a]
+    cb = [float(x["close"]) for x in b]
+    ra = (ca[-1] / ca[0] - 1.0) * 100.0
+    rb = (cb[-1] / cb[0] - 1.0) * 100.0
+    return round(ra - rb, 2)

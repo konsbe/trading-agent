@@ -19,6 +19,7 @@ import discord
 
 from reports.models import (
     AlertEvent,
+    AnalyzeContextSnapshot,
     DailyReport,
     FundamentalSnapshot,
     MacroIntelSnapshot,
@@ -723,6 +724,10 @@ def symbol_report_embeds(report: SymbolReport) -> list[discord.Embed]:
     embeds: list[discord.Embed] = []
     if report.price:
         embeds.append(price_embed(report.price))
+    if report.analyze_context:
+        ce = analyze_context_embed(report.analyze_context)
+        if ce:
+            embeds.append(ce)
     if report.technical:
         embeds.append(technical_embed(
             report.technical,
@@ -1355,6 +1360,94 @@ def macro_market_cycle_embed(macro: MacroSnapshot) -> Optional[discord.Embed]:
     return embed
 
 
+def macro_macro_correlation_embed(macro: MacroSnapshot) -> Optional[discord.Embed]:
+    """mc_macro_correlation: cross-metric regime label (Macro Correlations panel)."""
+    missing = (
+        macro.macro_corr_regime is None
+        and macro.macro_corr_score is None
+        and not macro.macro_corr_label
+        and not macro.macro_corr_flags
+    )
+    if missing:
+        return discord.Embed(
+            title="🔗 Macro correlations — data missing",
+            description=(
+                "No **`mc_macro_correlation`** in **`macro_derived`** yet.\n\n"
+                "• Rebuild & restart **`macro-analysis`** (correlation pass runs after market cycle).\n"
+                "• Ensure **`MARKET_MACRO_CORR_ENABLE=true`** (default).\n\n"
+                "_See **bot.md** — Macro correlation regime._"
+            ),
+            color=COLOR_GREY,
+        )
+
+    title_reg = (macro.macro_corr_regime or "regime").replace("_", " ").title()
+    embed = discord.Embed(
+        title=f"🔗 Macro correlations — {title_reg}",
+        color=COLOR_BLUE,
+    )
+    sc = _num(macro.macro_corr_score, 2) if macro.macro_corr_score is not None else "—"
+    embed.add_field(
+        name="Regime",
+        value=f"**{macro.macro_corr_regime or '—'}** · score **{sc}** (−1 stress … +1 constructive)",
+        inline=False,
+    )
+    if macro.macro_corr_label:
+        embed.add_field(name="Read", value=_trunc(macro.macro_corr_label, 1020), inline=False)
+    if macro.macro_corr_flags:
+        embed.add_field(
+            name="Flags",
+            value=_trunc(", ".join(macro.macro_corr_flags), 1020),
+            inline=False,
+        )
+    embed.set_footer(text="mc_macro_correlation · MARKET_MACRO_CORR_ENABLE · see bot.md")
+    return embed
+
+
+def analyze_context_embed(ctx: AnalyzeContextSnapshot) -> Optional[discord.Embed]:
+    """Compact backdrop for /analyze: benchmark cycle, macro regime, optional vs-benchmark RS."""
+    if not (
+        ctx.benchmark_composite_phase
+        or ctx.benchmark_price_phase
+        or ctx.macro_corr_regime
+        or ctx.rs_20d_vs_benchmark_pct is not None
+    ):
+        return None
+
+    embed = discord.Embed(
+        title=f"📐 Context vs {ctx.benchmark_symbol}",
+        color=COLOR_BLUE,
+    )
+    bench_lines: list[str] = []
+    if ctx.benchmark_composite_phase:
+        bench_lines.append(f"Composite **{ctx.benchmark_composite_phase}**")
+    if ctx.benchmark_price_phase:
+        bench_lines.append(f"Price **{ctx.benchmark_price_phase}**")
+    if ctx.benchmark_drawdown_pct is not None:
+        bench_lines.append(f"Drawdown from peak **{_num(ctx.benchmark_drawdown_pct, 2)}%**")
+    if bench_lines:
+        embed.add_field(name="Benchmark cycle", value="\n".join(bench_lines), inline=False)
+
+    if ctx.macro_corr_regime:
+        sc = _num(ctx.macro_corr_score, 2) if ctx.macro_corr_score is not None else "—"
+        body = f"**{ctx.macro_corr_regime.replace('_', ' ')}** · {sc}"
+        if ctx.macro_corr_label:
+            body += f"\n{_trunc(ctx.macro_corr_label, 800)}"
+        embed.add_field(name="Macro correlation regime", value=body, inline=False)
+
+    if ctx.rs_20d_vs_benchmark_pct is not None:
+        embed.add_field(
+            name="20d relative strength",
+            value=(
+                f"vs **{ctx.benchmark_symbol}**: **{_num(ctx.rs_20d_vs_benchmark_pct, 2)}** pp "
+                "(excess return, ~20 sessions)"
+            ),
+            inline=False,
+        )
+
+    embed.set_footer(text="mc_market_cycle · mc_macro_correlation · equity_ohlcv")
+    return embed
+
+
 def macro_intel_embed(intel: MacroIntelSnapshot) -> Optional[discord.Embed]:
     """Calendars, GPR, GDELT, optional FOMC narrative, macro RSS / Finnhub general headlines."""
     has_any = (
@@ -1492,6 +1585,11 @@ def daily_report_embeds(report: DailyReport) -> list[discord.Embed]:
         mcy_embed = macro_market_cycle_embed(report.macro)
         if mcy_embed:
             embeds.append(mcy_embed)
+
+    if report.macro:
+        mcc_embed = macro_macro_correlation_embed(report.macro)
+        if mcc_embed:
+            embeds.append(mcc_embed)
 
     if report.macro_intel:
         mi_embed = macro_intel_embed(report.macro_intel)

@@ -42,6 +42,8 @@ class BotConfig(BaseSettings):
     bot_crypto_symbols: str = "BTCUSDT,ETHUSDT"
     bot_equity_interval: str = "1Day"
     bot_crypto_interval: str = "1d"
+    # Same env as macro-analysis MARKET_CYCLE_SYMBOL — benchmark for cycle + /analyze RS context
+    market_cycle_symbol: str = "SPY"
 
     @property
     def equity_symbols(self) -> list[str]:

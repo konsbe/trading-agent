@@ -35,7 +35,7 @@ These appear on the price title and the trend field.
 `/analyze symbol:AAPL asset_type:equity` — Full deep-dive: price → technical → Tier 1 fundamentals → 🏦 Tier 2 balance sheet → 🔍 Tier 3 deep context → news
 `/report` — Triggers the daily market report on demand (same as the 07:00 scheduled job)
 `/dictionary` — Sends this glossary as paginated Discord embeds
-`/status` — Bot health: DB ✅/❌, Redis ✅/❌, scheduler jobs, configured symbols
+`/status` — Bot health: DB ✅/❌, Redis ✅/❌, scheduler jobs, configured symbols; macro-intel table row counts; latest **`mc_market_cycle`** / **`mc_macro_correlation`** timestamps in **`macro_derived`**
 `/ping` — Bot latency in milliseconds
 
 `asset_type` dropdown: `equity` for stocks/ETFs, `crypto` for crypto pairs. Defaults to `equity`.
@@ -1343,6 +1343,34 @@ Use Discord **`/status`** (ephemeral) to see **row counts** for macro-intel tabl
 Implements the **live** slice of `macro_analysis_reference.html` **Market Cycles** (drawdown bands + 200DMA row). Historical episode **tables** in that HTML stay reference-only unless you add a static dataset later.
 
 If **`mc_market_cycle`** is missing from the DB, the bot still shows a grey **“Market cycle — data missing”** card with fix steps (rebuild `macro-analysis`, ingest SPY daily bars, env).
+
+### Macro correlation regime embed (after Market cycle)
+
+**Storage:** same hypertable **`macro_derived`**, **`source = macro_analysis`** — **no new migration**.  
+**Metric:** **`mc_macro_correlation`**, written by **`macro-analysis`** after **`analyzeMarketCycles`** when **`MARKET_MACRO_CORR_ENABLE=true`** (default).
+
+The worker reads the **latest payloads** for stances/regimes already upserted in that run (`gc_stance`, `mp_stance`, `inf_stance`, `gg_stance`, `mp_yield_curve`, `mp_real_rate`, `mp_credit_spread`, `gc_gdp`, `inf_oil`, `gg_broad_dollar`, `gg_usdjpy`) and maps them to one **regime** bucket, a numeric **score** (−1 stress … +1 constructive), a short **label**, and **flags** (e.g. curve, credit, USD). Logic lives in **`services/data-analyzer/internal/macrocorr`** — it is a **compact regime summary**, not a full replication of every narrative cell in **`macro_analysis_reference.html`** **Macro Correlations** (that HTML panel remains the conceptual reference).
+
+| Regime (examples) | Rough meaning |
+|-------------------|---------------|
+| `recession_pipeline` | Inverted curve + stressed credit + weak GDP/growth |
+| `stagflation_risk` | Hot inflation stance + soft growth |
+| `rising_inflation_tight_policy` | Hot inflation + restrictive policy + flat/inverted curve |
+| `global_liquidity_stress` | Elevated global stress + USD or JPY stress |
+| `goldilocks_light` / `disinflation_soft_landing` | Constructive mixes when spreads contained |
+| `deflation_risk` / `neutral_mixed` | Deflationary stance or no single dominant story |
+
+**Daily report:** Discord embed **Macro correlations** (after **Market cycle**). **Missing data** → grey card with rebuild/env hints.
+
+### `/analyze` context strip (after price)
+
+**Symbol reports** show the **price** embed first, then a compact **Context vs \<benchmark\>** embed when any of: benchmark **composite/price** phase or drawdown (`mc_market_cycle`), **macro correlation** regime (`mc_macro_correlation`), or (equities only) **20-session excess return vs benchmark** is available.
+
+- **Benchmark symbol** matches **`MARKET_CYCLE_SYMBOL`** on the bot (`market_cycle_symbol` in config, default **SPY**) so it stays aligned with the index used for **`mc_market_cycle`**.
+- **Crypto** symbols get benchmark + macro regime only (no vs-benchmark RS from `equity_ohlcv`).
+- Cached **`/analyze`** responses include **`analyze_context`** in the Redis payload (see `ReportBuilder._serialise_symbol_report`).
+
+Discord **`/status`** lists **latest `ts`** per metric for **`mc_market_cycle`** and **`mc_macro_correlation`** under **Macro derived (latest ts)** when the DB query succeeds.
 
 ---
 

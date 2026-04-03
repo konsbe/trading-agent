@@ -470,6 +470,29 @@ class MacroSnapshot:
     # ── Market cycle (equity index + macro blend — mc_market_cycle) ───────────
     market_cycle: Optional[MarketCycleSnapshot] = None
 
+    # ── Macro correlation regime (mc_macro_correlation — cross-metric label) ─
+    macro_corr_regime: Optional[str] = None
+    macro_corr_score: Optional[float] = None
+    macro_corr_label: Optional[str] = None
+    macro_corr_flags: list[str] = field(default_factory=list)
+
+
+# ── /analyze context strip (benchmark + macro regime + optional vs benchmark) ─
+
+@dataclass
+class AnalyzeContextSnapshot:
+    """Compact backdrop for /analyze: index cycle, macro correlation regime, equity vs benchmark."""
+
+    benchmark_symbol: str = "SPY"
+    benchmark_price_phase: Optional[str] = None
+    benchmark_composite_phase: Optional[str] = None
+    benchmark_drawdown_pct: Optional[float] = None
+    rs_20d_vs_benchmark_pct: Optional[float] = None  # equity only: excess 20-session return vs benchmark
+    macro_corr_regime: Optional[str] = None
+    macro_corr_score: Optional[float] = None
+    macro_corr_label: Optional[str] = None
+    macro_corr_flags: list[str] = field(default_factory=list)
+
 
 # ── Composite symbol report ───────────────────────────────────────────────────
 
@@ -483,6 +506,7 @@ class SymbolReport:
     fundamental: Optional[FundamentalSnapshot] = None  # None for crypto
     sentiment: Optional[SentimentSnapshot] = None
     news: list[NewsHeadline] = field(default_factory=list)
+    analyze_context: Optional[AnalyzeContextSnapshot] = None
 
 
 # ── Daily report (full market run) ───────────────────────────────────────────

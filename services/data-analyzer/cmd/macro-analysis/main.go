@@ -48,6 +48,10 @@
 //   mc_market_cycle   SPY (configurable) drawdown vs peak, 200DMA %, crash heuristics,
 //                     composite phase blending gc/mp/inf/gg (see macro_analysis_reference.html Market Cycles)
 //
+// Macro correlation regime (analyzeMacroCorrelations) — after all macro + market cycle:
+//   mc_macro_correlation  Cross-metric regime label + score + flags for bot /analyze context
+//                         (see macro_analysis_reference.html — Macro Correlations panel)
+//
 // TODO [PAID]:    ICE DXY, real-time FX — FRED DTWEXBGS is weekly broad goods index.
 // TODO [PAID]:    China official / Caixin PMI — NBS/Caixin; EM stress (JPM EMBI+) paid.
 // TODO [SCRAPE]:  USTR tariffs, PBOC announcements, CBO outlook — no clean API.
@@ -75,6 +79,7 @@ import (
 	"github.com/konsbe/trading-agent/services/data-analyzer/internal/config"
 	"github.com/konsbe/trading-agent/services/data-analyzer/internal/db"
 	"github.com/konsbe/trading-agent/services/data-analyzer/internal/logx"
+	"github.com/konsbe/trading-agent/services/data-analyzer/internal/macrocorr"
 	"github.com/konsbe/trading-agent/services/data-analyzer/internal/marketcycle"
 	"github.com/konsbe/trading-agent/services/data-analyzer/internal/store"
 )
@@ -104,6 +109,7 @@ func main() {
 		inflationCfg: config.LoadInflationCycle(),
 		globalCfg:    config.LoadGlobalGeopolitical(),
 		cycleCfg:     config.LoadMarketCycle(),
+		corrCfg:      config.LoadMacroCorrelation(),
 		pool:         pool,
 		log:          log,
 	}
@@ -156,6 +162,7 @@ type worker struct {
 	inflationCfg config.InflationCycle
 	globalCfg    config.GlobalGeopolitical
 	cycleCfg     config.MarketCycle
+	corrCfg      config.MacroCorrelation
 	pool         *pgxpool.Pool
 	log          *slog.Logger
 }
@@ -166,6 +173,7 @@ func (w *worker) analyzeAll(ctx context.Context) {
 	w.analyzeInflation(ctx)
 	w.analyzeGlobal(ctx)
 	w.analyzeMarketCycles(ctx)
+	w.analyzeMacroCorrelations(ctx)
 }
 
 // analyzeMonetary computes all monetary-policy signals from FRED series stored
@@ -1925,4 +1933,66 @@ func (w *worker) analyzeMarketCycles(ctx context.Context) {
 		"dd_pct", fmt.Sprintf("%.2f", pr.DrawdownPct*100),
 		"vs_sma200", fmt.Sprintf("%.2f", pr.PctVsSMA200),
 	)
+}
+
+// analyzeMacroCorrelations blends latest stance/regime strings from macro_derived into one
+// mc_macro_correlation row for the analyst-bot (daily report + /analyze context strip).
+func (w *worker) analyzeMacroCorrelations(ctx context.Context) {
+	if !w.corrCfg.Enabled {
+		return
+	}
+	ts := time.Now().UTC()
+	ptr := func(v float64) *float64 { return &v }
+	upsert := func(metric string, value *float64, payload any) {
+		if err := store.UpsertMacroDerived(ctx, w.pool, ts, metric, value, payload); err != nil {
+			w.log.Error("upsert macro derived", "metric", metric, "err", err)
+		}
+	}
+	get := func(metric, key string) string {
+		m, ok := store.QueryMacroDerivedPayloadMap(ctx, w.pool, metric)
+		if !ok {
+			return ""
+		}
+		v, ok := m[key].(string)
+		if !ok {
+			return ""
+		}
+		return v
+	}
+	in := macrocorr.Inputs{
+		GCStance:     get("gc_stance", "stance"),
+		MPStance:     get("mp_stance", "stance"),
+		InfStance:    get("inf_stance", "stance"),
+		GGStance:     get("gg_stance", "stance"),
+		YieldCurve:   get("mp_yield_curve", "regime"),
+		RealRate:     get("mp_real_rate", "regime"),
+		CreditRegime: get("mp_credit_spread", "regime"),
+		GDPRegime:    get("gc_gdp", "regime"),
+		OilRegime:    get("inf_oil", "regime"),
+		DollarRegime: get("gg_broad_dollar", "regime"),
+		JPYRegime:    get("gg_usdjpy", "regime"),
+	}
+	r := macrocorr.Build(in)
+	payload := map[string]any{
+		"regime": r.Regime,
+		"score":  r.Score,
+		"label":  r.Label,
+		"flags":  r.Flags,
+		"inputs": map[string]any{
+			"gc_stance":    in.GCStance,
+			"mp_stance":    in.MPStance,
+			"inf_stance":   in.InfStance,
+			"gg_stance":    in.GGStance,
+			"yield_curve":  in.YieldCurve,
+			"real_rate":    in.RealRate,
+			"credit":       in.CreditRegime,
+			"gdp":          in.GDPRegime,
+			"oil":          in.OilRegime,
+			"dollar":       in.DollarRegime,
+			"usdjpy":       in.JPYRegime,
+		},
+		"reference": "macro_analysis_reference.html — Macro Correlations panel",
+	}
+	upsert("mc_macro_correlation", ptr(r.Score), payload)
+	w.log.Info("macro correlation regime complete", "regime", r.Regime, "score", fmt.Sprintf("%.2f", r.Score))
 }

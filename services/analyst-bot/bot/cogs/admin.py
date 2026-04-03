@@ -1,7 +1,7 @@
 """
 Admin cog — operational commands for bot operators.
 
-/status  — DB, Redis, scheduler, symbols, and macro-intel table row counts
+/status  — DB, Redis, scheduler, symbols, macro-intel row counts, macro_derived mc_* latest ts
 /ping    — Latency check
 """
 import logging
@@ -41,6 +41,33 @@ class AdminCog(commands.Cog):
                 embed.add_field(
                     name="Macro intel tables",
                     value=f"⚠️ {mi_exc}",
+                    inline=False,
+                )
+            try:
+                mc_rows = await conn.fetch(
+                    """
+                    SELECT metric, MAX(ts) AS latest
+                    FROM macro_derived
+                    WHERE source = 'macro_analysis'
+                      AND metric = ANY($1::text[])
+                    GROUP BY metric
+                    ORDER BY metric
+                    """,
+                    ["mc_market_cycle", "mc_macro_correlation"],
+                )
+                if mc_rows:
+                    mc_lines = [
+                        f"`{r['metric']}`: {r['latest']}" for r in mc_rows
+                    ]
+                    embed.add_field(
+                        name="Macro derived (latest ts)",
+                        value="\n".join(mc_lines)[:1020],
+                        inline=False,
+                    )
+            except Exception as mc_exc:
+                embed.add_field(
+                    name="Macro derived (latest ts)",
+                    value=f"⚠️ {mc_exc}",
                     inline=False,
                 )
         except Exception as exc:

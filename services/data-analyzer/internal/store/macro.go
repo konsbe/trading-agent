@@ -125,3 +125,23 @@ func QueryMacroDerivedLatest(ctx context.Context, pool *pgxpool.Pool, metric str
 	}
 	return val, payload, true
 }
+
+// QueryMacroDerivedPayloadMap returns the JSON payload of the latest macro_derived row
+// for `metric` (source = macro_analysis). Use this when `value` may be NULL — Scan into
+// float64 would fail on NULL for QueryMacroDerivedLatest.
+func QueryMacroDerivedPayloadMap(ctx context.Context, pool *pgxpool.Pool, metric string) (map[string]any, bool) {
+	var raw []byte
+	row := pool.QueryRow(ctx,
+		`SELECT payload FROM macro_derived
+		 WHERE metric = $1 AND source = 'macro_analysis' AND payload IS NOT NULL
+		 ORDER BY ts DESC LIMIT 1`,
+		metric)
+	if err := row.Scan(&raw); err != nil || len(raw) == 0 {
+		return nil, false
+	}
+	var m map[string]any
+	if err := json.Unmarshal(raw, &m); err != nil {
+		return nil, false
+	}
+	return m, true
+}
