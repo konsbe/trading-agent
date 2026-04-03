@@ -1102,6 +1102,208 @@ Total weight when all signals available: 0.91 (0.09 reserved for future paid PMI
 
 ---
 
+## Macro Analysis — Inflation & Prices
+
+The Inflation & Prices embed appears in `/report` after the Growth Cycle embed.  
+It is a **market-wide analysis** — not per-symbol, not per-asset.
+
+Inflation drives the most important macro trades:
+- **Hot inflation** → Fed stays hawkish → bonds sell off → growth/tech underperforms → defensives, energy, commodities outperform
+- **Deflationary** → demand collapse → Fed forced to cut → bonds rally → gold and cash outperform
+- **Moderate (goldilocks)** → Fed comfortable → risk assets thrive
+
+---
+
+### Composite Score
+
+| Display | Score | Meaning |
+|---------|-------|---------|
+| `🔴 Hot (score)` | > +0.4 | Multiple inflation signals elevated — Fed hawkish, bonds under pressure |
+| `🟡 Moderate (score)` | -0.4 to +0.4 | Inflation within manageable range — mixed conditions |
+| `🔵 Deflationary (score)` | < -0.4 | Deflation risk — demand collapse, bonds rally, Fed forced to act |
+| `⚪ Insufficient Data` | — | FRED data not yet populated |
+
+Score range: +1.0 = maximum inflation pressure, -1.0 = deflation risk.  
+Configurable: `INFLATION_HOT_SCORE` (default 0.4), `INFLATION_DEFLATION_SCORE` (default -0.4)
+
+---
+
+### Tier 1 — Core Inflation Measures
+
+#### Core PCE — The Fed's Actual Target (PCEPILFE)
+Source: FRED `PCEPILFE` (monthly, index level; YoY % computed)  
+Weight in composite: **0.20 (highest)** — when Powell says "inflation," he means Core PCE.  
+Core PCE runs ~0.3–0.5pp **below** Core CPI due to chain-weighting (consumers substitute cheaper alternatives).
+
+| Display | YoY % | Meaning |
+|---------|--------|---------|
+| 🟢 `at_target` | < 2.2% | Fed comfortable — neutral to dovish policy bias |
+| 🟡 `hawkish_bias` | 2.2–3.0% | Above target — Fed stays restrictive; rate cuts unlikely |
+| 🔴 `aggressive_tightening` | > 3.0% | Persistent overshot — Fed must hike or hold rates significantly longer |
+| 🟢 `below_target` | < 1.8% | Potential undershoot — mild dovish pressure |
+
+Fed target context: Core PCE persistently above 2.5% = **Fed will not cut rates regardless of other economic data.**
+
+Configurable: `INFLATION_CORE_PCE_AT_TARGET` (2.2), `INFLATION_CORE_PCE_HAWKISH` (3.0)
+
+---
+
+#### Headline CPI (CPIAUCSL) + Core CPI (CPILFESL)
+Sources: FRED `CPIAUCSL`, `CPILFESL` (monthly, index level; YoY % computed)  
+Weight of CPI in composite: **0.20** | Core CPI: **0.10**
+
+| Display | CPI YoY % | Meaning |
+|---------|-----------|---------|
+| 🟢 `goldilocks` | 1.5–2.5% | Ideal — Fed comfortable, equities thrive |
+| 🟡 `rising` | 2.5–4.0% | Tightening bias — watch for Fed communication shift |
+| 🔴 `above_target` | 4.0–5.0% | Significant overshoot — market expects sustained restriction |
+| 🔴 `hot` | > 5.0% | Aggressive hiking cycle (2022: peaked at 9.1%) |
+| 🟢 `below_target` | 0–1.5% | Below Fed comfort zone |
+| 🔴 `deflation_risk` | < 0% | Demand collapse — recession signal |
+
+CPI day surprise vs consensus = one of the highest-impact single data releases for bonds and equities.
+
+Configurable: `INFLATION_CPI_GOLDILOCKS_MAX` (2.5), `INFLATION_CPI_ABOVE_TARGET` (4.0), `INFLATION_CPI_HOT` (5.0)
+
+---
+
+#### Shelter CPI (CUSR0000SAH1) — 35% of Headline CPI
+Source: FRED `CUSR0000SAH1` (monthly, YoY % computed)  
+Shelter (Owner's Equivalent Rent) has an **18-month lag** to actual market rents. This makes it the longest-lasting structural inflation driver in a rate cycle.
+
+| Display | YoY % | Meaning |
+|---------|--------|---------|
+| 🟢 `normalizing` | < 2.5% | Shelter disinflation is materialising — CPI will follow down |
+| 🟡 `moderating` | 2.5–3.5% | Slowing but still elevated — more time needed |
+| 🟡 `elevated` | 3.5–5.0% | Still sticky — CPI will remain elevated despite goods disinflation |
+| 🔴 `hot` | > 5.0% | Rent surge — structural inflation driver at peak |
+
+*(18m lag)* notation shown — when market rents peaked in 2022, shelter CPI peaked in 2023.
+
+> **TODO [LLM]**: Compare shelter CPI to real-time rental indices (Zillow, Apartments.com) to estimate the forward path of OER and predict when shelter disinflation arrives.
+
+---
+
+### Pipeline & Energy — Tier 2
+
+#### PPI Final Demand (PPIFID) + PPI-CPI Spread
+Source: FRED `PPIFID` (monthly, YoY % computed), `PPIACO` (all commodities)  
+Weight in composite: **0.10**  
+PPI typically **leads CPI by 3–6 months** — falling PPI = disinflation arriving.
+
+| Display | PPI YoY % | Meaning |
+|---------|-----------|---------|
+| 🟢 `deflationary` | < 0% | Goods deflation — CPI will follow down in 3–6 months |
+| 🟢 `stable` | 0–2% | Producer prices stable |
+| 🟡 `moderate` | 2–4% | Moderate pipeline pressure |
+| 🔴 `elevated` | 4–8% | Above-target producer inflation — CPI to follow |
+| 🔴 `surge` | > 8% | Severe producer inflation (Ukraine war 2022: +11.2%) |
+
+**PPI-CPI Spread (corporate margin signal):**
+
+| Spread | Signal | Meaning |
+|--------|--------|---------|
+| > +3pp | 🔴 `margin_pressure` | Producers absorbing more than they pass through → watch for earnings misses from manufacturers |
+| -3 to +3pp | 🟡 `neutral` | Normal pass-through |
+| < -3pp | 🟢 `margin_expansion` | Producers benefit — input costs falling faster than output prices |
+
+Configurable: `INFLATION_PPI_SURGE` (8.0), `INFLATION_PPI_ELEVATED` (4.0), `INFLATION_PPI_CPI_SPREAD_WARNING` (3.0)
+
+---
+
+#### WTI Crude Oil (DCOILWTICO) + Brent (DCOILBRENTEU)
+Source: FRED `DCOILWTICO`, `DCOILBRENTEU` (daily, $/barrel — latest observation)  
+Weight in composite: **0.15**  
+A **$10/barrel move shifts US headline CPI by ~0.3–0.4pp.**
+
+| Display | WTI $/barrel | Meaning |
+|---------|--------------|---------|
+| 🔴 `inflationary_risk` | > $100 | Demand destruction risk; consumer headwind; energy outperforms |
+| 🟡 `elevated` | $80–100 | Inflationary pressure building; energy sector profitable |
+| 🟢 `goldilocks` | $60–80 | Affordable energy; economy + margins healthy |
+| 🟢 `low` | $50–60 | Disinflationary; energy sector under pressure |
+| 🔴 `energy_sector_stress` | < $50 | Severe energy deflation; E&P sector stress; deflationary signal |
+
+**Brent-WTI spread**: Brent trades above WTI due to transportation costs. A widening spread > $5 indicates elevated geopolitical risk premium.
+
+> **TODO [SCRAPE]**: EIA weekly petroleum inventories — no FRED equivalent; EIA.gov data requires scraping.  
+> **TODO [PAID]**: CME WTI futures curve (contango/backwardation) — requires CME API.
+
+Configurable: `INFLATION_WTI_GOLDILOCKS_MIN` (60), `INFLATION_WTI_GOLDILOCKS_MAX` (80), `INFLATION_WTI_INFLATIONARY` (100), `INFLATION_WTI_STRESS` (50)
+
+---
+
+### Wages & Commodities — Tier 3
+
+#### Wages — AHE (CES0500000003) + ECI (ECIALLCIV)
+Sources: FRED `CES0500000003` (monthly), `ECIALLCIV` (quarterly)  
+Weight in composite: **0.15**  
+Wages are **60–70% of service sector costs**. Wage growth above 3.5% in a 2% inflation target regime = wage-price spiral risk.
+
+AHE (Average Hourly Earnings) = high frequency but volatile.  
+ECI (Employment Cost Index) = quarterly, smoother, the Fed's preferred wage measure.
+
+| Display | AHE YoY % | Meaning |
+|---------|-----------|---------|
+| 🟢 `soft` | < 2% | Wage growth too low — deflationary pressure on services |
+| 🟢 `target_consistent` | 2–3.5% | Consistent with 2% inflation target — neutral Fed |
+| 🟡 `above_target` | 3.5–4.5% | Services inflation sticky — Fed cautious on cuts |
+| 🔴 `elevated` | 4.5–5% | Above-target wage pressure — hawkish Fed stance reinforced |
+| 🔴 `spiral_risk` | > 5% | Wage-price spiral risk — the 2022–2023 challenge |
+
+Configurable: `INFLATION_WAGE_TARGET_MAX` (3.5), `INFLATION_WAGE_ELEVATED` (4.5), `INFLATION_WAGE_SPIRAL` (5.0)
+
+---
+
+#### Copper (PCOPPUSDM) — Global Industrial Demand Proxy
+Source: FRED `PCOPPUSDM` (monthly, $/metric ton; YoY % computed)  
+Weight in composite: **0.10**  
+Copper is used in virtually every industrial process. **China = 55% of global demand** → copper is a real-time barometer of Chinese and global industrial activity.
+
+| Display | YoY % | Meaning |
+|---------|--------|---------|
+| 🟢 `global_expansion` | > +10% | Strong global industrial demand; cyclicals outperform |
+| 🟢 `stable` | 0–10% | Neutral global growth signal |
+| 🟡 `slowing` | -10–0% | Global demand decelerating |
+| 🔴 `global_contraction` | < -10% | Global industrial contraction; defensives outperform |
+
+> **TODO [PAID]**: Iron ore price — no free FRED equivalent; LME data is paid. AUD/USD (`DEXUSAL`) is a free liquid proxy for copper / iron ore exposure.  
+> **TODO [PAID]**: CME copper futures curve for contango/backwardation signal.
+
+Configurable: `INFLATION_COPPER_EXPANSION_YOY` (10.0), `INFLATION_COPPER_CONTRACTION_YOY` (-10.0)
+
+---
+
+### Composite Score Weights
+
+| Signal | Source | Weight |
+|--------|--------|--------|
+| Core PCE (Fed target) | `PCEPILFE` | 0.20 |
+| Headline CPI | `CPIAUCSL` | 0.20 |
+| Wages (AHE) | `CES0500000003` | 0.15 |
+| WTI Crude Oil | `DCOILWTICO` | 0.15 |
+| Core CPI | `CPILFESL` | 0.10 |
+| PPI Final Demand | `PPIFID` | 0.10 |
+| Copper | `PCOPPUSDM` | 0.10 |
+
+Shelter CPI and Brent are stored for context but not scored (shelter has a structural lag; Brent is a regional crude variant).  
+ECI is scored implicitly through the wage signal.
+
+---
+
+### What is NOT yet implemented (Future TODOs)
+
+| What | Why Blocked |
+|------|-------------|
+| **Iron ore price** | No free FRED equivalent — LME data is paid |
+| **EIA weekly oil inventory** | EIA.gov has data but no FRED series; web scraping needed |
+| **CPI surprise vs consensus** | Bloomberg/Refinitiv consensus estimates are paid |
+| **Shelter CPI lag adjustment** | Requires LLM estimation vs real-time rent indices (Zillow etc.) |
+| **CME WTI/copper futures curves** | Contango/backwardation signals require CME API |
+| **AUD/USD as iron ore proxy** | `DEXUSAL` on FRED — low-effort future addition |
+
+---
+
 ## ETF / SPY Note
 
 SPY is an ETF (Exchange-Traded Fund) that tracks the S&P 500 index. ETFs have no individual earnings, P/E ratio, or margins — all fundamental fields will show `⚪ —`. Only price and technical signals apply.

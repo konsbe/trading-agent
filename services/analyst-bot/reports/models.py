@@ -324,7 +324,7 @@ class MacroSnapshot:
     # Employment (PAYEMS / UNRATE / AHE / Sahm Rule)
     gc_payrolls_k: Optional[float] = None        # net monthly jobs added (thousands)
     gc_unemployment: Optional[float] = None      # UNRATE (%)
-    gc_ahe_pct: Optional[float] = None           # avg hourly earnings (%)
+    gc_ahe_pct: Optional[float] = None           # avg hourly earnings YoY % change (computed from dollar level)
     gc_sahm_pp: Optional[float] = None           # Sahm Rule indicator (pp above 12m low)
     gc_empl_regime: Optional[str] = None         # "strong"|"moderate"|"slowing"|"contraction"|"recession_confirmed"
 
@@ -348,6 +348,46 @@ class MacroSnapshot:
     gc_stance: Optional[str] = None              # "expansion"|"slowdown"|"contraction"|"insufficient_data"
     gc_score: Optional[float] = None             # -1.0 (contraction) … +1.0 (expansion)
     gc_signals_used: Optional[int] = None        # number of sub-signals that had data
+
+    # ── Inflation & Prices ────────────────────────────────────────────────────
+    # Tier 1 — Core inflation
+    inf_cpi_yoy: Optional[float] = None          # Headline CPI YoY % (CPIAUCSL)
+    inf_cpi_regime: Optional[str] = None         # "goldilocks"|"rising"|"above_target"|"hot"|"below_target"|"deflation_risk"
+    inf_core_cpi_yoy: Optional[float] = None     # Core CPI YoY % (CPILFESL, ex food & energy)
+    inf_core_cpi_regime: Optional[str] = None    # "at_target"|"above_target"|"hot"|"below_target"
+    inf_shelter_yoy: Optional[float] = None      # Shelter CPI YoY % (CUSR0000SAH1, 35% of CPI, ~18m lag)
+    inf_shelter_regime: Optional[str] = None     # "normalizing"|"moderating"|"elevated"|"hot"
+    inf_core_pce_yoy: Optional[float] = None     # Core PCE YoY % (PCEPILFE — Fed's actual 2% target)
+    inf_core_pce_regime: Optional[str] = None    # "below_target"|"at_target"|"hawkish_bias"|"aggressive_tightening"
+    inf_headline_pce_yoy: Optional[float] = None # Headline PCE YoY % (PCEPI, context only)
+
+    # PPI pipeline (leads CPI by 3–6 months)
+    inf_ppi_yoy: Optional[float] = None          # PPI Final Demand YoY % (PPIFID)
+    inf_ppi_regime: Optional[str] = None         # "deflationary"|"stable"|"moderate"|"elevated"|"surge"
+    inf_ppi_cpi_spread: Optional[float] = None   # PPI-CPI spread (pp) — margin pressure signal
+    inf_ppi_margin_signal: Optional[str] = None  # "margin_pressure"|"neutral"|"margin_expansion"
+    inf_ppiaco_yoy: Optional[float] = None       # PPI All Commodities YoY % (PPIACO)
+
+    # Energy
+    inf_wti: Optional[float] = None              # WTI crude oil $/barrel (DCOILWTICO)
+    inf_brent: Optional[float] = None            # Brent crude $/barrel (DCOILBRENTEU)
+    inf_brent_wti_spread: Optional[float] = None # Brent-WTI spread ($/barrel, geopolitical premium)
+    inf_oil_regime: Optional[str] = None         # "energy_sector_stress"|"low"|"goldilocks"|"elevated"|"inflationary_risk"
+
+    # Wages (services inflation driver — 60–70% of service sector costs)
+    inf_ahe_yoy: Optional[float] = None          # Avg Hourly Earnings YoY % (CES0500000003)
+    inf_eci_yoy: Optional[float] = None          # Employment Cost Index YoY % (ECIALLCIV, quarterly)
+    inf_wage_regime: Optional[str] = None        # "soft"|"target_consistent"|"above_target"|"elevated"|"spiral_risk"
+
+    # Commodities / global demand
+    inf_copper_yoy: Optional[float] = None       # Copper price YoY % (PCOPPUSDM)
+    inf_copper_usd: Optional[float] = None       # Copper $/metric ton (latest level)
+    inf_copper_regime: Optional[str] = None      # "global_contraction"|"slowing"|"stable"|"global_expansion"
+
+    # Composite
+    inf_stance: Optional[str] = None             # "deflationary"|"moderate"|"hot"|"insufficient_data"
+    inf_score: Optional[float] = None            # -1.0 (deflation) … +1.0 (hot)
+    inf_signals_used: Optional[int] = None       # number of sub-signals with data
 
 
 # ── Composite symbol report ───────────────────────────────────────────────────
