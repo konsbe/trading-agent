@@ -52,6 +52,10 @@
 //   mc_macro_correlation  Cross-metric regime label + score + flags for bot /analyze context
 //                         (see macro_analysis_reference.html — Macro Correlations panel)
 //
+// Additional analysis (analyzeAdditionalReference) — additional_analysis_reference.html (v1):
+//   aa_reference_snapshot  Intermarket 60d bond–equity corr (SPY×DGS10) + static month seasonality +
+//                            presidential cycle context (JSON payload; scalar value = correlation when computed)
+//
 // TODO [PAID]:    ICE DXY, real-time FX — FRED DTWEXBGS is weekly broad goods index.
 // TODO [PAID]:    China official / Caixin PMI — NBS/Caixin; EM stress (JPM EMBI+) paid.
 // TODO [SCRAPE]:  USTR tariffs, PBOC announcements, CBO outlook — no clean API.
@@ -79,6 +83,7 @@ import (
 	"github.com/konsbe/trading-agent/services/data-analyzer/internal/config"
 	"github.com/konsbe/trading-agent/services/data-analyzer/internal/db"
 	"github.com/konsbe/trading-agent/services/data-analyzer/internal/logx"
+	"github.com/konsbe/trading-agent/services/data-analyzer/internal/additional"
 	"github.com/konsbe/trading-agent/services/data-analyzer/internal/macrocorr"
 	"github.com/konsbe/trading-agent/services/data-analyzer/internal/marketcycle"
 	"github.com/konsbe/trading-agent/services/data-analyzer/internal/store"
@@ -110,6 +115,7 @@ func main() {
 		globalCfg:    config.LoadGlobalGeopolitical(),
 		cycleCfg:     config.LoadMarketCycle(),
 		corrCfg:      config.LoadMacroCorrelation(),
+		addCfg:       config.LoadAdditionalAnalysis(),
 		pool:         pool,
 		log:          log,
 	}
@@ -163,6 +169,7 @@ type worker struct {
 	globalCfg    config.GlobalGeopolitical
 	cycleCfg     config.MarketCycle
 	corrCfg      config.MacroCorrelation
+	addCfg       config.AdditionalAnalysis
 	pool         *pgxpool.Pool
 	log          *slog.Logger
 }
@@ -174,6 +181,7 @@ func (w *worker) analyzeAll(ctx context.Context) {
 	w.analyzeGlobal(ctx)
 	w.analyzeMarketCycles(ctx)
 	w.analyzeMacroCorrelations(ctx)
+	w.analyzeAdditionalReference(ctx)
 }
 
 // analyzeMonetary computes all monetary-policy signals from FRED series stored
@@ -1995,4 +2003,30 @@ func (w *worker) analyzeMacroCorrelations(ctx context.Context) {
 	}
 	upsert("mc_macro_correlation", ptr(r.Score), payload)
 	w.log.Info("macro correlation regime complete", "regime", r.Regime, "score", fmt.Sprintf("%.2f", r.Score))
+}
+
+func (w *worker) analyzeAdditionalReference(ctx context.Context) {
+	if !w.addCfg.Enabled {
+		return
+	}
+	ts := time.Now().UTC()
+	upsert := func(metric string, value *float64, payload any) {
+		if err := store.UpsertMacroDerived(ctx, w.pool, ts, metric, value, payload); err != nil {
+			w.log.Error("upsert macro derived", "metric", metric, "err", err)
+		}
+	}
+	ac := additional.Config{
+		Enabled:    true,
+		CorrWindow: w.addCfg.CorrWindow,
+		MinCorObs:  w.addCfg.MinCorObs,
+		MaxBars:    w.addCfg.MaxBars,
+		Symbol:     w.cycleCfg.Symbol,
+		Interval:   w.cycleCfg.Interval,
+	}
+	payload, corrVal := additional.BuildSnapshot(ctx, w.pool, ac)
+	if payload == nil {
+		return
+	}
+	upsert("aa_reference_snapshot", corrVal, payload)
+	w.log.Info("additional analysis snapshot complete", "metric", "aa_reference_snapshot")
 }

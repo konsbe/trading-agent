@@ -1134,6 +1134,25 @@ func LoadMacroCorrelation() MacroCorrelation {
 	}
 }
 
+// AdditionalAnalysis configures the "additional analysis" snapshot (additional_analysis_reference.html)
+// computed at the end of macro-analysis: intermarket bond–equity correlation, static seasonality, presidential cycle.
+type AdditionalAnalysis struct {
+	Enabled    bool
+	CorrWindow int
+	MinCorObs  int
+	MaxBars    int
+}
+
+// LoadAdditionalAnalysis reads ADDITIONAL_ANALYSIS_* env vars. Benchmark symbol/interval come from market cycle.
+func LoadAdditionalAnalysis() AdditionalAnalysis {
+	return AdditionalAnalysis{
+		Enabled:    boolEnv("ADDITIONAL_ANALYSIS_ENABLE", true),
+		CorrWindow: intEnv("ADDITIONAL_ANALYSIS_CORR_WINDOW", 60),
+		MinCorObs:  intEnv("ADDITIONAL_ANALYSIS_MIN_CORR_OBS", 40),
+		MaxBars:    intEnv("ADDITIONAL_ANALYSIS_MAX_BARS", 180),
+	}
+}
+
 func LoadMacroAnalysis() (MacroAnalysis, error) {
 	b := LoadBase()
 	if b.DatabaseURL == "" {

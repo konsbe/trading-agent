@@ -20,6 +20,7 @@ import asyncpg
 from db import cache as _cache
 from db.queries import fundamental, macro_intel, news, ohlcv, sentiment, technical
 from reports.models import (
+    AdditionalAnalysisSnapshot,
     AlertEvent,
     AnalyzeContextSnapshot,
     DailyReport,
@@ -37,6 +38,86 @@ from reports.models import (
 )
 
 log = logging.getLogger(__name__)
+
+
+def _im_branch(im: dict, key: str) -> dict:
+    v = im.get(key)
+    return v if isinstance(v, dict) else {}
+
+
+def _fill_roll_branch(snap: AdditionalAnalysisSnapshot, d: dict, prefix: str) -> None:
+    """prefix: bond_equity | oil_equity | vix_equity — sets corr, regime, label, insufficient."""
+    ins = bool(d.get("insufficient_data"))
+    setattr(snap, f"{prefix}_insufficient", ins)
+    if d.get("correlation_60d") is not None:
+        setattr(snap, f"{prefix}_corr_60d", float(d["correlation_60d"]))
+    r = d.get("regime")
+    if isinstance(r, str):
+        setattr(snap, f"{prefix}_regime", r)
+    lbl = d.get("label")
+    if isinstance(lbl, str):
+        setattr(snap, f"{prefix}_label", lbl)
+    if prefix == "bond_equity" and d.get("observations_used") is not None:
+        snap.bond_equity_observations = int(d["observations_used"])
+
+
+def _parse_additional_snapshot(raw: dict) -> Optional[AdditionalAnalysisSnapshot]:
+    """Map aa_reference_snapshot payload → model."""
+    im = raw.get("intermarket") if isinstance(raw.get("intermarket"), dict) else {}
+    be = _im_branch(im, "bond_equity_60d")
+    oil = _im_branch(im, "oil_equity_60d")
+    vix = _im_branch(im, "vix_equity_60d")
+    seas = raw.get("seasonality") if isinstance(raw.get("seasonality"), dict) else {}
+    pres = raw.get("presidential_cycle") if isinstance(raw.get("presidential_cycle"), dict) else {}
+
+    snap = AdditionalAnalysisSnapshot()
+    _fill_roll_branch(snap, be, "bond_equity")
+    _fill_roll_branch(snap, oil, "oil_equity")
+    _fill_roll_branch(snap, vix, "vix_equity")
+
+    if isinstance(seas.get("month_name"), str):
+        snap.seasonality_month_name = seas["month_name"]
+    if isinstance(seas.get("bias"), str):
+        snap.seasonality_bias = seas["bias"]
+    if isinstance(seas.get("note"), str):
+        snap.seasonality_note = seas["note"]
+    if pres.get("cycle_year") is not None:
+        snap.presidential_cycle_year = int(pres["cycle_year"])
+    if isinstance(pres.get("label"), str):
+        snap.presidential_label = pres["label"]
+    if isinstance(pres.get("note"), str):
+        snap.presidential_note = pres["note"]
+
+    mods = raw.get("reference_modules")
+    if isinstance(mods, dict):
+        for k in sorted(mods.keys()):
+            ent = mods[k]
+            if isinstance(ent, dict):
+                snap.reference_coverage_lines.append(
+                    f"{k}: {ent.get('status', '—')} — {ent.get('hint', '')}"
+                )
+    return snap
+
+
+def _format_additional_summary_line(aa: dict) -> Optional[str]:
+    parts: list[str] = []
+    im = aa.get("intermarket") if isinstance(aa.get("intermarket"), dict) else {}
+    for key, label in (
+        ("bond_equity_60d", "bond–equity"),
+        ("oil_equity_60d", "oil–equity"),
+        ("vix_equity_60d", "VIX–equity"),
+    ):
+        br = _im_branch(im, key)
+        if not br.get("insufficient_data") and br.get("correlation_60d") is not None:
+            reg = br.get("regime") or "—"
+            parts.append(f"{label} 60d ρ≈{float(br['correlation_60d']):+.2f} ({reg})")
+    seas = aa.get("seasonality")
+    if isinstance(seas, dict) and seas.get("month_name"):
+        parts.append(f"{seas['month_name']}: {seas.get('bias', '—')}")
+    pres = aa.get("presidential_cycle")
+    if isinstance(pres, dict) and pres.get("cycle_year") is not None:
+        parts.append(f"election cycle yr{pres['cycle_year']} ({pres.get('label', '—')})")
+    return " · ".join(parts) if parts else None
 
 
 class ReportBuilder:
@@ -79,7 +160,7 @@ class ReportBuilder:
         if asset_type == "equity":
             report.fundamental = await self._build_fundamental(symbol)
         report.sentiment = await self._build_sentiment(symbol)
-        report.news = await self._build_news(symbol)
+        report.news = await self._build_news(symbol, asset_type)
         report.analyze_context = await self._build_analyze_context(symbol, asset_type)
 
         if use_cache:
@@ -585,9 +666,11 @@ class ReportBuilder:
             log.warning("sentiment build failed symbol=%s: %s", symbol, exc)
             return None
 
-    async def _build_news(self, symbol: str) -> list[NewsHeadline]:
+    async def _build_news(self, symbol: str, asset_type: str = "equity") -> list[NewsHeadline]:
         try:
-            rows = await news.recent_headlines(self._pool, symbol, self._news_limit)
+            rows = await news.recent_headlines(
+                self._pool, symbol, self._news_limit, asset_type=asset_type
+            )
             return [
                 NewsHeadline(
                     headline=r["headline"],
@@ -841,6 +924,12 @@ class ReportBuilder:
                 if isinstance(fl, list):
                     snap.macro_corr_flags = [str(x) for x in fl if x is not None][:12]
 
+            aa_p = await _md("aa_reference_snapshot")
+            if aa_p:
+                add = _parse_additional_snapshot(aa_p)
+                if add:
+                    snap.additional = add
+
         except Exception as exc:
             log.warning("macro build failed: %s", exc)
         return snap
@@ -883,6 +972,13 @@ class ReportBuilder:
                     ctx.macro_corr_flags = [str(x) for x in fl if x is not None][:10]
                     if ctx.macro_corr_flags:
                         has_any = True
+
+            aa = await ohlcv.latest_macro_derived(self._pool, "aa_reference_snapshot")
+            if aa:
+                summary = _format_additional_summary_line(aa)
+                if summary:
+                    ctx.additional_summary_line = summary
+                    has_any = True
 
             if asset_type == "equity":
                 rs = await ohlcv.rel_return_vs_benchmark_excess_pct(
@@ -1025,6 +1121,9 @@ class ReportBuilder:
                 if isinstance(ac.get("macro_corr_label"), str)
                 else None,
                 macro_corr_flags=[str(x) for x in mflags],
+                additional_summary_line=ac.get("additional_summary_line")
+                if isinstance(ac.get("additional_summary_line"), str)
+                else None,
             )
         return SymbolReport(
             symbol=data["symbol"],

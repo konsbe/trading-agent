@@ -476,6 +476,35 @@ class MacroSnapshot:
     macro_corr_label: Optional[str] = None
     macro_corr_flags: list[str] = field(default_factory=list)
 
+    # ── Additional analysis (aa_reference_snapshot — additional_analysis_reference.html v1) ─
+    additional: Optional["AdditionalAnalysisSnapshot"] = None
+
+
+@dataclass
+class AdditionalAnalysisSnapshot:
+    """Intermarket + calendar context from macro-analysis aa_reference_snapshot."""
+
+    bond_equity_corr_60d: Optional[float] = None
+    bond_equity_regime: Optional[str] = None
+    bond_equity_label: Optional[str] = None
+    bond_equity_insufficient: bool = False
+    bond_equity_observations: Optional[int] = None
+    oil_equity_corr_60d: Optional[float] = None
+    oil_equity_regime: Optional[str] = None
+    oil_equity_label: Optional[str] = None
+    oil_equity_insufficient: bool = False
+    vix_equity_corr_60d: Optional[float] = None
+    vix_equity_regime: Optional[str] = None
+    vix_equity_label: Optional[str] = None
+    vix_equity_insufficient: bool = False
+    seasonality_month_name: Optional[str] = None
+    seasonality_bias: Optional[str] = None
+    seasonality_note: Optional[str] = None
+    presidential_cycle_year: Optional[int] = None
+    presidential_label: Optional[str] = None
+    presidential_note: Optional[str] = None
+    reference_coverage_lines: list[str] = field(default_factory=list)
+
 
 # ── /analyze context strip (benchmark + macro regime + optional vs benchmark) ─
 
@@ -492,6 +521,8 @@ class AnalyzeContextSnapshot:
     macro_corr_score: Optional[float] = None
     macro_corr_label: Optional[str] = None
     macro_corr_flags: list[str] = field(default_factory=list)
+    # One-line summary from aa_reference_snapshot (intermarket + calendars)
+    additional_summary_line: Optional[str] = None
 
 
 # ── Composite symbol report ───────────────────────────────────────────────────

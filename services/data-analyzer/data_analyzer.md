@@ -532,6 +532,25 @@ data-ingestion workers
             reads both tables to build Discord reports
 ```
 
+## `macro-analysis` worker (FRED + market cycle + derived signals)
+
+The third binary in the same Docker image as technical/fundamental analysis. Reads **`macro_fred`**, **`equity_ohlcv`** (for `MARKET_CYCLE_SYMBOL`), writes **`macro_derived`** with `source = macro_analysis`.
+
+| Output (examples) | Meaning |
+|---|---|
+| `mp_*`, `gc_*`, `inf_*`, `gg_*` | Monetary, growth, inflation, global stance/regime metrics |
+| `mc_market_cycle` | Benchmark drawdown + 200DMA + composite phase |
+| `mc_macro_correlation` | Cross-metric regime label (Macro Correlations panel) |
+| **`aa_reference_snapshot`** | **Additional analysis** (`additional_analysis_reference.html`): 60d rolling **ρ** benchmark × **DGS10**, **DCOILWTICO**, **VIXCLS**; static **month** + **presidential** calendars; **`reference_modules`** maps each HTML tab to `live_*` / `needs_data` / `not_automated` |
+
+**Package layout:** `internal/marketcycle`, `internal/macrocorr`, `internal/additional` (intermarket + calendar helpers).
+
+**Env (additional slice):** `ADDITIONAL_ANALYSIS_ENABLE`, `ADDITIONAL_ANALYSIS_CORR_WINDOW` (default 60), `ADDITIONAL_ANALYSIS_MIN_CORR_OBS` (default 40), `ADDITIONAL_ANALYSIS_MAX_BARS` (default 180). Benchmark symbol/interval follow **`MARKET_CYCLE_*`**.
+
+**Not in v1:** options flow, GEX, dark pool, alt data, pairs trading — those remain reference-only in the HTML until separate ingestion exists.
+
+---
+
 ## Known Limitations & Future Work
 
 | Area | Current state | Future plan |
