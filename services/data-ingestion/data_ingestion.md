@@ -452,6 +452,8 @@ Tall/narrow format — one row per `(symbol, period, metric)`. This mirrors the 
 | `MACRO_INTEL_GDELT_MAX_RECORDS` | `120` | Cap per request |
 | `MACRO_INTEL_GDELT_LOOKBACK` | `168h` | Window for GDELT query |
 
+The GDELT 2.1 doc API requires `STARTDATETIME` / `ENDDATETIME` in **`YYYYMMDDHHMMSS`** (14 digits). The worker uses that format; shorter values return a non-JSON error from GDELT.
+
 **Qualitative LLM scores** (e.g. FOMC hawkish/dovish) are **not** written by this worker; they are optional `narrative_scores` rows from `analyst-bot` (see `services/analyst-bot/bot.md`).
 
 ---

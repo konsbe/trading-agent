@@ -1332,7 +1332,11 @@ def macro_intel_embed(intel: MacroIntelSnapshot) -> Optional[discord.Embed]:
         geo_parts.append(
             f"**GPR** ({intel.gpr_month}): {_num(intel.gpr_total, 2)}"
         )
-    if intel.gdelt_article_count is not None or intel.gdelt_avg_tone is not None:
+    if (
+        intel.gdelt_day is not None
+        or intel.gdelt_article_count is not None
+        or intel.gdelt_avg_tone is not None
+    ):
         day = intel.gdelt_day or "—"
         lbl = intel.gdelt_query_label or "—"
         geo_parts.append(
@@ -1364,7 +1368,9 @@ def macro_intel_embed(intel: MacroIntelSnapshot) -> Optional[discord.Embed]:
             inline=False,
         )
 
-    embed.set_footer(text="data-macro-intel + narrative_scores · Finnhub tier may block economic calendar")
+    embed.set_footer(
+        text="data-macro-intel · /status → macro table counts · Finnhub calendar may 403 on some tiers"
+    )
     return embed
 
 

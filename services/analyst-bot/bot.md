@@ -1326,6 +1326,8 @@ Separate Discord embed **Macro intel · calendars · geo · headlines** — data
 
 Configure the job with `BOT_FOMC_NARRATIVE_ENABLE=true`, `OPENAI_API_KEY`, `FOMC_STATEMENT_URL` (HTML page), and `BOT_FOMC_NARRATIVE_CRON` (cron, UTC). See root `.env.example`.
 
+Use Discord **`/status`** (ephemeral) to see **row counts** for macro-intel tables (`economic_calendar_events`, `gdelt_macro_daily`, etc.) — useful when a section is empty (Finnhub tier limits, missing `GPR_CSV_URL`, or worker not rebuilt).
+
 ---
 
 ### Composite `gg_stance`
