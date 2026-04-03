@@ -756,6 +756,41 @@ class ReportBuilder:
             snap.inf_score = inf_stance_p.get("value")
             snap.inf_signals_used = inf_stance_p.get("signals_used")
 
+            # ── Global & Geopolitical ───────────────────────────────────────
+            gbd_p = await _md("gg_broad_dollar")
+            snap.gg_broad_dollar_index = gbd_p.get("value")
+            snap.gg_broad_dollar_regime = gbd_p.get("regime")
+            if snap.gg_broad_dollar_index is None and gbd_p.get("index") is not None:
+                snap.gg_broad_dollar_index = float(gbd_p["index"])
+
+            uj_p = await _md("gg_usdjpy")
+            snap.gg_usdjpy_spot = uj_p.get("value")
+            if snap.gg_usdjpy_spot is None and uj_p.get("latest_spot") is not None:
+                snap.gg_usdjpy_spot = float(uj_p["latest_spot"])
+            snap.gg_usdjpy_chg_20d_pct = uj_p.get("pct_chg_20d")
+            snap.gg_usdjpy_regime = uj_p.get("regime")
+
+            chn_p = await _md("gg_china_gdp")
+            snap.gg_china_gdp_yoy = chn_p.get("yoy_pct")
+            if snap.gg_china_gdp_yoy is None and chn_p.get("value") is not None:
+                snap.gg_china_gdp_yoy = float(chn_p["value"])
+            snap.gg_china_gdp_regime = chn_p.get("regime")
+
+            fis_p = await _md("gg_fiscal")
+            snap.gg_fiscal_deficit_pct_gdp = fis_p.get("deficit_pct_gdp")
+            snap.gg_fiscal_fyfsd_millions = fis_p.get("fyfsd_millions")
+            if snap.gg_fiscal_fyfsd_millions is None and fis_p.get("value") is not None:
+                # When GDP missing, value may hold raw FYFSD millions
+                v = fis_p.get("value")
+                if v is not None and fis_p.get("deficit_pct_gdp") is None:
+                    snap.gg_fiscal_fyfsd_millions = float(v)
+            snap.gg_fiscal_regime = fis_p.get("regime")
+
+            gg_stance_p = await _md("gg_stance")
+            snap.gg_stance = gg_stance_p.get("stance")
+            snap.gg_score = gg_stance_p.get("value")
+            snap.gg_signals_used = gg_stance_p.get("signals_used")
+
         except Exception as exc:
             log.warning("macro build failed: %s", exc)
         return snap

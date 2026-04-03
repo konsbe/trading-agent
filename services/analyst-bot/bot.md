@@ -1241,7 +1241,8 @@ Weight in composite: **0.15**
 Wages are **60–70% of service sector costs**. Wage growth above 3.5% in a 2% inflation target regime = wage-price spiral risk.
 
 AHE (Average Hourly Earnings) = high frequency but volatile.  
-ECI (Employment Cost Index) = quarterly, smoother, the Fed's preferred wage measure.
+ECI (Employment Cost Index) = quarterly, smoother, the Fed's preferred wage measure.  
+**ECI YoY %** in the bot is **latest quarter vs same quarter one year ago** (four quarterly observations back in `macro_fred`), not a 12-row lookback (which would mis-read quarterly data).
 
 | Display | AHE YoY % | Meaning |
 |---------|-----------|---------|
@@ -1301,6 +1302,110 @@ ECI is scored implicitly through the wage signal.
 | **Shelter CPI lag adjustment** | Requires LLM estimation vs real-time rent indices (Zillow etc.) |
 | **CME WTI/copper futures curves** | Contango/backwardation signals require CME API |
 | **AUD/USD as iron ore proxy** | `DEXUSAL` on FRED — low-effort future addition |
+
+---
+
+## Macro Analysis — Global & Geopolitical
+
+Embed order in `/report`: after **Inflation & Prices**. Same as other macro panels: **one global snapshot**, not per symbol.
+
+Uses **FRED only** today: `DTWEXBGS`, `DEXJPUS`, `CHNGDPNQDSMEI`, `FYFSD`, `GDP`. Computed by `macro-analysis` → `macro_derived` (`gg_*` metrics).
+
+---
+
+### Composite `gg_stance`
+
+| Display | Score (approx.) | Meaning |
+|---------|------------------|---------|
+| `🔴 Elevated stress` | ≥ `GLOBAL_STRESS_ELEVATED_SCORE` (0.35) | Strong USD, carry unwind, weak China, and/or high deficit — tight global financial conditions |
+| `🟡 Moderate` | between benign and elevated | Mixed signals |
+| `🟢 Benign` | ≤ `GLOBAL_STRESS_BENIGN_SCORE` (-0.15) | Relatively supportive backdrop for risk / EM / commodities |
+| `⚪ Insufficient Data` | — | Not enough FRED series backfilled yet |
+
+Score range: **-1.0** (benign) … **+1.0** (elevated stress). Weights: broad dollar 0.28, USD/JPY 0.28, China GDP 0.24, fiscal 0.20.
+
+---
+
+### Tier 1 — FX & carry
+
+#### Broad USD — `DTWEXBGS`
+
+FRED **Trade Weighted U.S. Dollar Index: Broad, Goods** (weekly). **Not the ICE DXY** (different basket/weights); same macro role: strong USD tightens global liquidity.
+
+| Regime | Index (defaults) | Meaning |
+|--------|------------------|---------|
+| `dollar_weak_risk_on` | < 95 | Softer USD — tailwind for commodities / EM FX |
+| `supportive_equities` | 95–100 | Neutral-to-supportive for US equities |
+| `neutral` | 100–105 | Transition zone |
+| `em_commodity_headwind` | 105–110 | Headwind for commodities & EM |
+| `major_global_stress` | ≥ 110 | Extreme USD strength — EM stress risk |
+
+Configurable: `GLOBAL_DOLLAR_SUPPORTIVE_MAX`, `GLOBAL_DOLLAR_NEUTRAL_MAX`, `GLOBAL_DOLLAR_HEADWIND_MAX`, `GLOBAL_DOLLAR_STRESS_MIN`.
+
+#### USD/JPY — `DEXJPUS`
+
+Daily spot; **~20 observation** (~1 month) **% change**. **Negative %** = JPY strengthening vs USD → **yen carry unwind** risk (reference: 5% / 10% thresholds).
+
+| Regime | Condition | Meaning |
+|--------|-----------|---------|
+| `carry_intact` | shallow drawdown | Baseline |
+| `early_carry_unwind` | 20d % ≤ `GLOBAL_USDJPY_EARLY_UNWIND_PCT` (-5%) | Early warning |
+| `systemic_carry_unwind` | 20d % ≤ `GLOBAL_USDJPY_SYSTEMIC_UNWIND_PCT` (-10%) | Severe deleveraging risk |
+
+Configurable: `GLOBAL_USDJPY_LOOKBACK_OBS` (22), early/systemic % thresholds.
+
+> **TODO [PAID]**: Options-implied JPY vol overlay.  
+> **TODO [FUTURE]**: ECB / BoE rates vs Fed (`ECBDFR`, `UKBRBASE`) for policy divergence.
+
+---
+
+### Tier 2 — China & US fiscal
+
+#### China GDP YoY — `CHNGDPNQDSMEI`
+
+OECD **quarterly** China GDP; YoY vs same quarter prior year. **Low frequency** — not a PMI substitute.
+
+| Regime | YoY % (defaults) | Stress contribution |
+|--------|------------------|---------------------|
+| `expansion` | ≥ 6% | Lowers composite stress |
+| `stable` | 5–6% | Neutral |
+| `slowing` | 3–5% | Raises stress |
+| `contraction_risk` | < 3% | Raises stress |
+
+Configurable: `GLOBAL_CHINA_GDP_CONTRACT`, `GLOBAL_CHINA_GDP_STABLE`, `GLOBAL_CHINA_GDP_EXPANSION`.
+
+> **TODO [PAID]**: NBS official PMI, Caixin PMI — not on free FRED.  
+> **TODO [SCRAPE]**: PBOC RRR/MLF, NPC/fiscal stimulus headlines.
+
+#### US fiscal — `FYFSD` + `GDP`
+
+- **`FYFSD`**: federal surplus (+) / deficit (-), **millions of USD**, **fiscal year** (annual, slow updates).
+- **`GDP`**: US nominal GDP **billions**, quarterly **SAAR** — latest observation used as **annualized nominal GDP** denominator.
+
+Deficit % of GDP ≈ `|FYFSD| / 1000 / GDP × 100` (indicative; FY vs calendar timing differs).
+
+| Regime | Deficit % GDP | Meaning |
+|--------|----------------|--------|
+| `manageable` | ≤ 3% | Reference: manageable peacetime |
+| `elevated_supply_risk` | 3–6% | More Treasury supply / term premium risk |
+| `high_deficit_stress` | > 6% | Elevated peacetime concern |
+
+Configurable: `GLOBAL_FISCAL_MANAGEABLE_PCT`, `GLOBAL_FISCAL_ELEVATED_PCT`.
+
+> **TODO [SCRAPE]**: CBO long-run outlook narrative.  
+> **TODO [LLM]**: Tariff / trade-war sector overlays (USTR) — not time-series in DB.
+
+---
+
+### Not implemented (see code `TODO`)
+
+| Item | Blocker |
+|------|---------|
+| ICE DXY real-time | Paid / different vendor |
+| GPR index, GDELT | Separate ingestion (file/API) |
+| CFTC COT | Weekly bulk + parser + storage |
+| EM stress (EMBI+), Caixin PMI | Paid or scrape |
+| USTR / WTO tariff tracker | Scrape or manual |
 
 ---
 

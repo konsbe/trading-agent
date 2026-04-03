@@ -23,6 +23,13 @@
 //   gc_capex          Core capex trend (NEWORDER)
 //   gc_stance         Composite weighted score (-1 contraction … +1 expansion)
 //
+// Global & Geopolitical (analyzeGlobal) — free FRED data:
+//   gg_broad_dollar   Trade-weighted broad USD (DTWEXBGS)
+//   gg_usdjpy         USD/JPY spot + ~20d % change (DEXJPUS) — carry unwind
+//   gg_china_gdp      China GDP YoY % (CHNGDPNQDSMEI, OECD quarterly)
+//   gg_fiscal         FY deficit (FYFSD) + deficit % of GDP (GDP SAAR)
+//   gg_stance         Composite global stress score (-1 benign … +1 elevated)
+//
 // TODO [LLM]:  Score FOMC statements and minutes hawkish/dovish on -5 to +5 scale.
 // TODO [PAID]: CME FedWatch implied rate probabilities (requires CME API subscription).
 // TODO [PAID]: S&P Global (Markit) Manufacturing PMI — higher frequency and sector breakdown.
@@ -30,8 +37,19 @@
 // TODO [PAID]: China Caixin PMI / Eurozone / UK / Japan PMI — paid subscriptions.
 // TODO [SCRAPE]: GDPNow (Atlanta Fed real-time GDP) — no public API; needs web scraping.
 // TODO [PAID]: ADP National Employment Report — no free API.
-// TODO [FUTURE]: Inflation panel — CPI (CPIAUCSL), Core PCE (PCEPILFE), PPI (WPSFD4131).
-// TODO [FUTURE]: Global panel — ECB rate (ECBDFR), BoE (UKBANKRATE), EM stress signals.
+// Global & Geopolitical signals (analyzeGlobal) — free FRED data:
+//   gg_broad_dollar   Trade-weighted broad USD index (DTWEXBGS) — not ICE DXY but same macro role
+//   gg_usdjpy         USD/JPY spot + ~20d % change (DEXJPUS) — carry unwind detector
+//   gg_china_gdp      OECD China GDP level, YoY % (CHNGDPNQDSMEI)
+//   gg_fiscal         Federal surplus/deficit (FYFSD) + deficit % of nominal GDP (GDP, SAAR)
+//   gg_stance         Composite global-financial-conditions stress score
+//
+// TODO [PAID]:    ICE DXY, real-time FX — FRED DTWEXBGS is weekly broad goods index.
+// TODO [PAID]:    China official / Caixin PMI — NBS/Caixin; EM stress (JPM EMBI+) paid.
+// TODO [SCRAPE]:  USTR tariffs, PBOC announcements, CBO outlook — no clean API.
+// TODO [API]:     GDELT / GPR index — separate ingestion pipeline (not FRED).
+// TODO [API]:     CFTC COT weekly positioning — new parser + storage.
+// TODO [FUTURE]:  ECB (ECBDFR), BoE (UKBRBASE), DEXUSAL (AUD) as iron-ore/copper liquid proxy.
 // TODO [FUTURE]: Equity Risk Premium — link FA composite P/E → forward ERP calculation.
 // TODO [PYTHON]: Migrate to Python + asyncpg once the LLM scoring layer is added.
 package main
@@ -79,6 +97,7 @@ func main() {
 		cfg:          cfg,
 		growthCfg:    config.LoadGrowthCycle(),
 		inflationCfg: config.LoadInflationCycle(),
+		globalCfg:    config.LoadGlobalGeopolitical(),
 		pool:         pool,
 		log:          log,
 	}
@@ -129,6 +148,7 @@ type worker struct {
 	cfg          config.MacroAnalysis
 	growthCfg    config.GrowthCycle
 	inflationCfg config.InflationCycle
+	globalCfg    config.GlobalGeopolitical
 	pool         *pgxpool.Pool
 	log          *slog.Logger
 }
@@ -137,8 +157,8 @@ func (w *worker) analyzeAll(ctx context.Context) {
 	w.analyzeMonetary(ctx)
 	w.analyzeGrowth(ctx)
 	w.analyzeInflation(ctx)
-	// TODO [FUTURE]: w.analyzeGlobal(ctx)  — ECB/BoE/BoJ rates, China PMI, EM stress
-	// TODO [FUTURE]: w.analyzeCycles(ctx)  — composite cross-panel regime detection
+	w.analyzeGlobal(ctx)
+	// TODO [FUTURE]: w.analyzeCycles(ctx) — composite cross-panel regime detection
 }
 
 // analyzeMonetary computes all monetary-policy signals from FRED series stored
@@ -1139,6 +1159,19 @@ func (w *worker) analyzeInflation(ctx context.Context) {
 		return (obs[0].Value/obs[12].Value - 1) * 100, true
 	}
 
+	// yoyPctQuarterly: ECIALLCIV and similar — FRED stores one row per quarter.
+	// obs[4] = same quarter one year ago (not obs[12], which would be 12 quarters).
+	yoyPctQuarterly := func(seriesID string) (float64, bool) {
+		obs := fredSeries(seriesID, 6)
+		if len(obs) < 5 {
+			return 0, false
+		}
+		if obs[4].Value == 0 {
+			return 0, false
+		}
+		return (obs[0].Value/obs[4].Value - 1) * 100, true
+	}
+
 	clamp := func(v float64) float64 {
 		if v > 1 {
 			return 1
@@ -1406,9 +1439,9 @@ func (w *worker) analyzeInflation(ctx context.Context) {
 	wageRegime := "no_data"
 	var wageScore float64
 	if aheYoy, ok := yoyPct("CES0500000003"); ok {
-		// ECI for supplementary context (quarterly, only ~4 points/year).
+		// ECI YoY must use quarterly spacing (obs[4]), not monthly yoyPct (obs[12] = 3y back).
 		var eciYoy *float64
-		if eci, ok2 := yoyPct("ECIALLCIV"); ok2 {
+		if eci, ok2 := yoyPctQuarterly("ECIALLCIV"); ok2 {
 			v := math.Round(eci*100) / 100
 			eciYoy = &v
 		}
@@ -1548,6 +1581,264 @@ func (w *worker) analyzeInflation(ctx context.Context) {
 	w.log.Info("inflation analysis complete",
 		"stance", infStance,
 		"score", fmt.Sprintf("%.3f", infStanceScore),
+		"signals", usedSignals,
+	)
+}
+
+// ── Global & Geopolitical Analysis ────────────────────────────────────────────
+
+// analyzeGlobal derives cross-border / USD / China / fiscal stress signals from
+// FRED series in macro_fred and writes macro_derived metrics (gg_*).
+//
+// Not per-equity — one global snapshot for the whole report.
+//
+// TODO [PAID]:    Replace DTWEXBGS with ICE DXY if a licensed feed is added.
+// TODO [PAID]:    China Caixin / official PMI — not on free FRED.
+// TODO [SCRAPE]:  Tariff calendars (USTR), PBOC RRR/MLF — manual or scrape.
+// TODO [API]:     Import GPR CSV, GDELT counts — new workers + tables.
+// TODO [API]:     CFTC COT — weekly bulk download + parser.
+// TODO [FUTURE]:  ECBDFR, UKBRBASE, EM FX basket — extend FRED_SERIES_IDS + signals here.
+func (w *worker) analyzeGlobal(ctx context.Context) {
+	ts := time.Now().UTC()
+	g := w.globalCfg
+
+	ptr := func(v float64) *float64 { return &v }
+
+	upsert := func(metric string, value *float64, payload any) {
+		if err := store.UpsertMacroDerived(ctx, w.pool, ts, metric, value, payload); err != nil {
+			w.log.Error("upsert global derived", "metric", metric, "err", err)
+		}
+	}
+
+	fredLatest := func(seriesID string) (float64, bool) {
+		v, _, ok := store.QueryMacroFredLatest(ctx, w.pool, seriesID)
+		return v, ok
+	}
+
+	fredSeries := func(seriesID string, n int) []store.MacroObs {
+		rows, err := store.QueryMacroFredSeries(ctx, w.pool, seriesID, n)
+		if err != nil {
+			return nil
+		}
+		return rows
+	}
+
+	clamp := func(v float64) float64 {
+		if v > 1 {
+			return 1
+		}
+		if v < -1 {
+			return -1
+		}
+		return v
+	}
+
+	type scored struct {
+		score  float64
+		weight float64
+	}
+	var scores []scored
+	usedSignals := 0
+
+	addScore := func(s, wt float64) {
+		scores = append(scores, scored{clamp(s), wt})
+		usedSignals++
+	}
+
+	// ── Tier 1: Broad USD (DTWEXBGS) ─────────────────────────────────────────
+	// FRED "Trade Weighted U.S. Dollar Index: Broad, Goods" — weekly.
+	// Strong USD → tighter global financial conditions, EM stress, commodity headwind.
+	dollarRegime := "no_data"
+	var dollarScore float64
+	if tw, ok := fredLatest("DTWEXBGS"); ok {
+		switch {
+		case tw >= g.DollarStressMin:
+			dollarRegime = "major_global_stress"
+			dollarScore = 1.0
+		case tw >= g.DollarHeadwindMax:
+			dollarRegime = "em_commodity_headwind"
+			dollarScore = 0.55
+		case tw >= g.DollarNeutralMax:
+			dollarRegime = "neutral"
+			dollarScore = 0.15
+		case tw >= g.DollarSupportiveMax:
+			dollarRegime = "supportive_equities"
+			dollarScore = -0.1
+		default:
+			dollarRegime = "dollar_weak_risk_on"
+			dollarScore = -0.35
+		}
+		addScore(dollarScore, 0.28)
+		upsert("gg_broad_dollar", ptr(tw), map[string]any{
+			"regime":        dollarRegime,
+			"score":         dollarScore,
+			"index":         math.Round(tw*1000) / 1000,
+			"series":        "DTWEXBGS",
+			"not_ice_dxy":   true,
+			"interpretation": "broad USD goods TWI — proxy for USD strength vs ICE DXY",
+		})
+	} else {
+		upsert("gg_broad_dollar", nil, map[string]any{"regime": dollarRegime})
+	}
+
+	// ── Tier 1: USD/JPY carry unwind (DEXJPUS, daily) ───────────────────────
+	// Negative % change over ~20 sessions = JPY strengthening vs USD → carry unwind risk.
+	// TODO [PAID]: Options-implied FX vol (JPY) for stress overlay.
+	jpyRegime := "no_data"
+	var jpyChg *float64
+	var jpyScore float64
+	obsJPY := fredSeries("DEXJPUS", g.USDJPYLookbackObs+5)
+	if len(obsJPY) > g.USDJPYLookbackObs && obsJPY[g.USDJPYLookbackObs].Value != 0 {
+		cur := obsJPY[0].Value
+		old := obsJPY[g.USDJPYLookbackObs].Value
+		pct := (cur/old - 1) * 100
+		jpyChg = ptr(math.Round(pct*100) / 100)
+		switch {
+		case pct <= g.USDJPYSystemicUnwindPct:
+			jpyRegime = "systemic_carry_unwind"
+			jpyScore = 1.0
+		case pct <= g.USDJPYEarlyUnwindPct:
+			jpyRegime = "early_carry_unwind"
+			jpyScore = 0.65
+		default:
+			jpyRegime = "carry_intact"
+			jpyScore = -0.05
+		}
+		addScore(jpyScore, 0.28)
+		payload := map[string]any{
+			"regime":           jpyRegime,
+			"score":            jpyScore,
+			"pct_chg_20d":      *jpyChg,
+			"lookback_obs":     g.USDJPYLookbackObs,
+			"series":           "DEXJPUS",
+			"latest_spot":      math.Round(cur*10000) / 10000,
+		}
+		upsert("gg_usdjpy", ptr(cur), payload)
+	} else {
+		upsert("gg_usdjpy", nil, map[string]any{"regime": jpyRegime})
+	}
+
+	// ── Tier 2: China GDP YoY (CHNGDPNQDSMEI, OECD quarterly) ───────────────
+	// TODO [PAID]: NBS manufacturing PMI, Caixin PMI — higher frequency China pulse.
+	chinaRegime := "no_data"
+	var chinaScore float64
+	chObs := fredSeries("CHNGDPNQDSMEI", 6)
+	if len(chObs) >= 5 && chObs[4].Value != 0 {
+		yoy := (chObs[0].Value/chObs[4].Value - 1) * 100
+		switch {
+		case yoy >= g.ChinaGDPExpansion:
+			chinaRegime = "expansion"
+			chinaScore = -0.25
+		case yoy >= g.ChinaGDPStable:
+			chinaRegime = "stable"
+			chinaScore = 0.0
+		case yoy >= g.ChinaGDPContract:
+			chinaRegime = "slowing"
+			chinaScore = 0.35
+		default:
+			chinaRegime = "contraction_risk"
+			chinaScore = 0.7
+		}
+		addScore(chinaScore, 0.24)
+		upsert("gg_china_gdp", ptr(yoy), map[string]any{
+			"regime":    chinaRegime,
+			"score":     chinaScore,
+			"yoy_pct":   math.Round(yoy*100) / 100,
+			"series":    "CHNGDPNQDSMEI",
+			"frequency": "quarterly_oecd",
+		})
+	} else {
+		upsert("gg_china_gdp", nil, map[string]any{"regime": chinaRegime})
+	}
+
+	// ── Tier 2: US fiscal — FYFSD + deficit % of GDP ─────────────────────────
+	// FYFSD: annual fiscal surplus (+) / deficit (-) in millions of dollars.
+	// GDP: nominal quarterly, billions SAAR — one observation = annualized nominal GDP.
+	// TODO [SCRAPE]: CBO 10-year deficit path — narrative supply expectations.
+	fiscalRegime := "no_data"
+	var fiscalScore float64
+	var deficitPct *float64
+	if fyfsd, okF := fredLatest("FYFSD"); okF {
+		if gdp, okG := fredLatest("GDP"); okG && gdp > 0 {
+			deficitBillions := math.Abs(fyfsd) / 1000.0 // FYFSD in millions → billions
+			pct := deficitBillions / gdp * 100
+			deficitPct = ptr(math.Round(pct*100) / 100)
+			switch {
+			case pct > g.FiscalElevatedPct:
+				fiscalRegime = "high_deficit_stress"
+				fiscalScore = 0.85
+			case pct > g.FiscalManageablePct:
+				fiscalRegime = "elevated_supply_risk"
+				fiscalScore = 0.4
+			default:
+				fiscalRegime = "manageable"
+				fiscalScore = 0.0
+			}
+			addScore(fiscalScore, 0.20)
+			upsert("gg_fiscal", deficitPct, map[string]any{
+				"regime":              fiscalRegime,
+				"score":               fiscalScore,
+				"deficit_pct_gdp":     *deficitPct,
+				"fyfsd_millions":      math.Round(fyfsd),
+				"gdp_billions_saar":   math.Round(gdp*10) / 10,
+				"series_deficit":      "FYFSD",
+				"series_gdp":          "GDP",
+				"note":                "FYFSD is fiscal-year; GDP is latest quarterly SAAR — ratio is indicative",
+			})
+		} else {
+			upsert("gg_fiscal", ptr(fyfsd), map[string]any{
+				"regime":         fiscalRegime,
+				"fyfsd_millions": math.Round(fyfsd),
+				"series":         "FYFSD",
+				"note":           "GDP missing — deficit % of GDP not computed",
+			})
+		}
+	} else {
+		upsert("gg_fiscal", nil, map[string]any{"regime": fiscalRegime})
+	}
+
+	// ── Composite gg_stance ─────────────────────────────────────────────────
+	ggStance := "insufficient_data"
+	var ggScore float64
+	var ggScorePtr *float64
+	if usedSignals == 0 {
+		upsert("gg_stance", nil, map[string]any{
+			"stance":  ggStance,
+			"signals": 0,
+		})
+	} else {
+		wSum := 0.0
+		for _, s := range scores {
+			ggScore += s.score * s.weight
+			wSum += s.weight
+		}
+		if wSum > 0 {
+			ggScore /= wSum
+		}
+		switch {
+		case ggScore >= g.StressElevatedScore:
+			ggStance = "elevated_stress"
+		case ggScore <= g.StressBenignScore:
+			ggStance = "benign"
+		default:
+			ggStance = "moderate"
+		}
+		ggScorePtr = ptr(ggScore)
+		upsert("gg_stance", ggScorePtr, map[string]any{
+			"stance":           ggStance,
+			"score":            math.Round(ggScore*1000) / 1000,
+			"signals_used":     usedSignals,
+			"dollar_regime":    dollarRegime,
+			"usdjpy_regime":    jpyRegime,
+			"china_regime":     chinaRegime,
+			"fiscal_regime":    fiscalRegime,
+			"interpretation":   "+1 = max USD/carry/fiscal stress; -1 = benign global liquidity",
+		})
+	}
+
+	w.log.Info("global geopolitical analysis complete",
+		"stance", ggStance,
+		"score", fmt.Sprintf("%.3f", ggScore),
 		"signals", usedSignals,
 	)
 }

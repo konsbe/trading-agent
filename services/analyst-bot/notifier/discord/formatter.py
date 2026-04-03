@@ -1189,6 +1189,109 @@ def macro_inflation_embed(macro: MacroSnapshot) -> Optional[discord.Embed]:
     return embed
 
 
+# ── Global & Geopolitical embed ───────────────────────────────────────────────
+
+def macro_global_embed(macro: MacroSnapshot) -> Optional[discord.Embed]:
+    """Global FX / China GDP / US fiscal stress — FRED-only, market-wide."""
+    has_data = any([
+        macro.gg_broad_dollar_index is not None,
+        macro.gg_usdjpy_spot is not None,
+        macro.gg_china_gdp_yoy is not None,
+        macro.gg_fiscal_deficit_pct_gdp is not None,
+        macro.gg_fiscal_fyfsd_millions is not None,
+    ])
+    if not has_data:
+        return None
+
+    STANCE_COLOR: dict[str, int] = {
+        "elevated_stress":   COLOR_RED,
+        "moderate":          COLOR_YELLOW,
+        "benign":            COLOR_GREEN,
+        "insufficient_data": COLOR_GREY,
+    }
+    STANCE_LABEL: dict[str, str] = {
+        "elevated_stress":   "🔴 Elevated stress",
+        "moderate":          "🟡 Moderate",
+        "benign":            "🟢 Benign",
+        "insufficient_data": "⚪ Insufficient Data",
+    }
+    stance = macro.gg_stance or "insufficient_data"
+    stance_color = STANCE_COLOR.get(stance, COLOR_GREY)
+    stance_label = STANCE_LABEL.get(stance, f"⚪ {stance.replace('_', ' ')}")
+    score_str = f"{macro.gg_score:+.2f}" if macro.gg_score is not None else "+0.00"
+
+    embed = discord.Embed(
+        title=f"🌍 Global & Geopolitical — {stance_label} ({score_str})",
+        color=stance_color,
+    )
+
+    def _fmt(regime: Optional[str]) -> str:
+        return (regime or "—").replace("_", " ")
+
+    def _fx_jpy(v: Optional[float]) -> str:
+        if v is None:
+            return "—"
+        return f"{v:.2f}" if v > 20 else f"{v:.6f}"
+
+    def _pct_loc(v: Optional[float], sign: bool = True) -> str:
+        if v is None:
+            return "—"
+        if sign:
+            return f"{v:+.2f}%"
+        return f"{v:.2f}%"
+
+    t1: list[str] = []
+    if macro.gg_broad_dollar_index is not None:
+        d_emoji = "🔴" if macro.gg_broad_dollar_regime == "major_global_stress" else (
+            "🟡" if macro.gg_broad_dollar_regime in (
+                "em_commodity_headwind", "neutral") else "🟢")
+        t1.append(
+            f"{d_emoji} **Broad USD (TWI)** — {macro.gg_broad_dollar_index:.2f} · "
+            f"{_fmt(macro.gg_broad_dollar_regime)} *(not ICE DXY)*"
+        )
+    if macro.gg_usdjpy_spot is not None:
+        u_emoji = "🔴" if macro.gg_usdjpy_regime == "systemic_carry_unwind" else (
+            "🟡" if macro.gg_usdjpy_regime == "early_carry_unwind" else "🟢")
+        chg = ""
+        if macro.gg_usdjpy_chg_20d_pct is not None:
+            chg = f" · 20d {_pct_loc(macro.gg_usdjpy_chg_20d_pct)}"
+        t1.append(
+            f"{u_emoji} **USD/JPY** — {_fx_jpy(macro.gg_usdjpy_spot)}{chg} · "
+            f"{_fmt(macro.gg_usdjpy_regime)}"
+        )
+    if t1:
+        embed.add_field(name="FX & carry — Tier 1", value="\n".join(t1), inline=False)
+
+    t2: list[str] = []
+    if macro.gg_china_gdp_yoy is not None:
+        c_emoji = "🔴" if macro.gg_china_gdp_regime in ("contraction_risk", "slowing") else (
+            "🟡" if macro.gg_china_gdp_regime == "stable" else "🟢")
+        t2.append(
+            f"{c_emoji} **China GDP YoY** — {_pct_loc(macro.gg_china_gdp_yoy)} · "
+            f"{_fmt(macro.gg_china_gdp_regime)} *(OECD quarterly)*"
+        )
+    if macro.gg_fiscal_deficit_pct_gdp is not None:
+        f_emoji = "🔴" if macro.gg_fiscal_regime == "high_deficit_stress" else (
+            "🟡" if macro.gg_fiscal_regime == "elevated_supply_risk" else "🟢")
+        t2.append(
+            f"{f_emoji} **US fiscal** — deficit {_pct_loc(macro.gg_fiscal_deficit_pct_gdp, sign=False)} of GDP · "
+            f"{_fmt(macro.gg_fiscal_regime)}"
+        )
+    elif macro.gg_fiscal_fyfsd_millions is not None:
+        t2.append(
+            f"⚪ **US fiscal** — FYFSD {macro.gg_fiscal_fyfsd_millions:,.0f}M USD "
+            f"(GDP missing for %GDP) · {_fmt(macro.gg_fiscal_regime)}"
+        )
+    if t2:
+        embed.add_field(name="China & fiscal — Tier 2", value="\n".join(t2), inline=False)
+
+    sigs = f"{macro.gg_signals_used} signals" if macro.gg_signals_used else "partial data"
+    embed.set_footer(
+        text=f"Global · {sigs} · FRED free data · see bot.md · TODO: PMI/GPR/COT"
+    )
+    return embed
+
+
 # ── Daily report (summary embed per symbol) ───────────────────────────────────
 
 def daily_report_embeds(report: DailyReport) -> list[discord.Embed]:
@@ -1234,6 +1337,12 @@ def daily_report_embeds(report: DailyReport) -> list[discord.Embed]:
         inf_embed = macro_inflation_embed(report.macro)
         if inf_embed:
             embeds.append(inf_embed)
+
+    # Global & Geopolitical embed (follows Inflation)
+    if report.macro:
+        gg_embed = macro_global_embed(report.macro)
+        if gg_embed:
+            embeds.append(gg_embed)
 
     # Per-symbol compact summary
     for sr in report.symbols:
