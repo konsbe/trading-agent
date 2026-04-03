@@ -1202,6 +1202,22 @@ class ReportBuilder:
             snap.gg_score = gg_stance_p.get("value")
             snap.gg_signals_used = gg_stance_p.get("signals_used")
 
+            # Heal stale mc_market_cycle inputs: the Go worker embeds gc/mp/inf/gg stance
+            # strings at write time; if those stances were insufficient_data (worker ran
+            # before FRED data arrived) but are now available as standalone metrics,
+            # backfill so the market-cycle embed agrees with the live macro embeds above it.
+            if snap.market_cycle is not None:
+                def _stale(v: Optional[str]) -> bool:
+                    return v is None or v == "insufficient_data"
+                if _stale(snap.market_cycle.gc_stance) and not _stale(snap.gc_stance):
+                    snap.market_cycle.gc_stance = snap.gc_stance
+                if _stale(snap.market_cycle.mp_stance) and not _stale(snap.mp_stance):
+                    snap.market_cycle.mp_stance = snap.mp_stance
+                if _stale(snap.market_cycle.inf_stance) and not _stale(snap.inf_stance):
+                    snap.market_cycle.inf_stance = snap.inf_stance
+                if _stale(snap.market_cycle.gg_stance) and not _stale(snap.gg_stance):
+                    snap.market_cycle.gg_stance = snap.gg_stance
+
         except Exception as exc:
             log.warning("macro build failed: %s", exc)
         return snap

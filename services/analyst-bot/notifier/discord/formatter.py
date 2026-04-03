@@ -1803,23 +1803,6 @@ def daily_report_embeds(report: DailyReport) -> list[discord.Embed]:
         if macro_parts:
             header.add_field(name="Macro", value=" | ".join(macro_parts), inline=False)
 
-    has_equity_ta_vix = any(
-        sr.asset_type == "equity"
-        and sr.technical
-        and sr.technical.vix_regime
-        for sr in report.symbols
-    )
-    has_mo_vix_band = any(
-        sr.market_ops and sr.market_ops.global_vix_regime for sr in report.symbols
-    )
-    if has_equity_ta_vix and has_mo_vix_band:
-        header.set_footer(
-            text=(
-                "TA vix_regime (symbol footer) and Market ops VIX band use different "
-                "thresholds — same spot VIX can look \"normal\" in one line and "
-                "\"elevated\" in the other. See bot.md (VIX Regime + daily symbols)."
-            )
-        )
     embeds.append(header)
 
     # Monetary Policy embed (appears once per report, immediately after header)
