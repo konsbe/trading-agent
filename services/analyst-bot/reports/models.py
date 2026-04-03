@@ -389,6 +389,21 @@ class MacroSnapshot:
     inf_score: Optional[float] = None            # -1.0 (deflation) … +1.0 (hot)
     inf_signals_used: Optional[int] = None       # number of sub-signals with data
 
+    # ── Global & Geopolitical (FRED — market-wide, not per symbol) ────────────
+    gg_broad_dollar_index: Optional[float] = None   # DTWEXBGS (broad USD goods TWI, not ICE DXY)
+    gg_broad_dollar_regime: Optional[str] = None    # "dollar_weak_risk_on"|"supportive_equities"|…
+    gg_usdjpy_spot: Optional[float] = None          # DEXJPUS latest
+    gg_usdjpy_chg_20d_pct: Optional[float] = None   # ~20 session % change (carry unwind detector)
+    gg_usdjpy_regime: Optional[str] = None          # "carry_intact"|"early_carry_unwind"|"systemic_carry_unwind"
+    gg_china_gdp_yoy: Optional[float] = None        # CHNGDPNQDSMEI YoY % (OECD quarterly)
+    gg_china_gdp_regime: Optional[str] = None       # "contraction_risk"|"slowing"|"stable"|"expansion"
+    gg_fiscal_deficit_pct_gdp: Optional[float] = None  # |FYFSD|/GDP ratio % (indicative)
+    gg_fiscal_fyfsd_millions: Optional[float] = None     # FYFSD level (millions USD, negative = deficit)
+    gg_fiscal_regime: Optional[str] = None        # "manageable"|"elevated_supply_risk"|"high_deficit_stress"
+    gg_stance: Optional[str] = None               # "benign"|"moderate"|"elevated_stress"|"insufficient_data"
+    gg_score: Optional[float] = None              # -1 benign … +1 elevated global stress
+    gg_signals_used: Optional[int] = None
+
 
 # ── Composite symbol report ───────────────────────────────────────────────────
 

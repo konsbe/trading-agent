@@ -1027,6 +1027,64 @@ func LoadInflationCycle() InflationCycle {
 	}
 }
 
+// ── GlobalGeopolitical ─────────────────────────────────────────────────────────
+
+// GlobalGeopolitical holds thresholds for FX / China GDP / US fiscal stress signals.
+// All series are free FRED; see macro_analysis_reference.html "Global & Geopolitical".
+//
+// TODO [PAID]:    ICE DXY, Markit China PMI, JPM EMBI+ EM stress.
+// TODO [SCRAPE]: PBOC / NPC policy, USTR tariff headlines.
+// TODO [API]:     GPR index file import, GDELT event counts, CFTC COT.
+// TODO [FUTURE]:  ECBDFR, UKBRBASE, DEXUSAL — policy divergence vs Fed.
+type GlobalGeopolitical struct {
+	// Broad USD (DTWEXBGS) — weekly index; not identical to ICE DXY.
+	DollarSupportiveMax float64 // < this = supportive_em_commodities  default 95
+	DollarNeutralMax    float64 // < this = neutral  default 100
+	DollarHeadwindMax   float64 // < this = em_commodity_headwind  default 105
+	DollarStressMin     float64 // ≥ this = major_global_stress  default 110
+
+	// USD/JPY (DEXJPUS) — daily; negative % = JPY strengthening vs USD (carry unwind).
+	USDJPYEarlyUnwindPct    float64 // ≤ this 20d % chg = early warning  default -5
+	USDJPYSystemicUnwindPct float64 // ≤ this = systemic deleveraging  default -10
+	USDJPYLookbackObs       int     // trading days approx — obs index  default 22
+
+	// China GDP YoY % (CHNGDPNQDSMEI, OECD quarterly).
+	ChinaGDPContract   float64 // YoY < this = contraction  default 3
+	ChinaGDPStable     float64 // YoY < this = stable  default 5
+	ChinaGDPExpansion  float64 // YoY ≥ this = expansion  default 6
+
+	// US federal deficit % of nominal GDP (FYFSD millions, GDP billions SAAR).
+	FiscalManageablePct float64 // < this = manageable  default 3
+	FiscalElevatedPct   float64 // > this = high peacetime stress  default 6
+
+	// Composite gg_stance
+	StressElevatedScore float64 // weighted mean ≥ this = elevated_stress  default 0.35
+	StressBenignScore   float64 // ≤ this = benign  default -0.15
+}
+
+func LoadGlobalGeopolitical() GlobalGeopolitical {
+	return GlobalGeopolitical{
+		DollarSupportiveMax: floatEnv("GLOBAL_DOLLAR_SUPPORTIVE_MAX", 95),
+		DollarNeutralMax:    floatEnv("GLOBAL_DOLLAR_NEUTRAL_MAX", 100),
+		DollarHeadwindMax:   floatEnv("GLOBAL_DOLLAR_HEADWIND_MAX", 105),
+		DollarStressMin:     floatEnv("GLOBAL_DOLLAR_STRESS_MIN", 110),
+
+		USDJPYEarlyUnwindPct:    floatEnv("GLOBAL_USDJPY_EARLY_UNWIND_PCT", -5.0),
+		USDJPYSystemicUnwindPct: floatEnv("GLOBAL_USDJPY_SYSTEMIC_UNWIND_PCT", -10.0),
+		USDJPYLookbackObs:       intEnv("GLOBAL_USDJPY_LOOKBACK_OBS", 22),
+
+		ChinaGDPContract:  floatEnv("GLOBAL_CHINA_GDP_CONTRACT", 3.0),
+		ChinaGDPStable:    floatEnv("GLOBAL_CHINA_GDP_STABLE", 5.0),
+		ChinaGDPExpansion: floatEnv("GLOBAL_CHINA_GDP_EXPANSION", 6.0),
+
+		FiscalManageablePct: floatEnv("GLOBAL_FISCAL_MANAGEABLE_PCT", 3.0),
+		FiscalElevatedPct:   floatEnv("GLOBAL_FISCAL_ELEVATED_PCT", 6.0),
+
+		StressElevatedScore: floatEnv("GLOBAL_STRESS_ELEVATED_SCORE", 0.35),
+		StressBenignScore:   floatEnv("GLOBAL_STRESS_BENIGN_SCORE", -0.15),
+	}
+}
+
 func LoadMacroAnalysis() (MacroAnalysis, error) {
 	b := LoadBase()
 	if b.DatabaseURL == "" {
