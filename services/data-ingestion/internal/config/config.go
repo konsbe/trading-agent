@@ -215,3 +215,64 @@ func LoadSentiment() (Sentiment, error) {
 		EquityNewsSymbols: equitySyms,
 	}, nil
 }
+
+// MacroIntel configures data-macro-intel: calendars, RSS, GPR CSV, GDELT, Finnhub general macro news.
+type MacroIntel struct {
+	Base
+	PollInterval time.Duration
+
+	FinnhubKey string
+
+	EnableEconomicCalendar bool
+	EnableEarningsCalendar  bool
+	EarningsSymbols         []string
+
+	EnableFinnhubGeneralNews bool
+
+	RSSFeedURLs []string
+	RSSMaxItems int
+
+	GPRCSVURL string
+
+	GDELTEnabled bool
+	GDELTQuery string
+	GDELTMaxRec int
+	GDELTLookback time.Duration
+}
+
+func LoadMacroIntel() (MacroIntel, error) {
+	b := LoadBase()
+	if b.DatabaseURL == "" {
+		return MacroIntel{}, fmt.Errorf("DATABASE_URL is required")
+	}
+	def := defaultPoll()
+	earn := splitCSV("MACRO_INTEL_EARNINGS_SYMBOLS")
+	if len(earn) == 0 {
+		earn = splitCSV("FINNHUB_EQUITY_NEWS_SYMBOLS")
+	}
+	if len(earn) == 0 {
+		earn = splitCSV("ALPACA_DATA_SYMBOLS")
+	}
+	return MacroIntel{
+		Base:         b,
+		PollInterval: pollFor("DATA_MACRO_INTEL_POLL_INTERVAL", def),
+
+		FinnhubKey: os.Getenv("FINNHUB_API_KEY"),
+
+		EnableEconomicCalendar: env("MACRO_INTEL_ENABLE_ECONOMIC_CALENDAR", "true") == "true",
+		EnableEarningsCalendar: env("MACRO_INTEL_ENABLE_EARNINGS_CALENDAR", "true") == "true",
+		EarningsSymbols:         earn,
+
+		EnableFinnhubGeneralNews: env("MACRO_INTEL_ENABLE_FINNHUB_GENERAL", "true") == "true",
+
+		RSSFeedURLs: splitCSV("MACRO_INTEL_RSS_FEEDS"),
+		RSSMaxItems: intEnv("MACRO_INTEL_RSS_MAX_ITEMS", 15),
+
+		GPRCSVURL: strings.TrimSpace(os.Getenv("GPR_CSV_URL")),
+
+		GDELTEnabled:    env("MACRO_INTEL_GDELT_ENABLE", "true") == "true",
+		GDELTQuery:      env("MACRO_INTEL_GDELT_QUERY", "(federal reserve OR FOMC OR inflation) sourcelang:english"),
+		GDELTMaxRec:     intEnv("MACRO_INTEL_GDELT_MAX_RECORDS", 120),
+		GDELTLookback:   durationEnv("MACRO_INTEL_GDELT_LOOKBACK", 7*24*time.Hour),
+	}, nil
+}

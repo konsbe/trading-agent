@@ -30,6 +30,13 @@ External APIs
      └── Finnhub (crypto news) ────┘  data-sentiment    → sentiment_snapshots
                                                         → news_headlines
      │
+     ├── Finnhub calendars + news ─┐
+     ├── GDELT doc API ────────────┤  data-macro-intel   → economic_calendar_events
+     ├── GPR CSV URL ──────────────┤                     → earnings_calendar_events
+     └── RSS macro feeds ──────────┘                     → geopolitical_risk_monthly
+                                                         → gdelt_macro_daily
+                                                         → news_headlines (rss_macro_*, finnhub_macro_general)
+     │
      ├── Finnhub /stock/metric ────┐
      ├── Finnhub /financials-rep.──┤
      ├── Finnhub /earnings ────────┤  data-fundamental  → equity_fundamentals
@@ -50,7 +57,12 @@ All tables are **TimescaleDB hypertables** — time-partitioned PostgreSQL table
 | `macro_fred` | data-equity | `(series_id, ts)` |
 | `onchain_metrics` | data-onchain | `(asset, metric, ts, source)` |
 | `sentiment_snapshots` | data-sentiment | `(source, symbol, ts)` |
-| `news_headlines` | data-sentiment | `(ts, source, headline)` |
+| `news_headlines` | data-sentiment, **data-macro-intel** | `(ts, source, headline)` |
+| `economic_calendar_events` | data-macro-intel | `(source, external_id)` |
+| `earnings_calendar_events` | data-macro-intel | `(source, external_id)` |
+| `geopolitical_risk_monthly` | data-macro-intel | `(month_ts, source)` |
+| `gdelt_macro_daily` | data-macro-intel | `(day_ts, query_label)` |
+| `narrative_scores` | optional analyst-bot (FOMC LLM job) | `(id)` |
 | `equity_fundamentals` | data-fundamental | `(symbol, period, metric, source, ts)` |
 
 All writes use `ON CONFLICT DO UPDATE` (upsert) unless noted otherwise, so re-running workers is idempotent.
@@ -416,6 +428,34 @@ Tall/narrow format — one row per `(symbol, period, metric)`. This mirrors the 
 
 ---
 
+## Worker 7 — `data-macro-intel`
+
+**Purpose:** Event-style macro context that is **not** on FRED: economic and earnings calendars, a user-supplied **GPR** CSV, **GDELT** article-tone aggregates for a boolean query, **RSS** macro headlines, and Finnhub **general** market news (stored as `news_headlines` with distinct `source` values so equity/crypto company news stays separate).
+
+**Migration:** `shared/databases/migrations/006_macro_intel.sql` (apply on existing DBs, not only fresh `initdb`).
+
+### Environment variables
+
+| Variable | Default | Description |
+|---|---|---|
+| `DATA_MACRO_INTEL_POLL_INTERVAL` | `DATA_POLL_INTERVAL` | Loop interval between full ingest passes |
+| `FINNHUB_API_KEY` | — | Required for calendars + general news (same key as other Finnhub workers) |
+| `MACRO_INTEL_ENABLE_ECONOMIC_CALENDAR` | `true` | `GET /calendar/economic` — **some Finnhub tiers return 403**; disable if needed |
+| `MACRO_INTEL_ENABLE_EARNINGS_CALENDAR` | `true` | `GET /calendar/earnings` |
+| `MACRO_INTEL_EARNINGS_SYMBOLS` | falls back to equity symbol envs | Comma list; empty = one unfiltered earnings request |
+| `MACRO_INTEL_ENABLE_FINNHUB_GENERAL` | `true` | `GET /news?category=general` → `finnhub_macro_general` |
+| `MACRO_INTEL_RSS_FEEDS` | — | Comma-separated RSS URLs |
+| `MACRO_INTEL_RSS_MAX_ITEMS` | `15` | Max items stored per feed per pass |
+| `GPR_CSV_URL` | — | HTTP(S) URL to GPR-style monthly CSV (optional) |
+| `MACRO_INTEL_GDELT_ENABLE` | `true` | Query GDELT 2.1 doc API (no API key) |
+| `MACRO_INTEL_GDELT_QUERY` | macro boolean query | Passed to GDELT `ArtList` |
+| `MACRO_INTEL_GDELT_MAX_RECORDS` | `120` | Cap per request |
+| `MACRO_INTEL_GDELT_LOOKBACK` | `168h` | Window for GDELT query |
+
+**Qualitative LLM scores** (e.g. FOMC hawkish/dovish) are **not** written by this worker; they are optional `narrative_scores` rows from `analyst-bot` (see `services/analyst-bot/bot.md`).
+
+---
+
 ## Shared Configuration
 
 All workers inherit these base variables:
@@ -465,12 +505,16 @@ data-sentiment   → sentiment_snapshots (LunarCrush Galaxy Score per coin)
 
 data-fundamental → equity_fundamentals (TTM ratios, quarterly/annual XBRL,
                                         earnings history, forward estimates)
+
+data-macro-intel → economic_calendar_events, earnings_calendar_events,
+                   geopolitical_risk_monthly, gdelt_macro_daily,
+                   news_headlines (rss_macro_*, finnhub_macro_general)
 ```
 
 **Downstream consumers:**
 - `data-analyzer/technical-analysis` reads `crypto_ohlcv` + `equity_ohlcv` + `macro_fred` to compute all technical indicators → writes to `technical_indicators`
 - `data-analyzer/fundamental-analysis` reads `equity_fundamentals` to score and tier each metric → writes derived rows back to `equity_fundamentals` (period=`derived`)
-- `analyst-bot` (Python) reads all tables to generate Discord reports
+- `analyst-bot` (Python) reads all tables to generate Discord reports (including the **Macro intel** embed from macro-intel tables + optional `narrative_scores`)
 
 **Limitations:**
 - `SEC EDGAR API`. Finnhub's `/stock/financials-reported` endpoint is a pre-parsed wrapper over SEC EDGAR filings. Finnhub downloads the 10-Q and 10-K XBRL filings from EDGAR, parses the XBRL tags, normalises the concept names, and serves the result through their REST API. Your code in data-fundamental/main.go calls Finnhub — it never touches sec.gov directly.

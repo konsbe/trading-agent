@@ -91,6 +91,13 @@ class BotConfig(BaseSettings):
     bot_news_headlines_limit: int = 5
     bot_report_max_symbols: int = 10
 
+    # ── Optional FOMC / policy narrative (OpenAI → narrative_scores) ───────────
+    bot_fomc_narrative_enable: bool = False
+    bot_fomc_narrative_cron: str = "0 18 * * 3"  # Wednesday 18:00 UTC (tune around FOMC)
+    openai_api_key: str = ""
+    openai_model: str = "gpt-4o-mini"
+    fomc_statement_url: str = ""  # HTML page URL; text is stripped server-side
+
 
 def load() -> BotConfig:
     return BotConfig()

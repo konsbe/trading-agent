@@ -10,7 +10,7 @@ them for their own output channel. No formatting lives here.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import date, datetime
 from typing import Optional
 
 
@@ -238,6 +238,47 @@ class NewsHeadline:
     symbol: Optional[str] = None
 
 
+# ── Macro intelligence (calendars, geo, RSS — not FRED) ───────────────────────
+
+@dataclass
+class EconomicCalendarBrief:
+    event_ts: datetime
+    country: str
+    event_name: str
+    impact: Optional[str] = None
+
+
+@dataclass
+class EarningsCalendarBrief:
+    earnings_date: date
+    symbol: str
+    quarter: Optional[str] = None
+    hour: Optional[str] = None
+
+
+@dataclass
+class MacroIntelSnapshot:
+    """Event-driven and narrative layers ingested by data-macro-intel + optional LLM job."""
+
+    economic_events: list[EconomicCalendarBrief] = field(default_factory=list)
+    earnings_events: list[EarningsCalendarBrief] = field(default_factory=list)
+
+    gpr_month: Optional[date] = None
+    gpr_total: Optional[float] = None
+
+    gdelt_day: Optional[date] = None
+    gdelt_query_label: Optional[str] = None
+    gdelt_article_count: Optional[int] = None
+    gdelt_avg_tone: Optional[float] = None
+
+    narrative_kind: Optional[str] = None
+    narrative_score: Optional[float] = None
+    narrative_summary: Optional[str] = None
+    narrative_at: Optional[datetime] = None
+
+    macro_headlines: list[NewsHeadline] = field(default_factory=list)
+
+
 # ── Macro ─────────────────────────────────────────────────────────────────────
 
 @dataclass
@@ -426,6 +467,7 @@ class DailyReport:
     generated_at: datetime
     symbols: list[SymbolReport] = field(default_factory=list)
     macro: Optional[MacroSnapshot] = None
+    macro_intel: Optional[MacroIntelSnapshot] = None
 
 
 # ── Alert event ───────────────────────────────────────────────────────────────

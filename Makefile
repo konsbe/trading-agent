@@ -113,7 +113,7 @@ log-docker-compose:
 
 log-services:
 	$(COMPOSE) logs -f \
-	  data-crypto data-equity data-fundamental data-onchain data-sentiment data-technical
+	  data-crypto data-equity data-fundamental data-onchain data-sentiment data-technical data-macro-intel
 
 log-analyzer:
 	$(COMPOSE) logs -f technical-analysis fundamental-analysis
