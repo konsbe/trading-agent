@@ -115,6 +115,7 @@ async def recent_headlines(
         """
         SELECT ts, source, symbol, headline, url, sentiment
         FROM news_headlines
+        WHERE source != 'finnhub_crypto'
         ORDER BY ts DESC
         LIMIT $1
         """,
