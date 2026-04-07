@@ -797,6 +797,11 @@ class ReportBuilder:
                 log.debug("market ops VIX TA fallback: %s", exc)
 
         if fv is None:
+            # No live VIX — clear any stale "unknown" from the precomputed snapshot so
+            # the field is omitted from the embed rather than showing the literal string.
+            if mo.global_vix_regime == "unknown":
+                mo.global_vix_regime = None
+                mo.global_vix_label = None
             return
         mo.global_vix = fv
         mo.vix_from_macro_fred = from_fred
