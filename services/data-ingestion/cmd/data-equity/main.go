@@ -102,6 +102,7 @@ func main() {
 				log.Error("fred series", "id", sid, "err", err)
 				continue
 			}
+			rows := make([]store.MacroFredRow, 0, len(obs))
 			for _, o := range obs {
 				if !o.Valid {
 					continue
@@ -110,12 +111,16 @@ func main() {
 				if err != nil {
 					continue
 				}
-				ts := time.Date(d.Year(), d.Month(), d.Day(), 0, 0, 0, 0, time.UTC)
-				if err := store.UpsertMacroFred(ctx, pool, sid, ts, o.Value); err != nil {
-					log.Error("upsert fred", "series", sid, "err", err)
-				}
+				rows = append(rows, store.MacroFredRow{
+					TS:    time.Date(d.Year(), d.Month(), d.Day(), 0, 0, 0, 0, time.UTC),
+					Value: o.Value,
+				})
 			}
-			log.Info("fred series refreshed", "id", sid, "points", len(obs))
+			if err := store.UpsertMacroFredBatch(ctx, pool, sid, rows); err != nil {
+				log.Error("upsert fred batch", "series", sid, "err", err)
+			} else {
+				log.Info("fred series refreshed", "id", sid, "points", len(rows))
+			}
 		}
 	}
 

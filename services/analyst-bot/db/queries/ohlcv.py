@@ -116,6 +116,33 @@ async def latest_macro(pool: asyncpg.Pool, series_id: str) -> Optional[float]:
         return None
 
 
+async def latest_macro_fred_rows(
+    pool: asyncpg.Pool,
+    series_ids: list[str],
+) -> list[dict]:
+    """Latest (value, ts) per series_id, in the same order as ``series_ids``."""
+    if not series_ids:
+        return []
+    rows = await pool.fetch(
+        """
+        SELECT DISTINCT ON (series_id) series_id, value, ts
+        FROM macro_fred
+        WHERE series_id = ANY($1::text[])
+        ORDER BY series_id, ts DESC
+        """,
+        series_ids,
+    )
+    by_id = {r["series_id"]: r for r in rows}
+    out: list[dict] = []
+    for sid in series_ids:
+        r = by_id.get(sid)
+        if r:
+            out.append({"series_id": sid, "value": r["value"], "ts": r["ts"]})
+        else:
+            out.append({"series_id": sid, "value": None, "ts": None})
+    return out
+
+
 async def latest_macro_derived(
     pool: asyncpg.Pool,
     metric: str,

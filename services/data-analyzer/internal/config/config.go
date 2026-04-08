@@ -315,7 +315,7 @@ func LoadTechnicalAnalysis() (TechnicalAnalysis, error) {
 
 	equitySyms := splitCSV("TECHNICAL_EQUITY_SYMBOLS")
 	if len(equitySyms) == 0 {
-		equitySyms = splitCSV("ALPACA_DATA_SYMBOLS")
+		equitySyms = MergedAlpacaEquitySymbols()
 	}
 	if len(equitySyms) == 0 {
 		equitySyms = []string{"AAPL", "MSFT", "SPY"}
@@ -1195,7 +1195,7 @@ func LoadFundamentalAnalysis() (FundamentalAnalysis, error) {
 	}
 	syms := splitCSV("FUNDAMENTAL_SYMBOLS")
 	if len(syms) == 0 {
-		syms = splitCSV("ALPACA_DATA_SYMBOLS")
+		syms = MergedAlpacaEquitySymbols()
 	}
 	if len(syms) == 0 {
 		syms = []string{"AAPL", "MSFT", "SPY"}

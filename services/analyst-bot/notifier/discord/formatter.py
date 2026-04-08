@@ -21,6 +21,8 @@ from reports.models import (
     AlertEvent,
     AnalyzeContextSnapshot,
     DailyReport,
+    DashboardStripRow,
+    FredSeriesObservation,
     FundamentalSnapshot,
     MacroIntelSnapshot,
     MacroSnapshot,
@@ -879,11 +881,11 @@ def macro_monetary_embed(macro: MacroSnapshot) -> Optional[discord.Embed]:
     # Treasury Term Structure
     if any(x is not None for x in [macro.dgs2, macro.dgs10, macro.dgs30]):
         parts = []
-        if macro.dgs2:
+        if macro.dgs2 is not None:
             parts.append(f"2Y: {_f(macro.dgs2, '.2f', '%')}")
-        if macro.dgs10:
+        if macro.dgs10 is not None:
             parts.append(f"10Y: {_f(macro.dgs10, '.2f', '%')}")
-        if macro.dgs30:
+        if macro.dgs30 is not None:
             parts.append(f"30Y: {_f(macro.dgs30, '.2f', '%')}")
         t2_lines.append(f"📊 **Treasury Yields** — {' | '.join(parts)}")
 
@@ -1776,7 +1778,122 @@ def macro_intel_embed(intel: MacroIntelSnapshot) -> Optional[discord.Embed]:
     return embed
 
 
+def _daily_report_symbol_summary_embed(sr: SymbolReport) -> discord.Embed:
+    """One compact embed per symbol — shared by full daily report and compact /report all."""
+    color = COLOR_GREY
+    if sr.fundamental and sr.fundamental.composite_tier == "strong":
+        color = COLOR_GREEN
+    elif sr.fundamental and sr.fundamental.composite_tier == "weak":
+        color = COLOR_RED
+
+    price_str = _price(sr.price.close) if sr.price else "—"
+    change_str = _pct(sr.price.change_pct) if sr.price else "—"
+    title = f"{'📈' if sr.price and (sr.price.change_pct or 0) >= 0 else '📉'} {sr.symbol}  {price_str}  ({change_str})"
+
+    embed = discord.Embed(title=_trunc(title, 256), color=color)
+
+    if sr.technical:
+        t = sr.technical
+        ta_parts = []
+        if t.rsi is not None:
+            ta_parts.append(f"RSI {t.rsi:.0f}")
+        if t.trend_direction:
+            ta_parts.append(f"{_trend_emoji(t.trend_direction)} {t.trend_direction}")
+        if t.bb_squeeze:
+            ta_parts.append("🔴 Squeeze")
+        if t.macd_bullish_cross:
+            ta_parts.append("🟢 MACD cross")
+        if t.macd_bearish_cross:
+            ta_parts.append("🔴 MACD cross")
+        if t.hs_found:
+            ta_parts.append("🔴 H&S✅" if t.hs_neckline_break else "🔴 H&S")
+        if t.inv_hs_found:
+            ta_parts.append("🟢 Inv H&S✅" if t.inv_hs_neckline_break else "🟢 Inv H&S")
+        if ta_parts:
+            embed.add_field(name="Technical", value=" | ".join(ta_parts[:6]), inline=False)
+
+    if sr.fundamental:
+        f = sr.fundamental
+        fa_parts = []
+        if f.composite_tier:
+            fa_parts.append(f"{_tier_emoji(f.composite_tier)} FA: {f.composite_tier} ({_num(f.composite_score, 2)})")
+        if f.pe_tier:
+            fa_parts.append(f"P/E: {f.pe_tier}")
+        if f.fcf_yield_tier:
+            fa_parts.append(f"FCF: {f.fcf_yield_tier}")
+        if f.t2_health_tier and f.t2_health_tier != "neutral":
+            fa_parts.append(f"BS: {_tier_emoji(f.t2_health_tier)} {f.t2_health_tier}")
+        if fa_parts:
+            embed.add_field(name="Fundamentals", value=" | ".join(fa_parts), inline=False)
+
+    if sr.sentiment and sr.sentiment.score is not None:
+        embed.add_field(
+            name=f"Sentiment ({sr.sentiment.source})",
+            value=_num(sr.sentiment.score, 1),
+            inline=True,
+        )
+
+    if sr.news:
+        n = sr.news[0]
+        headline = n.headline[:100] + ("…" if len(n.headline) > 100 else "")
+        embed.add_field(name="Latest News", value=headline, inline=False)
+
+    if sr.market_ops and (
+        sr.market_ops.atr_pct is not None
+        or sr.market_ops.volume_vs_median_ratio is not None
+        or sr.market_ops.flags
+    ):
+        mo_parts: list[str] = []
+        if sr.market_ops.global_vix_regime:
+            mo_parts.append(f"VIX regime: {sr.market_ops.global_vix_regime.replace('_', ' ')}")
+        if sr.market_ops.atr_pct is not None:
+            mo_parts.append(f"ATR% {_num(sr.market_ops.atr_pct, 2)}")
+        if sr.market_ops.volume_vs_median_ratio is not None:
+            mo_parts.append(f"Vol×median {_num(sr.market_ops.volume_vs_median_ratio, 2)}")
+        if sr.market_ops.flags:
+            mo_parts.append(", ".join(sr.market_ops.flags))
+        embed.add_field(
+            name="Market ops",
+            value=_trunc(" · ".join(mo_parts), 1020),
+            inline=False,
+        )
+
+    if sr.technical and sr.technical.vix_regime and sr.asset_type == "equity":
+        embed.set_footer(text=f"VIX: {_regime_emoji(sr.technical.vix_regime)} {sr.technical.vix_regime}")
+
+    return embed
+
+
 # ── Daily report (summary embed per symbol) ───────────────────────────────────
+
+def fred_observations_embeds(title: str, obs: list[FredSeriesObservation]) -> list[discord.Embed]:
+    if not obs:
+        return []
+    embeds: list[discord.Embed] = []
+    chunk = 20
+    for i in range(0, len(obs), chunk):
+        part = obs[i : i + chunk]
+        t = title if i == 0 else f"{title} (cont.)"
+        e = discord.Embed(title=t, color=COLOR_GREY)
+        for o in part:
+            v = f"{o.value:.8g}" if o.value is not None else "—"
+            ts_s = o.observation_ts.strftime("%Y-%m-%d") if o.observation_ts else "—"
+            e.add_field(name=o.series_id, value=f"{v}\n`{ts_s}`", inline=True)
+        embeds.append(e)
+    return embeds
+
+
+def dashboard_strip_embed(rows: list[DashboardStripRow]) -> Optional[discord.Embed]:
+    if not rows:
+        return None
+    e = discord.Embed(title="📌 Dashboard strip", color=COLOR_BLUE)
+    lines: list[str] = []
+    for r in rows:
+        hint = _trunc(r.hint, 80)
+        lines.append(f"**{r.label}** · {hint}\n{r.value_text}")
+    e.description = _trunc("\n\n".join(lines), 4000)
+    return e
+
 
 def daily_report_embeds(report: DailyReport) -> list[discord.Embed]:
     """
@@ -1788,8 +1905,9 @@ def daily_report_embeds(report: DailyReport) -> list[discord.Embed]:
 
     # Header
     ts_str = report.generated_at.strftime("%Y-%m-%d %H:%M UTC")
+    tag = f" · {report.mode_tag}" if getattr(report, "mode_tag", "") else ""
     header = discord.Embed(
-        title=f"📊 Daily Market Report — {ts_str}",
+        title=f"📊 Daily Market Report{tag} — {ts_str}",
         color=COLOR_BLUE,
     )
     if report.macro:
@@ -1849,94 +1967,18 @@ def daily_report_embeds(report: DailyReport) -> list[discord.Embed]:
         if mi_embed:
             embeds.append(mi_embed)
 
-    # Per-symbol compact summary
     for sr in report.symbols:
-        color = COLOR_GREY
-        if sr.fundamental and sr.fundamental.composite_tier == "strong":
-            color = COLOR_GREEN
-        elif sr.fundamental and sr.fundamental.composite_tier == "weak":
-            color = COLOR_RED
+        embeds.append(_daily_report_symbol_summary_embed(sr))
 
-        price_str = _price(sr.price.close) if sr.price else "—"
-        change_str = _pct(sr.price.change_pct) if sr.price else "—"
-        title = f"{'📈' if sr.price and (sr.price.change_pct or 0) >= 0 else '📉'} {sr.symbol}  {price_str}  ({change_str})"
+    if report.fred_series_values:
+        embeds.extend(
+            fred_observations_embeds("📈 FRED · latest observations", report.fred_series_values)
+        )
 
-        embed = discord.Embed(title=_trunc(title, 256), color=color)
-
-        # TA summary
-        if sr.technical:
-            t = sr.technical
-            ta_parts = []
-            if t.rsi is not None:
-                ta_parts.append(f"RSI {t.rsi:.0f}")
-            if t.trend_direction:
-                ta_parts.append(f"{_trend_emoji(t.trend_direction)} {t.trend_direction}")
-            if t.bb_squeeze:
-                ta_parts.append("🔴 Squeeze")
-            if t.macd_bullish_cross:
-                ta_parts.append("🟢 MACD cross")
-            if t.macd_bearish_cross:
-                ta_parts.append("🔴 MACD cross")
-            if t.hs_found:
-                ta_parts.append("🔴 H&S✅" if t.hs_neckline_break else "🔴 H&S")
-            if t.inv_hs_found:
-                ta_parts.append("🟢 Inv H&S✅" if t.inv_hs_neckline_break else "🟢 Inv H&S")
-            if ta_parts:
-                embed.add_field(name="Technical", value=" | ".join(ta_parts[:6]), inline=False)
-
-        # FA summary (equity only)
-        if sr.fundamental:
-            f = sr.fundamental
-            fa_parts = []
-            if f.composite_tier:
-                fa_parts.append(f"{_tier_emoji(f.composite_tier)} FA: {f.composite_tier} ({_num(f.composite_score, 2)})")
-            if f.pe_tier:
-                fa_parts.append(f"P/E: {f.pe_tier}")
-            if f.fcf_yield_tier:
-                fa_parts.append(f"FCF: {f.fcf_yield_tier}")
-            if f.t2_health_tier and f.t2_health_tier != "neutral":
-                fa_parts.append(f"BS: {_tier_emoji(f.t2_health_tier)} {f.t2_health_tier}")
-            if fa_parts:
-                embed.add_field(name="Fundamentals", value=" | ".join(fa_parts), inline=False)
-
-        # Sentiment
-        if sr.sentiment and sr.sentiment.score is not None:
-            embed.add_field(
-                name=f"Sentiment ({sr.sentiment.source})",
-                value=_num(sr.sentiment.score, 1),
-                inline=True,
-            )
-
-        # Top headline
-        if sr.news:
-            n = sr.news[0]
-            headline = n.headline[:100] + ("…" if len(n.headline) > 100 else "")
-            embed.add_field(name="Latest News", value=headline, inline=False)
-
-        if sr.market_ops and (
-            sr.market_ops.atr_pct is not None
-            or sr.market_ops.volume_vs_median_ratio is not None
-            or sr.market_ops.flags
-        ):
-            mo_parts: list[str] = []
-            if sr.market_ops.global_vix_regime:
-                mo_parts.append(f"VIX regime: {sr.market_ops.global_vix_regime.replace('_', ' ')}")
-            if sr.market_ops.atr_pct is not None:
-                mo_parts.append(f"ATR% {_num(sr.market_ops.atr_pct, 2)}")
-            if sr.market_ops.volume_vs_median_ratio is not None:
-                mo_parts.append(f"Vol×median {_num(sr.market_ops.volume_vs_median_ratio, 2)}")
-            if sr.market_ops.flags:
-                mo_parts.append(", ".join(sr.market_ops.flags))
-            embed.add_field(
-                name="Market ops",
-                value=_trunc(" · ".join(mo_parts), 1020),
-                inline=False,
-            )
-
-        if sr.technical and sr.technical.vix_regime and sr.asset_type == "equity":
-            embed.set_footer(text=f"VIX: {_regime_emoji(sr.technical.vix_regime)} {sr.technical.vix_regime}")
-
-        embeds.append(embed)
+    if report.dashboard_rows:
+        de = dashboard_strip_embed(report.dashboard_rows)
+        if de:
+            embeds.append(de)
 
     return embeds
 

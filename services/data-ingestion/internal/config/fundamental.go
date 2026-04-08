@@ -74,7 +74,7 @@ func LoadFundamental() (Fundamental, error) {
 
 	syms := splitCSV("FUNDAMENTAL_SYMBOLS")
 	if len(syms) == 0 {
-		syms = splitCSV("ALPACA_DATA_SYMBOLS")
+		syms = MergedAlpacaEquitySymbols()
 	}
 	if len(syms) == 0 {
 		syms = []string{"AAPL", "MSFT", "SPY"}

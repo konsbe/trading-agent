@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -88,6 +89,39 @@ ON CONFLICT (series_id, ts) DO UPDATE SET value = EXCLUDED.value
 `
 	_, err := pool.Exec(ctx, q, ts, seriesID, value)
 	return err
+}
+
+// MacroFredRow holds a single observation ready for bulk insert.
+type MacroFredRow struct {
+	TS    time.Time
+	Value float64
+}
+
+// UpsertMacroFredBatch upserts all observations for one series inside a single
+// transaction. This prevents partial-series reads that would otherwise occur
+// when the analyst-bot queries mid-backfill (e.g. on first container start).
+// Under READ COMMITTED isolation, readers either see the full committed state
+// or the pre-transaction state — never a halfway-populated series.
+func UpsertMacroFredBatch(ctx context.Context, pool *pgxpool.Pool, seriesID string, rows []MacroFredRow) error {
+	if len(rows) == 0 {
+		return nil
+	}
+	const q = `
+INSERT INTO macro_fred (ts, series_id, value) VALUES ($1,$2,$3)
+ON CONFLICT (series_id, ts) DO UPDATE SET value = EXCLUDED.value
+`
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin tx for %s: %w", seriesID, err)
+	}
+	defer tx.Rollback(ctx) //nolint:errcheck — no-op after Commit
+
+	for _, r := range rows {
+		if _, err := tx.Exec(ctx, q, r.TS, seriesID, r.Value); err != nil {
+			return fmt.Errorf("upsert %s @ %s: %w", seriesID, r.TS.Format("2006-01-02"), err)
+		}
+	}
+	return tx.Commit(ctx)
 }
 
 func UpsertOnchain(ctx context.Context, pool *pgxpool.Pool, ts time.Time, asset, metric string, value *float64, payload any, source string) error {

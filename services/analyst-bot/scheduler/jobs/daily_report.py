@@ -34,6 +34,7 @@ class DailyReportJob:
             report = await self._builder.build_daily_report(
                 self._cfg.equity_symbols,
                 self._cfg.crypto_symbols,
+                macro_intel_equity_symbols=self._cfg.equity_symbols,
             )
             for notifier in self._notifiers:
                 try:

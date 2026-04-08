@@ -23,6 +23,20 @@ def _csv(value: str) -> list[str]:
     return [s.strip() for s in value.split(",") if s.strip()]
 
 
+def _merge_unique_csv(*chunks: str) -> list[str]:
+    """Concatenate comma-separated chunks; dedupe case-insensitively; first occurrence wins."""
+    seen: set[str] = set()
+    out: list[str] = []
+    for chunk in chunks:
+        for s in _csv(chunk):
+            k = s.upper()
+            if k in seen:
+                continue
+            seen.add(k)
+            out.append(s)
+    return out
+
+
 class BotConfig(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -38,8 +52,15 @@ class BotConfig(BaseSettings):
     # ── Symbols & intervals — stored as CSV strings, parsed via properties ────
     # pydantic-settings v2 tries json.loads() on List[str] fields; using str
     # avoids that entirely and accepts plain BOT_EQUITY_SYMBOLS=AAPL,MSFT,SPY
-    bot_equity_symbols: str = "AAPL,MSFT,SPY"
-    bot_crypto_symbols: str = "BTCUSDT,ETHUSDT"
+    # When BOT_EQUITY_SYMBOLS is empty, equity_symbols merges the three watchlists
+    # (same env names as data-ingestion / data-analyzer).
+    bot_equity_symbols: str = ""
+    equity_symbols_stocks: str = ""
+    equity_symbols_etfs: str = ""
+    equity_symbols_commodity_etfs: str = ""
+    bot_crypto_symbols: str = (
+        "BTCUSDT,ETHUSDT,LINKUSDT,KSMUSDT,TAOUSDT,RENDERUSDT,SOLUSDT,TIAUSDT"
+    )
     bot_equity_interval: str = "1Day"
     bot_crypto_interval: str = "1d"
     # Same env as macro-analysis MARKET_CYCLE_SYMBOL — benchmark for cycle + /analyze RS context
@@ -47,7 +68,16 @@ class BotConfig(BaseSettings):
 
     @property
     def equity_symbols(self) -> list[str]:
-        return _csv(self.bot_equity_symbols)
+        if self.bot_equity_symbols.strip():
+            return _csv(self.bot_equity_symbols)
+        merged = _merge_unique_csv(
+            self.equity_symbols_stocks,
+            self.equity_symbols_etfs,
+            self.equity_symbols_commodity_etfs,
+        )
+        if merged:
+            return merged
+        return _csv("AAPL,MSFT,SPY")
 
     @property
     def crypto_symbols(self) -> list[str]:
@@ -98,6 +128,22 @@ class BotConfig(BaseSettings):
     # ── Report formatting ─────────────────────────────────────────────────────
     bot_news_headlines_limit: int = 5
     bot_report_max_symbols: int = 10
+
+    # ── /report mode subsets (full macro panels always included) ────────────────
+    bot_report_etf_symbols: str = "SPY,QQQ,IWM,XLF,EEM,MCHI,^GSPC,^GDAXI"
+    bot_report_commodity_equity_symbols: str = "GLD,COPX,USO"
+    bot_report_commodity_fred_series: str = "DCOILWTICO,DCOILBRENTEU,GOLDAMGBD228NLBM,PCOPPUSDM"
+    bot_report_macro_fred_series: str = (
+        "DGS10,DEXUSEU,VIXCLS,FEDFUNDS,T10Y2Y,T10Y3M,DFII10,WALCL,"
+        "BAMLH0A0HYM2,BAMLC0A0CM,T10YIE,T5YIE,DGS2,DGS30,M2SL,USSLIND,ICSA,CCSA,HOUST,PERMIT,"
+        "GDPC1,PAYEMS,UNRATE,CES0500000003,SAHMREALTIME,RSAFS,RRSFS,UMCSENT,DGORDER,NEWORDER,"
+        "CPIAUCSL,CPILFESL,CUSR0000SAH1,PCEPI,PCEPILFE,PPIACO,PPIFID,ECIALLCIV,DTWEXBGS,DEXJPUS,"
+        "CHNGDPNQDSMEI,FYFSD,GDP"
+    )
+    bot_report_crypto_symbols: str = "BTCUSDT,ETHUSDT,TIA,LINK,KSM,TAO,RNDR,SOL"
+    bot_report_equity_symbols: str = (
+        "XOM,CVX,SHEL,BB,TTE,2222.SR,TSM,INTC,GFS,OXIG.L,KEYS,COHR,IPGP,AMZN,MSFT,GOOGL"
+    )
 
     # ── Market operations (mo_reference_snapshot + per-symbol ATR% / volume vs median) ─
     bot_market_ops_enable: bool = True

@@ -24,8 +24,10 @@ from reports.models import (
     AlertEvent,
     AnalyzeContextSnapshot,
     DailyReport,
+    DashboardStripRow,
     EconomicCalendarBrief,
     EarningsCalendarBrief,
+    FredSeriesObservation,
     FundamentalSnapshot,
     MacroIntelSnapshot,
     MacroSnapshot,
@@ -39,6 +41,21 @@ from reports.models import (
 )
 
 log = logging.getLogger(__name__)
+
+# Dashboard strip: (label, kind, ref, hint) — kind is "fred" or "eq"
+_DASHBOARD_ITEMS: tuple[tuple[str, str, str, str], ...] = (
+    ("DXY", "fred", "DTWEXBGS", "FRED broad USD index (not ICE DXY)"),
+    ("US10Y", "fred", "DGS10", "10Y yield %"),
+    ("US02Y", "fred", "DGS2", "2Y yield %"),
+    ("T10Y2Y", "fred", "T10Y2Y", "10Y−2Y spread (pp)"),
+    ("SPX", "eq", "SPY", "SPY proxy for S&P 500"),
+    ("DAX", "eq", "^GDAXI", "index / ADR if in OHLCV"),
+    ("MCHI", "eq", "MCHI", "MSCI China ETF"),
+    ("USOIL", "fred", "DCOILWTICO", "WTI $/bbl"),
+    ("GOLD", "eq", "GLD", "Gold ETF (GLD $/share proxy)"),
+    ("HG1!", "fred", "PCOPPUSDM", "Copper $/mt (macro proxy)"),
+    ("USDJPY", "fred", "DEXJPUS", "FRED series units"),
+)
 
 
 def _im_branch(im: dict, key: str) -> dict:
@@ -208,8 +225,12 @@ class ReportBuilder:
         self,
         equity_symbols: list[str],
         crypto_symbols: list[str],
+        *,
+        macro_intel_equity_symbols: Optional[list[str]] = None,
+        mode_tag: str = "",
     ) -> DailyReport:
         report = DailyReport(generated_at=datetime.now(timezone.utc))
+        report.mode_tag = mode_tag.strip()
         for sym in equity_symbols:
             sr = await self.build_symbol_report(sym, "equity", use_cache=False)
             report.symbols.append(sr)
@@ -217,8 +238,53 @@ class ReportBuilder:
             sr = await self.build_symbol_report(sym, "crypto", use_cache=False)
             report.symbols.append(sr)
         report.macro = await self._build_macro()
-        report.macro_intel = await self._build_macro_intel(equity_symbols)
+        mi_syms = macro_intel_equity_symbols if macro_intel_equity_symbols is not None else equity_symbols
+        report.macro_intel = await self._build_macro_intel(mi_syms)
         return report
+
+    async def fetch_fred_observations(self, series_ids: list[str]) -> list[FredSeriesObservation]:
+        seen: set[str] = set()
+        uniq: list[str] = []
+        for s in series_ids:
+            if s not in seen:
+                seen.add(s)
+                uniq.append(s)
+        rows = await ohlcv.latest_macro_fred_rows(self._pool, uniq)
+        out: list[FredSeriesObservation] = []
+        for r in rows:
+            raw = r.get("value")
+            v = float(raw) if raw is not None else None
+            ts = r.get("ts")
+            out.append(FredSeriesObservation(series_id=r["series_id"], value=v, observation_ts=ts))
+        return out
+
+    async def build_dashboard_strip(self) -> list[DashboardStripRow]:
+        rows_out: list[DashboardStripRow] = []
+        for label, kind, ref, hint in _DASHBOARD_ITEMS:
+            if kind == "fred":
+                val = await ohlcv.latest_macro(self._pool, ref)
+                if val is None:
+                    text = "—"
+                elif label in ("US10Y", "US02Y"):
+                    text = f"{val:.2f}%"
+                elif label == "T10Y2Y":
+                    text = f"{val:.2f} pp"
+                elif label == "DXY":
+                    text = f"{val:.2f}"
+                elif label in ("USOIL", "HG1!", "GOLD"):
+                    text = f"{val:.2f}"
+                elif label == "USDJPY":
+                    text = f"{val:.4f}"
+                else:
+                    text = f"{val:.4g}"
+            else:
+                bar = await ohlcv.latest_bar(self._pool, ref, "equity_ohlcv", self._equity_interval)
+                if bar and bar.get("close") is not None:
+                    text = f"{float(bar['close']):,.2f}"
+                else:
+                    text = "—"
+            rows_out.append(DashboardStripRow(label=label, hint=hint, value_text=text))
+        return rows_out
 
     async def scan_alerts(
         self,

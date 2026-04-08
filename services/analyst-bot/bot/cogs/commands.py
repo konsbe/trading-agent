@@ -10,7 +10,7 @@ Commands:
   /signals    <symbol> [asset_type]  — Key signals summary (fast, one embed)
   /analyze    <symbol> [asset_type]  — Full TA + FA + sentiment (multi-embed)
   /marketops  [symbol] [asset_type]  — Vol regime (VIX) + Module 5 coverage; optional symbol execution strip
-  /report                            — Trigger the daily report on-demand
+  /report     [mode]                 — full macro panels + mode filter (standard|all|etfs|commodities|macro_fred|crypto|equity|dashboard)
   /dictionary                        — Glossary of every symbol & label the bot uses
 """
 import logging
@@ -23,7 +23,21 @@ from discord.ext import commands
 
 from notifier.discord import formatter
 from reports.builder import ReportBuilder
+from reports.daily_mode_plan import plan_daily_report
 from reports.models import AlertEvent
+
+def _no_indicators_help(symbol: str, exchange: str, interval: str) -> str:
+    """User-facing hint when technical_indicators has no rows for /alert and /action."""
+    return (
+        f"❌ No indicator data for **{symbol}** (`{exchange}` · `{interval}`).\n\n"
+        "Indicators are read from Postgres table **technical_indicators**, written by the "
+        "**technical-analysis** worker from OHLCV bars.\n"
+        "• Ensure **data-technical** is running so **1Day** (or your "
+        "`TECHNICAL_EQUITY_INTERVALS`) bars exist in **equity_ohlcv**.\n"
+        "• Ensure **technical-analysis** (compose profile **analyzer**) is running.\n"
+        "• Match **BOT_EQUITY_INTERVAL** to **TECHNICAL_EQUITY_INTERVALS** (e.g. both `1Day`)."
+    )
+
 
 # Path to the lexicon file, relative to this file's location in the container.
 # Dockerfile copies the entire service dir to /app, so bot.md lands at /app/bot.md.
@@ -89,6 +103,73 @@ def _dictionary_embeds() -> list[discord.Embed]:
     return embeds
 
 log = logging.getLogger(__name__)
+
+_MAX_DISCORD_EMBEDS = 10
+_MAX_DISCORD_EMBED_CHARS = 6000  # Discord per-message character sum limit
+
+
+def _embed_char_count(embed: discord.Embed) -> int:
+    """Approximate the character count Discord applies to a single embed."""
+    total = 0
+    if embed.title:
+        total += len(embed.title)
+    if embed.description:
+        total += len(embed.description)
+    if embed.footer and embed.footer.text:
+        total += len(embed.footer.text)
+    if embed.author and embed.author.name:
+        total += len(embed.author.name)
+    for field in embed.fields:
+        total += len(field.name or "") + len(field.value or "")
+    return total
+
+
+def _split_into_batches(embeds: list[discord.Embed]) -> list[list[discord.Embed]]:
+    """Split embeds into sendable batches, respecting Discord's dual limits:
+    - max 10 embeds per message
+    - max 6000 total characters per message
+    Each embed is sent individually if it alone exceeds 6000 chars (Discord
+    will reject it anyway, but at least we don't combine it with others).
+    """
+    batches: list[list[discord.Embed]] = []
+    current_batch: list[discord.Embed] = []
+    current_chars = 0
+
+    for embed in embeds:
+        size = _embed_char_count(embed)
+        # Start a new batch if adding this embed would exceed either limit.
+        if current_batch and (
+            len(current_batch) >= _MAX_DISCORD_EMBEDS
+            or current_chars + size > _MAX_DISCORD_EMBED_CHARS
+        ):
+            batches.append(current_batch)
+            current_batch = []
+            current_chars = 0
+        current_batch.append(embed)
+        current_chars += size
+
+    if current_batch:
+        batches.append(current_batch)
+
+    return batches
+
+
+async def _respond_embed_batches(
+    ctx: discord.ApplicationContext,
+    embeds: list[discord.Embed],
+    *,
+    ephemeral: bool = False,
+) -> None:
+    """Send embeds in batches that respect Discord's 10-embed and 6000-char limits."""
+    if not embeds:
+        await ctx.respond("❌ No content.", ephemeral=ephemeral)
+        return
+    batches = _split_into_batches(embeds)
+    for i, batch in enumerate(batches):
+        if i == 0:
+            await ctx.respond(embeds=batch, ephemeral=ephemeral)
+        else:
+            await ctx.followup.send(embeds=batch, ephemeral=ephemeral)
 
 
 def _marketops_asset_type(symbol: Optional[str], asset_type: str, cfg) -> str:
@@ -199,10 +280,7 @@ class CommandsCog(commands.Cog):
             await ctx.respond(f"❌ No data found for **{symbol}**.")
             return
 
-        # py-cord: first embed via respond, rest via followup
-        await ctx.respond(embed=embeds[0])
-        for embed in embeds[1:10]:  # max 10 embeds
-            await ctx.followup.send(embed=embed)
+        await _respond_embed_batches(ctx, embeds)
 
     @discord.slash_command(
         name="marketops",
@@ -233,18 +311,41 @@ class CommandsCog(commands.Cog):
         embed = formatter.market_ops_command_embed(mo, sym)
         await ctx.respond(embed=embed)
 
-    @discord.slash_command(name="report", description="Generate the daily market report right now")
-    async def report_cmd(self, ctx: discord.ApplicationContext) -> None:
+    @discord.slash_command(
+        name="report",
+        description="Daily report: full macro panels always; mode filters symbol/FRED/dashboard sections",
+    )
+    @discord.option(
+        "mode",
+        description="standard|all=full universe · etfs·commodities·macro_fred·crypto·equity·dashboard",
+        choices=[
+            "standard",
+            "all",
+            "etfs",
+            "commodities",
+            "macro_fred",
+            "crypto",
+            "equity",
+            "dashboard",
+        ],
+        default="standard",
+    )
+    async def report_cmd(self, ctx: discord.ApplicationContext, mode: str = "standard") -> None:
         await ctx.defer()
         cfg = self.bot.cfg
+        plan = plan_daily_report(mode, cfg)
         report = await self.bot.builder.build_daily_report(
-            cfg.equity_symbols,
-            cfg.crypto_symbols,
+            plan.equity_symbols,
+            plan.crypto_symbols,
+            macro_intel_equity_symbols=cfg.equity_symbols,
+            mode_tag=plan.mode_tag,
         )
+        if plan.fred_panel_ids:
+            report.fred_series_values = await self.bot.builder.fetch_fred_observations(plan.fred_panel_ids)
+        if plan.include_dashboard:
+            report.dashboard_rows = await self.bot.builder.build_dashboard_strip()
         embeds = formatter.daily_report_embeds(report)
-        await ctx.respond(embed=embeds[0])
-        for embed in embeds[1:]:
-            await ctx.followup.send(embed=embed)
+        await _respond_embed_batches(ctx, embeds)
 
     @discord.slash_command(
         name="dictionary",
@@ -256,9 +357,7 @@ class CommandsCog(commands.Cog):
         if not embeds:
             await ctx.respond("❌ `bot.md` not found inside the container. The file should be at `/app/bot.md`.")
             return
-        await ctx.respond(embed=embeds[0])
-        for embed in embeds[1:]:
-            await ctx.followup.send(embed=embed)
+        await _respond_embed_batches(ctx, embeds)
 
     # ── /alert <symbol> ───────────────────────────────────────────────────────
     @discord.slash_command(
@@ -288,7 +387,7 @@ class CommandsCog(commands.Cog):
         indicators = await tech_q.latest_indicators(self.bot.pool, symbol, exchange, interval)
 
         if not indicators:
-            await ctx.respond(f"❌ No indicator data found for **{symbol}**.")
+            await ctx.respond(_no_indicators_help(symbol, exchange, interval))
             return
 
         triggered: list[str] = []
@@ -388,7 +487,7 @@ class CommandsCog(commands.Cog):
 
         indicators = await tech_q.latest_indicators(self.bot.pool, symbol, exchange, interval)
         if not indicators:
-            await ctx.respond(f"❌ No indicator data found for **{symbol}**.")
+            await ctx.respond(_no_indicators_help(symbol, exchange, interval))
             return
 
         try:
