@@ -568,12 +568,33 @@ class SymbolReport:
 
 # ── Daily report (full market run) ───────────────────────────────────────────
 
+
+@dataclass
+class FredSeriesObservation:
+    series_id: str
+    value: Optional[float] = None
+    observation_ts: Optional[datetime] = None
+
+
+@dataclass
+class DashboardStripRow:
+    label: str
+    hint: str
+    value_text: str
+
+
 @dataclass
 class DailyReport:
     generated_at: datetime
     symbols: list[SymbolReport] = field(default_factory=list)
     macro: Optional[MacroSnapshot] = None
     macro_intel: Optional[MacroIntelSnapshot] = None
+    #: Optional FRED table (macro_fred / commodity modes)
+    fred_series_values: list[FredSeriesObservation] = field(default_factory=list)
+    #: Benchmark strip (dashboard mode)
+    dashboard_rows: list[DashboardStripRow] = field(default_factory=list)
+    #: Shown in report title, e.g. "ETFs"
+    mode_tag: str = ""
 
 
 # ── Alert event ───────────────────────────────────────────────────────────────

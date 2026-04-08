@@ -135,7 +135,7 @@ func LoadEquity() (Equity, error) {
 		return Equity{}, fmt.Errorf("DATABASE_URL is required")
 	}
 	def := defaultPoll()
-	syms := splitCSV("ALPACA_DATA_SYMBOLS")
+	syms := MergedAlpacaEquitySymbols()
 	if len(syms) == 0 {
 		syms = []string{"SPY", "QQQ"}
 	}
@@ -203,7 +203,7 @@ func LoadSentiment() (Sentiment, error) {
 	}
 	equitySyms := splitCSV("FINNHUB_EQUITY_NEWS_SYMBOLS")
 	if len(equitySyms) == 0 {
-		equitySyms = splitCSV("EQUITY_SYMBOLS")
+		equitySyms = MergedAlpacaEquitySymbols()
 	}
 	return Sentiment{
 		Base:              b,
@@ -251,7 +251,7 @@ func LoadMacroIntel() (MacroIntel, error) {
 		earn = splitCSV("FINNHUB_EQUITY_NEWS_SYMBOLS")
 	}
 	if len(earn) == 0 {
-		earn = splitCSV("ALPACA_DATA_SYMBOLS")
+		earn = MergedAlpacaEquitySymbols()
 	}
 	return MacroIntel{
 		Base:         b,

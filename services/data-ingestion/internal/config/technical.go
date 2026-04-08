@@ -37,7 +37,7 @@ func LoadOHLCVBars() (OHLCVBars, error) {
 
 	equitySyms := splitCSV("TECHNICAL_EQUITY_SYMBOLS")
 	if len(equitySyms) == 0 {
-		equitySyms = splitCSV("ALPACA_DATA_SYMBOLS")
+		equitySyms = MergedAlpacaEquitySymbols()
 	}
 	if len(equitySyms) == 0 {
 		equitySyms = []string{"AAPL", "MSFT", "SPY"}
