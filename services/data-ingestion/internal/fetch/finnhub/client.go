@@ -17,19 +17,59 @@ import (
 
 const base = "https://finnhub.io/api/v1"
 
+// Limiter is the subset of *golang.org/x/time/rate.Limiter this client uses.
+//
+// Declared structurally so the client can be handed either its own in-process
+// bucket or a cross-process shared budget (internal/ratelimit) without this
+// package importing either one.
+type Limiter interface {
+	Wait(ctx context.Context) error
+}
+
 type Client struct {
 	Token   string
 	HTTP    *http.Client
-	Limiter *rate.Limiter
+	Limiter Limiter
+}
+
+// defaultLimiter is the per-process bucket this client has always used:
+// 1 request / 2s, burst 2.
+//
+// It is correct in isolation and wrong in aggregate — five workers sharing one
+// API key each allow this rate, summing to five times the intended budget. It
+// remains the FALLBACK for the shared limiter, so a coordination outage
+// degrades to exactly this, never to unlimited.
+func defaultLimiter() *rate.Limiter {
+	return rate.NewLimiter(rate.Every(2*time.Second), 2)
 }
 
 func New(token string) *Client {
 	return &Client{
 		Token:   token,
 		HTTP:    httpclient.New(25 * time.Second),
-		Limiter: rate.NewLimiter(rate.Every(2*time.Second), 2),
+		Limiter: defaultLimiter(),
 	}
 }
+
+// NewWithLimiter builds a client pacing itself against the supplied limiter,
+// normally a cross-process shared budget.
+//
+// A nil limiter yields exactly New()'s behaviour, so a caller that cannot build
+// a shared limiter passes nil and keeps working rather than special-casing.
+func NewWithLimiter(token string, l Limiter) *Client {
+	if l == nil {
+		return New(token)
+	}
+	return &Client{
+		Token:   token,
+		HTTP:    httpclient.New(25 * time.Second),
+		Limiter: l,
+	}
+}
+
+// DefaultLimiter exposes the per-process bucket so callers can pass it as the
+// shared limiter's fallback without re-deriving the rate and drifting from it.
+func DefaultLimiter() Limiter { return defaultLimiter() }
 
 func (c *Client) HasToken() bool {
 	return c.Token != ""

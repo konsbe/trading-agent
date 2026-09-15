@@ -1,16 +1,16 @@
 // data-universe maintains universe_symbols: the eligible US common-stock
 // universe the momentum scanner operates on.
 //
-// Spec: docs/MOMENTUM_SCANNER_PHASE1.md §8.1. Build-order step 2 covers the two
-// weekly passes implemented here:
+// Spec: docs/MOMENTUM_SCANNER_PHASE1.md §8.1. Four passes, each independently
+// switchable:
 //
-//	runSymbols       refresh the symbol list and apply §3.1 eligibility
-//	runFundamentals  refresh sector / shares outstanding / market cap
+//	runSymbols        weekly   refresh the symbol list, apply §3.1 eligibility
+//	runFundamentals   weekly   refresh sector / shares outstanding / market cap
+//	runBackfillRound  looping  resumable 3-year bar backfill (§8.1.3)
+//	runDailyBars      daily    incremental bar refresh after the US close (§8.1.4)
 //
-// The resumable 3-year bar backfill (§8.1.3) and the daily incremental bar
-// refresh (§8.1.4) are later build-order steps and are not wired up yet.
-//
-// Every write is an upsert, so the worker is safe to re-run and safe to kill.
+// Every write is an upsert and the backfill checkpoints per symbol, so the
+// worker is safe to re-run and safe to kill at any point.
 package main
 
 import (
@@ -26,7 +26,9 @@ import (
 	"github.com/konsbe/trading-agent/services/data-ingestion/internal/config"
 	"github.com/konsbe/trading-agent/services/data-ingestion/internal/db"
 	"github.com/konsbe/trading-agent/services/data-ingestion/internal/fetch/finnhub"
+	"github.com/konsbe/trading-agent/services/data-ingestion/internal/fetch/yahoo"
 	"github.com/konsbe/trading-agent/services/data-ingestion/internal/logx"
+	"github.com/konsbe/trading-agent/services/data-ingestion/internal/ratelimit"
 	"github.com/konsbe/trading-agent/services/data-ingestion/internal/store"
 	"github.com/konsbe/trading-agent/services/data-ingestion/internal/universe"
 
@@ -45,8 +47,8 @@ func main() {
 	}
 	log := logx.New(cfg.LogLevel)
 
-	if !cfg.EnableSymbols && !cfg.EnableFundamentals {
-		log.Info("both universe passes disabled; exiting")
+	if !cfg.EnableSymbols && !cfg.EnableFundamentals && !cfg.EnableBackfill && !cfg.EnableDailyBars {
+		log.Info("all universe passes disabled; exiting")
 		return
 	}
 
@@ -60,22 +62,34 @@ func main() {
 	}
 	defer pool.Close()
 
-	fh := finnhub.New(cfg.FinnhubKey)
+	fh := finnhub.NewWithLimiter(cfg.FinnhubKey, ratelimit.SharedFinnhub(ctx, pool, log))
 	if cfg.EnableSymbols && !fh.HasToken() {
 		// Consistent with the other workers: a missing key disables the pass and
 		// logs, it never crashes the service.
 		log.Warn("FINNHUB_API_KEY not set; symbol-list refresh disabled")
 		cfg.EnableSymbols = false
 	}
-	if !cfg.EnableSymbols && !cfg.EnableFundamentals {
+	if !cfg.EnableSymbols && !cfg.EnableFundamentals && !cfg.EnableBackfill && !cfg.EnableDailyBars {
 		log.Info("no usable universe passes after config checks; exiting")
 		return
 	}
+
+	// Yahoo needs no key. The rate limiter is shared across every goroutine in
+	// this client, so BackfillConcurrency controls pipelining, not throughput.
+	yh := yahoo.NewWithOptions(yahoo.Options{
+		RequestsPerSecond: cfg.RequestsPerSecond,
+		Burst:             cfg.RequestBurst,
+		Timeout:           cfg.RequestTimeout,
+		MaxRetries:        cfg.RequestMaxRetries,
+		BackoffBase:       cfg.BackoffBase,
+		BackoffMax:        cfg.BackoffMax,
+	})
 
 	w := &worker{
 		cfg:   cfg,
 		pool:  pool,
 		fh:    fh,
+		yh:    yh,
 		log:   log,
 		rules: universe.NewRules(cfg.AllowedTypes, cfg.AllowedMICs, cfg.ExcludedSuffixes, cfg.AllowEmptyMIC),
 	}
@@ -99,10 +113,25 @@ func main() {
 	defer tSymbols.Stop()
 	tFundamentals := time.NewTicker(cfg.PollFundamentals)
 	defer tFundamentals.Stop()
+	tDailyBars := time.NewTicker(cfg.DailyBarsInterval)
+	defer tDailyBars.Stop()
+
+	// The backfill runs back-to-back batches while work remains, then idles. A
+	// timer rather than a ticker so the interval is measured from the end of the
+	// previous round, not its start — a long batch must not queue up more.
+	backfillTimer := time.NewTimer(0)
+	if !cfg.EnableBackfill {
+		backfillTimer.Stop()
+	}
+	defer backfillTimer.Stop()
 
 	log.Info("data-universe running",
 		"symbols_every", cfg.PollSymbols.String(),
-		"fundamentals_every", cfg.PollFundamentals.String())
+		"fundamentals_every", cfg.PollFundamentals.String(),
+		"daily_bars_every", cfg.DailyBarsInterval.String(),
+		"backfill_enabled", cfg.EnableBackfill,
+		"backfill_years", cfg.BackfillYears,
+		"yahoo_req_per_sec", cfg.RequestsPerSecond)
 
 	for {
 		select {
@@ -117,6 +146,19 @@ func main() {
 			if cfg.EnableFundamentals {
 				w.runFundamentals(ctx)
 			}
+		case <-tDailyBars.C:
+			if cfg.EnableDailyBars {
+				w.runDailyBars(ctx)
+			}
+		case <-backfillTimer.C:
+			processed := w.runBackfillRound(ctx)
+			// Immediately continue while there is work; idle once drained so a
+			// finished backfill stops polling the database every second.
+			next := time.Duration(0)
+			if processed == 0 {
+				next = cfg.BackfillIdleInterval
+			}
+			backfillTimer.Reset(next)
 		}
 	}
 }
@@ -125,6 +167,7 @@ type worker struct {
 	cfg   config.Universe
 	pool  *pgxpool.Pool
 	fh    *finnhub.Client
+	yh    *yahoo.Client
 	log   *slog.Logger
 	rules universe.Rules
 }

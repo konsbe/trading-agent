@@ -375,18 +375,18 @@ func TestRefreshBarCountsIsInformationalOnly(t *testing.T) {
 	// equity_ohlcv is keyed on ts, so re-running this test would otherwise
 	// accumulate a fresh set of bars at a new now() and inflate the count.
 	if _, err := pool.Exec(ctx,
-		`DELETE FROM equity_ohlcv WHERE symbol = 'AAPL' AND source = 'yahoo'`); err != nil {
+		`DELETE FROM equity_ohlcv WHERE symbol = 'AAPL' AND source = 'yahoo_finance'`); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := pool.Exec(ctx, `
 INSERT INTO equity_ohlcv (ts, symbol, interval, open, high, low, close, volume, source)
-SELECT date_trunc('day', now()) - (g || ' days')::interval, 'AAPL', '1Day', 1,1,1,1,1000, 'yahoo'
+SELECT date_trunc('day', now()) - (g || ' days')::interval, 'AAPL', '1Day', 1,1,1,1,1000, 'yahoo_finance'
 FROM generate_series(1, 12) g
 ON CONFLICT DO NOTHING`); err != nil {
 		t.Fatal(err)
 	}
 
-	if _, err := RefreshUniverseBarCounts(ctx, pool, "1Day", "yahoo"); err != nil {
+	if _, err := RefreshUniverseBarCounts(ctx, pool, "1Day", "yahoo_finance"); err != nil {
 		t.Fatalf("refresh: %v", err)
 	}
 

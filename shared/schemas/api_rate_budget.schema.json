@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/konsbe/trading-agent/shared/schemas/api_rate_budget.schema.json",
+  "title": "api_rate_budget row",
+  "description": "Logical row for table api_rate_budget (see shared/databases/migrations/008_api_rate_budget.sql). One row per upstream API quota, shared by every worker process that calls it. Solves the aggregate-rate problem: each worker's in-process token bucket is correct alone and wrong in sum, so N workers on one API key permit N times the intended rate. Backed by Postgres rather than Redis because every worker already holds a pgxpool and already treats Postgres-down as total outage, so this adds no new partial-failure surface — and because rows here survive restarts, where a Redis fixed-window scheme would hand out a fresh burst on every rolling deploy.",
+  "type": "object",
+  "required": ["budget_key", "tokens", "refill_per_sec", "burst", "updated_at"],
+  "properties": {
+    "budget_key": { "type": "string", "description": "Names the QUOTA, not the worker: 'finnhub' is one budget shared by every caller using FINNHUB_API_KEY. Callers passing different keys are not sharing anything" },
+    "tokens": { "type": "number", "description": "Current balance, fractional. Refilled lazily at read time from refill_per_sec × (now() − updated_at) rather than by a background job, so there is nothing to schedule and nothing to drift" },
+    "refill_per_sec": { "type": "number", "exclusiveMinimum": 0, "description": "Sustained request rate. 1.0 for Finnhub's free tier (60 requests/minute)" },
+    "burst": { "type": "number", "minimum": 1, "description": "Maximum accumulation, i.e. the largest allowed spike. Must be at least 1: a smaller burst could never satisfy a request, so every acquisition would silently degrade to the caller's local limiter" },
+    "updated_at": { "type": "string", "format": "date-time", "description": "Advanced on every successful acquisition; the lazy-refill baseline" }
+  },
+  "additionalProperties": false
+}

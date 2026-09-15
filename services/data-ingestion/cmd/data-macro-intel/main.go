@@ -2,7 +2,8 @@
 // and Finnhub general market news into TimescaleDB. No LLM — raw + light aggregates only.
 //
 // Tables: economic_calendar_events, earnings_calendar_events, geopolitical_risk_monthly,
-//         gdelt_macro_daily, news_headlines (RSS + Finnhub general).
+//
+//	gdelt_macro_daily, news_headlines (RSS + Finnhub general).
 //
 // TODO [PAID]: TradingEconomics / Investing.com calendars if Finnhub tier blocks economic API.
 // TODO [LLM]: narrative_scores filled by analyst-bot (FOMC hawkish/dovish scoring).
@@ -31,6 +32,7 @@ import (
 	"github.com/konsbe/trading-agent/services/data-ingestion/internal/fetch/gpr"
 	"github.com/konsbe/trading-agent/services/data-ingestion/internal/fetch/rss"
 	"github.com/konsbe/trading-agent/services/data-ingestion/internal/logx"
+	"github.com/konsbe/trading-agent/services/data-ingestion/internal/ratelimit"
 	"github.com/konsbe/trading-agent/services/data-ingestion/internal/store"
 )
 
@@ -53,7 +55,7 @@ func main() {
 	}
 	defer pool.Close()
 
-	fh := finnhub.New(cfg.FinnhubKey)
+	fh := finnhub.NewWithLimiter(cfg.FinnhubKey, ratelimit.SharedFinnhub(context.Background(), pool, log))
 	gdc := gdelt.New()
 
 	run := func() {

@@ -17,6 +17,7 @@ import (
 	"github.com/konsbe/trading-agent/services/data-ingestion/internal/fetch/finnhub"
 	"github.com/konsbe/trading-agent/services/data-ingestion/internal/fetch/lunarcrush"
 	"github.com/konsbe/trading-agent/services/data-ingestion/internal/logx"
+	"github.com/konsbe/trading-agent/services/data-ingestion/internal/ratelimit"
 	"github.com/konsbe/trading-agent/services/data-ingestion/internal/store"
 )
 
@@ -40,7 +41,7 @@ func main() {
 	defer pool.Close()
 
 	lc := lunarcrush.New(cfg.LunarCrushKey)
-	fh := finnhub.New(cfg.FinnhubKey)
+	fh := finnhub.NewWithLimiter(cfg.FinnhubKey, ratelimit.SharedFinnhub(context.Background(), pool, log))
 
 	tLunar := time.NewTicker(cfg.PollLunarCrush)
 	tNews := time.NewTicker(cfg.PollFinnhubNews)

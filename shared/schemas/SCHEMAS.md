@@ -7,6 +7,62 @@ not validate JSON Schema), but can be used by downstream consumers, code generat
 
 ---
 
+## Migration conventions
+
+Migrations are numbered sequentially (`001_`…) and live in
+`shared/databases/migrations/`. Every statement must be idempotent
+(`CREATE TABLE IF NOT EXISTS`, `create_hypertable(..., if_not_exists => TRUE)`,
+`CREATE INDEX IF NOT EXISTS`), because the directory is mounted at
+`/docker-entrypoint-initdb.d` and therefore only auto-runs on a **fresh** volume —
+an already-initialised database needs each new migration applied by hand.
+
+### When a migration may be amended
+
+> **A migration may be amended in place only until it has been applied to a
+> non-scratch database. After that, every change is a new migration. No exceptions.**
+
+"Scratch" means a throwaway container or a local database you are willing to drop.
+Staging, production, and any shared development database are **not** scratch — even
+one you rarely think about, because someone else's data is in it.
+
+The reasoning matters more than the rule, because the rule is easy to misapply:
+amending a migration that has only ever run against a container you deleted costs
+nothing, since no database anywhere has the old version. Amending one that has run
+somewhere persistent produces two databases that disagree about what `007` means,
+and nothing detects it — the file looks right, the schema looks right, and they are
+different. That failure is silent and arbitrarily delayed.
+
+The trap is that the "has it shipped yet?" answer changes over time while the file
+does not. Whoever next edits a migration will be making this judgment call months
+later, without knowing whether it was deployed in the interim. So: if you cannot
+personally confirm the migration has never left scratch, treat it as shipped and
+write a new one. A redundant extra migration is free; a divergent schema is not.
+
+### When reusing a state column is a mistake
+
+Job state — `*_status`, `*_claimed_at`, `*_attempts`, `*_last_error` — is tempting
+to share between two jobs that need the same shape. The test for whether that is
+safe:
+
+> **Would these two failures be distinguishable at 3 a.m.?**
+
+If job A and job B write their status to the same column, then a failure in either
+presents identically in the one place an on-call reader would look. The shape being
+identical is exactly what makes the confusion possible, and it is cheapest to
+notice while designing rather than during an incident.
+
+Worked example: the momentum scanner's bar backfill and its fundamentals fetch both
+want per-symbol status, claim timestamp, attempt count and error text. They
+deliberately do **not** share `universe_symbols.backfill_*` — a fundamentals
+failure appearing in a column named `backfill_last_error` would send a reader to
+the wrong pipeline entirely. Separate tables, one per job (§8.4 of
+`docs/MOMENTUM_SCANNER_PHASE1.md`).
+
+The corollary is the cheap part: a second small state table costs a migration and
+nothing else. Diagnosability is worth more than the saved table.
+
+---
+
 ## Table of contents
 
 | Schema file | DB table | Migration | Populated by |
@@ -26,6 +82,8 @@ not validate JSON Schema), but can be used by downstream consumers, code generat
 | [momentum_labels](#momentum_labels) | `momentum_labels` | `007_momentum.sql` | `momentum-scanner` (backfill mode) |
 | [catalyst_events](#catalyst_events) | `catalyst_events` | `007_momentum.sql` | `data-universe` (company news) |
 | [momentum_tracked](#momentum_tracked) | `momentum_tracked` | `007_momentum.sql` | `momentum-scanner`, `analyst-bot` |
+| [api_rate_budget](#api_rate_budget) | `api_rate_budget` | `008_api_rate_budget.sql` | every worker calling a shared-quota API |
+| [fundamental_fetch_state](#fundamental_fetch_state) | `fundamental_fetch_state` | `009_fundamental_fetch_state.sql` | `data-fundamental` |
 
 > Tables introduced by `004_qualitative.sql` (`insider_transactions`), `005_macro_derived.sql`
 > (`macro_derived`) and `006_macro_intel.sql` (`economic_calendar_events`,
@@ -316,7 +374,8 @@ This table uses a **tall/narrow** layout: each computed number is its own row, i
 The six tables below are introduced by `007_momentum.sql` and implement
 `docs/MOMENTUM_SCANNER_PHASE1.md`. Daily bars are **not** duplicated — momentum
 features are computed from `equity_ohlcv` rows with `interval = '1Day'` and
-`source = 'yahoo'`.
+`source = 'yahoo_finance'` — the value `internal/fetch/yahoo` actually writes. The
+spec's §7 originally said `'yahoo'`, which matches zero rows.
 
 **Why Yahoo and not Alpaca:** every volume feature in the scanner (RVOL, volume
 acceleration, dollar volume) requires **consolidated** volume. Alpaca's free tier
@@ -352,7 +411,9 @@ A null input is never replaced by a default. Specifically:
 **Grain:** one row per `(symbol, exchange)`. Regular table (not a hypertable) — it is current state, not time-series.
 **Refresh:** weekly.
 
-Eligibility (§3.1) requires **all** of: common stock, exchange in NASDAQ / NYSE / NYSE American, no non-common ticker suffix, and ≥ 250 daily bars of history. Ineligible symbols are **retained** with `is_eligible = false` and a populated `excluded_reason` so the exclusion rules stay auditable.
+Eligibility (§3.1) requires **all** of: common stock, exchange in NASDAQ / NYSE / NYSE American, no non-common ticker suffix, and ≥ 252 daily bars of history. Ineligible symbols are **retained** with `is_eligible = false` and a populated `excluded_reason` so the exclusion rules stay auditable.
+
+The bar-count rule is the one exception to "applied at symbol-list load": it is enforced as a §3.2 hard gate at scan time, because bars exist only after the backfill, and the backfill iterates the eligible set. `bar_count` here is the audit record, not the gate.
 
 | Column | Type | Required | Notes |
 |---|---|---|---|
@@ -366,12 +427,13 @@ Eligibility (§3.1) requires **all** of: common stock, exchange in NASDAQ / NYSE
 | `shares_outstanding` | number/null | no | **Absolute share count** |
 | `market_cap` | number/null | no | **USD absolute** |
 | `fundamentals_ts` | datetime/null | no | When sector/shares/cap were last refreshed |
-| `bar_count` | integer/null | no | Daily bars in `equity_ohlcv`; ≥ 250 required |
+| `bar_count` | integer/null | no | Daily bars in `equity_ohlcv`; ≥ 252 required (§3.7's window reads `high[t-251]`) |
 | `first_bar_ts` / `last_bar_ts` | datetime/null | no | |
 | `is_eligible` | boolean | yes | |
 | `excluded_reason` | string/null | no | Null iff eligible. `type_not_common_stock`, `exchange_not_allowed`, `ticker_suffix_excluded`, `insufficient_history` |
 | `backfill_status` | string | yes | `pending` / `in_progress` / `done` / `failed` |
 | `backfill_cursor_ts` | datetime/null | no | Oldest bar fetched so far — the resume point after a crash |
+| `backfill_claimed_at` | datetime/null | no | When `in_progress` was set. Claims older than the lease are reclaimable, so a worker killed mid-symbol does not strand the row |
 | `backfill_attempts` | integer | yes | |
 | `backfill_last_error` | string/null | no | |
 | `backfill_completed_at` | datetime/null | no | |
@@ -511,7 +573,7 @@ candidate set.
 | `change_pct` | +8 % to +25 % | +10 % to +40 % |
 | `rvol_20` | ≥ 3.0 | ≥ 4.0 |
 | `dollar_volume` | ≥ $5M | ≥ $2M |
-| bars of history | 250 | 250 |
+| bars of history | 252 | 252 |
 
 The **upper bound on `change_pct` is central to the strategy**, not a safety
 rail: the thesis is entering at +8–15 % on a confirmed move, so a stock up +60 %
@@ -699,3 +761,123 @@ live measure of whether the score is worth anything.
 deliberately mechanical so the backtest can evaluate and replace them. Nothing
 here constitutes trading advice; the score is a research output, not a
 recommendation.
+
+---
+
+# Cross-worker infrastructure
+
+## api_rate_budget
+
+**File:** `api_rate_budget.schema.json`
+**Source:** written by `internal/ratelimit` from every worker that calls a shared-quota API.
+**Grain:** one row per upstream quota. Regular table — current state, not time-series.
+
+### The problem
+
+Every worker builds its own in-process token bucket. Each is correct alone and
+wrong in aggregate: the five Go workers holding a Finnhub client each allow
+~0.5 req/s, summing to ~2.5 req/s against a free-tier budget of 1 req/s.
+
+This has been harmless only because observed demand is roughly 10 % of budget —
+each worker polls a handful of symbols on a 60-second tick and none approaches its
+own allowance. **It stops being harmless the moment one caller saturates its
+allowance for hours**, which the momentum scanner's universe-wide fundamentals pass
+does. The 429s then surface in whichever *other* worker happens to be running, so
+symptom and cause land in different services.
+
+### Why Postgres and not Redis
+
+| | Postgres | Redis |
+|---|---|---|
+| New dependency for the four existing workers | none — they already hold a `pgxpool` | yes, and no Go client exists in this repo today |
+| New partial-failure surface | none — these workers already treat Postgres-down as total outage | a second thing that can fail independently |
+| Survives a rolling restart | yes, rows are durable | a naive fixed-window scheme resets, handing out a free burst per deploy |
+| Contention cost | ~1 acquisition/second aggregate — noise | lower, but irrelevant at this volume |
+
+The deploy-burst row is the subtle one: it would present as an occasional
+unexplained 429 spike after deploys, which is very hard to connect to its cause.
+
+### Columns
+
+| Column | Type | Required | Notes |
+|---|---|---|---|
+| `budget_key` | string | yes | Names the **quota**, not the worker. `finnhub` is one budget shared by every caller using `FINNHUB_API_KEY`; callers passing different keys share nothing |
+| `tokens` | number | yes | Current balance, fractional. Refilled **lazily at read time**, so there is no background job to schedule and nothing to drift |
+| `refill_per_sec` | number | yes | Sustained rate. `1.0` for Finnhub free tier |
+| `burst` | number | yes | Largest allowed spike. Must be ≥ 1 — a smaller burst could never satisfy a request, so every acquisition would silently degrade |
+| `updated_at` | datetime | yes | Advanced on each successful acquisition; the refill baseline |
+
+### Atomicity
+
+Acquisition is a single `UPDATE` whose `WHERE` clause repeats the refill
+expression, so the check and the deduction are one statement. Two callers cannot
+both take the last token: the second blocks on the row lock taken by the first,
+then re-evaluates the predicate against the committed row under `READ COMMITTED`
+and returns zero rows if the balance has fallen below 1. No explicit `FOR UPDATE`,
+no advisory lock.
+
+### Degradation
+
+If coordination fails — unreachable database, exceeded acquire deadline, or a
+missing budget row — the limiter falls back to the caller's **existing in-process
+bucket** for that request. Three properties, each covered by a test:
+
+- **Never unlimited.** The fallback is the rate that shipped before this table existed.
+- **Never blocks indefinitely.** Acquisition has a bounded deadline (250 ms default).
+- **Per-request, not a latch.** The next call re-attempts coordination, so a brief blip does not strand a worker on local rate.
+
+A `degraded` counter and a throttled warn log exist so that *"why are there 429s in
+`data-sentiment`"* resolves to *"the shared limiter degraded"* rather than becoming
+a fresh investigation.
+
+---
+
+## fundamental_fetch_state
+
+**File:** `fundamental_fetch_state.schema.json`
+**Source:** `data-fundamental`'s checkpointed universe metrics pass.
+**Grain:** one row per `(symbol, task)`. Regular table — current state, not time-series.
+**Spec:** `docs/MOMENTUM_SCANNER_PHASE1.md` §8.4 (build-order step 3b).
+
+### Why it exists
+
+`data-fundamental`'s sub-tasks iterate a static symbol list and re-fetch all of it
+each tick. Fine for three configured symbols; not fine once `runMetrics` is widened
+to the eligible universe, where one pass is **~3.3 hours** at the shared Finnhub
+rate. A multi-hour rate-limited pass has to survive a restart the same way the bar
+backfill does.
+
+### Why a separate table rather than reusing `universe_symbols.backfill_*`
+
+> Would these two failures be distinguishable at 3 a.m.?
+
+The bar backfill and the fundamentals fetch want identically-shaped state, and that
+identical shape is exactly what would make them confusable. A fundamentals failure
+surfacing in a column named `backfill_last_error` sends an on-call reader to the
+wrong pipeline. One state table per job — the extra table costs a migration and
+nothing else. See the standing convention near the top of this document.
+
+### Columns
+
+| Column | Type | Required | Notes |
+|---|---|---|---|
+| `symbol` | string | yes | |
+| `task` | string | yes | `metrics` is the only widened sub-task in Phase 1. Part of the key, so **the key is the lease granularity** |
+| `status` | string | yes | `pending` / `in_progress` / `done` / `failed` |
+| `claimed_at` | datetime/null | no | Set on claim; claims older than the lease are reclaimable, so a killed worker strands nothing |
+| `attempts` | integer | yes | Incremented on failure only. Past the cap the row stops being claimed |
+| `last_error` | string/null | no | Persisted so a stall is diagnosable from SQL alone |
+| `completed_at` | datetime/null | no | Last attempt finished, successful or not |
+| `last_success_ts` | datetime/null | no | Last time data was **actually stored** |
+| `updated_at` | datetime | yes | |
+
+### `last_success_ts` is the one to understand
+
+It advances only on success, never on failure. Two consequences:
+
+- **The weekly cadence is emergent, not scheduled.** A row is claimable when it is `pending`, when `last_success_ts` is older than the refresh interval, when its claim expired, or when it failed under the attempt cap. There is no cycle boundary to coordinate and nothing to reset — and a symbol newly added to the universe is `pending`, so it is fetched on the next round rather than waiting out a cycle.
+- **A broken symbol cannot hide.** If failures advanced freshness, a persistently failing symbol would look current, drop out of the rotation, and make its own staleness invisible. Because they do not, it stays claimable until it exhausts its attempts and is then reported.
+
+This is also why progress is reported as **`fresh`** rather than `done`: `done`
+only says the last attempt worked, while `fresh` says the data is inside the refresh
+window. `fresh` is the number step 5's candidate counts actually depend on.

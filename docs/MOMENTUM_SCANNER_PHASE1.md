@@ -70,6 +70,14 @@ EODHD's bulk endpoints are the right long-term answer (one call returns an entir
 
 After filtering (§3.1) expect roughly **5,000–7,500 US common stocks**.
 
+> **Measured 2026-09-15: 4,978**, from a live 31,051-record Finnhub US directory.
+> Marginally below the estimate, and explained rather than anomalous — the
+> directory contains 2,223 ADRs and 422 REITs which §3.1's strict common-stock
+> reading excludes, and admitting ADRs alone would land inside the stated band. So
+> the estimate above probably assumed a looser type filter. Treat ~5,000 as the
+> Phase 1 baseline. Breakdown and method in
+> `services/data-ingestion/data_ingestion.md`.
+
 - Initial backfill: 3 years of daily bars per symbol. At ~5 requests/second this is a multi-hour, run-once job. Make it resumable — checkpoint progress per symbol so a crash doesn't restart from zero.
 - Daily incremental refresh: one recent-bars request per symbol, ~25–40 minutes at the same rate. Runs after US close.
 - Fundamentals (shares outstanding, sector, market cap): refresh **weekly**, not daily. These do not move intraday and Finnhub's free quota is the binding constraint.
@@ -91,9 +99,29 @@ Include a symbol only if **all** hold:
 - Instrument type is **common stock**. Exclude ETFs, ETNs, closed-end funds, mutual funds, warrants, rights, units, preferred shares, and SPAC warrant/unit classes.
 - Exchange is NASDAQ, NYSE, or NYSE American (exclude OTC/pink sheets in Phase 1 — data quality is poor and the free sources cover them badly).
 - Ticker contains no suffix indicating a non-common class (e.g. trailing `.W`, `.U`, `.R`, `-WT`, `-UN`, `-P`). Normalize and document the exclusion rules in code.
-- Has at least 250 daily bars of history (needed for the 52-week window).
+- Has at least **252** daily bars of history. This is the §3.7 52-week window's true requirement: that window reads `high[t-251]`, so a complete window needs 252 bars including today. An earlier revision said 250, which left a two-bar gap where "eligible" meant "window usually full" rather than "window full".
 
 Store the result in `universe_symbols`. Refresh weekly.
+
+> **Where the bar-count check actually runs.** The first three rules are applied at
+> symbol-list load. The bar-count minimum is **not** — it is enforced as a hard gate
+> in §3.2, at scan time, and `universe_symbols.bar_count` records the current depth
+> for audit.
+>
+> This is not an omission. Checking bar history at symbol-list load is circular: bars
+> exist only because the §8.1.3 backfill ran, and that backfill iterates the eligible
+> set. Gating eligibility on bar count would leave the universe permanently empty on
+> a fresh install. §3.2 already lists the same minimum as a hard gate, which is the
+> non-circular place for it.
+
+**ADRs and REITs are excluded in Phase 1**, even though both are arguably common
+equity and ADRs in particular can run hard. The reason is measurement, not merit:
+their fundamentals coverage on free sources is patchier than domestic common stock,
+and adding a second asset class with its own data-quality profile on top of an
+already-degraded fundamentals pipeline would make §6's base rate harder to read.
+Revisit in Phase 3, once the core universe's numbers are trustworthy. The
+instrument-type allowlist is configurable precisely so this is a one-line change
+later rather than a code edit.
 
 ### 3.2 Hard gates (the candidate filter)
 
@@ -108,7 +136,7 @@ Two buckets, differing only in thresholds:
 | `change_pct` (§3.3) | +8% to +25% | +10% to +40% |
 | `rvol_20` (§3.4) | ≥ 3.0 | ≥ 4.0 |
 | `dollar_volume` (§3.3) | ≥ $5M | ≥ $2M |
-| `min bars of history` | 250 | 250 |
+| `min bars of history` | 252 | 252 |
 
 Notes on the gate design:
 - **The upper bound on `change_pct` is deliberate and central to the strategy.** The stated thesis is to enter at +8–15% on a confirmed move, not to chase something already up 50%. A stock up +60% today is not a Phase 1 candidate — it is already gone. Do not remove this bound.
@@ -191,10 +219,10 @@ pct_of_52w_high = close[t] / high_52w        // 1.0 = at the prior high; > 1.0 =
   `new_52w_high` boolean of that earlier revision is redundant and has been **removed**. One
   field, no knife-edge, top band reachable.
 
-> Note the interaction with §3.1: the window reads `high[t-251]`, so a fully-populated
-> `high_52w` needs 252 bars including today, while §3.1's eligibility minimum is 250. Symbols
-> between 250 and 251 prior bars compute `high_52w` over a slightly short window. The bar
-> minimum is an env var; raise it to 252 if you want the window always complete.
+> The window reads `high[t-251]`, so a complete `high_52w` needs **252** bars including
+> today. §3.1's bar minimum is set to 252 for exactly this reason, so an eligible symbol
+> always has a full window rather than an occasionally-short one. The minimum is an env
+> var, but lowering it below 252 reintroduces silently truncated 52-week windows.
 
 ### 3.8 VWAP — `above_vwap`
 
@@ -286,6 +314,29 @@ Computed daily, stored on the feature row, **not included in the Phase 1 score.*
 | Pre-market / after-hours change | Different data tier; and `change_pct`, `rvol`, and VWAP all mean different things across sessions. Phase 1 is **regular session only** — state this in the Discord footer so output is never misread. |
 | Short interest | No acceptable free source (§3.9). |
 | Intraday session VWAP | Needs intraday bars (§3.8). |
+| **Sector / industry** — and therefore `sector_strength_pct` (§3.12) | Structurally unreachable on the free tier at universe scale, see below. |
+
+#### Why sector is null in Phase 1
+
+`sector` and `industry` reach `equity_fundamentals` from exactly one place:
+`data-fundamental`'s `runOverview`, which calls **Alpha Vantage
+`COMPANY_OVERVIEW`**. The Alpha Vantage free tier allows **25 requests per day**.
+Against a 5,000–7,500 symbol universe that is a **200+ day** pass for a single
+refresh. No cadence, concurrency or retry setting changes that — it is a quota
+ceiling, not a throughput problem.
+
+This costs **zero scoring accuracy**, which is why it is acceptable rather than
+merely unavoidable: §3.12 already specifies `sector_strength_pct` as *recorded, not
+scored* in Phase 1, precisely because there is no principled weight for it yet. A
+null sector therefore removes a Phase 2 candidate feature from the dataset and
+nothing from `momentum_score_100`.
+
+**Phase 2 path, not something to chase now:** Finnhub `/stock/profile2` is on the
+free tier and carries `finnhubIndustry`, so sector becomes reachable at roughly one
+request per symbol — about 3.3 hours for the universe at the client's current rate.
+Worth doing only once §3.12 has earned a weight from the labelled data. Adding it
+in Phase 1 would buy an unscored column at the cost of another 6,000-symbol pass
+against a Finnhub budget that is already oversubscribed (see §8.1.2).
 
 ---
 
@@ -436,7 +487,15 @@ Rules that keep this honest:
 
 New migration `007_momentum.sql`. Follow existing conventions: TimescaleDB hypertables for time-series, `ON CONFLICT DO UPDATE` upserts everywhere (workers must be idempotent), and document every table in `shared/schemas/SCHEMAS.md` with a matching `*.schema.json`.
 
-**Reuse `equity_ohlcv` for daily bars** — do not create a parallel bar table. Add rows with `source = 'yahoo'` (already a documented source value) and `interval = '1Day'`.
+**Reuse `equity_ohlcv` for daily bars** — do not create a parallel bar table. Add rows with `source = 'yahoo_finance'` and `interval = '1Day'`.
+
+> An earlier revision of this section said `source = 'yahoo'`. That value does not exist
+> anywhere in the repo: `internal/fetch/yahoo` writes `yahoo_finance`, `data-analyzer`'s
+> bar reader prefers `source = 'yahoo_finance'` when deduplicating across sources, and
+> `SCHEMAS.md` documents `yahoo_finance`. Filtering on `'yahoo'` returns **zero rows** —
+> a failure that looks like missing data rather than a wrong predicate. The code is
+> authoritative here; `data_ingestion.md` also carried the wrong short form and has been
+> corrected.
 
 | Table | Type | Primary key | Purpose |
 |---|---|---|---|
@@ -537,6 +596,112 @@ The footer must state **"regular session only"** and the scan date. Free-tier da
 
 ---
 
+### 8.4 `data-fundamental` widening (build-order step 3b)
+
+Step 3b's design, recorded here because it changes a **shared worker with live
+consumers** rather than adding a new one. `data-fundamental` currently feeds the
+bot's existing daily-report output for its configured symbols, and that must not
+regress.
+
+#### Only one of eight sub-tasks needs widening
+
+`data-fundamental` runs **eight** independent sub-tasks, each on its own ticker and
+enable flag: `runMetrics`, `runFinancials`, `runEarnings`, `runOverview`,
+`runRecommendations`, `runInsiderTransactions`, `runNewsSentiment`,
+`runInstitutionalOwnership`.
+
+The scanner needs exactly two fields, and both come from one of them:
+`market_cap` and `shares_outstanding` are written by **`runMetrics`** from Finnhub
+`/stock/metric`. Those are the inputs to §3.2's market-cap gate and §3.9's
+`market_cap_est` proxy. The other seven are irrelevant to Phase 1 and are **not
+touched**.
+
+`sector` / `industry` are the exception, and they are unreachable rather than
+merely expensive — see §3.13. They stay null in Phase 1 at zero cost to
+`momentum_score_100`.
+
+This is what collapses 3b from "widen a worker" to "widen one sub-task": about
+3.3 hours per universe pass rather than 23, and one checkpoint rather than eight.
+
+#### Symbol source: union, never replacement
+
+A per-sub-task flag, `FUNDAMENTAL_METRICS_SYMBOL_SOURCE = env | env+universe`,
+defaulting to `env`. The other seven sub-tasks keep reading the configured list
+with no flag and no new code path.
+
+When enabled, `runMetrics` iterates:
+
+```
+FUNDAMENTAL_SYMBOLS  ∪  (universe_symbols WHERE is_eligible)
+```
+
+**Union, not replacement, and this is load-bearing.** The configured list contains
+`SPY`, an ETF that by construction is never in `universe_symbols` because §3.1
+excludes ETFs. Replacement would silently drop the single most visible symbol in
+the daily report — a structural change quietly degrading something that already
+works, which is the same failure the float and market-cap proxies exist to avoid.
+Union also means an empty or missing `universe_symbols` cannot regress anything.
+
+If the universe query errors or returns zero rows, fall back to the env list and
+warn. Never fail closed into fetching nothing.
+
+#### Checkpoint state: a new table, keyed `(symbol, task)`
+
+New table `fundamental_fetch_state` in migration `009`, primary key
+`(symbol, task)`, with the same columns as step 3's bar backfill: `status`,
+`claimed_at`, `attempts`, `last_error`, `completed_at`, `last_success_ts`.
+
+Two rejected homes, and the reasons generalise:
+
+- **Not on `universe_symbols`.** That is the scanner's table; `data-fundamental` is
+  a shared worker whose other seven sub-tasks are not universe-scoped. Coupling a
+  shared worker's job state to a feature-specific table points the dependency the
+  wrong way.
+- **Not reusing `universe_symbols.backfill_*`.** Those belong to the bar backfill.
+  Sharing them would make a fundamentals failure indistinguishable from a bar
+  failure in precisely the column someone would check during an incident. *"Would
+  these two failures be distinguishable at 3 a.m.?"* is the test to apply when
+  tempted to reuse a state column.
+
+Per the migration rule in `shared/schemas/SCHEMAS.md`, this is a **new migration**,
+not an amendment to `007` or `008`.
+
+#### Leases are independent per `(symbol, task)`
+
+The primary key *is* the lease granularity, so a symbol whose metric call
+succeeded and whose earnings call failed retries only earnings — it never redoes
+completed work.
+
+Only one task row per symbol exists today, since only `runMetrics` is widened. The
+per-task key is kept anyway: it costs nothing now and avoids a migration later,
+which matters because the Alpha Vantage quota wall (§3.13) is the kind of
+constraint a paid tier eventually removes, at which point `runOverview` becomes a
+widening candidate too.
+
+Claim semantics are **reused from step 3, not reinvented**: claim sets
+`in_progress` plus `claimed_at`, claims older than a configurable lease are
+reclaimable so a killed worker strands nothing, attempts are capped, and the error
+text is persisted so a stall is diagnosable from SQL alone.
+
+#### Cadence
+
+`runMetrics` fires on a 24-hour ticker today. At ~3.3 hours per universe pass that
+would be seven passes and ~23 hours of API time per week, against §2.3 and §8.1.2
+which both specify **weekly**. The widened path therefore gets its own
+`FUNDAMENTAL_METRICS_UNIVERSE_POLL_INTERVAL`, default `168h`, rather than
+inheriting the 24-hour cadence — a cadence change to a shared worker should be a
+stated decision, not an inherited default.
+
+#### Prerequisite
+
+The widened pass is the first workload in this repo to saturate a Finnhub
+allowance continuously for hours, which is why the **shared rate limiter**
+(migration `008`, `internal/ratelimit`) had to land first. Without it the 429s
+would surface in whichever *other* Finnhub-calling worker happened to be running.
+Full rationale in `shared/schemas/SCHEMAS.md` under `api_rate_budget`.
+
+---
+
 ## 9. Configuration
 
 Every threshold in §3.2, §4, and §5 is an env var with the documented value as default. Follow the existing `.env` conventions and the `SCANNER_` / `MOMENTUM_` prefix pattern.
@@ -555,7 +720,8 @@ Each step should produce something verifiable before the next begins.
 |---|---|---|
 | 1 | Migration `007_momentum.sql` + schema docs + `*.schema.json` | Tables exist; `SCHEMAS.md` updated |
 | 2 | `data-universe`: symbol list + eligibility | `universe_symbols` populated, ~5–7.5k eligible, exclusions auditable |
-| 3 | `data-universe`: resumable 3-year bar backfill | `equity_ohlcv` has `source='yahoo'` daily bars for the universe; job survives a kill and resumes |
+| 3 | `data-universe`: resumable 3-year bar backfill **+ the §8.1.4 daily incremental refresh** | `equity_ohlcv` has `source='yahoo_finance'` daily bars for the universe; job survives a kill and resumes; the daily short-window refresh keeps them current. §8.1.4 is folded in here because §10 originally gave it no step of its own, and without it bars go stale the day after the backfill completes |
+| **3b** | **`data-fundamental`: widen symbol source to the eligible universe** | **One full pass completed against the real universe; `universe_symbols.market_cap` / `shares_outstanding` / `sector` populated for the bulk of it. HARD PREREQUISITE FOR STEP 5 — see below.** |
 | 4 | Feature engine (§3) + unit tests against hand-computed fixtures | Every formula tested; a no-lookahead test passes |
 | 5 | Hard gates + bucketing | Candidate counts per day are sane (tens to low hundreds, not thousands) |
 | 6 | Scorer (§4) with full sub-score persistence | `/score` output reconstructs the total exactly |
@@ -563,6 +729,46 @@ Each step should produce something verifiable before the next begins.
 | 8 | Catalyst keyword classifier + `catalyst_events` | Matches stored with keyword and tier |
 | 9 | `analyst-bot`: queries, job, formatter, 4 channels, 3 commands | Alerts post; unset channel IDs don't crash |
 | 10 | Sell-side tracking (§5) | Tracked rows open and close with recorded reasons |
+
+### Step 3b — the fundamentals-coverage prerequisite
+
+This step was not in the original build order. It exists because step 2 surfaced a
+gap that makes steps 5 and 7 unreadable if left alone.
+
+**The gap.** §8.1.2 says to refresh sector, shares outstanding and market cap "from
+existing fundamentals ingestion", and `data-universe` does exactly that — it reads
+`equity_fundamentals` and makes no API calls. But `data-fundamental` fetches only
+the symbols in its static `FUNDAMENTAL_SYMBOLS` env var, which defaults to three
+tickers. So market cap and sector are populated for a handful of symbols out of
+several thousand.
+
+**Why that is fatal rather than cosmetic.** `market_cap` is load-bearing in §3.2 for
+*both* buckets — the market bucket needs $300M–$10B, the penny bucket needs
+≤ $300M — so it decides bucket membership, not just ranking. With coverage near
+zero, almost every symbol fails the market-cap gate, candidate counts collapse, and
+§6's base rate is computed over a tiny non-representative slice. Step 5's
+"candidate counts are sane" check would pass for entirely the wrong reason.
+
+**The fix.** Point `data-fundamental`'s symbol source at `universe_symbols WHERE
+is_eligible` instead of the static env list, behind a feature flag so existing
+non-scanner use of that worker is unaffected. **The full design — which single
+sub-task is widened, the union-not-replacement resolver, the
+`fundamental_fetch_state` table shape, per-`(symbol, task)` leases, and the
+cadence decision — is in §8.4.** Weekly cadence, which is what §2.3
+and §8.1.2 already specify — the ~4-hour runtime at one request per two seconds is
+not a new cost, it is the job the spec already assumed, at the scale that had not
+been built yet. Reuse the same `backfill_status` / `backfill_cursor_ts` checkpoint
+pattern as the step 3 bar backfill rather than inventing a second one: a
+multi-hour rate-limited pass must survive a restart for the same reasons.
+
+Rejected alternatives: a cap-free gate (market cap is not optional, per the above),
+and a second metric-fetch pass inside `data-universe` (duplicates a worker that
+already exists, which §0 and §12 both forbid).
+
+**Sequencing.** Steps 3 and 3b are independent and may run in parallel. **Do not
+start step 5 until both have completed a full pass against the real universe.** The
+temptation is to treat 3b as "not blocking steps 3 or 4" — true, and irrelevant,
+because step 5 is where it bites and step 7 is where it becomes unrecoverable.
 
 **Step 7 is the decision point.** If high-score deciles do not beat the base rate for `hit_100`, the scoring weights in §4 are wrong. The correct response is to revise the weights (or the features) using the labeled data — not to proceed to Phase 2 or build a UI on top of a score with no demonstrated edge. This ordering exists specifically so that finding out is cheap.
 
@@ -586,4 +792,5 @@ Each step should produce something verifiable before the next begins.
 - **Do not reimplement indicators.** `services/data-analyzer/internal/compute/` has ATR, RSI, Donchian, VWAP, swings, support/resistance already.
 - **Do not create a second Discord bot.** Extend `analyst-bot`.
 - Every worker must be idempotent (upserts) and safe to re-run.
+- **Do not share job-state columns between two jobs.** The test: *would these two failures be distinguishable at 3 a.m.?* Identical shape is what makes the confusion possible. A second small state table costs one migration; a fundamentals failure surfacing in a column named `backfill_last_error` costs an incident. Stated in full in `shared/schemas/SCHEMAS.md`.
 - Ask before deviating from any definition in §3 or §4 — these are the product, and a plausible-looking variation silently changes what the whole system measures.

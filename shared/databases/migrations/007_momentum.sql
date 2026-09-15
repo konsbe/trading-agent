@@ -6,7 +6,7 @@
 -- (Go); read by analyst-bot (Python).
 --
 -- Daily bars are NOT duplicated here — momentum features are computed from
--- equity_ohlcv rows with interval = '1Day' and source = 'yahoo' (§7).
+-- equity_ohlcv rows with interval = '1Day' and source = 'yahoo_finance' (§7).
 --
 -- Applies to existing databases as well as fresh initdb: every statement is
 -- idempotent (migrations are only auto-run by Postgres on first init, so this
@@ -35,6 +35,12 @@
 -- The backfill_* columns are the per-symbol checkpoint for the resumable 3-year
 -- bar backfill (§8.1.3) — they are job state, not a §3 feature.
 --   backfill_status: 'pending' | 'in_progress' | 'done' | 'failed'
+--
+-- Resume semantics: a worker claims a symbol by setting 'in_progress' and
+-- stamping backfill_claimed_at. If the process is killed mid-symbol the row is
+-- left 'in_progress' forever, so claims older than a configurable lease are
+-- reclaimable. Without the timestamp a crash would strand rows permanently,
+-- which is the opposite of §10 step 3's "survives a kill and resumes".
 CREATE TABLE IF NOT EXISTS universe_symbols (
     symbol                TEXT             NOT NULL,
     exchange              TEXT             NOT NULL,
@@ -53,6 +59,7 @@ CREATE TABLE IF NOT EXISTS universe_symbols (
     excluded_reason       TEXT,                        -- null iff is_eligible; e.g. 'type_not_common_stock', 'exchange_not_allowed', 'ticker_suffix_excluded', 'insufficient_history'
     backfill_status       TEXT             NOT NULL DEFAULT 'pending',
     backfill_cursor_ts    TIMESTAMPTZ,                 -- oldest bar fetched so far; resume point
+    backfill_claimed_at   TIMESTAMPTZ,                 -- when 'in_progress' was set; a claim older than the lease is reclaimable after a crash
     backfill_attempts     INTEGER          NOT NULL DEFAULT 0,
     backfill_last_error   TEXT,
     backfill_completed_at TIMESTAMPTZ,

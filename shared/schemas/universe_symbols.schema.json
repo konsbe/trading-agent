@@ -23,6 +23,7 @@
     "excluded_reason": { "type": ["string", "null"], "description": "Null iff eligible. e.g. type_not_common_stock, exchange_not_allowed, ticker_suffix_excluded, insufficient_history" },
     "backfill_status": { "type": "string", "enum": ["pending", "in_progress", "done", "failed"] },
     "backfill_cursor_ts": { "type": ["string", "null"], "format": "date-time", "description": "Oldest bar fetched so far; the resume point after a crash" },
+    "backfill_claimed_at": { "type": ["string", "null"], "format": "date-time", "description": "When backfill_status was set to in_progress. A claim older than the configured lease is reclaimable — without this a worker killed mid-symbol would strand the row in in_progress forever" },
     "backfill_attempts": { "type": "integer" },
     "backfill_last_error": { "type": ["string", "null"] },
     "backfill_completed_at": { "type": ["string", "null"], "format": "date-time" },

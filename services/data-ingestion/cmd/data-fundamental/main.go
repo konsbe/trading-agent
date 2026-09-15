@@ -14,6 +14,7 @@ import (
 	"github.com/konsbe/trading-agent/services/data-ingestion/internal/config"
 	"github.com/konsbe/trading-agent/services/data-ingestion/internal/fetch/alphavantage"
 	"github.com/konsbe/trading-agent/services/data-ingestion/internal/fetch/finnhub"
+	"github.com/konsbe/trading-agent/services/data-ingestion/internal/ratelimit"
 	"github.com/konsbe/trading-agent/services/data-ingestion/internal/store"
 )
 
@@ -44,7 +45,7 @@ func main() {
 	}
 	defer pool.Close()
 
-	fh := finnhub.New(cfg.FinnhubKey)
+	fh := finnhub.NewWithLimiter(cfg.FinnhubKey, ratelimit.SharedFinnhub(context.Background(), pool, log))
 	if !fh.HasToken() {
 		log.Warn("FINNHUB_API_KEY not set; fundamental fetching disabled")
 		return
@@ -58,7 +59,11 @@ func main() {
 	w := &worker{cfg: cfg, pool: pool, fh: fh, av: av, log: log}
 
 	// Run immediately on startup, then on ticker cadence.
-	if cfg.EnableMetrics {
+	//
+	// The widened metrics pass is deliberately NOT run at startup: it is a
+	// multi-hour job, and a restart loop would otherwise re-enter it repeatedly
+	// while starving the other sub-tasks. Its timer fires it shortly after.
+	if cfg.EnableMetrics && !w.metricsUniverseCheckpointed() {
 		w.runMetrics(context.Background())
 	}
 	if cfg.EnableFinancials {
@@ -83,6 +88,15 @@ func main() {
 		w.runInstitutionalOwnership(context.Background())
 	}
 
+	// The widened pass runs back-to-back batches while work remains, then idles.
+	// A timer rather than a ticker, so the interval is measured from the end of a
+	// round: a batch that overruns must not queue up another behind it.
+	metricsUniverseTimer := time.NewTimer(30 * time.Second)
+	if !(cfg.EnableMetrics && w.metricsUniverseCheckpointed()) {
+		metricsUniverseTimer.Stop()
+	}
+	defer metricsUniverseTimer.Stop()
+
 	tMetrics := time.NewTicker(cfg.PollMetrics)
 	tFinancials := time.NewTicker(cfg.PollFinancials)
 	tEarnings := time.NewTicker(cfg.PollEarnings)
@@ -103,9 +117,17 @@ func main() {
 	for {
 		select {
 		case <-tMetrics.C:
-			if cfg.EnableMetrics {
+			// The static ticker is skipped entirely under checkpointing, so the
+			// two paths never both walk the symbol list.
+			if cfg.EnableMetrics && !w.metricsUniverseCheckpointed() {
 				w.runMetrics(context.Background())
 			}
+		case <-metricsUniverseTimer.C:
+			next := cfg.MetricsUniverseIdleInterval
+			if w.runMetricsUniverse(context.Background()) > 0 {
+				next = 0 // work remains; continue straight into the next batch
+			}
+			metricsUniverseTimer.Reset(next)
 		case <-tFinancials.C:
 			if cfg.EnableFinancials {
 				w.runFinancials(context.Background())
@@ -152,20 +174,38 @@ type worker struct {
 // We extract the Tier 1 FA scalars and store each as an individual row so the
 // signal layer can query by metric name just like technical_indicators.
 
+// runMetrics fetches TTM metrics for the statically configured symbol list.
+//
+// Unchanged behaviour: no checkpoint, whole list every tick. Correct and cheap
+// for the handful of symbols data-fundamental was built for, and it remains the
+// path taken unless the universe source is explicitly enabled (spec §8.4).
 func (w *worker) runMetrics(ctx context.Context) {
 	ts := time.Now().UTC()
-	for _, sym := range w.cfg.Symbols {
-		raw, err := w.fh.Metrics(ctx, sym)
-		if err != nil {
+	for _, sym := range w.metricsSymbolsForStaticPass(ctx) {
+		if err := w.fetchMetricsForSymbol(ctx, sym, ts); err != nil {
 			w.log.Error("finnhub metrics", "symbol", sym, "err", err)
 			continue
 		}
-		metricMap, ok := raw["metric"].(map[string]any)
-		if !ok {
-			w.log.Warn("finnhub metrics: unexpected response shape", "symbol", sym)
-			continue
-		}
+	}
+}
 
+// fetchMetricsForSymbol fetches and stores one symbol's TTM metrics.
+//
+// Extracted verbatim from runMetrics' loop body so the static-list path is
+// behaviourally identical and the checkpointed universe path can reuse it. It
+// returns an error rather than logging-and-continuing, because the checkpointed
+// caller has to record the failure against the symbol.
+func (w *worker) fetchMetricsForSymbol(ctx context.Context, sym string, ts time.Time) error {
+	raw, err := w.fh.Metrics(ctx, sym)
+	if err != nil {
+		return err
+	}
+	metricMap, ok := raw["metric"].(map[string]any)
+	if !ok {
+		return fmt.Errorf("unexpected /stock/metric response shape for %s", sym)
+	}
+
+	{
 		upsert := func(metric string, value *float64, payload any) {
 			if err := store.UpsertFundamental(ctx, w.pool, ts, sym, "ttm", metric, value, payload, "finnhub_metric"); err != nil {
 				w.log.Error("upsert fundamental", "metric", metric, "symbol", sym, "err", err)
@@ -252,9 +292,10 @@ func (w *worker) runMetrics(ctx context.Context) {
 		if err := store.UpsertFundamental(ctx, w.pool, ts, sym, "ttm", "metrics_raw", nil, metricMap, "finnhub_metric"); err != nil {
 			w.log.Error("upsert metrics_raw", "symbol", sym, "err", err)
 		}
-
-		w.log.Info("fundamentals metrics stored", "symbol", sym)
 	}
+
+	w.log.Debug("fundamentals metrics stored", "symbol", sym)
+	return nil
 }
 
 // ─── Detailed financials (income statement + cash flow) ────────────────────────
@@ -315,171 +356,171 @@ func (w *worker) storeFinancials(ctx context.Context, freq string, limit int) {
 			cf := statementMap(reportBody, "cf") // cash flow statement
 			bs := statementMap(reportBody, "bs") // balance sheet
 
-		// Income statement — concept names vary between 10-Q and 10-K filings.
-		// Apple 10-K uses RevenueFromContractWithCustomerExcludingAssessedTax.
-		// All dollar amounts are divided by 1e6 (divM) to match Finnhub metric API scale (millions).
-		upsert("revenue_reported", divM(conceptVal(ic,
-			"RevenueFromContractWithCustomerExcludingAssessedTax",
-			"RevenueFromContractWithCustomerIncludingAssessedTax",
-			"Revenues", "Revenue", "SalesRevenueNet",
-			"SalesRevenueGoodsNet", "TotalRevenues",
-		)), nil)
-		upsert("gross_profit_reported", divM(conceptVal(ic,
-			"GrossProfit",
-		)), nil)
-		upsert("operating_income_reported", divM(conceptVal(ic,
-			"OperatingIncomeLoss", "OperatingIncome",
-			"IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest",
-		)), nil)
-		upsert("net_income_reported", divM(conceptVal(ic,
-			"NetIncomeLoss", "ProfitLoss", "NetIncome",
-			"NetIncomeLossAvailableToCommonStockholdersBasic",
-		)), nil)
-		// EPS values are per-share — no unit conversion needed.
-		upsert("eps_diluted_reported", conceptVal(ic,
-			"EarningsPerShareDiluted", "EarningsPerShareBasic",
-			"IncomeLossFromContinuingOperationsPerDilutedShare",
-		), nil)
-		upsert("eps_basic_reported", conceptVal(ic,
-			"EarningsPerShareBasic",
-			"IncomeLossFromContinuingOperationsPerBasicShare",
-		), nil)
-		// Weighted-average diluted shares — divide by 1e6 to store in millions.
-		upsert("shares_wa_reported", divM(conceptVal(ic,
-			"WeightedAverageNumberOfDilutedSharesOutstanding",
-			"WeightedAverageNumberOfSharesOutstandingBasic",
-		)), nil)
+			// Income statement — concept names vary between 10-Q and 10-K filings.
+			// Apple 10-K uses RevenueFromContractWithCustomerExcludingAssessedTax.
+			// All dollar amounts are divided by 1e6 (divM) to match Finnhub metric API scale (millions).
+			upsert("revenue_reported", divM(conceptVal(ic,
+				"RevenueFromContractWithCustomerExcludingAssessedTax",
+				"RevenueFromContractWithCustomerIncludingAssessedTax",
+				"Revenues", "Revenue", "SalesRevenueNet",
+				"SalesRevenueGoodsNet", "TotalRevenues",
+			)), nil)
+			upsert("gross_profit_reported", divM(conceptVal(ic,
+				"GrossProfit",
+			)), nil)
+			upsert("operating_income_reported", divM(conceptVal(ic,
+				"OperatingIncomeLoss", "OperatingIncome",
+				"IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest",
+			)), nil)
+			upsert("net_income_reported", divM(conceptVal(ic,
+				"NetIncomeLoss", "ProfitLoss", "NetIncome",
+				"NetIncomeLossAvailableToCommonStockholdersBasic",
+			)), nil)
+			// EPS values are per-share — no unit conversion needed.
+			upsert("eps_diluted_reported", conceptVal(ic,
+				"EarningsPerShareDiluted", "EarningsPerShareBasic",
+				"IncomeLossFromContinuingOperationsPerDilutedShare",
+			), nil)
+			upsert("eps_basic_reported", conceptVal(ic,
+				"EarningsPerShareBasic",
+				"IncomeLossFromContinuingOperationsPerBasicShare",
+			), nil)
+			// Weighted-average diluted shares — divide by 1e6 to store in millions.
+			upsert("shares_wa_reported", divM(conceptVal(ic,
+				"WeightedAverageNumberOfDilutedSharesOutstanding",
+				"WeightedAverageNumberOfSharesOutstandingBasic",
+			)), nil)
 
-		// Cash flow — all in raw dollars; convert to millions.
-		upsert("operating_cf_reported", divM(conceptVal(cf,
-			"NetCashProvidedByUsedInOperatingActivities",
-			"NetCashProvidedByOperatingActivities",
-		)), nil)
-		upsert("capex_reported", divM(conceptVal(cf,
-			"PaymentsToAcquirePropertyPlantAndEquipment",
-			"CapitalExpenditures",
-			"AcquisitionsOfPropertyPlantAndEquipment",
-			"PurchaseOfPropertyPlantAndEquipment",
-		)), nil)
-		opCF := conceptVal(cf,
-			"NetCashProvidedByUsedInOperatingActivities",
-			"NetCashProvidedByOperatingActivities",
-		)
-		capex := conceptVal(cf,
-			"PaymentsToAcquirePropertyPlantAndEquipment",
-			"CapitalExpenditures",
-			"AcquisitionsOfPropertyPlantAndEquipment",
-			"PurchaseOfPropertyPlantAndEquipment",
-		)
-		if opCF != nil && capex != nil {
-			// Convert raw dollars to millions before storing.
-			fcfRaw := *opCF - abs(*capex)
-			fcfMVal := fcfRaw / 1e6
-			upsert("fcf_reported", &fcfMVal, map[string]any{
-				"operating_cf_millions": *opCF / 1e6,
-				"capex_millions":        *capex / 1e6,
-				"note":                  "fcf = operating_cf - abs(capex), in millions",
-			})
-		}
+			// Cash flow — all in raw dollars; convert to millions.
+			upsert("operating_cf_reported", divM(conceptVal(cf,
+				"NetCashProvidedByUsedInOperatingActivities",
+				"NetCashProvidedByOperatingActivities",
+			)), nil)
+			upsert("capex_reported", divM(conceptVal(cf,
+				"PaymentsToAcquirePropertyPlantAndEquipment",
+				"CapitalExpenditures",
+				"AcquisitionsOfPropertyPlantAndEquipment",
+				"PurchaseOfPropertyPlantAndEquipment",
+			)), nil)
+			opCF := conceptVal(cf,
+				"NetCashProvidedByUsedInOperatingActivities",
+				"NetCashProvidedByOperatingActivities",
+			)
+			capex := conceptVal(cf,
+				"PaymentsToAcquirePropertyPlantAndEquipment",
+				"CapitalExpenditures",
+				"AcquisitionsOfPropertyPlantAndEquipment",
+				"PurchaseOfPropertyPlantAndEquipment",
+			)
+			if opCF != nil && capex != nil {
+				// Convert raw dollars to millions before storing.
+				fcfRaw := *opCF - abs(*capex)
+				fcfMVal := fcfRaw / 1e6
+				upsert("fcf_reported", &fcfMVal, map[string]any{
+					"operating_cf_millions": *opCF / 1e6,
+					"capex_millions":        *capex / 1e6,
+					"note":                  "fcf = operating_cf - abs(capex), in millions",
+				})
+			}
 
-		// Balance sheet — all dollar amounts converted to millions.
-		upsert("total_assets_reported", divM(conceptVal(bs,
-			"Assets",
-		)), nil)
-		upsert("total_liabilities_reported", divM(conceptVal(bs,
-			"Liabilities", "LiabilitiesAndStockholdersEquity",
-		)), nil)
-		upsert("total_equity_reported", divM(conceptVal(bs,
-			"StockholdersEquity", "Equity",
-			"StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest",
-		)), nil)
-		// Long-term debt only; does not include commercial paper or short-term notes.
-		upsert("total_debt_reported", divM(conceptVal(bs,
-			"LongTermDebt", "LongTermDebtNoncurrent",
-			"LongTermDebtAndCapitalLeaseObligations",
-			"DebtAndCapitalLeaseObligations",
-		)), nil)
-		upsert("cash_reported", divM(conceptVal(bs,
-			"CashAndCashEquivalentsAtCarryingValue",
-			"CashAndCashEquivalents", "Cash",
-			"CashCashEquivalentsAndShortTermInvestments",
-		)), nil)
-		// Shares outstanding — divide by 1e6 to store in millions (matches Finnhub metric scale).
-		upsert("shares_outstanding_reported", divM(conceptVal(bs,
-			"CommonStockSharesOutstanding",
-			"CommonStockSharesIssued",
-		)), nil)
+			// Balance sheet — all dollar amounts converted to millions.
+			upsert("total_assets_reported", divM(conceptVal(bs,
+				"Assets",
+			)), nil)
+			upsert("total_liabilities_reported", divM(conceptVal(bs,
+				"Liabilities", "LiabilitiesAndStockholdersEquity",
+			)), nil)
+			upsert("total_equity_reported", divM(conceptVal(bs,
+				"StockholdersEquity", "Equity",
+				"StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest",
+			)), nil)
+			// Long-term debt only; does not include commercial paper or short-term notes.
+			upsert("total_debt_reported", divM(conceptVal(bs,
+				"LongTermDebt", "LongTermDebtNoncurrent",
+				"LongTermDebtAndCapitalLeaseObligations",
+				"DebtAndCapitalLeaseObligations",
+			)), nil)
+			upsert("cash_reported", divM(conceptVal(bs,
+				"CashAndCashEquivalentsAtCarryingValue",
+				"CashAndCashEquivalents", "Cash",
+				"CashCashEquivalentsAndShortTermInvestments",
+			)), nil)
+			// Shares outstanding — divide by 1e6 to store in millions (matches Finnhub metric scale).
+			upsert("shares_outstanding_reported", divM(conceptVal(bs,
+				"CommonStockSharesOutstanding",
+				"CommonStockSharesIssued",
+			)), nil)
 
-		// ── Tier 3: Goodwill & Intangible Assets (rank 18) ───────────────
-		// Goodwill arises from acquisitions paying above book value. Heavy
-		// goodwill (>40% of total assets) carries impairment risk.
-		// XBRL concept names vary by filer; list most common in priority order.
-		upsert("goodwill_reported", divM(conceptVal(bs,
-			"Goodwill", "GoodwillNet",
-			"BusinessAcquisitionCostOfAcquiredEntityPurchasePrice",
-		)), nil)
-		upsert("intangible_assets_reported", divM(conceptVal(bs,
-			"IntangibleAssetsNetExcludingGoodwill",
-			"FiniteLivedIntangibleAssetsNet",
-			"IntangibleAssetsNet",
-			"OtherIntangibleAssetsNet",
-		)), nil)
+			// ── Tier 3: Goodwill & Intangible Assets (rank 18) ───────────────
+			// Goodwill arises from acquisitions paying above book value. Heavy
+			// goodwill (>40% of total assets) carries impairment risk.
+			// XBRL concept names vary by filer; list most common in priority order.
+			upsert("goodwill_reported", divM(conceptVal(bs,
+				"Goodwill", "GoodwillNet",
+				"BusinessAcquisitionCostOfAcquiredEntityPurchasePrice",
+			)), nil)
+			upsert("intangible_assets_reported", divM(conceptVal(bs,
+				"IntangibleAssetsNetExcludingGoodwill",
+				"FiniteLivedIntangibleAssetsNet",
+				"IntangibleAssetsNet",
+				"OtherIntangibleAssetsNet",
+			)), nil)
 
-		// ── Tier 3: Inventory (rank 16 — inventory turnover) ─────────────
-		// Slowing inventory turnover signals weakening demand before revenue drops.
-		upsert("inventory_reported", divM(conceptVal(bs,
-			"InventoryNet", "Inventories",
-			"FIFOInventoryAmount", "InventoryFinishedGoods",
-			"InventoryRawMaterialsAndSupplies",
-		)), nil)
+			// ── Tier 3: Inventory (rank 16 — inventory turnover) ─────────────
+			// Slowing inventory turnover signals weakening demand before revenue drops.
+			upsert("inventory_reported", divM(conceptVal(bs,
+				"InventoryNet", "Inventories",
+				"FIFOInventoryAmount", "InventoryFinishedGoods",
+				"InventoryRawMaterialsAndSupplies",
+			)), nil)
 
-		// ── Correlations: Accounts Receivable ─────────────────────────────
-		// Used by the deterioration warning signal: receivables growing faster
-		// than revenue = revenue being recognised before cash is collected.
-		// Stored in millions, consistent with all other XBRL dollar amounts.
-		upsert("accounts_receivable_reported", divM(conceptVal(bs,
-			"AccountsReceivableNetCurrent",
-			"ReceivablesNetCurrent",
-			"AccountsReceivableNet",
-			"TradeAndOtherReceivablesNetCurrent",
-		)), nil)
+			// ── Correlations: Accounts Receivable ─────────────────────────────
+			// Used by the deterioration warning signal: receivables growing faster
+			// than revenue = revenue being recognised before cash is collected.
+			// Stored in millions, consistent with all other XBRL dollar amounts.
+			upsert("accounts_receivable_reported", divM(conceptVal(bs,
+				"AccountsReceivableNetCurrent",
+				"ReceivablesNetCurrent",
+				"AccountsReceivableNet",
+				"TradeAndOtherReceivablesNetCurrent",
+			)), nil)
 
-		// ── Tier 3: Interest Expense (rank 15 — interest coverage) ───────
-		// Interest coverage = EBIT / Interest Expense.
-		// Interest expense is typically negative in XBRL; we take abs() in the analyzer.
-		upsert("interest_expense_reported", divM(conceptVal(ic,
-			"InterestExpense",
-			"InterestAndDebtExpense",
-			"InterestExpenseDebt",
-			"FinanceLeaseInterestExpense",
-		)), nil)
+			// ── Tier 3: Interest Expense (rank 15 — interest coverage) ───────
+			// Interest coverage = EBIT / Interest Expense.
+			// Interest expense is typically negative in XBRL; we take abs() in the analyzer.
+			upsert("interest_expense_reported", divM(conceptVal(ic,
+				"InterestExpense",
+				"InterestAndDebtExpense",
+				"InterestExpenseDebt",
+				"FinanceLeaseInterestExpense",
+			)), nil)
 
-		// ── ROIC inputs: pre-tax income, tax expense, current liabilities ─
-		// Used by the analyzer to compute NOPAT / Invested Capital.
-		// NOPAT = OperatingIncome × (1 − effective_tax_rate)
-		// Invested Capital = Total Assets − Current Liabilities
-		upsert("pretax_income_reported", divM(conceptVal(ic,
-			"IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest",
-			"IncomeLossFromContinuingOperationsBeforeIncomeTaxes",
-			"IncomeLossBeforeIncomeTaxes",
-		)), nil)
-		upsert("tax_expense_reported", divM(conceptVal(ic,
-			"IncomeTaxExpenseBenefit",
-			"IncomeTaxExpense",
-			"CurrentIncomeTaxExpenseBenefit",
-		)), nil)
-		upsert("current_liabilities_reported", divM(conceptVal(bs,
-			"LiabilitiesCurrent",
-			"CurrentLiabilities",
-		)), nil)
+			// ── ROIC inputs: pre-tax income, tax expense, current liabilities ─
+			// Used by the analyzer to compute NOPAT / Invested Capital.
+			// NOPAT = OperatingIncome × (1 − effective_tax_rate)
+			// Invested Capital = Total Assets − Current Liabilities
+			upsert("pretax_income_reported", divM(conceptVal(ic,
+				"IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest",
+				"IncomeLossFromContinuingOperationsBeforeIncomeTaxes",
+				"IncomeLossBeforeIncomeTaxes",
+			)), nil)
+			upsert("tax_expense_reported", divM(conceptVal(ic,
+				"IncomeTaxExpenseBenefit",
+				"IncomeTaxExpense",
+				"CurrentIncomeTaxExpenseBenefit",
+			)), nil)
+			upsert("current_liabilities_reported", divM(conceptVal(bs,
+				"LiabilitiesCurrent",
+				"CurrentLiabilities",
+			)), nil)
 
-		// ── R&D Expense ─────────────────────────────────────────────────────
-		// Enables qual_rd_intensity: R&D% of revenue signals innovation investment.
-		// Stored in millions, consistent with all other XBRL dollar amounts.
-		upsert("rd_expense_reported", divM(conceptVal(ic,
-			"ResearchAndDevelopmentExpense",
-			"ResearchAndDevelopmentExpenseExcludingAcquiredInProcessCost",
-		)), nil)
+			// ── R&D Expense ─────────────────────────────────────────────────────
+			// Enables qual_rd_intensity: R&D% of revenue signals innovation investment.
+			// Stored in millions, consistent with all other XBRL dollar amounts.
+			upsert("rd_expense_reported", divM(conceptVal(ic,
+				"ResearchAndDevelopmentExpense",
+				"ResearchAndDevelopmentExpenseExcludingAcquiredInProcessCost",
+			)), nil)
 
 			// Raw report payload for forward-compat access.
 			upsert("report_raw", nil, report)
@@ -616,11 +657,11 @@ func (w *worker) runOverview(ctx context.Context) {
 		if sector != "" {
 			if err := store.UpsertFundamental(ctx, w.pool, ts, sym, "ttm", "sector_profile", nil,
 				map[string]any{
-					"sector":       sector,
-					"industry":     industry,
-					"asset_type":   alphavantage.StringField(data, "AssetType"),
-					"fiscal_year":  alphavantage.StringField(data, "FiscalYearEnd"),
-					"latest_qtr":   alphavantage.StringField(data, "LatestQuarter"),
+					"sector":      sector,
+					"industry":    industry,
+					"asset_type":  alphavantage.StringField(data, "AssetType"),
+					"fiscal_year": alphavantage.StringField(data, "FiscalYearEnd"),
+					"latest_qtr":  alphavantage.StringField(data, "LatestQuarter"),
 				}, source); err != nil {
 				w.log.Error("upsert sector_profile", "symbol", sym, "err", err)
 			}
@@ -694,12 +735,12 @@ func (w *worker) runRecommendations(ctx context.Context) {
 
 		// Month-over-month change in net buy score (the revision trend signal).
 		upsert("analyst_rec_trend", &delta, map[string]any{
-			"current_period":      items[0]["period"],
-			"prior_period":        items[1]["period"],
-			"net_score_current":   current,
-			"net_score_prior":     prior,
-			"delta":               delta,
-			"note":                "positive = analysts upgrading consensus; negative = downgrading",
+			"current_period":    items[0]["period"],
+			"prior_period":      items[1]["period"],
+			"net_score_current": current,
+			"net_score_prior":   prior,
+			"delta":             delta,
+			"note":              "positive = analysts upgrading consensus; negative = downgrading",
 		})
 
 		w.log.Info("analyst recommendation trend stored",

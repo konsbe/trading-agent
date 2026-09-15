@@ -202,7 +202,7 @@ Default FRED series: `DGS10` (10-year Treasury yield), `VIXCLS` (VIX closing lev
 
 Same tables as the other price workers:
 
-- **`equity_ohlcv`** — daily/weekly equity bars with `source=yahoo` or `source=alpaca`
+- **`equity_ohlcv`** — daily/weekly equity bars with `source=yahoo_finance` or `source=alpaca`
 - **`crypto_ohlcv`** — daily crypto bars with `source=binance_rest`
 
 ### Configurable environment variables
@@ -430,6 +430,46 @@ Tall/narrow format — one row per `(symbol, period, metric)`. This mirrors the 
 |---|---|---|
 | `FUNDAMENTAL_STARTUP_DELAY_SECS` | `30` | Seconds to wait on startup before first fetch (prevents race conditions with `data-fundamental`) |
 
+#### Universe-wide metrics pass (momentum scanner step 3b)
+
+`runMetrics` can be widened from the static `FUNDAMENTAL_SYMBOLS` list to the
+eligible momentum universe. **Only this one sub-task is widened** — `market_cap`
+and `shares_outstanding`, the two fields the scanner's §3.2 gate and §3.9 proxy
+need, both come from `/stock/metric`. The other seven sub-tasks are untouched.
+
+Sector is *not* obtainable this way: it comes from Alpha Vantage, whose free tier
+is **25 requests per day** — a 200+ day pass for the universe. It stays null in
+Phase 1 at zero cost to the score, because `sector_strength_pct` is recorded but
+not scored. See `docs/MOMENTUM_SCANNER_PHASE1.md` §3.13.
+
+Three behaviours worth knowing:
+
+- **Union, never replacement.** `env+universe` iterates `FUNDAMENTAL_SYMBOLS ∪ (universe_symbols WHERE is_eligible)`. The configured list contains `SPY`, an ETF that §3.1 excludes from the universe, so replacing the list would silently drop the most visible symbol in the daily report. An unreachable or empty universe degrades to the configured list — never to an empty pass.
+- **Checkpointed per symbol.** One pass is ~3.3 hours at the shared Finnhub rate, so work is claimed in batches against `fundamental_fetch_state` and survives a restart. The static and checkpointed paths are mutually exclusive; the 24-hour ticker is skipped entirely when checkpointing is on, so the symbol list is never walked twice.
+- **Cadence is emergent.** A symbol is re-fetched when its *last success* is older than the refresh interval, so there is no cycle to reset and a newly-listed symbol is picked up on the next round rather than waiting one out.
+
+The widened pass runs **sequentially** on purpose. The Finnhub budget is shared
+across all five workers (migration `008`), so parallelism would not raise
+throughput — it would only deepen the queue in front of the shared limiter and
+starve the other workers' short, latency-sensitive polls.
+
+| Variable | Default | Description |
+|---|---|---|
+| `FUNDAMENTAL_METRICS_SYMBOL_SOURCE` | `env` | `env` or `env+universe`. Opt-in, because this worker has live consumers |
+| `FUNDAMENTAL_METRICS_UNIVERSE_CHECKPOINTED` | `true` | Route the widened pass through `fundamental_fetch_state` |
+| `FUNDAMENTAL_METRICS_UNIVERSE_POLL_INTERVAL` | `168h` | The widened pass's **own** cadence — deliberately not the 24h metrics ticker |
+| `FUNDAMENTAL_METRICS_UNIVERSE_REFRESH_INTERVAL` | `168h` | How stale a symbol's last success may be before it is claimable |
+| `FUNDAMENTAL_METRICS_UNIVERSE_BATCH_SIZE` | `250` | Symbols claimed per round |
+| `FUNDAMENTAL_METRICS_UNIVERSE_CLAIM_LEASE` | `30m` | A claim older than this is treated as abandoned |
+| `FUNDAMENTAL_METRICS_UNIVERSE_MAX_ATTEMPTS` | `3` | Past this a symbol is reported, not retried |
+| `FUNDAMENTAL_METRICS_UNIVERSE_IDLE_INTERVAL` | `1h` | Wait before re-checking once drained |
+
+> **Watch `fresh`, not `done`.** The batch log reports both. `done` only means the
+> last attempt worked; `fresh` means the data is inside the refresh window, and it
+> is `fresh` that the scanner's candidate counts depend on. The worker warns when
+> fewer than half the universe is fresh, because until that clears, §3.2's gate
+> excludes the remainder and §6's base rate is not meaningful.
+
 ---
 
 ## Worker 7 — `data-macro-intel`
@@ -470,24 +510,68 @@ momentum scanner operates on. Spec: `docs/MOMENTUM_SCANNER_PHASE1.md` §3.1 and 
 **Migration:** `shared/databases/migrations/007_momentum.sql` (apply manually on an
 already-initialised volume — migrations only auto-run on first `initdb`).
 
+> Migration numbering, idempotency, and the rule for **when a migration may be
+> amended in place versus superseded by a new one**, are documented once in
+> `shared/schemas/SCHEMAS.md`. The short version: amend only while the migration has
+> never been applied outside a scratch database.
+
 This worker performs **no computation and no scoring**. It answers one question:
 which tickers are in scope, and why is everything else out?
 
-### Two weekly passes
+### Four passes
 
 | Pass | Cadence | What it does |
 |---|---|---|
 | `runSymbols` | weekly | Fetch the exchange symbol directory, apply §3.1 eligibility, upsert **every** decision — exclusions included, with a reason |
 | `runFundamentals` | weekly | Copy sector, industry, shares outstanding and market cap from `equity_fundamentals` onto the universe rows |
+| `runBackfillRound` | looping | Claim a batch of symbols and backfill 3 years of daily bars (§8.1.3). Runs back-to-back while work remains, then idles |
+| `runDailyBars` | daily | Short-window incremental refresh for every backfilled symbol (§8.1.4) |
 
-The resumable 3-year bar backfill (§8.1.3) and the daily incremental bar refresh
-(§8.1.4) are separate build-order steps and are **not** wired up yet.
+Each pass is independently switchable, and all four are safe to interrupt.
+
+### The backfill is resumable, not merely restartable
+
+A symbol is claimed (`in_progress` + `backfill_claimed_at`) **before** its fetch and
+only reaches `done` **after** its bars are committed. So a kill at any point leaves
+the row reclaimable, and no symbol is ever recorded complete without its data.
+
+The piece that makes this work is the **claim lease**. If the process dies
+mid-symbol, the row stays `in_progress` forever; a claim older than
+`UNIVERSE_BACKFILL_CLAIM_LEASE` is therefore treated as abandoned and re-claimed.
+Without it a crash would silently finish the backfill incomplete — which looks
+exactly like a universe with thin history rather than like a bug.
+
+Claim priority is `pending` → abandoned `in_progress` → `failed` (under
+`max_attempts`), so a first pass covers the universe once before spending rate
+budget on known-flaky symbols. `FOR UPDATE SKIP LOCKED` means two workers would
+split the work rather than duplicate it.
+
+Three outcomes per symbol, deliberately distinguished:
+
+| Outcome | Recorded as | Why |
+|---|---|---|
+| Bars fetched | `done`, `backfill_cursor_ts` = **oldest stored bar** | The cursor reflects the data, not the request window — a recent IPO gets its true first bar, not "three years ago" |
+| Yahoo returns an empty series | `done`, `backfill_last_error = 'no_bars_returned'` | A delisting or bad ticker. Not a failure, and retrying it every round would waste the rate budget the rest of the universe needs |
+| Request failed | `failed`, attempts incremented, error text persisted | Diagnosable from SQL alone rather than by correlating logs |
 
 ### APIs used
 
 | API | Endpoint | What it provides | Auth |
 |---|---|---|---|
 | **Finnhub** | `GET /stock/symbol?exchange=US` | The entire US listing (~25–30k rows, all instrument types) in **one** request | `FINNHUB_API_KEY` |
+| **Yahoo Finance** | `GET /v8/finance/chart/{sym}?period1=&period2=` | Daily OHLCV over an **explicit date window** | None |
+
+The bar fetch uses `period1`/`period2` Unix bounds rather than Yahoo's `range`
+parameter. That is not a style choice: `range` tops out at `2y` for daily bars, so
+the pre-existing `FetchBars` **cannot** satisfy the three-year backfill. The
+explicit-window path (`FetchBarsRange`) has no such cap and makes the requested
+window auditable. Both paths share one decoder, so the scanner's bars are filtered
+identically to the ones `data-technical` already stores.
+
+Retry policy: `429` and `5xx` are retried with exponential backoff, honouring
+`Retry-After` when the server sends it. **`404` is not retried** — a delisted or
+misspelled ticker will never succeed, and on a 6,000-symbol pass that wasted budget
+is the difference between finishing and not.
 
 `runFundamentals` makes **no API calls at all**. §8.1.2 specifies refreshing those
 fields "from existing fundamentals ingestion", so it reads `equity_fundamentals`.
@@ -509,7 +593,7 @@ product, and a wrong exclusion silently shrinks the scannable universe.
 Rules are evaluated in that order and the **first** failure is the recorded reason,
 so `excluded_reason` is deterministic.
 
-**The 250-bar history minimum is deliberately not applied here.** Bars only exist
+**The 252-bar history minimum is deliberately not applied here.** Bars only exist
 because the backfill ran over the eligible set, so gating eligibility on bar count
 would be circular and would leave the universe permanently empty. `bar_count`,
 `first_bar_ts` and `last_bar_ts` are refreshed on every pass for auditability, and
@@ -569,9 +653,170 @@ unexplained empty penny bucket later.
 | `UNIVERSE_ALLOWED_MICS` | `XNAS,XNGS,XNMS,XNCM,XNYS,XASE` | Venue allowlist |
 | `UNIVERSE_EXCLUDED_SUFFIXES` | `W,WS,WT,U,UN,R,RT` | Non-common share-class suffixes |
 | `UNIVERSE_ALLOW_EMPTY_MIC` | `false` | Admit records with a blank MIC |
-| `UNIVERSE_MIN_BARS_HISTORY` | `250` | Recorded/reported, not used for eligibility |
+| `UNIVERSE_MIN_BARS_HISTORY` | `252` | §3.7's 52-week window reads `high[t-251]`, so 252 bars are needed for a complete window. Recorded/reported, not used for eligibility |
 | `UNIVERSE_BAR_INTERVAL` | `1Day` | Which `equity_ohlcv` rows count as daily bars |
-| `UNIVERSE_BAR_SOURCE` | `yahoo` | Bar source. **Not Alpaca** — its free tier is IEX-only volume, a single-venue fraction of consolidated volume, which makes every volume feature in §3 wrong |
+| `UNIVERSE_BAR_SOURCE` | `yahoo_finance` | Bar source. **Not Alpaca** — its free tier is IEX-only volume, a single-venue fraction of consolidated volume, which makes every volume feature in §3 wrong. Note the value is `yahoo_finance`, not `yahoo`: that is what `internal/fetch/yahoo` writes and what `data-analyzer` reads, and the spec's §7 originally named a value that matches zero rows |
+| `UNIVERSE_ENABLE_BACKFILL` | `true` | Enable the 3-year bar backfill |
+| `UNIVERSE_ENABLE_DAILY_BARS` | `true` | Enable the daily incremental refresh |
+| `UNIVERSE_BACKFILL_YEARS` | `3` | History depth |
+| `UNIVERSE_BACKFILL_BATCH_SIZE` | `200` | Symbols claimed per round |
+| `UNIVERSE_BACKFILL_CONCURRENCY` | `4` | Parallel in-flight fetches; the rate limiter is shared, so this is pipelining, not throughput |
+| `UNIVERSE_BACKFILL_CLAIM_LEASE` | `15m` | How long an `in_progress` claim is honoured before it is treated as abandoned |
+| `UNIVERSE_BACKFILL_MAX_ATTEMPTS` | `3` | Retries per symbol across runs |
+| `UNIVERSE_BACKFILL_IDLE_INTERVAL` | `1h` | Wait before re-checking for work once drained |
+| `UNIVERSE_YAHOO_REQUESTS_PER_SEC` | `2.0` | §2.3 budgets ~5/s, but the endpoint is unofficial and §2.2 says to be polite. Above ~5/s expect sustained 429s |
+| `UNIVERSE_YAHOO_BURST` | `1` | Keeps request spacing even |
+| `UNIVERSE_YAHOO_TIMEOUT` | `30s` | Per-request timeout |
+| `UNIVERSE_YAHOO_MAX_RETRIES` | `3` | Retries after the first attempt, transient statuses only |
+| `UNIVERSE_YAHOO_BACKOFF_BASE` / `_MAX` | `2s` / `60s` | Exponential backoff bounds; `Retry-After` overrides when longer |
+| `UNIVERSE_DAILY_BARS_INTERVAL` | `24h` | Incremental refresh cadence |
+| `UNIVERSE_DAILY_BARS_LOOKBACK_DAYS` | `7` | Window per symbol — wider than a day to repair missed runs and late corrections |
+
+---
+
+## Shared API rate budgets
+
+Five workers hold a Finnhub client: `data-equity`, `data-sentiment`,
+`data-macro-intel`, `data-fundamental`, and `data-universe`. Each used to build its
+own in-process token bucket at ~0.5 req/s, summing to **~2.5 req/s against a
+free-tier budget of 1 req/s** (60 requests/minute).
+
+That was harmless only because observed demand is roughly **10 % of budget** — each
+worker polls a handful of symbols on a 60-second tick and none approaches its own
+allowance. It stops being harmless the moment one caller saturates its allowance
+for hours, which the momentum scanner's universe-wide fundamentals pass does. The
+429s then surface in whichever *other* worker happens to be running, which is the
+worst shape of bug: symptom and cause in different services.
+
+All five now pace against one Postgres-backed budget (`api_rate_budget`, migration
+`008`). Construction is one line per worker:
+
+```go
+fh := finnhub.NewWithLimiter(cfg.FinnhubKey, ratelimit.SharedFinnhub(ctx, pool, log))
+```
+
+`SharedFinnhub` returns `nil` when disabled or unbuildable, and
+`NewWithLimiter(token, nil)` is exactly the old `New(token)` — so a worker that
+cannot coordinate still starts and still runs at its previous rate.
+
+**If coordination fails**, the limiter falls back to that same in-process bucket
+for the affected request: never unlimited, never blocking indefinitely, and
+per-request rather than a latch, so a brief blip does not strand a worker on local
+rate. A `degraded` counter and a throttled warn log make the condition visible —
+that log line is what turns *"why are there 429s in `data-sentiment`"* into *"the
+shared limiter degraded"*.
+
+Full rationale, including why Postgres rather than Redis, is in
+`shared/schemas/SCHEMAS.md` under `api_rate_budget`.
+
+### What to check after the first real universe-wide pass
+
+Nothing in this design has yet run against live Finnhub. Coordination is proven
+against Postgres and the fallback against an unreachable one, but the operational
+question — do five workers under one budget stop producing 429s where they
+previously would — is only answerable from a real pass. Two numbers, with
+thresholds set in advance rather than eyeballed afterwards:
+
+| Signal | Where | Threshold |
+|---|---|---|
+| `degraded` count across the five workers | the throttled `shared rate limiter unavailable` warn, and `Stats().Degraded` | **Any nonzero count is worth investigating.** A handful during a Postgres failover is fine; a *sustained* rate is not, because it means the workers are running uncoordinated while appearing healthy |
+| Measured Finnhub ceiling | 429 responses while the shared budget is active and `degraded` is zero | If the real ceiling proves **meaningfully below 1.0 req/s**, fold the measured value back into `FINNHUB_RATE_PER_SEC` / `refill_per_sec`. Do **not** work around it by lowering individual workers' rates — that recreates the uncoordinated-aggregate problem this table exists to solve |
+
+The second row is the one that is easy to get wrong under pressure: a per-worker
+tweak makes the symptom go away locally and puts the budget back out of sync
+globally. The shared budget is now the only place that number should live.
+
+The same evidence-first rule applies to `UNIVERSE_YAHOO_REQUESTS_PER_SEC`
+(default `2.0`, against §2.3's guessed ~5/s): tune it from observed
+success/error/retry rates on the first backfill, not from the spec's number.
+
+### Measured findings from the first verification attempt (2026-09-15)
+
+Recorded as found, not after deciding what to do about them.
+
+#### 1. Yahoo's chart API is unreachable from this network — Step 3 is blocked
+
+Every request returns **`HTTP 429 "Too Many Requests"`**, a 19-byte plain-text
+body, no `Retry-After`, `server: ATS` (Yahoo's CDN). It is identical on the first
+request of a session and unaffected by the browser-like headers the client already
+sends, so it is **not** per-request rate limiting — it is an IP-level block.
+
+The likely cause is shared egress: this host sits behind a corporate proxy
+(a Nokia PAC config is active and `infra/corp-ca.pem` is populated), so the entire
+network appears to Yahoo as one address whose per-IP allowance is already spent by
+other users. Lowering `UNIVERSE_YAHOO_REQUESTS_PER_SEC` cannot help — the limit is
+not ours to spend. Running the workers in containers does not help either, since
+they share the host's egress IP.
+
+**Why this matters beyond one blocked step:** §2.2 designates Yahoo as the
+*primary* bar source for Phase 1, specifically because it provides **consolidated**
+volume, and every volume feature in §3 (RVOL, acceleration, dollar volume) is
+meaningless without that. Alpaca's free tier is explicitly rejected in §2.2 for
+being IEX-only. So this is not "swap the fetcher" — there is currently no verified
+free source of consolidated daily volume reachable from this network, which is a
+prerequisite for Steps 4 through 7 having meaningful inputs.
+
+Options, none yet chosen: run the backfill from a network with its own egress
+(the endpoint is unofficial and best-effort either way, per §2.2); obtain a data
+source with an authenticated quota rather than an IP-shared one; or re-verify from
+a different host before treating this as permanent.
+
+#### 2. Finnhub works — including the endpoint 3b depends on
+
+Verified with the configured key: `/quote` → 200, `/stock/metric` → 200 with a
+242 KB payload, `/stock/symbol?exchange=US` → 200 after one redirect. Confirmed
+working from inside a container with the corporate CA mounted, which is the real
+runtime path.
+
+One trap worth recording: `/stock/symbol` answers **`302`** to a pre-signed
+`static2.finnhub.io` URL rather than returning the directory inline. Go's
+`http.Client` follows redirects by default so `StockSymbols` is unaffected, but a
+`curl` without `-L` makes a working key look like a rejected one.
+
+#### 3. The eligible universe is 4,978 — marginally below §2.3's estimate
+
+Measured by running the real §3.1 rules over the live 31,051-record directory
+(`TestRealDirectory_EligibleCountIsInTheExpectedRange`):
+
+| | Count |
+|---|---|
+| Directory records | 31,051 |
+| Excluded — venue not allowed | 22,033 |
+| Excluded — type not common stock | 4,040 |
+| **Eligible** | **4,978** |
+| … NASDAQ | 3,193 |
+| … NYSE | 1,558 |
+| … NYSE American | 227 |
+
+§2.3 expects 5,000–7,500. The shortfall is **explained, not an allowlist bug**: the
+directory holds 2,223 ADRs and 422 REITs, which §3.1's strict common-stock reading
+excludes. Admitting ADRs alone would land the count inside the stated band, which
+suggests §2.3's estimate assumed a looser type filter. Keeping the exclusion is
+still the right Phase 1 call (§3.1), and this is a good argument for
+`UNIVERSE_ALLOWED_TYPES` having been made configurable rather than hardcoded.
+
+Two smaller observations from the same run:
+
+- Finnhub returns only **composite** MICs (`XNAS`, `XNYS`, `XASE`). The tier codes
+  `XNGS`/`XNMS`/`XNCM` in the default allowlist are dead with this provider —
+  harmless, and worth keeping for provider changes.
+- `SkippedDuplicate` was **0**, so cross-tier duplication does not occur with this
+  provider. The dedup in `BuildPlan` is defensive rather than load-bearing here,
+  but it still guards the batch's primary key.
+
+| Variable | Default | Description |
+|---|---|---|
+| `FINNHUB_SHARED_RATE_ENABLE` | `true` | Set `false` to revert a worker to its own in-process bucket |
+| `FINNHUB_RATE_PER_SEC` | `1.0` | The **shared** sustained rate — free tier is 60/min |
+| `FINNHUB_RATE_BURST` | `2.0` | Largest allowed spike; must be ≥ 1 |
+| `SHARED_RATE_ACQUIRE_TIMEOUT` | `250ms` | Bound on one acquisition before degrading |
+| `SHARED_RATE_MAX_SLEEP` | `5s` | Cap on a single enforced wait |
+| `SHARED_RATE_WARN_EVERY` | `30s` | Degradation-warning throttle |
+
+> Alpha Vantage is **not** coordinated here. Its free tier is 25 requests **per
+> day**, a quota so small that no rate limiter helps — the constraint is handled by
+> restricting which symbols reach `runOverview` at all. See
+> `docs/MOMENTUM_SCANNER_PHASE1.md` §3.13.
 
 ---
 

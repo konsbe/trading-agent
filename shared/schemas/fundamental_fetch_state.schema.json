@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/konsbe/trading-agent/shared/schemas/fundamental_fetch_state.schema.json",
+  "title": "fundamental_fetch_state row",
+  "description": "Logical row for table fundamental_fetch_state (see shared/databases/migrations/009_fundamental_fetch_state.sql). Per-symbol, per-sub-task fetch checkpoint for data-fundamental, added so the universe-wide TTM metrics pass (~3.3 hours at the shared Finnhub rate) survives a restart. Deliberately a separate table from universe_symbols.backfill_* rather than a reuse of it: the two jobs want identically-shaped state, and that identical shape is exactly what would make a fundamentals failure indistinguishable from a bar failure in the one column an on-call reader would check. Spec: docs/MOMENTUM_SCANNER_PHASE1.md §8.4.",
+  "type": "object",
+  "required": ["symbol", "task", "status", "attempts", "updated_at"],
+  "properties": {
+    "symbol": { "type": "string" },
+    "task": { "type": "string", "description": "Which data-fundamental sub-task this row tracks. 'metrics' is the only widened task in Phase 1; the other seven still iterate the static symbol list and have no rows here. Part of the primary key, so the key itself is the lease granularity — a symbol whose metrics call succeeded and whose earnings call failed retries only earnings" },
+    "status": { "type": "string", "enum": ["pending", "in_progress", "done", "failed"] },
+    "claimed_at": { "type": ["string", "null"], "format": "date-time", "description": "Set when in_progress is claimed. A claim older than the configured lease is reclaimable — without it a worker killed mid-symbol would strand the row forever and the pass would silently finish incomplete" },
+    "attempts": { "type": "integer", "description": "Incremented on failure only. Past the configured cap the row stops being claimed, so a permanently broken symbol stops consuming the shared Finnhub budget" },
+    "last_error": { "type": ["string", "null"], "description": "Persisted so a stalled pass is diagnosable from SQL alone rather than by correlating logs. Truncated to 500 characters" },
+    "completed_at": { "type": ["string", "null"], "format": "date-time", "description": "When the last attempt finished, successful or not" },
+    "last_success_ts": { "type": ["string", "null"], "format": "date-time", "description": "When data was last actually stored. Distinct from completed_at on purpose: the weekly cadence is driven by how long since a symbol was genuinely refreshed, so a run of failures must not make it look fresh. Advanced only by MarkFundamentalFetchDone" },
+    "updated_at": { "type": "string", "format": "date-time" }
+  },
+  "additionalProperties": false
+}

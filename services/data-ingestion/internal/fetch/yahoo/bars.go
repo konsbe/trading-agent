@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"math"
 	"net/http"
 	"net/url"
@@ -17,10 +18,33 @@ import (
 
 const apiBase = "https://query1.finance.yahoo.com/v8/finance/chart"
 
+// SourceName is the equity_ohlcv.source value every bar from this package
+// carries. Exported so callers filter on the same constant rather than a
+// hand-typed literal: the momentum scanner reads bars back by source, and
+// 'yahoo' (a plausible-looking guess) matches nothing.
+const SourceName = "yahoo_finance"
+
 // Client fetches OHLCV bars from Yahoo Finance (no API key required).
 type Client struct {
 	HTTP    *http.Client
 	Limiter *rate.Limiter
+
+	// opts is set only by NewWithOptions. When nil, the retry-capable paths fall
+	// back to DefaultOptions, so a Client built by New() keeps working unchanged.
+	opts *Options
+
+	// baseURL overrides the public chart endpoint. Empty means apiBase; it is
+	// set only by tests, so the retry and decode paths can be exercised against
+	// a stub server instead of the live unofficial endpoint.
+	baseURL string
+}
+
+// base returns the chart endpoint this client should call.
+func (c *Client) base() string {
+	if c.baseURL != "" {
+		return c.baseURL
+	}
+	return apiBase
 }
 
 // New creates a Yahoo Finance client with a conservative rate limit (1 req / 1.5 s).
@@ -74,8 +98,27 @@ func (c *Client) FetchBars(ctx context.Context, symbol, alpacaInterval string, l
 		return nil, fmt.Errorf("yahoo finance %s: HTTP %s", symbol, resp.Status)
 	}
 
+	bars, err := decodeChartBars(resp.Body, symbol, alpacaInterval)
+	if err != nil {
+		return nil, err
+	}
+
+	// Trim to the most recent `limit` bars.
+	if limit > 0 && len(bars) > limit {
+		bars = bars[len(bars)-limit:]
+	}
+	return bars, nil
+}
+
+// decodeChartBars parses a v8 chart response into equity bars.
+//
+// Shared by FetchBars and FetchBarsRange so both paths apply identical
+// filtering — a divergence here would give the momentum scanner subtly
+// different bars from the ones data-technical already stored, which is exactly
+// the kind of difference that is invisible in output and fatal to §6's results.
+func decodeChartBars(r io.Reader, symbol, alpacaInterval string) ([]store.EquityBar, error) {
 	var body chartResponse
-	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+	if err := json.NewDecoder(r).Decode(&body); err != nil {
 		return nil, fmt.Errorf("yahoo decode %s: %w", symbol, err)
 	}
 	if len(body.Chart.Error) > 0 && string(body.Chart.Error) != "null" {
@@ -118,13 +161,8 @@ func (c *Client) FetchBars(ctx context.Context, symbol, alpacaInterval string, l
 			Low:      l,
 			Close:    cl,
 			Volume:   v,
-			Source:   "yahoo_finance",
+			Source:   SourceName,
 		})
-	}
-
-	// Trim to the most recent `limit` bars.
-	if limit > 0 && len(bars) > limit {
-		bars = bars[len(bars)-limit:]
 	}
 	return bars, nil
 }

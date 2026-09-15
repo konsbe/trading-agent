@@ -16,6 +16,7 @@ import (
 	"github.com/konsbe/trading-agent/services/data-ingestion/internal/fetch/finnhub"
 	"github.com/konsbe/trading-agent/services/data-ingestion/internal/fetch/fred"
 	"github.com/konsbe/trading-agent/services/data-ingestion/internal/logx"
+	"github.com/konsbe/trading-agent/services/data-ingestion/internal/ratelimit"
 	"github.com/konsbe/trading-agent/services/data-ingestion/internal/store"
 )
 
@@ -40,7 +41,7 @@ func main() {
 	defer pool.Close()
 
 	alp := alpacadata.New(cfg.AlpacaKey, cfg.AlpacaSecret)
-	fh := finnhub.New(cfg.FinnhubKey)
+	fh := finnhub.NewWithLimiter(cfg.FinnhubKey, ratelimit.SharedFinnhub(context.Background(), pool, log))
 	fr := fred.New(cfg.FredAPIKey)
 
 	tAlpaca := time.NewTicker(cfg.PollAlpaca)
