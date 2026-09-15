@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/konsbe/trading-agent/shared/schemas/momentum_labels.schema.json",
+  "title": "momentum_labels row",
+  "description": "Logical row for hypertable momentum_labels (see shared/databases/migrations/007_momentum.sql). MOMENTUM_SCANNER_PHASE1.md §6 — the real Phase 1 deliverable and the dataset Phase 2 trains on. Forward outcomes for historical gated candidates. Features for day t use only bars <= t; labels use only bars > t. The hit_200/300/500/1000 flags exist as Phase 2 training targets only — Phase 1 never computes or displays a score for them. SURVIVORSHIP BIAS IS PRESENT: a universe list pulled today omits delisted tickers, which are disproportionately failures; results must not be presented as unbiased.",
+  "type": "object",
+  "required": ["ts", "symbol", "horizon_days", "bars_available", "label_complete", "labeled_at"],
+  "properties": {
+    "ts": { "type": "string", "format": "date-time", "description": "The setup date t" },
+    "symbol": { "type": "string" },
+
+    "horizon_days": { "type": "integer", "description": "H, forward window in trading days (default 120)" },
+    "bars_available": { "type": "integer", "description": "Forward bars actually present after t; fewer than H implies label_complete = false" },
+    "label_complete": { "type": "boolean", "description": "false for rows inside the last H sessions. Incomplete rows MUST be excluded from any evaluation (§6)" },
+
+    "entry_close": { "type": ["number", "null"], "description": "close[t], the gain denominator; copied for reproducibility" },
+    "fwd_max_close": { "type": ["number", "null"], "description": "max(close[t+1 .. t+H])" },
+    "fwd_max_gain_pct": { "type": ["number", "null"], "description": "(fwd_max_close / close[t] - 1) * 100" },
+    "days_to_peak": { "type": ["integer", "null"], "description": "Offset of fwd_max_close, 1..H" },
+    "fwd_max_drawdown_pct": { "type": ["number", "null"], "description": "Largest peak-to-trough decline within the window, as a negative percent" },
+
+    "hit_100": { "type": ["boolean", "null"], "description": "fwd_max_gain_pct >= 100. The Phase 1 evaluation target: score deciles must beat the base rate on this (§6)" },
+    "hit_200": { "type": ["boolean", "null"], "description": ">= 200. Recorded for Phase 2 only" },
+    "hit_300": { "type": ["boolean", "null"], "description": ">= 300. Recorded for Phase 2 only" },
+    "hit_500": { "type": ["boolean", "null"], "description": ">= 500. Recorded for Phase 2 only" },
+    "hit_1000": { "type": ["boolean", "null"], "description": ">= 1000. Recorded for Phase 2 only" },
+
+    "labeled_at": { "type": "string", "format": "date-time" }
+  },
+  "additionalProperties": false
+}

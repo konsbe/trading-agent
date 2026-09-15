@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/konsbe/trading-agent/shared/schemas/momentum_features.schema.json",
+  "title": "momentum_features row",
+  "description": "Logical row for hypertable momentum_features (see shared/databases/migrations/007_momentum.sql). One row per symbol per completed trading day, holding every feature in MOMENTUM_SCANNER_PHASE1.md §3 plus the §3.2 gate outcome. Computed from equity_ohlcv daily bars (interval='1Day', source='yahoo') — bars are not duplicated here. NO LOOKAHEAD: every field is computable from bars up to and including ts; forward-looking quantities live in momentum_labels. Percent fields are percent points (11.8 = +11.8%); pct_of_52w_high is a ratio where 1.0 = at the high; rvol_20 and vol_accel are ratios; market_cap, shares and dollar_volume are absolute.",
+  "type": "object",
+  "required": ["ts", "symbol", "float_is_proxy", "gates_passed", "gate_failures", "computed_at"],
+  "properties": {
+    "ts": { "type": "string", "format": "date-time", "description": "The bar date t, matching equity_ohlcv.ts" },
+    "symbol": { "type": "string" },
+
+    "close": { "type": ["number", "null"], "description": "close[t]; denormalised from the bar because §4 penalties, §5 exits and §6 labels all reference it" },
+    "volume": { "type": ["number", "null"], "description": "volume[t]; consolidated volume (§2.2) — single-venue volume makes every volume feature wrong" },
+    "prior_close": { "type": ["number", "null"], "description": "close[t-1]" },
+    "change_pct": { "type": ["number", "null"], "description": "(close[t]/close[t-1] - 1) * 100" },
+    "gap_pct": { "type": ["number", "null"], "description": "(open[t]/close[t-1] - 1) * 100" },
+    "dollar_volume": { "type": ["number", "null"], "description": "close[t] * volume[t], USD" },
+    "atr_14": { "type": ["number", "null"], "description": "Wilder ATR, 14 bars (compute/atr.go)" },
+    "atr_pct": { "type": ["number", "null"], "description": "atr_14 / close[t] * 100" },
+
+    "avg_vol_20": { "type": ["number", "null"], "description": "mean(volume[t-20..t-1]) — EXCLUDES today (§3.4)" },
+    "rvol_20": { "type": ["number", "null"], "description": "volume[t] / avg_vol_20. NULL when avg_vol_20 is 0 or fewer than 20 prior bars exist — never 0, never 1 (§3.4, §12)" },
+
+    "vol_accel": { "type": ["number", "null"], "description": "mean(volume[t-2..t]) / mean(volume[t-7..t-3]). NULL when the 8-bar span t-7..t is not fully available" },
+
+    "resistance_20": { "type": ["number", "null"], "description": "max(high[t-20..t-1]), Donchian upper excluding today" },
+    "range_20": { "type": ["number", "null"], "description": "(max(high[t-20..t-1]) - min(low[t-20..t-1])) / close[t]" },
+    "was_consolidating": { "type": ["boolean", "null"], "description": "range_20 < 0.25" },
+    "breakout_state": {
+      "type": ["string", "null"],
+      "enum": ["breakout_from_consolidation", "breakout", "approaching", "none", null],
+      "description": "Judged on close[t], never on an intrabar high — a wick above resistance that closes back below is not a breakout (§3.6)"
+    },
+
+    "high_52w": { "type": ["number", "null"], "description": "max(high[t-251..t]), 252 trading days INCLUDING today" },
+    "pct_of_52w_high": { "type": ["number", "null"], "description": "close[t] / high_52w. RATIO, not percent: 1.0 = at the high" },
+    "new_52w_high": { "type": ["boolean", "null"], "description": "close[t] > max(high[t-251..t-1]) — window EXCLUDES today" },
+
+    "vwap_20": { "type": ["number", "null"], "description": "Rolling 20-day VWAP (compute/vwap.go). Phase 1 stand-in for intraday session VWAP; field name is stable so the Phase 3 swap is one place" },
+    "above_vwap": { "type": ["boolean", "null"], "description": "close[t] > vwap_20" },
+    "vwap_dist_pct": { "type": ["number", "null"], "description": "(close[t]/vwap_20 - 1) * 100" },
+
+    "float_shares_est": { "type": ["number", "null"], "description": "ABSOLUTE share count. Shares outstanding used as an APPROXIMATION of public float — insider and locked-up shares are not excluded, so it OVERSTATES float for recent IPOs and insider-heavy names (§3.9). Present to the user as 'Float (est)', never 'Float'" },
+    "float_is_proxy": { "type": "boolean", "description": "Always true in Phase 1; exists so Phase 2 can discount the feature" },
+
+    "rsi_14": { "type": ["number", "null"], "description": "Wilder RSI, 14 bars. Penalty input only (§4.3) — never a positive score, because a momentum breakout is supposed to have elevated RSI (§3.10)" },
+
+    "catalyst_tier": {
+      "type": ["string", "null"],
+      "enum": ["A", "B", "none", null],
+      "description": "NULL means not looked up (news is fetched only for gated candidates); 'none' means looked up and no company news in the window"
+    },
+    "catalyst_headline": { "type": ["string", "null"], "description": "Headline backing the winning tier, for the Discord embed. Every match is stored separately in catalyst_events" },
+    "catalyst_checked_at": { "type": ["string", "null"], "format": "date-time" },
+
+    "sector_strength_pct": { "type": ["number", "null"], "description": "median(change_pct_5d) across eligible universe symbols in the same sector. RECORDED, NOT SCORED in Phase 1 — there is no principled weight yet (§3.12)" },
+    "change_pct_5d": { "type": ["number", "null"], "description": "(close[t]/close[t-5] - 1) * 100. Input to sector_strength_pct; not defined in §3.3, see SCHEMAS.md" },
+
+    "market_cap": { "type": ["number", "null"], "description": "USD absolute, at t. §3.2 gate input and embed field" },
+
+    "bucket": {
+      "type": ["string", "null"],
+      "enum": ["market", "penny", null],
+      "description": "Assigned from close[t] (the two price bands are disjoint); NULL when price falls outside both"
+    },
+    "gates_passed": { "type": "boolean", "description": "true = candidate. A gate failure means EXCLUDED, not low-scored (§3.2)" },
+    "gate_failures": { "type": "array", "items": { "type": "string" }, "description": "Empty array when passing, so 'evaluated and passed' is distinguishable from 'not evaluated'" },
+
+    "short_interest_pct": { "type": ["number", "null"], "description": "Always NULL in Phase 1 — no acceptable free source (§3.9, §3.13). Column exists so the feature can be added without a migration" },
+    "days_to_cover": { "type": ["number", "null"], "description": "Always NULL in Phase 1 — see short_interest_pct" },
+    "is_halted": { "type": ["boolean", "null"], "description": "Always NULL in Phase 1 — LULD status is not on free/EOD data and is irrelevant to a once-daily post-close scan (§3.13)" },
+    "premarket_change_pct": { "type": ["number", "null"], "description": "Always NULL in Phase 1 — regular session only (§3.13)" },
+
+    "computed_at": { "type": "string", "format": "date-time" }
+  },
+  "additionalProperties": false
+}

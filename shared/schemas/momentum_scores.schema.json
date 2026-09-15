@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/konsbe/trading-agent/shared/schemas/momentum_scores.schema.json",
+  "title": "momentum_scores row",
+  "description": "Logical row for hypertable momentum_scores (see shared/databases/migrations/007_momentum.sql). MOMENTUM_SCANNER_PHASE1.md §4: exactly one score, momentum_score_100, an integer 0-100 measuring SETUP QUALITY — it does not predict a percentage gain. Only gated candidates are scored. Every sub-score is persisted separately alongside the pre-penalty subtotal so /score reconstructs the total exactly and Phase 2 can use components independently (§4.4). The +200/+300/+500/+1000 divisions are NOT built in Phase 1.",
+  "type": "object",
+  "required": ["ts", "symbol", "bucket", "momentum_score_100", "penalties", "null_inputs", "scored_at"],
+  "properties": {
+    "ts": { "type": "string", "format": "date-time", "description": "The bar date t, matching momentum_features.ts" },
+    "symbol": { "type": "string" },
+    "bucket": { "type": "string", "enum": ["market", "penny"] },
+
+    "momentum_score_100": { "type": "integer", "minimum": 0, "maximum": 100, "description": "subtotal_before_penalties + penalty_total, clamped to [0,100], rounded to integer" },
+
+    "score_vol_accel": { "type": ["number", "null"], "minimum": 0, "maximum": 25, "description": "0-25 from vol_accel. Weight 25 measures whether volume is BUILDING (§4.1) — distinct from score_rvol" },
+    "score_rvol": { "type": ["number", "null"], "minimum": 0, "maximum": 20, "description": "0-20 from rvol_20. Weight 20 measures whether today is UNUSUAL vs the month (§4.1). The original brief's separate 'Volume +25' double-counted this; do not reintroduce a plain volume score" },
+    "score_breakout": { "type": ["number", "null"], "minimum": 0, "maximum": 20, "description": "0-20 from breakout_state: from_consolidation 20, breakout 14, approaching 8, none 0" },
+    "score_catalyst": { "type": ["number", "null"], "minimum": 0, "maximum": 15, "description": "0-15 from catalyst_tier: A 15, B 8, none 0" },
+    "score_float": { "type": ["number", "null"], "minimum": 0, "maximum": 10, "description": "0-10 from float_shares_est (a proxy — see momentum_features.float_is_proxy)" },
+    "score_vwap": { "type": ["number", "null"], "minimum": 0, "maximum": 5, "description": "0-5: above_vwap true 5, false 0" },
+    "score_52w": { "type": ["number", "null"], "minimum": 0, "maximum": 5, "description": "0-5 from 52-week high proximity" },
+
+    "subtotal_before_penalties": { "type": ["number", "null"], "minimum": 0, "maximum": 100, "description": "Sum of the seven sub-scores, before §4.3 penalties" },
+    "penalty_total": { "type": ["number", "null"], "maximum": 0, "description": "Sum of applied penalties; negative or zero" },
+    "penalties": {
+      "type": "object",
+      "description": "Applied §4.3 penalties only. Keys: rsi_exhausted (-5, rsi_14 > 85), already_extended (-10, change_pct > 20), volume_decaying (-5, vol_accel < 1.0 AND rvol_20 >= 3). already_extended enforces the core thesis in the score itself — the system fires at +8-15% on a confirmed move, and a same-day +22% move is later in the sequence than the intended entry.",
+      "additionalProperties": { "type": "number" }
+    },
+
+    "null_inputs": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Feature names that were NULL and therefore scored 0 for their component. A null input scores zero and is never imputed (§4.2, §12)."
+    },
+
+    "scored_at": { "type": "string", "format": "date-time" }
+  },
+  "additionalProperties": false
+}

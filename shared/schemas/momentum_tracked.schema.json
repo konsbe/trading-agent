@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/konsbe/trading-agent/shared/schemas/momentum_tracked.schema.json",
+  "title": "momentum_tracked row",
+  "description": "Logical row for table momentum_tracked (see shared/databases/migrations/007_momentum.sql). MOMENTUM_SCANNER_PHASE1.md §5 — sell-side state. The original brief specified sell channels but never defined a sell signal; Phase 1 defines it as EXIT TRACKING ON PRIOR ALERTS, not shorting. Buy and sell are not symmetric: a sell signal requires knowing what was previously alerted. The *_at_alert fields are frozen snapshots of the levels the exit rules are measured against and must never be refreshed. These exit rules are a starting default, not a validated strategy — they are deliberately mechanical so the backtest can evaluate and replace them. Nothing here is trading advice; the score is a research output.",
+  "type": "object",
+  "required": ["symbol", "alerted_ts", "bucket", "status", "reference_price", "low_rvol_streak", "sessions_elapsed", "created_at", "updated_at"],
+  "properties": {
+    "symbol": { "type": "string" },
+    "alerted_ts": { "type": "string", "format": "date-time", "description": "The momentum_features.ts that triggered the buy alert" },
+    "bucket": { "type": "string", "enum": ["market", "penny"] },
+    "status": { "type": "string", "enum": ["active", "closed"] },
+
+    "reference_price": { "type": "number", "description": "close[t] at alert; the stop_atr basis" },
+    "score_at_alert": { "type": ["integer", "null"] },
+    "resistance_20_at_alert": { "type": ["number", "null"], "description": "The level it broke out over; the breakout_failed test compares close[t] against this frozen value" },
+    "atr_14_at_alert": { "type": ["number", "null"], "description": "Frozen ATR for the stop_atr test: close[t] < reference_price - 2 * atr_14_at_alert" },
+
+    "last_evaluated_ts": { "type": ["string", "null"], "format": "date-time" },
+    "highest_close_since": { "type": ["number", "null"], "description": "Highest close since the alert; the timeout rule requires no new high since alert" },
+    "max_gain_pct": { "type": ["number", "null"], "description": "Realised maximum favourable move while active. Free labelling data that doubles as a live measure of whether the score is worth anything" },
+    "low_rvol_streak": { "type": "integer", "description": "Consecutive sessions with rvol_20 < 1.5; momentum_stalled fires at 3" },
+    "sessions_elapsed": { "type": "integer", "description": "Trading sessions since the alert; timeout fires at 20" },
+
+    "exit_reason": {
+      "type": ["string", "null"],
+      "enum": ["breakout_failed", "lost_vwap", "momentum_stalled", "stop_atr", "timeout", null],
+      "description": "Evaluated in exactly this order; the FIRST condition that matches wins (§5)"
+    },
+    "exit_ts": { "type": ["string", "null"], "format": "date-time" },
+    "exit_price": { "type": ["number", "null"] },
+    "exit_pct": { "type": ["number", "null"], "description": "(exit_price / reference_price - 1) * 100" },
+
+    "created_at": { "type": "string", "format": "date-time" },
+    "updated_at": { "type": "string", "format": "date-time" }
+  },
+  "additionalProperties": false
+}

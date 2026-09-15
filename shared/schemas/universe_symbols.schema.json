@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/konsbe/trading-agent/shared/schemas/universe_symbols.schema.json",
+  "title": "universe_symbols row",
+  "description": "Logical row for table universe_symbols (see shared/databases/migrations/007_momentum.sql). Eligible US common-stock universe per MOMENTUM_SCANNER_PHASE1.md §3.1, refreshed weekly by data-universe. Ineligible symbols are retained with is_eligible=false and a populated excluded_reason so exclusions stay auditable. The backfill_* fields are per-symbol checkpoint state for the resumable 3-year bar backfill (§8.1.3), not features.",
+  "type": "object",
+  "required": ["symbol", "exchange", "is_eligible", "backfill_status", "updated_at"],
+  "properties": {
+    "symbol": { "type": "string", "description": "e.g. AAPL" },
+    "exchange": { "type": "string", "description": "NASDAQ, NYSE, or NYSE American; OTC excluded in Phase 1" },
+    "mic": { "type": ["string", "null"], "description": "Market identifier code from the Finnhub symbol list; the reliable exchange discriminator" },
+    "name": { "type": ["string", "null"] },
+    "type": { "type": ["string", "null"], "description": "Raw instrument type from the symbol list, retained pre-filter for audit" },
+    "sector": { "type": ["string", "null"], "description": "From equity_fundamentals; also the grouping key for §3.12 sector strength" },
+    "industry": { "type": ["string", "null"] },
+    "shares_outstanding": { "type": ["number", "null"], "description": "ABSOLUTE share count. Finnhub serves millions; the writer multiplies by 1e6" },
+    "market_cap": { "type": ["number", "null"], "description": "USD ABSOLUTE. Finnhub serves $ millions; the writer multiplies by 1e6" },
+    "fundamentals_ts": { "type": ["string", "null"], "format": "date-time", "description": "When sector/shares/cap were last refreshed" },
+    "bar_count": { "type": ["integer", "null"], "description": "Daily bars in equity_ohlcv; §3.1 requires >= 250" },
+    "first_bar_ts": { "type": ["string", "null"], "format": "date-time" },
+    "last_bar_ts": { "type": ["string", "null"], "format": "date-time" },
+    "is_eligible": { "type": "boolean" },
+    "excluded_reason": { "type": ["string", "null"], "description": "Null iff eligible. e.g. type_not_common_stock, exchange_not_allowed, ticker_suffix_excluded, insufficient_history" },
+    "backfill_status": { "type": "string", "enum": ["pending", "in_progress", "done", "failed"] },
+    "backfill_cursor_ts": { "type": ["string", "null"], "format": "date-time", "description": "Oldest bar fetched so far; the resume point after a crash" },
+    "backfill_attempts": { "type": "integer" },
+    "backfill_last_error": { "type": ["string", "null"] },
+    "backfill_completed_at": { "type": ["string", "null"], "format": "date-time" },
+    "updated_at": { "type": "string", "format": "date-time" }
+  },
+  "additionalProperties": false
+}

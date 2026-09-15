@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/konsbe/trading-agent/shared/schemas/catalyst_events.schema.json",
+  "title": "catalyst_events row",
+  "description": "Logical row for hypertable catalyst_events (see shared/databases/migrations/007_momentum.sql). MOMENTUM_SCANNER_PHASE1.md §3.11 — EVERY keyword match is stored, not just the winning tier, because Phase 2's most valuable analysis is which specific keywords preceded real runners and that requires the raw matches retained. Phase 1 uses a keyword classifier, NOT an LLM: the point is to discover which keywords correlate with runners before paying for classification. Keyword lists live in configuration, not code, so they can be tuned without a rebuild. News is fetched only for symbols that passed the §3.2 hard gates, over a 48-hour window.",
+  "type": "object",
+  "required": ["ts", "symbol", "source", "headline_hash", "matched_keyword", "tier", "headline", "ingested_at"],
+  "properties": {
+    "ts": { "type": "string", "format": "date-time", "description": "Article publication time" },
+    "symbol": { "type": "string" },
+    "source": { "type": "string", "description": "e.g. finnhub_company_news" },
+    "headline_hash": { "type": "string", "description": "sha256 hex of the normalised headline (lowercased, whitespace collapsed, trimmed). Headlines are too long for a practical key and arrive duplicated across wires" },
+    "matched_keyword": { "type": "string", "description": "The configured keyword that matched. Part of the key: one headline matching several keywords yields several rows" },
+    "tier": { "type": "string", "enum": ["A", "B"], "description": "A = strong (FDA approval, acquisition, contract award, phase 3, earnings beat, raised guidance, uplisting); B = weak (upgrade, price target, partnership, product launch, general PR). The 'none' tier is an absence of rows, never a stored row" },
+    "headline": { "type": "string" },
+    "url": { "type": ["string", "null"] },
+    "scan_ts": { "type": ["string", "null"], "format": "date-time", "description": "The momentum_features.ts this match was fetched for, linking a match back to the setup day that triggered the lookup" },
+    "payload": { "type": ["object", "null"], "description": "Raw news item as returned by the source" },
+    "ingested_at": { "type": "string", "format": "date-time" }
+  },
+  "additionalProperties": false
+}
