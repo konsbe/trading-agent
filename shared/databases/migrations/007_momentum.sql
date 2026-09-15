@@ -113,10 +113,12 @@ CREATE TABLE IF NOT EXISTS momentum_features (
     was_consolidating     BOOLEAN,
     breakout_state        TEXT,
 
-    -- §3.7 52-week high proximity. pct_of_52w_high is a ratio (1.0 = at high).
+    -- §3.7 52-week high proximity. The window EXCLUDES today, matching the
+    -- same convention as avg_vol_20 and resistance_20, so pct_of_52w_high can
+    -- exceed 1.0 and > 1.0 *is* a new 52-week high. There is deliberately no
+    -- separate new_52w_high boolean — it would be redundant with this ratio.
     high_52w              DOUBLE PRECISION,
     pct_of_52w_high       DOUBLE PRECISION,
-    new_52w_high          BOOLEAN,
 
     -- §3.8 rolling 20-day VWAP (Phase 1 stand-in for intraday session VWAP;
     -- field names are stable so the Phase 3 swap is one place).
@@ -144,8 +146,16 @@ CREATE TABLE IF NOT EXISTS momentum_features (
     sector_strength_pct   DOUBLE PRECISION,
     change_pct_5d         DOUBLE PRECISION,            -- input to sector_strength_pct; see SCHEMAS.md note
 
-    -- market cap at t, used by the §3.2 gate and the embed
+    -- §3.2 / §3.9 market cap. market_cap is Finnhub's value; market_cap_est is
+    -- the documented fallback shares_outstanding * close[t], used for the gate
+    -- ONLY when market_cap is null (Finnhub's micro-cap coverage is poor and a
+    -- hard null would silently empty the penny bucket). market_cap_is_proxy
+    -- mirrors float_is_proxy. Not a silent default: explicit formula, persisted
+    -- flag, and 'market_cap_null' stays in gate_failures even when the estimate
+    -- lets the symbol through, so the proxy's contribution stays measurable.
     market_cap            DOUBLE PRECISION,
+    market_cap_est        DOUBLE PRECISION,
+    market_cap_is_proxy   BOOLEAN          NOT NULL DEFAULT false,
 
     -- §3.2 gate outcome. gates_passed = candidate; a gate failure means
     -- EXCLUDED, not low-scored. gate_failures is populated even when passing

@@ -147,6 +147,28 @@ services:
     profiles: [ingestion]
     restart: on-failure
 
+  # Eligible US common-stock universe for the momentum scanner (§3.1 / §8.1).
+  # Weekly symbol-list refresh + weekly sector/shares/market-cap refresh.
+  # Requires FINNHUB_API_KEY for the symbol list; without it that pass is
+  # skipped with a warning and the service keeps running.
+  data-universe:
+    build:
+      context: ../services/data-ingestion
+      dockerfile: Dockerfile
+    command: ["/app/data-universe"]
+    env_file:
+      - path: ../.env
+        required: false
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@timescaledb:5432/trading?sslmode=disable
+    volumes:
+      - ${CORP_CA_PEM_PATH:-/dev/null}:/etc/ssl/extra/corp-ca.pem:ro
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+    profiles: [ingestion]
+    restart: on-failure
+
   # ── data-analyzer ──────────────────────────────────────────────────────────
   # Reads bars / fundamentals from TimescaleDB and writes computed indicators
   # and derived fundamental scores. No external API calls are made here.

@@ -445,13 +445,16 @@ breakout from a failed one.
 
 | Column | Type | Notes |
 |---|---|---|
-| `high_52w` | number/null | `max(high[t-251 .. t])`, 252 trading days **including** today |
-| `pct_of_52w_high` | number/null | `close[t] / high_52w`. **Ratio**, 1.0 = at the high |
-| `new_52w_high` | boolean/null | `close[t] > max(high[t-251 .. t-1])` — window **excludes** today |
+| `high_52w` | number/null | `max(high[t-251 .. t-1])`, 251 trading days **excluding** today |
+| `pct_of_52w_high` | number/null | `close[t] / high_52w`. **Ratio**, 1.0 = at the prior high, **> 1.0 is a new 52-week high** |
 
-The two windows differ on purpose: you cannot be a "new high" relative to
-yourself. Note the consequence — because `close[t] ≤ high[t] ≤ high_52w`,
-`pct_of_52w_high` can never exceed 1.0.
+The window excludes the current bar, the same convention as `avg_vol_20` and
+`resistance_20`. There is deliberately **no** `new_52w_high` boolean: it would be
+redundant with `pct_of_52w_high >= 1.0`.
+
+An earlier revision defined the window over `[t-251 .. t]`, *including* today.
+Because `close[t] ≤ high[t] ≤ high_52w`, that capped the ratio at 1.0 and made
+§4.2's top band unreachable — every genuine new high scored 4 instead of 5.
 
 ### §3.8 VWAP
 
@@ -486,7 +489,9 @@ companies. Label it `Float (est)` in any output — never `Float`.
 | `catalyst_checked_at` | datetime/null | |
 | `sector_strength_pct` | number/null | `median(change_pct_5d)` across eligible symbols in the same sector. **Recorded, not scored** — there is no principled weight yet, and guessing one adds noise |
 | `change_pct_5d` | number/null | `(close[t]/close[t-5] - 1) * 100`. Input to `sector_strength_pct`; not defined in §3.3 |
-| `market_cap` | number/null | USD absolute, at `t` |
+| `market_cap` | number/null | USD absolute, at `t`, as reported by Finnhub |
+| `market_cap_est` | number/null | `shares_outstanding * close[t]`. Documented fallback, used for the gate **only** when `market_cap` is null |
+| `market_cap_is_proxy` | boolean | `true` when the gate was evaluated against the estimate. Mirrors `float_is_proxy` |
 
 ### §3.2 gate outcome
 
@@ -511,6 +516,16 @@ candidate set.
 The **upper bound on `change_pct` is central to the strategy**, not a safety
 rail: the thesis is entering at +8–15 % on a confirmed move, so a stock up +60 %
 today is not a candidate — it is already gone.
+
+**Market cap falls back to `market_cap_est`.** Finnhub's free-tier micro-cap
+coverage is poor, and failing the gate on a hard null would silently empty the
+penny bucket — exactly the population that bucket exists to scan. When
+`market_cap` is null the gate is evaluated against `shares_outstanding * close[t]`,
+`market_cap_is_proxy` is set, and **`market_cap_null` stays in `gate_failures`
+even though the symbol passed**, so the proxy's contribution stays measurable.
+This is not a silent default: §12 forbids substitutions with no formula and no
+flag, and this one has an explicit formula, a persisted flag and a retained
+failure record. If `shares_outstanding` is also null the gate fails for real.
 
 ### Phase-1-null columns
 

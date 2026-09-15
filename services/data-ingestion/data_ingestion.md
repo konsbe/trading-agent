@@ -30,6 +30,9 @@ External APIs
      └── Finnhub (crypto news) ────┘  data-sentiment    → sentiment_snapshots
                                                         → news_headlines
      │
+     ├── Finnhub /stock/symbol ────┐  data-universe     → universe_symbols
+     └── equity_fundamentals (read)┘
+     │
      ├── Finnhub calendars + news ─┐
      ├── GDELT doc API ────────────┤  data-macro-intel   → economic_calendar_events
      ├── GPR CSV URL ──────────────┤                     → earnings_calendar_events
@@ -64,6 +67,7 @@ All tables are **TimescaleDB hypertables** — time-partitioned PostgreSQL table
 | `gdelt_macro_daily` | data-macro-intel | `(day_ts, query_label)` |
 | `narrative_scores` | optional analyst-bot (FOMC LLM job) | `(id)` |
 | `equity_fundamentals` | data-fundamental | `(symbol, period, metric, source, ts)` |
+| `universe_symbols` | **data-universe** | `(symbol, exchange)` |
 
 All writes use `ON CONFLICT DO UPDATE` (upsert) unless noted otherwise, so re-running workers is idempotent.
 
@@ -458,6 +462,119 @@ The GDELT 2.1 doc API requires `STARTDATETIME` / `ENDDATETIME` in **`YYYYMMDDHHM
 
 ---
 
+## Worker 8 — `data-universe`
+
+**Purpose:** maintain `universe_symbols`, the eligible US common-stock universe the
+momentum scanner operates on. Spec: `docs/MOMENTUM_SCANNER_PHASE1.md` §3.1 and §8.1.
+
+**Migration:** `shared/databases/migrations/007_momentum.sql` (apply manually on an
+already-initialised volume — migrations only auto-run on first `initdb`).
+
+This worker performs **no computation and no scoring**. It answers one question:
+which tickers are in scope, and why is everything else out?
+
+### Two weekly passes
+
+| Pass | Cadence | What it does |
+|---|---|---|
+| `runSymbols` | weekly | Fetch the exchange symbol directory, apply §3.1 eligibility, upsert **every** decision — exclusions included, with a reason |
+| `runFundamentals` | weekly | Copy sector, industry, shares outstanding and market cap from `equity_fundamentals` onto the universe rows |
+
+The resumable 3-year bar backfill (§8.1.3) and the daily incremental bar refresh
+(§8.1.4) are separate build-order steps and are **not** wired up yet.
+
+### APIs used
+
+| API | Endpoint | What it provides | Auth |
+|---|---|---|---|
+| **Finnhub** | `GET /stock/symbol?exchange=US` | The entire US listing (~25–30k rows, all instrument types) in **one** request | `FINNHUB_API_KEY` |
+
+`runFundamentals` makes **no API calls at all**. §8.1.2 specifies refreshing those
+fields "from existing fundamentals ingestion", so it reads `equity_fundamentals`.
+That is also the only affordable option: `/stock/metric` is rate-limited to one
+request per two seconds, which is over four hours for a 7,500-symbol universe.
+
+### Eligibility rules (§3.1)
+
+Applied by `internal/universe`, which is pure and unit-tested — the rules are the
+product, and a wrong exclusion silently shrinks the scannable universe.
+
+| Rule | Excluded reason | Notes |
+|---|---|---|
+| Instrument type must be common stock | `type_not_common_stock` | Strict reading. ETFs, ETNs, closed-end funds, mutual funds, warrants, rights, units and preferred shares are all out. ADRs and REITs are **also** out by default — widen via `UNIVERSE_ALLOWED_TYPES` if you want them |
+| Venue must be NASDAQ / NYSE / NYSE American | `exchange_not_allowed` | Matched on **MIC**, the only reliable discriminator. `ARCX` (NYSE Arca, predominantly ETFs) and every OTC tier are excluded — §3.1 drops OTC/pink sheets in Phase 1 |
+| No non-common ticker suffix | `ticker_suffix_excluded` | Matched after a `.` or `-`. Warrants, units, rights and preferred series. Share-class letters (`BRK.B`) stay eligible, and bare tickers like `U` (Unity) and `R` (Ryder) are not mistaken for units or rights |
+| Symbol well-formed | `symbol_malformed` | Blank or containing whitespace/slash |
+
+Rules are evaluated in that order and the **first** failure is the recorded reason,
+so `excluded_reason` is deterministic.
+
+**The 250-bar history minimum is deliberately not applied here.** Bars only exist
+because the backfill ran over the eligible set, so gating eligibility on bar count
+would be circular and would leave the universe permanently empty. `bar_count`,
+`first_bar_ts` and `last_bar_ts` are refreshed on every pass for auditability, and
+the minimum is enforced as a hard gate at scan time, where §3.2 also lists it.
+
+### Table written
+
+#### `universe_symbols`
+Regular table (current state, not time-series). Ineligible symbols are **retained**
+so the filter is auditable. Full column reference: `shared/schemas/SCHEMAS.md`.
+
+Two write-safety properties worth knowing:
+
+- The symbol upsert runs in **one transaction**, so the daily scan never reads a
+  half-refreshed universe — it sees either the previous complete set or the new one.
+- An empty fetch is treated as a provider fault and leaves the existing universe
+  untouched, rather than emptying it.
+- `runFundamentals` uses `COALESCE`, so a provider returning null for one field
+  preserves the previous value instead of erasing it. `fundamentals_ts` still
+  advances, so staleness stays visible.
+
+### Unit conversion
+
+`equity_fundamentals` stores `market_cap` in **$ millions** and
+`shares_outstanding` in **millions**. `universe_symbols` and the §3.2 gates are in
+**absolute** dollars and shares, so both are multiplied by `1e6` on read. Getting
+this wrong is invisible — the numbers still look plausible — so it is documented at
+the top of the migration, in the schemas, and here.
+
+### Sanity checks the worker logs
+
+§2.3 expects roughly **5,000–7,500** eligible US common stocks after filtering. The
+worker warns when the count falls below 3,000 or exceeds 12,000, because either
+means the type or MIC allowlist is wrong and everything downstream is affected.
+
+It also reports fundamentals coverage and warns when symbols have **neither**
+market cap nor shares outstanding — those fail the §3.2 market-cap gate and cannot
+be rescued by the §3.9 `market_cap_est` proxy either. Coverage is bounded by
+whatever `FUNDAMENTAL_SYMBOLS` was set to, which is typically far narrower than the
+universe; the warning exists so that shows up as a number now rather than as an
+unexplained empty penny bucket later.
+
+### Configurable environment variables
+
+| Variable | Default | Description |
+|---|---|---|
+| `DATABASE_URL` | `postgres://...` | TimescaleDB connection string |
+| `LOG_LEVEL` | `info` | Log verbosity |
+| `FINNHUB_API_KEY` | — | Required for the symbol list; missing key disables that pass with a warning, never a crash |
+| `UNIVERSE_ENABLE_SYMBOLS` | `true` | Enable the symbol-list pass |
+| `UNIVERSE_ENABLE_FUNDAMENTALS` | `true` | Enable the sector/shares/cap pass |
+| `UNIVERSE_EXCHANGE` | `US` | Finnhub `/stock/symbol` exchange code |
+| `UNIVERSE_SYMBOLS_POLL_INTERVAL` | `168h` | Symbol-list refresh cadence |
+| `UNIVERSE_FUNDAMENTALS_POLL_INTERVAL` | `168h` | Fundamentals refresh cadence |
+| `UNIVERSE_STARTUP_DELAY_SECS` | `30` | Settling delay before the first pass |
+| `UNIVERSE_ALLOWED_TYPES` | `Common Stock` | Instrument-type allowlist; blank falls back to the default |
+| `UNIVERSE_ALLOWED_MICS` | `XNAS,XNGS,XNMS,XNCM,XNYS,XASE` | Venue allowlist |
+| `UNIVERSE_EXCLUDED_SUFFIXES` | `W,WS,WT,U,UN,R,RT` | Non-common share-class suffixes |
+| `UNIVERSE_ALLOW_EMPTY_MIC` | `false` | Admit records with a blank MIC |
+| `UNIVERSE_MIN_BARS_HISTORY` | `250` | Recorded/reported, not used for eligibility |
+| `UNIVERSE_BAR_INTERVAL` | `1Day` | Which `equity_ohlcv` rows count as daily bars |
+| `UNIVERSE_BAR_SOURCE` | `yahoo` | Bar source. **Not Alpaca** — its free tier is IEX-only volume, a single-venue fraction of consolidated volume, which makes every volume feature in §3 wrong |
+
+---
+
 ## Shared Configuration
 
 All workers inherit these base variables:
@@ -507,6 +624,8 @@ data-sentiment   → sentiment_snapshots (LunarCrush Galaxy Score per coin)
 
 data-fundamental → equity_fundamentals (TTM ratios, quarterly/annual XBRL,
                                         earnings history, forward estimates)
+
+data-universe    → universe_symbols (eligible US common stock, weekly)
 
 data-macro-intel → economic_calendar_events, earnings_calendar_events,
                    geopolitical_risk_monthly, gdelt_macro_daily,

@@ -113,6 +113,7 @@ Two buckets, differing only in thresholds:
 Notes on the gate design:
 - **The upper bound on `change_pct` is deliberate and central to the strategy.** The stated thesis is to enter at +8–15% on a confirmed move, not to chase something already up 50%. A stock up +60% today is not a Phase 1 candidate — it is already gone. Do not remove this bound.
 - **`dollar_volume` is a required addition** not in the original filter list. Without it the penny bucket fills with illiquid names where a $50k order moves the price 20%, and RVOL is statistical noise. `dollar_volume = close × volume`.
+- **`market_cap` falls back to `market_cap_est`** when Finnhub returns null — see §3.9. The gate is evaluated against the estimate, and `market_cap_null` stays recorded in `gate_failures` so the proxy's contribution stays measurable.
 - Penny bucket has a **$0.30 floor**: sub-$0.30 names are dominated by tick artifacts and reverse-split noise.
 
 ### 3.3 Price and change features
@@ -175,10 +176,25 @@ was_consolidating = range_20 < 0.25          // prior 20-bar range under 25% of 
 ### 3.7 52-week high proximity — `pct_of_52w_high`
 
 ```
-high_52w        = max(high[t-251 .. t])      // 252 trading days including today
-pct_of_52w_high = close[t] / high_52w        // 1.0 = at the high
-new_52w_high    = close[t] > max(high[t-251 .. t-1])
+high_52w        = max(high[t-251 .. t-1])    // 251 trading days, EXCLUDING today
+pct_of_52w_high = close[t] / high_52w        // 1.0 = at the prior high; > 1.0 = new 52-week high
 ```
+
+**The window excludes the current bar**, matching the same convention already used by
+`avg_vol_20` (§3.4) and `resistance_20` (§3.6). This is deliberate and load-bearing:
+
+- An earlier revision defined `high_52w` over `[t-251 .. t]`, *including* today. Because
+  `close[t] <= high[t] <= high_52w`, that made `pct_of_52w_high <= 1.0` always, so §4.2's top
+  band (`>= 1.00`) was unreachable except in the knife-edge case of a stock closing exactly at
+  its own session high on a 52-week-high day. Every genuine new high scored 4 instead of 5.
+- With today excluded, `pct_of_52w_high > 1.0` **is** a new 52-week high, so the separate
+  `new_52w_high` boolean of that earlier revision is redundant and has been **removed**. One
+  field, no knife-edge, top band reachable.
+
+> Note the interaction with §3.1: the window reads `high[t-251]`, so a fully-populated
+> `high_52w` needs 252 bars including today, while §3.1's eligibility minimum is 250. Symbols
+> between 250 and 251 prior bars compute `high_52w` over a slightly short window. The bar
+> minimum is an env var; raise it to 252 if you want the window always complete.
 
 ### 3.8 VWAP — `above_vwap`
 
@@ -203,6 +219,27 @@ float_is_proxy   = true                      // always true in Phase 1
 ```
 
 Insider and locked-up shares are not excluded, so this **overstates** float for recently-IPO'd and insider-heavy companies. Store `float_is_proxy` so Phase 2 can discount the feature's weight when the proxy is known to be poor. Do not present it to the user as "Float" without qualification — label it `Float (est)` in Discord output.
+
+#### Market cap fallback — `market_cap_est`
+
+Market cap comes from Finnhub's free `/stock/metric`, whose micro-cap coverage is poor. A null
+market cap fails the §3.2 gate, which would silently empty the penny bucket — precisely the
+population the penny bucket exists to scan. Phase 1 therefore uses the same documented-proxy
+pattern as float above:
+
+```
+market_cap_est      = shares_outstanding * close[t]   // ONLY when Finnhub market_cap is null
+market_cap_is_proxy = true                            // mirrors float_is_proxy
+```
+
+Gate on `market_cap_est` when the real value is null. **Keep `market_cap_null` in
+`gate_failures` even when the estimate lets the symbol through**, so §10 step 5's candidate-count
+sanity check can measure how often the proxy is doing the work.
+
+This is not a silent substitution and does not violate §12. What §12 forbids is a substitution
+with no formula and no flag — a bare `0` or `1`, or quietly dropping the gate. This fallback has
+an explicit formula, a persisted `market_cap_is_proxy` flag, and a retained gate-failure record.
+If `shares_outstanding` is *also* null, `market_cap_est` is null and the gate fails for real.
 
 **Short interest / days-to-cover is not in Phase 1.** Small float plus high short interest is one of the more reliable ingredients in real 100%+ squeezes, but no free source covers it acceptably. Leave nullable columns `short_interest_pct` and `days_to_cover` in the schema so the feature can be added without a migration later.
 
@@ -323,6 +360,9 @@ All piecewise-linear and deterministic. Interpolate linearly inside each band; c
 | 0.95 – 1.00 | 4 |
 | 0.90 – 0.95 | 2 |
 | < 0.90 | 0 |
+
+Since §3.7's window excludes today, `pct_of_52w_high` can exceed 1.0 and the top band is
+reachable: `>= 1.00` *is* the new-52-week-high case. Values above 1.0 clamp to 5.
 
 ### 4.3 Penalties
 
@@ -471,7 +511,7 @@ Reuse the existing Redis alert-cooldown pattern so a symbol that stays qualified
 **Embed content** (follow root `README.md` conventions — embeds only, `—` for nulls, existing colour semantics):
 
 ```
-🟩 ┃ 🔥 XYZ  +11.8%   Score 92/100
+🟩 ┃ 🔥 XYZ  +11.8%   Score 89/100
    ┃
    ┃ RVOL          Vol accel      Volume
    ┃ 7.4x          2.1x           4.2M
@@ -483,10 +523,15 @@ Reuse the existing Redis alert-cooldown pattern so a symbol that stays qualified
    ┃ 18M           $850M          A — FDA clearance
    ┃
    ┃ Score breakdown
-   ┃ accel 21 · rvol 19 · breakout 20 · catalyst 15 · float 10 · vwap 5 · 52w 4  (−2 rsi)
+   ┃ accel 21 · rvol 19 · breakout 20 · catalyst 15 · float 10 · vwap 5 · 52w 4  (−5 rsi)
    ┃
    ┃ Daily bars · regular session only · EOD scan 2026-09-15
 ```
+
+The breakdown must reconcile: the seven sub-scores sum to 94, the single applied penalty is
+**−5** (`rsi_14 > 85`, §4.3), and 94 − 5 = 89. §4.3 is the definition — an earlier revision of
+this mockup showed `(−2 rsi)` totalling 92, which contradicted it. If a future mockup and §4.3
+disagree again, §4.3 wins.
 
 The footer must state **"regular session only"** and the scan date. Free-tier daily data is easy to misread as live, and a stale-looking number with no provenance is how a research tool turns into a bad decision.
 

@@ -32,9 +32,8 @@
       "description": "Judged on close[t], never on an intrabar high — a wick above resistance that closes back below is not a breakout (§3.6)"
     },
 
-    "high_52w": { "type": ["number", "null"], "description": "max(high[t-251..t]), 252 trading days INCLUDING today" },
-    "pct_of_52w_high": { "type": ["number", "null"], "description": "close[t] / high_52w. RATIO, not percent: 1.0 = at the high" },
-    "new_52w_high": { "type": ["boolean", "null"], "description": "close[t] > max(high[t-251..t-1]) — window EXCLUDES today" },
+    "high_52w": { "type": ["number", "null"], "description": "max(high[t-251..t-1]), 251 trading days EXCLUDING today — same convention as avg_vol_20 and resistance_20" },
+    "pct_of_52w_high": { "type": ["number", "null"], "description": "close[t] / high_52w. RATIO, not percent: 1.0 = at the prior high, > 1.0 IS a new 52-week high. There is deliberately no separate new_52w_high boolean; it would be redundant with this field" },
 
     "vwap_20": { "type": ["number", "null"], "description": "Rolling 20-day VWAP (compute/vwap.go). Phase 1 stand-in for intraday session VWAP; field name is stable so the Phase 3 swap is one place" },
     "above_vwap": { "type": ["boolean", "null"], "description": "close[t] > vwap_20" },
@@ -56,7 +55,9 @@
     "sector_strength_pct": { "type": ["number", "null"], "description": "median(change_pct_5d) across eligible universe symbols in the same sector. RECORDED, NOT SCORED in Phase 1 — there is no principled weight yet (§3.12)" },
     "change_pct_5d": { "type": ["number", "null"], "description": "(close[t]/close[t-5] - 1) * 100. Input to sector_strength_pct; not defined in §3.3, see SCHEMAS.md" },
 
-    "market_cap": { "type": ["number", "null"], "description": "USD absolute, at t. §3.2 gate input and embed field" },
+    "market_cap": { "type": ["number", "null"], "description": "USD absolute, at t, as reported by Finnhub. §3.2 gate input and embed field" },
+    "market_cap_est": { "type": ["number", "null"], "description": "shares_outstanding * close[t], USD absolute. Documented fallback used for the §3.2 gate ONLY when market_cap is null — Finnhub's micro-cap coverage is poor and a hard null would silently empty the penny bucket (§3.9). Null when shares_outstanding is also null, in which case the gate fails for real" },
+    "market_cap_is_proxy": { "type": "boolean", "description": "true when the gate was evaluated against market_cap_est. Mirrors float_is_proxy. Note that 'market_cap_null' remains in gate_failures even when the estimate lets the symbol through, so §10 step 5 can measure how often the proxy is doing the work" },
 
     "bucket": {
       "type": ["string", "null"],
