@@ -1,0 +1,25 @@
+---
+description: Route prompts to trading-agent subagents and enforce repo layout
+alwaysApply: true
+---
+
+# trading-agent
+
+Layout (do not invent another):
+
+- Host MFE: `web-app/ui/spog`
+- Remote MFEs: `web-app/ui/mfe-<name>`
+- Shared Stitch kit: `web-app/shared-components` (`@trading-agent/shared-components`)
+- Microservices: `services/svc-<name>`
+- Keycloak: `auth/`
+
+Every MFE and service package root must include `README.md`, `Makefile` (`build`, `test`, `run`, `docker`), and `Dockerfile`.
+
+Delegate:
+
+- New MFE / spog → subagent `mfe-creator`
+- Screens, components, theme, CSS → subagent `ui-developer`
+- React/TypeScript standards → subagent `react`
+- New microservice → subagent `svc-creator`
+
+Node 22 (`nvm use 22`). Public npm only.
