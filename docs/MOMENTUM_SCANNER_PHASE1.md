@@ -64,6 +64,18 @@ EODHD's bulk endpoints are the right long-term answer (one call returns an entir
 | Shares outstanding, sector, market cap | Finnhub `/stock/metric` | Already ingested into `equity_fundamentals` | `shares_outstanding` and `market_cap` metrics already exist there. |
 | Cross-check bars | Alpaca | `internal/fetch/alpacadata/bars.go` exists | ⚠️ **Do not use as primary.** Alpaca's free tier serves the IEX feed only, whose volume is a single-venue fraction of consolidated volume. Volume-based features computed on IEX volume are unreliable. |
 
+> **Status 2026-09-15 — the primary bar source is unverified in practice.** Yahoo's
+> chart API returns a blanket `429` from the development network (an IP-reputation
+> block, not rate limiting — Finnhub works fine from the same host, so egress is
+> not the issue). Two fallbacks were evaluated and neither is viable as-is:
+> Finnhub's own `/stock/candle` is **403 on the free tier** (a plan restriction
+> that would fail from any network), and Stooq's free CSV endpoint returns a
+> JavaScript proof-of-work challenge with an HTTP 200 status. The decisive
+> outstanding test is re-running Yahoo from a network with different egress, which
+> would distinguish "Yahoo is gone" from "Yahoo is unusable from that office".
+> Details and the consolidated-volume caveat in
+> `services/data-ingestion/data_ingestion.md`.
+
 **Critical constraint: volume must be consolidated volume.** Every volume feature in this spec (RVOL, acceleration, dollar volume) is meaningless on single-venue volume. Yahoo provides consolidated volume; IEX-only does not. If bar source ever changes, re-verify this.
 
 ### 2.3 Scale and runtime budget
@@ -722,7 +734,7 @@ Each step should produce something verifiable before the next begins.
 | 2 | `data-universe`: symbol list + eligibility | `universe_symbols` populated, ~5–7.5k eligible, exclusions auditable |
 | 3 | `data-universe`: resumable 3-year bar backfill **+ the §8.1.4 daily incremental refresh** | `equity_ohlcv` has `source='yahoo_finance'` daily bars for the universe; job survives a kill and resumes; the daily short-window refresh keeps them current. §8.1.4 is folded in here because §10 originally gave it no step of its own, and without it bars go stale the day after the backfill completes |
 | **3b** | **`data-fundamental`: widen symbol source to the eligible universe** | **One full pass completed against the real universe; `universe_symbols.market_cap` / `shares_outstanding` / `sector` populated for the bulk of it. HARD PREREQUISITE FOR STEP 5 — see below.** |
-| 4 | Feature engine (§3) + unit tests against hand-computed fixtures | Every formula tested; a no-lookahead test passes |
+| 4 | Feature engine (§3) + unit tests against hand-computed fixtures | Every formula tested; a no-lookahead test passes. **Delivered** as `services/data-analyzer/internal/momentum` — pure functions over bars, 25 tests. `ComputeAt(bars, i)` is the primitive so no-lookahead is *testable*: its output must equal `Compute(bars[:i+1])` for every `i`, which a forward index cannot satisfy. Mutation-verified — injecting a deliberate leak fails the test and names the leaking field |
 | 5 | Hard gates + bucketing | Candidate counts per day are sane (tens to low hundreds, not thousands) |
 | 6 | Scorer (§4) with full sub-score persistence | `/score` output reconstructs the total exactly |
 | 7 | **Backfill + labels + base-rate report (§6)** | Score-decile hit rates vs. base rate printed. **This is the go/no-go gate.** |

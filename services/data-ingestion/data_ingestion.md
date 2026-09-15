@@ -761,6 +761,40 @@ Options, none yet chosen: run the backfill from a network with its own egress
 source with an authenticated quota rather than an IP-shared one; or re-verify from
 a different host before treating this as permanent.
 
+**Narrowing evidence — the block is provider-specific, not egress-wide.** Three
+providers tested from the same host in the same minutes:
+
+| Provider | Result | Reading |
+|---|---|---|
+| Finnhub | `/quote`, `/stock/metric`, `/stock/symbol` all **200** (also from inside a container) | Outbound HTTPS to market-data APIs is not blocked |
+| Stooq | **200**, but the body is a JavaScript proof-of-work browser challenge, not CSV | Reachable; refuses non-browser clients |
+| Yahoo chart | **429** on every request, first one included | Blanket block |
+
+So the corporate proxy is not preventing market-data traffic in general — Yahoo
+alone refuses this egress address. That points at IP reputation rather than network
+policy, and it means the decisive test is **re-running the same request from a
+network with different egress** (phone hotspot, home connection). That test cannot
+be run from this host; it needs someone on a different connection. Until it is run,
+"Yahoo is unusable" is unproven — what is proven is "Yahoo is unusable *from here*".
+
+#### Fallback bar sources evaluated — neither is viable as-is
+
+| Candidate | Verdict |
+|---|---|
+| **Finnhub `/stock/candle`** | **403 `"You don't have access to this resource."`** Stock candles are behind a paid Finnhub tier. This is a plan restriction, not a network result — the same key succeeds on `/quote` and `/stock/metric` — so it would fail identically from clean egress. The appealing "reuse the client we already have" option is closed on the free tier. |
+| **Stooq CSV** (`stooq.com/q/d/l/?s=aapl.us&i=d`) | **Returns HTTP 200 with an HTML+JS proof-of-work challenge**, not CSV. Unusable without executing JavaScript. Whether a cleaner egress IP avoids the challenge is untested. |
+
+The Stooq result carries a trap worth recording: it answers **200** with an HTML
+body. A client that checks only the status code would treat the challenge page as
+success and parse it as CSV, producing zero or garbage bars rather than an error.
+Any Stooq adapter must validate the content type and the header row, not the status.
+
+Neither candidate has been confirmed to provide **consolidated** volume either,
+which is the actual requirement §2.2 encodes — Yahoo was a means to it, not the end.
+A fallback that quietly supplies single-venue volume reintroduces the exact problem
+that disqualified Alpaca's free tier, and every §3 volume feature would be wrong
+while looking fine. That check has to pass before any adapter is written.
+
 #### 2. Finnhub works — including the endpoint 3b depends on
 
 Verified with the configured key: `/quote` → 200, `/stock/metric` → 200 with a
