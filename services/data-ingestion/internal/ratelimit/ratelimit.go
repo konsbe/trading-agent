@@ -51,7 +51,38 @@ type Budget struct {
 
 	// Burst is the maximum accumulation, i.e. the largest allowed spike.
 	Burst float64
+
+	// DailyLimit is a hard requests-per-day ceiling, or nil for none.
+	//
+	// A separate mechanism from the token bucket above, not a second rate: the
+	// bucket paces, this stops. Twelve Data's free tier is the motivating case —
+	// 8 requests/minute AND 800 credits/day, where the daily cap binds first
+	// (800 at 8/min is ~100 minutes of work, then blocked until the window
+	// rolls).
+	//
+	// Pad this below the provider's documented figure until the window boundary
+	// has been reconciled against the provider's own reported usage. Being wrong
+	// in the "we have less room than we thought" direction costs a spurious
+	// ErrDailyQuotaExhausted, which callers already handle by retrying tomorrow.
+	// Being wrong the other way overruns the account.
+	DailyLimit *float64
 }
+
+// ErrDailyQuotaExhausted reports that the shared budget's daily ceiling is spent.
+//
+// This is deliberately NOT a coordination failure, and the difference is the
+// whole reason it exists. A coordination failure means "we do not know the
+// state, so be conservative" and correctly degrades to the caller's local
+// limiter. A spent daily quota means "we know the state exactly, and it is
+// zero" — degrading there would pace requests against an account with nothing
+// left, turning the mechanism built to prevent unlimited access into the thing
+// granting it, while the limiter's own logs looked healthy.
+//
+// Callers must stop the pass rather than retry in-process. The momentum
+// scanner's claim/lease checkpoint already does the right thing with this:
+// record the failure against the symbol, end the round, resume after the window
+// rolls.
+var ErrDailyQuotaExhausted = errors.New("ratelimit: daily quota exhausted")
 
 // Options tunes the shared limiter's behaviour.
 type Options struct {
@@ -84,6 +115,13 @@ type Stats struct {
 	Granted  uint64 // acquisitions satisfied by the shared budget
 	Throttle uint64 // times the shared budget made us wait
 	Degraded uint64 // times we fell back to the local limiter
+
+	// QuotaExhausted counts ErrDailyQuotaExhausted returns. Counted separately
+	// from Degraded on purpose: degradation means coordination broke and we are
+	// running on local rate, while quota exhaustion means coordination worked
+	// perfectly and the answer was no. Conflating them would hide a spent
+	// account inside a "limiter unhealthy" metric.
+	QuotaExhausted uint64
 }
 
 // Shared is a Postgres-backed token bucket with a local fallback.
@@ -100,6 +138,7 @@ type Shared struct {
 	granted  atomic.Uint64
 	throttle atomic.Uint64
 	degraded atomic.Uint64
+	quotaOut atomic.Uint64
 
 	warnMu   sync.Mutex
 	lastWarn time.Time
@@ -129,6 +168,12 @@ func NewShared(pool *pgxpool.Pool, b Budget, fallback Limiter, o Options, log *s
 	if fallback == nil {
 		return nil, errors.New("ratelimit: nil fallback — a coordination outage must degrade to a local limiter, never to unlimited")
 	}
+	if b.DailyLimit != nil && *b.DailyLimit < 1 {
+		// A ceiling below one request can never grant anything, so every
+		// acquisition would return ErrDailyQuotaExhausted and the caller would
+		// look permanently quota-blocked with no way to tell why.
+		return nil, fmt.Errorf("ratelimit: budget %q has DailyLimit %v; must be >= 1 or nil for no ceiling", b.Key, *b.DailyLimit)
+	}
 	d := DefaultOptions()
 	if o.AcquireTimeout <= 0 {
 		o.AcquireTimeout = d.AcquireTimeout
@@ -146,14 +191,18 @@ func NewShared(pool *pgxpool.Pool, b Budget, fallback Limiter, o Options, log *s
 }
 
 const ensureBudgetSQL = `
-INSERT INTO api_rate_budget (budget_key, tokens, refill_per_sec, burst, updated_at)
-VALUES ($1, $2, $2, $3, now())
+INSERT INTO api_rate_budget (budget_key, tokens, refill_per_sec, burst, daily_limit, updated_at)
+VALUES ($1, $2, $2, $3, $4, now())
 ON CONFLICT (budget_key) DO UPDATE SET
     refill_per_sec = EXCLUDED.refill_per_sec,
     burst          = EXCLUDED.burst,
+    daily_limit    = EXCLUDED.daily_limit,
     -- tokens and updated_at are deliberately NOT reset: a worker restarting
     -- must not refill the shared bucket, or a rolling restart would hand out a
     -- free burst per process. That is the Redis-TTL bug this design avoids.
+    --
+    -- daily_used and daily_window_start are likewise untouched, for the same
+    -- reason: a restart must not hand back a spent daily quota.
     tokens         = LEAST(api_rate_budget.tokens, EXCLUDED.burst)`
 
 // EnsureBudget creates or reconciles the budget row. Idempotent, so every worker
@@ -163,7 +212,8 @@ ON CONFLICT (budget_key) DO UPDATE SET
 // The initial token count is one second's worth rather than a full burst, so a
 // cold start does not immediately spend the entire allowance.
 func (s *Shared) EnsureBudget(ctx context.Context) error {
-	_, err := s.pool.Exec(ctx, ensureBudgetSQL, s.budget.Key, s.budget.RefillPerSec, s.budget.Burst)
+	_, err := s.pool.Exec(ctx, ensureBudgetSQL,
+		s.budget.Key, s.budget.RefillPerSec, s.budget.Burst, s.budget.DailyLimit)
 	if err != nil {
 		return fmt.Errorf("ensure budget %q: %w", s.budget.Key, err)
 	}
@@ -180,15 +230,36 @@ func (s *Shared) EnsureBudget(ctx context.Context) error {
 const acquireSQL = `
 UPDATE api_rate_budget SET
     tokens     = LEAST(burst, tokens + refill_per_sec * GREATEST(0, EXTRACT(EPOCH FROM (now() - updated_at)))) - 1,
-    updated_at = now()
+    updated_at = now(),
+    -- Roll the daily window and consume in the same statement, so the counter
+    -- can never be reset by one caller while another is mid-acquisition.
+    daily_used = CASE
+        WHEN daily_window_start IS DISTINCT FROM (now() AT TIME ZONE 'UTC')::date THEN 1
+        ELSE daily_used + 1
+    END,
+    daily_window_start = (now() AT TIME ZONE 'UTC')::date
 WHERE budget_key = $1
   AND LEAST(burst, tokens + refill_per_sec * GREATEST(0, EXTRACT(EPOCH FROM (now() - updated_at)))) >= 1
+  AND (
+       daily_limit IS NULL
+       -- A window that has rolled is fresh regardless of the stored counter.
+    OR daily_window_start IS DISTINCT FROM (now() AT TIME ZONE 'UTC')::date
+    OR daily_used < daily_limit
+  )
 RETURNING tokens`
 
-// waitSQL computes how long until one token is available. Only issued on the
-// denied path, where the caller is about to sleep anyway.
-const waitSQL = `
-SELECT GREATEST(0, (1 - LEAST(burst, tokens + refill_per_sec * GREATEST(0, EXTRACT(EPOCH FROM (now() - updated_at))))) / refill_per_sec)
+// denialSQL explains a denial: was it the rate, or the daily ceiling?
+//
+// Only issued on the denied path, where the caller is about to sleep anyway, and
+// the distinction is essential — one means "wait a moment", the other means
+// "come back tomorrow", and no amount of waiting inside Wait can express the
+// second.
+const denialSQL = `
+SELECT
+    (daily_limit IS NOT NULL
+     AND daily_window_start = (now() AT TIME ZONE 'UTC')::date
+     AND daily_used >= daily_limit) AS daily_exhausted,
+    GREATEST(0, (1 - LEAST(burst, tokens + refill_per_sec * GREATEST(0, EXTRACT(EPOCH FROM (now() - updated_at))))) / refill_per_sec) AS wait_secs
 FROM api_rate_budget
 WHERE budget_key = $1`
 
@@ -201,9 +272,20 @@ func (s *Shared) Wait(ctx context.Context) error {
 		}
 
 		granted, sleep, err := s.tryAcquire(ctx)
+		if errors.Is(err, ErrDailyQuotaExhausted) {
+			// NOT degradation, and deliberately NOT routed through the fallback.
+			// Coordination worked; the answer is that the account has nothing
+			// left today. Pacing against a spent quota would convert a hard
+			// ceiling into a wall of 429s — or, on a paid tier, into overage
+			// charges — using the very mechanism meant to prevent it.
+			s.quotaOut.Add(1)
+			s.warn("shared daily quota exhausted; stopping rather than falling back to the local limiter", err)
+			return err
+		}
 		if err != nil {
-			// Coordination failed. Degrade to the local limiter for this request
-			// only — never unlimited, never a permanent switch.
+			// Coordination failed: we do not know the state, so be conservative
+			// and degrade to the local limiter for this request only — never
+			// unlimited, never a permanent switch.
 			s.degraded.Add(1)
 			s.warn("shared rate limiter unavailable; falling back to the local in-process limiter for this request", err)
 			return s.fallback.Wait(ctx)
@@ -251,10 +333,16 @@ func (s *Shared) tryAcquire(ctx context.Context) (bool, time.Duration, error) {
 		return false, 0, err
 	}
 
+	var dailyExhausted bool
 	var secs float64
-	err = s.pool.QueryRow(actx, waitSQL, s.budget.Key).Scan(&secs)
+	err = s.pool.QueryRow(actx, denialSQL, s.budget.Key).Scan(&dailyExhausted, &secs)
 	switch {
 	case err == nil:
+		if dailyExhausted {
+			// Wrapped so the budget key appears in logs, while errors.Is still
+			// matches the sentinel.
+			return false, 0, fmt.Errorf("%w (budget %q)", ErrDailyQuotaExhausted, s.budget.Key)
+		}
 		return false, time.Duration(secs * float64(time.Second)), nil
 	case errors.Is(err, pgx.ErrNoRows):
 		return false, 0, fmt.Errorf("ratelimit: budget %q missing; call EnsureBudget at startup", s.budget.Key)
@@ -263,12 +351,59 @@ func (s *Shared) tryAcquire(ctx context.Context) (bool, time.Duration, error) {
 	}
 }
 
+const syncDailyUsageSQL = `
+UPDATE api_rate_budget SET
+    daily_used         = $2,
+    daily_window_start = (now() AT TIME ZONE 'UTC')::date,
+    updated_at         = now()
+WHERE budget_key = $1`
+
+// SyncDailyUsage overwrites the local daily counter with the provider's own
+// reported consumption.
+//
+// Our counter and the provider's can drift: a request that consumed a credit
+// upstream but failed locally is counted by them and not by us, and the
+// UTC-midnight window boundary is an assumption rather than a verified fact.
+// Reconciling against the authoritative number turns both into detectable
+// conditions instead of silent ones.
+//
+// Twelve Data exposes this directly via GET /api_usage (daily_usage,
+// plan_daily_limit). Call it periodically; until it has run across a window
+// rollover, keep the configured DailyLimit padded below the documented figure.
+func (s *Shared) SyncDailyUsage(ctx context.Context, used float64) error {
+	if _, err := s.pool.Exec(ctx, syncDailyUsageSQL, s.budget.Key, used); err != nil {
+		return fmt.Errorf("sync daily usage for %q: %w", s.budget.Key, err)
+	}
+	return nil
+}
+
+// DailyState reports the current window's consumption, for reconciliation and
+// for reporting how much of the day's budget a pass has left.
+type DailyState struct {
+	Used        float64
+	Limit       *float64
+	WindowStart *time.Time
+}
+
+func (s *Shared) DailyState(ctx context.Context) (DailyState, error) {
+	const q = `
+SELECT daily_used, daily_limit, daily_window_start
+FROM api_rate_budget WHERE budget_key = $1`
+	var d DailyState
+	err := s.pool.QueryRow(ctx, q, s.budget.Key).Scan(&d.Used, &d.Limit, &d.WindowStart)
+	if err != nil {
+		return d, fmt.Errorf("daily state for %q: %w", s.budget.Key, err)
+	}
+	return d, nil
+}
+
 // Stats returns a snapshot of coordination health.
 func (s *Shared) Stats() Stats {
 	return Stats{
-		Granted:  s.granted.Load(),
-		Throttle: s.throttle.Load(),
-		Degraded: s.degraded.Load(),
+		Granted:        s.granted.Load(),
+		Throttle:       s.throttle.Load(),
+		Degraded:       s.degraded.Load(),
+		QuotaExhausted: s.quotaOut.Load(),
 	}
 }
 

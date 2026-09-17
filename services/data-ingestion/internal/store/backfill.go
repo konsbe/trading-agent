@@ -40,12 +40,17 @@ type BackfillClaim struct {
 //
 // FOR UPDATE SKIP LOCKED makes concurrent claims safe. The design assumes one
 // worker, but two would now split the work instead of duplicating it.
+//
+// selectedOnly restricts claims to the pilot subset (backfill_selected). The
+// pilot and the full universe use different providers with different quotas, so
+// running the backfill over the wrong population would spend the wrong budget.
 func ClaimBackfillBatch(
 	ctx context.Context,
 	pool *pgxpool.Pool,
 	limit int,
 	lease time.Duration,
 	maxAttempts int,
+	selectedOnly bool,
 ) ([]BackfillClaim, error) {
 	if limit <= 0 {
 		return nil, nil
@@ -55,6 +60,7 @@ WITH claimable AS (
     SELECT symbol, exchange
     FROM universe_symbols
     WHERE is_eligible
+      AND (NOT $4 OR backfill_selected)
       AND (
             backfill_status = 'pending'
          OR (backfill_status = 'failed'      AND backfill_attempts < $3)
@@ -80,7 +86,7 @@ FROM claimable c
 WHERE u.symbol = c.symbol AND u.exchange = c.exchange
 RETURNING u.symbol, u.exchange, u.backfill_attempts`
 
-	rows, err := pool.Query(ctx, q, limit, lease, maxAttempts)
+	rows, err := pool.Query(ctx, q, limit, lease, maxAttempts, selectedOnly)
 	if err != nil {
 		return nil, fmt.Errorf("claim backfill batch: %w", err)
 	}

@@ -25,8 +25,8 @@ import (
 
 	"github.com/konsbe/trading-agent/services/data-ingestion/internal/config"
 	"github.com/konsbe/trading-agent/services/data-ingestion/internal/db"
+	"github.com/konsbe/trading-agent/services/data-ingestion/internal/fetch/barsource"
 	"github.com/konsbe/trading-agent/services/data-ingestion/internal/fetch/finnhub"
-	"github.com/konsbe/trading-agent/services/data-ingestion/internal/fetch/yahoo"
 	"github.com/konsbe/trading-agent/services/data-ingestion/internal/logx"
 	"github.com/konsbe/trading-agent/services/data-ingestion/internal/ratelimit"
 	"github.com/konsbe/trading-agent/services/data-ingestion/internal/store"
@@ -47,7 +47,11 @@ func main() {
 	}
 	log := logx.New(cfg.LogLevel)
 
-	if !cfg.EnableSymbols && !cfg.EnableFundamentals && !cfg.EnableBackfill && !cfg.EnableDailyBars {
+	// Pricing and subset selection are passes in their own right: running them
+	// alone is the normal way to prepare a pilot draw without spending any bar
+	// provider quota. Omitting them here made a pricing-only run exit at startup.
+	if !cfg.EnableSymbols && !cfg.EnableFundamentals && !cfg.EnableBackfill &&
+		!cfg.EnableDailyBars && !cfg.PricingEnable && !cfg.SubsetEnable {
 		log.Info("all universe passes disabled; exiting")
 		return
 	}
@@ -69,27 +73,36 @@ func main() {
 		log.Warn("FINNHUB_API_KEY not set; symbol-list refresh disabled")
 		cfg.EnableSymbols = false
 	}
-	if !cfg.EnableSymbols && !cfg.EnableFundamentals && !cfg.EnableBackfill && !cfg.EnableDailyBars {
+	if cfg.PricingEnable && !fh.HasToken() {
+		// Same contract as the symbol pass: a missing key disables the pass with a
+		// warning rather than crashing. Left enabled it would fail once per
+		// symbol for ~4,975 symbols and look like a provider outage.
+		log.Warn("FINNHUB_API_KEY not set; universe pricing disabled — the stratified subset draw has no bucketing signal without it")
+		cfg.PricingEnable = false
+	}
+	if !cfg.EnableSymbols && !cfg.EnableFundamentals && !cfg.EnableBackfill &&
+		!cfg.EnableDailyBars && !cfg.PricingEnable && !cfg.SubsetEnable {
 		log.Info("no usable universe passes after config checks; exiting")
 		return
 	}
 
-	// Yahoo needs no key. The rate limiter is shared across every goroutine in
-	// this client, so BackfillConcurrency controls pipelining, not throughput.
-	yh := yahoo.NewWithOptions(yahoo.Options{
-		RequestsPerSecond: cfg.RequestsPerSecond,
-		Burst:             cfg.RequestBurst,
-		Timeout:           cfg.RequestTimeout,
-		MaxRetries:        cfg.RequestMaxRetries,
-		BackoffBase:       cfg.BackoffBase,
-		BackoffMax:        cfg.BackoffMax,
-	})
+	// Bar provider is chosen by UNIVERSE_BAR_SOURCE. The backfill and daily
+	// refresh never name a provider — they hold a barsource.Fetcher — so adding
+	// or swapping one is configuration rather than a rewrite.
+	//
+	// The limiter is shared across every goroutine in the client, so
+	// BackfillConcurrency controls pipelining, not throughput.
+	bars, err := buildBarFetcher(ctx, cfg, pool, log)
+	if err != nil {
+		log.Error("bar source", "source", cfg.BarSource, "err", err)
+		os.Exit(1)
+	}
 
 	w := &worker{
 		cfg:   cfg,
 		pool:  pool,
 		fh:    fh,
-		yh:    yh,
+		bars:  bars,
 		log:   log,
 		rules: universe.NewRules(cfg.AllowedTypes, cfg.AllowedMICs, cfg.ExcludedSuffixes, cfg.AllowEmptyMIC),
 	}
@@ -107,6 +120,13 @@ func main() {
 	}
 	if cfg.EnableFundamentals {
 		w.runFundamentals(ctx)
+	}
+	// Pricing must precede selection: stratification buckets symbols by price.
+	if cfg.PricingEnable {
+		w.runUniversePricing(ctx)
+	}
+	if cfg.SubsetEnable {
+		w.runSubsetSelection(ctx)
 	}
 
 	tSymbols := time.NewTicker(cfg.PollSymbols)
@@ -131,7 +151,17 @@ func main() {
 		"daily_bars_every", cfg.DailyBarsInterval.String(),
 		"backfill_enabled", cfg.EnableBackfill,
 		"backfill_years", cfg.BackfillYears,
-		"yahoo_req_per_sec", cfg.RequestsPerSecond)
+		// Named after the setting, not after one provider: the field read
+		// "yahoo_req_per_sec" while UNIVERSE_BAR_SOURCE was tiingo, which
+		// invites exactly the wrong conclusion when someone is debugging pacing.
+		"bar_source", cfg.BarSource,
+		"bar_req_per_sec", cfg.RequestsPerSecond)
+
+	// Tracks the backfill's drained/working edge so the post-backfill consistency
+
+	// report fires on the transition, not on every idle tick.
+
+	backfillDrained := false
 
 	for {
 		select {
@@ -157,7 +187,15 @@ func main() {
 			next := time.Duration(0)
 			if processed == 0 {
 				next = cfg.BackfillIdleInterval
+				// Just drained. Report coverage and bucket drift on the
+				// transition rather than every idle tick, so the check lands in
+				// the log exactly when both the selection price and the real
+				// bars exist to be compared.
+				if cfg.SubsetEnable && !backfillDrained {
+					w.reportSubsetConsistency(ctx)
+				}
 			}
+			backfillDrained = processed == 0
 			backfillTimer.Reset(next)
 		}
 	}
@@ -167,7 +205,7 @@ type worker struct {
 	cfg   config.Universe
 	pool  *pgxpool.Pool
 	fh    *finnhub.Client
-	yh    *yahoo.Client
+	bars  barsource.Fetcher
 	log   *slog.Logger
 	rules universe.Rules
 }

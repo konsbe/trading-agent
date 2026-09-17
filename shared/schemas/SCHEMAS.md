@@ -373,14 +373,39 @@ This table uses a **tall/narrow** layout: each computed number is its own row, i
 
 The six tables below are introduced by `007_momentum.sql` and implement
 `docs/MOMENTUM_SCANNER_PHASE1.md`. Daily bars are **not** duplicated — momentum
-features are computed from `equity_ohlcv` rows with `interval = '1Day'` and
-`source = 'yahoo_finance'` — the value `internal/fetch/yahoo` actually writes. The
-spec's §7 originally said `'yahoo'`, which matches zero rows.
+features are computed from `equity_ohlcv` rows with `interval = '1Day'` and the
+`source` named by `UNIVERSE_BAR_SOURCE`, which must be the value the fetcher
+actually writes. (The spec's §7 originally said `'yahoo'`, which matches zero
+rows; `internal/fetch/yahoo` writes `'yahoo_finance'`.)
 
-**Why Yahoo and not Alpaca:** every volume feature in the scanner (RVOL, volume
+**Why not Alpaca:** every volume feature in the scanner (RVOL, volume
 acceleration, dollar volume) requires **consolidated** volume. Alpaca's free tier
 serves the IEX feed only, a single-venue fraction of consolidated volume, which
-would make all of them wrong. If the bar source ever changes, re-verify this.
+would make all of them wrong.
+
+**Why `tiingo` and not `yahoo_finance`:** Tiingo's `adj*` fields are split *and*
+dividend adjusted. Our Yahoo rows are not dividend adjusted — `internal/fetch/yahoo`
+decodes `indicators.quote` and the string `adjclose` appears nowhere in the
+package, so the adjustment is absent by construction. `data-analyzer`'s
+`QueryEquityBars` therefore prefers `source = 'tiingo'` per timestamp when a
+symbol has rows from both; preferring Yahoo made a doubly-covered symbol resolve
+to the unadjusted series, which is worse than either source alone.
+
+### `interval = 'quote_snapshot'` is not a bar
+
+`equity_ohlcv` also carries Finnhub `/quote` snapshots written with
+`interval = 'quote_snapshot'`, `source = 'finnhub_quote'`, and `volume = 0`.
+
+These are **not** daily bars and nothing reading `interval = '1Day'` can pick
+them up. They exist to break the pilot's stratification bootstrap: stratifying by
+price needs a price for every symbol, but prices come from the bar backfill that
+the stratified draw selects. Finnhub `/quote` supplies an approximate price for
+the whole universe through a budget the repo already pays for, at zero cost to
+the bar provider's quota. See §8.1.1 of the spec.
+
+Because the snapshot is a live price and not an adjusted close, a symbol's
+selection-time price bucket can disagree with its post-backfill bucket.
+`LoadSubsetStats` reports that disagreement with examples rather than hiding it.
 
 ### Unit conventions
 
@@ -437,7 +462,19 @@ The bar-count rule is the one exception to "applied at symbol-list load": it is 
 | `backfill_attempts` | integer | yes | |
 | `backfill_last_error` | string/null | no | |
 | `backfill_completed_at` | datetime/null | no | |
+| `backfill_selected` | boolean | yes | Marks the pilot subset validated on a free tier before the full universe (migration `010`). **Also the de-facto enforcement of Tiingo's 500-unique-symbols/month allowance** |
 | `updated_at` | datetime | yes | |
+
+**`backfill_selected` is a quota mechanism, and nothing else enforces it.** Tiingo's
+free allowance is 500 *unique symbols per month* — neither a rate nor a daily count,
+and therefore not expressible in `api_rate_budget` at all. Re-touching an
+already-counted symbol is free, so a stable subset refreshed daily stays inside the
+allowance indefinitely, while widening it past ~450 silently spends the month.
+
+No limiter will stop that. The guard has to be an explicit assertion on subset size
+in the selection job, where it fails loudly and immediately rather than a month later
+when Tiingo starts rejecting requests for reasons that look unrelated to the change
+that caused them.
 
 The `backfill_*` columns are per-symbol checkpoint state for the resumable 3-year
 bar backfill (§8.1.3). They are job state, not features — the backfill must
@@ -806,6 +843,62 @@ unexplained 429 spike after deploys, which is very hard to connect to its cause.
 | `refill_per_sec` | number | yes | Sustained rate. `1.0` for Finnhub free tier |
 | `burst` | number | yes | Largest allowed spike. Must be ≥ 1 — a smaller burst could never satisfy a request, so every acquisition would silently degrade |
 | `updated_at` | datetime | yes | Advanced on each successful acquisition; the refill baseline |
+| `daily_limit` | number/null | no | Hard requests-per-day ceiling (migration `010`). **NULL = no ceiling**, preserving pre-010 behaviour for existing rows |
+| `daily_used` | number | yes | Consumed in the current window. Only a *granted* acquisition consumes it — refusals do not |
+| `daily_window_start` | date/null | no | UTC calendar day the counter covers. Rolled inside the acquisition statement, so no worker action or scheduled job is needed |
+
+#### The daily ceiling is a second, separate mechanism
+
+A rate limit and a daily quota are not two settings of one thing:
+
+| | Mechanism | Caller's correct response |
+|---|---|---|
+| `tokens` / `refill_per_sec` / `burst` | continuous refill — paces | wait a moment, retry |
+| `daily_*` | fixed window — stops | **come back tomorrow** |
+
+They are kept as separate columns rather than merged because conflating them is
+where the bugs live. A token bucket can always eventually grant a request; a spent
+daily quota cannot until the window rolls, and `Wait` blocking for fourteen hours
+is not a sleep.
+
+Motivating case: Twelve Data's free tier is 8 requests/minute **and** 800
+credits/day, where the daily cap binds first — 800 credits at 8/min is ~100 minutes
+of work, after which the account is blocked. A limiter expressing only the rate
+would pace happily into a wall.
+
+> ### ⚠️ Quota exhaustion is not degradation, and must never use the fallback
+>
+> `internal/ratelimit` degrades to the caller's local in-process bucket whenever
+> coordination fails, and its guarantee is *"never unlimited"*. That is right for
+> its designed failure mode: Postgres briefly unreachable means **we do not know
+> the state, so be conservative**.
+>
+> A spent daily quota is the opposite: **we know the state exactly, and it is
+> zero.** Falling back there would pace requests against an account with nothing
+> left — turning a hard ceiling into a wall of 429s, or on a paid tier into overage
+> charges. The mechanism built to prevent unlimited access would be the thing
+> granting it, and the limiter's own logs would look healthy throughout.
+>
+> So exhaustion returns **`ErrDailyQuotaExhausted`**, is never routed through the
+> fallback, and is counted in a separate `QuotaExhausted` stat rather than hidden
+> inside `Degraded`. Callers stop the pass; the momentum scanner's claim/lease
+> checkpoint resumes it after the window rolls, with no new plumbing.
+>
+> `TestDailyQuota_ExhaustionIsNotDegradationAndNeverUsesFallback` pins this, and it
+> is mutation-verified: routing exhaustion through the degradation path makes
+> `Wait` return **`nil`** — i.e. "go ahead" — against a spent account, and the test
+> fails on exactly that.
+
+#### The UTC-midnight boundary is an assumption, so reconcile it
+
+`daily_window_start` uses the UTC calendar day because that is how most providers
+bill, but that has not been verified against any provider's actual reset. Getting it
+wrong in the "more room than we thought" direction overruns the account.
+
+Two mitigations, both in place:
+
+- **`SyncDailyUsage`** overwrites the local counter with the provider's own reported consumption. Twelve Data exposes this at `GET /api_usage` (`daily_usage`, `plan_daily_limit`), so drift — including a wrong window boundary — becomes detectable instead of silent.
+- **The configured limit is padded below the documented one** (750 against a documented 800) until reconciliation has run across a rollover. A spurious `ErrDailyQuotaExhausted` is handled gracefully by the checkpoint; an actual overrun is untested territory.
 
 ### Atomicity
 

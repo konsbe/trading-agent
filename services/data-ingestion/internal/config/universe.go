@@ -76,6 +76,58 @@ type Universe struct {
 	BarInterval string
 	BarSource   string
 
+	// ── Pilot subset (§2.2, migration 010) ─────────────────────────────────
+
+	// SubsetEnable runs the selection pass and restricts the backfill and daily
+	// refresh to the selected subset.
+	//
+	// The pilot exists because free-tier quotas cannot cover ~4,978 symbols, and
+	// because §6's base rate should be read cheaply before paying to backfill a
+	// universe on a score with no demonstrated edge.
+	SubsetEnable bool
+
+	// SubsetStrategy: "stratified" (default), "random", or "explicit".
+	SubsetStrategy string
+
+	// SubsetSize is how many symbols to select.
+	SubsetSize int
+
+	// SubsetMaxSize is the hard cap the selection asserts before writing. This
+	// is Tiingo's quota guard — its 500-unique-symbols/month allowance is not
+	// expressible as a rate, so nothing else enforces it.
+	SubsetMaxSize int
+
+	// SubsetPennyFloorPct is the minimum share drawn from §3.2's penny bucket.
+	// Without a floor, a ~9% sampling rate leaves the penny bucket's thresholds
+	// unexercised whenever the universe's natural proportion is small.
+	SubsetPennyFloorPct float64
+
+	SubsetPennyMinPrice float64
+	SubsetPennyMaxPrice float64
+
+	// PricingEnable runs the Finnhub /quote pass that supplies the bucketing
+	// signal for stratification.
+	PricingEnable bool
+
+	// SubsetReselect permits replacing an existing pilot draw. Off by default
+	// because a redraw spends a second batch of unique symbols on a metered
+	// provider and, with an empty seed, changes the sample the pilot's numbers
+	// were measured on.
+	SubsetReselect bool
+
+	// PriceInterval / PriceSource are the equity_ohlcv rows holding that signal.
+	// Separate from BarInterval/BarSource so pricing the universe costs no bar
+	// provider quota.
+	PriceInterval string
+	PriceSource   string
+
+	// SubsetSeed makes a draw reproducible. Empty means a different sample per
+	// run — set it for anything whose numbers will be cited.
+	SubsetSeed string
+
+	// SubsetSymbols is the verbatim list for the "explicit" strategy.
+	SubsetSymbols []string
+
 	// EnableSymbols / EnableFundamentals / EnableBackfill / EnableDailyBars allow
 	// each pass to be turned off independently, following the
 	// FUNDAMENTAL_ENABLE_* convention.
@@ -120,10 +172,16 @@ type Universe struct {
 	// compromise and sustains a ~6k-symbol pass in under an hour.
 	RequestsPerSecond float64
 	RequestBurst      int
-	RequestTimeout    time.Duration
-	RequestMaxRetries int
-	BackoffBase       time.Duration
-	BackoffMax        time.Duration
+
+	// TiingoToken / TiingoRequestsPerSecond apply when UNIVERSE_BAR_SOURCE is
+	// "tiingo". The rate is politeness only — Tiingo's real constraint is
+	// monthly unique symbols, guarded by the subset size cap.
+	TiingoToken             string
+	TiingoRequestsPerSecond float64
+	RequestTimeout          time.Duration
+	RequestMaxRetries       int
+	BackoffBase             time.Duration
+	BackoffMax              time.Duration
 
 	// ── §8.1.4 daily incremental refresh ───────────────────────────────────
 
@@ -163,6 +221,20 @@ func LoadUniverse() (Universe, error) {
 		BarInterval: env("UNIVERSE_BAR_INTERVAL", "1Day"),
 		BarSource:   env("UNIVERSE_BAR_SOURCE", "yahoo_finance"),
 
+		SubsetEnable:        env("UNIVERSE_SUBSET_ENABLE", "false") == "true",
+		SubsetStrategy:      env("UNIVERSE_SUBSET_STRATEGY", "stratified"),
+		SubsetSize:          intEnv("UNIVERSE_SUBSET_SIZE", 450),
+		SubsetMaxSize:       intEnv("TIINGO_MAX_SELECTED_SYMBOLS", 450),
+		SubsetPennyFloorPct: floatEnv("UNIVERSE_SUBSET_PENNY_FLOOR_PCT", 0.20),
+		PricingEnable:       env("UNIVERSE_PRICING_ENABLE", "false") == "true",
+		PriceInterval:       env("UNIVERSE_PRICE_INTERVAL", "quote_snapshot"),
+		PriceSource:         env("UNIVERSE_PRICE_SOURCE", "finnhub_quote"),
+
+		SubsetPennyMinPrice: floatEnv("UNIVERSE_SUBSET_PENNY_MIN_PRICE", 0.30),
+		SubsetPennyMaxPrice: floatEnv("UNIVERSE_SUBSET_PENNY_MAX_PRICE", 2.00),
+		SubsetSeed:          env("UNIVERSE_SUBSET_SEED", ""),
+		SubsetSymbols:       splitCSV("UNIVERSE_SUBSET_SYMBOLS"),
+
 		EnableSymbols:      env("UNIVERSE_ENABLE_SYMBOLS", "true") == "true",
 		EnableFundamentals: env("UNIVERSE_ENABLE_FUNDAMENTALS", "true") == "true",
 		EnableBackfill:     env("UNIVERSE_ENABLE_BACKFILL", "true") == "true",
@@ -174,6 +246,9 @@ func LoadUniverse() (Universe, error) {
 		BackfillClaimLease:   durationEnv("UNIVERSE_BACKFILL_CLAIM_LEASE", 15*time.Minute),
 		BackfillMaxAttempts:  intEnv("UNIVERSE_BACKFILL_MAX_ATTEMPTS", 3),
 		BackfillIdleInterval: durationEnv("UNIVERSE_BACKFILL_IDLE_INTERVAL", time.Hour),
+
+		TiingoToken:             strings.TrimSpace(os.Getenv("TIINGO_API_KEY")),
+		TiingoRequestsPerSecond: floatEnv("TIINGO_RATE_PER_SEC", 1.5),
 
 		RequestsPerSecond: floatEnv("UNIVERSE_YAHOO_REQUESTS_PER_SEC", 2.0),
 		RequestBurst:      intEnv("UNIVERSE_YAHOO_BURST", 1),

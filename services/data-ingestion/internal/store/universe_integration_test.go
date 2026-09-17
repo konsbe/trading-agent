@@ -34,11 +34,53 @@ func testPool(t *testing.T) *pgxpool.Pool {
 	return pool
 }
 
+// requireScratchDB refuses to run destructive fixtures unless the connected
+// database is named as a test database.
+//
+// clearUniverse truncates universe_symbols wholesale. That is fine on a scratch
+// database and catastrophic anywhere else, and TEST_DATABASE_URL is one careless
+// copy-paste from a populated instance. The failure is silent in both
+// directions: the real universe is destroyed, and the fixtures are left behind
+// marked is_eligible, where the next pilot draw will select them — a stratified
+// sample containing MKT0042 still looks like a perfectly normal row count.
+//
+// The check is on the database NAME rather than on row counts or symbol shapes.
+// Row counts cannot separate the two (seedPriced legitimately creates 1,000
+// rows, more than some real fixtures) and symbol names cannot either, because
+// other tests in this package use bare tickers like AAA and AAPL. A naming
+// convention is unambiguous, needs no allowlist maintenance, and cannot produce
+// a false positive on a genuine scratch database.
+//
+// It is also not an opt-in env flag on purpose: a flag gets set once and then
+// forgotten, at which point it protects nothing.
+func requireScratchDB(t *testing.T, pool *pgxpool.Pool) {
+	t.Helper()
+	var dbName string
+	if err := pool.QueryRow(context.Background(), `SELECT current_database()`).Scan(&dbName); err != nil {
+		t.Fatalf("scratch-db guard: %v", err)
+	}
+	if !strings.Contains(strings.ToLower(dbName), "test") {
+		t.Fatalf("refusing to run destructive fixtures against database %q: these tests truncate "+
+			"universe_symbols and equity_ohlcv wholesale. Point TEST_DATABASE_URL at a database "+
+			"whose name contains \"test\" (e.g. trading_test).", dbName)
+	}
+}
+
+// clearUniverse empties universe_symbols for a fixture and registers cleanup so
+// the fixtures do not outlive the test. A test that leaves eligible symbols
+// behind is not merely untidy — it seeds the next run's universe.
 func clearUniverse(t *testing.T, pool *pgxpool.Pool) {
 	t.Helper()
+	requireScratchDB(t, pool)
 	if _, err := pool.Exec(context.Background(), `DELETE FROM universe_symbols`); err != nil {
 		t.Fatalf("clear: %v", err)
 	}
+	t.Cleanup(func() {
+		ctx := context.Background()
+		pool.Exec(ctx, `DELETE FROM universe_symbols`)
+		pool.Exec(ctx, `DELETE FROM equity_ohlcv`)
+		pool.Exec(ctx, `DELETE FROM fundamental_fetch_state`)
+	})
 }
 
 // A realistic slice of Finnhub's US directory: real common stock, ETFs on both

@@ -93,7 +93,7 @@ type NewsSentimentArticle struct {
 	URL                   string
 	TimePublished         time.Time
 	OverallSentimentScore float64
-	TickerSentimentScore  float64  // per-ticker score (0 when ticker not in feed)
+	TickerSentimentScore  float64 // per-ticker score (0 when ticker not in feed)
 	HasTickerSentiment    bool
 }
 

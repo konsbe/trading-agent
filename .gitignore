@@ -1,4 +1,10 @@
+# Real secrets. The glob matters: a bare `.env` does NOT cover `.env.bak`,
+# `.env.local`, `.env.production` or any other suffixed copy, so a backup made
+# while editing config would be committable. The negation keeps the documented
+# template tracked.
 .env
+.env.*
+!.env.example
 *.exe
 # Corporate TLS inspection root CA — machine-specific, never commit
 infra/*.pem

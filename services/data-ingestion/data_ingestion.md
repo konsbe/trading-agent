@@ -655,7 +655,7 @@ unexplained empty penny bucket later.
 | `UNIVERSE_ALLOW_EMPTY_MIC` | `false` | Admit records with a blank MIC |
 | `UNIVERSE_MIN_BARS_HISTORY` | `252` | §3.7's 52-week window reads `high[t-251]`, so 252 bars are needed for a complete window. Recorded/reported, not used for eligibility |
 | `UNIVERSE_BAR_INTERVAL` | `1Day` | Which `equity_ohlcv` rows count as daily bars |
-| `UNIVERSE_BAR_SOURCE` | `yahoo_finance` | Bar source. **Not Alpaca** — its free tier is IEX-only volume, a single-venue fraction of consolidated volume, which makes every volume feature in §3 wrong. Note the value is `yahoo_finance`, not `yahoo`: that is what `internal/fetch/yahoo` writes and what `data-analyzer` reads, and the spec's §7 originally named a value that matches zero rows |
+| `UNIVERSE_BAR_SOURCE` | `tiingo` | Bar source. **Not Alpaca** — its free tier is IEX-only volume, a single-venue fraction of consolidated volume, which makes every volume feature in §3 wrong. Note the value is `yahoo_finance`, not `yahoo`: that is what `internal/fetch/yahoo` writes and what `data-analyzer` reads, and the spec's §7 originally named a value that matches zero rows |
 | `UNIVERSE_ENABLE_BACKFILL` | `true` | Enable the 3-year bar backfill |
 | `UNIVERSE_ENABLE_DAILY_BARS` | `true` | Enable the daily incremental refresh |
 | `UNIVERSE_BACKFILL_YEARS` | `3` | History depth |
@@ -795,6 +795,212 @@ A fallback that quietly supplies single-venue volume reintroduces the exact prob
 that disqualified Alpaca's free tier, and every §3 volume feature would be wrong
 while looking fine. That check has to pass before any adapter is written.
 
+#### API-key providers ARE reachable from this network — the fallback branch is open
+
+Tested from the same proxied host that Yahoo blocks:
+
+| Provider | Unauthenticated response | Reading |
+|---|---|---|
+| Tiingo | `403 {"detail":"Please supply a token"}` | Request reaches the API |
+| Polygon.io | `401 {"error":"API Key was not…"}` | Reaches the API |
+| Twelve Data | `401 apikey parameter …` | Reaches the API |
+| EODHD | `401 Unauthenticated` | Reaches the API |
+
+All four return **authentication** rejections, not IP blocks. That is the important
+distinction: providers authenticating by **API key** meter per account, so they do
+not share a rate budget with everyone else behind the same corporate egress — which
+is precisely the failure mode that killed Yahoo here.
+
+**Consequence for the decision.** Salvaging Yahoo is no longer the only path, and it
+is arguably the weaker one: it depends on IP reputation staying favourable, which is
+not something the project controls. An API-key provider is the more durable fix even
+if the hotspot test succeeds. The hotspot test is still worth running — it is five
+minutes and a clean result means zero new provider surface — but it is no longer
+blocking.
+
+**Not yet verified for any of the four:** whether their free tier includes daily
+bars at all, their history depth, their rate limits at ~5,000 symbols, and above all
+whether their volume is **consolidated**. No key is held for any of them
+(`ALPHA_VANTAGE_API_KEY` is the only market-data key present, and its 25-requests-
+per-day ceiling rules it out at universe scale regardless). Do not write any of them
+into §2.2 as the replacement until that is measured — same rule that correctly
+disqualified Finnhub candles and Stooq.
+
+#### `scripts/verify-bar-source.sh` — run this rather than re-deriving the test
+
+One command, answers both questions in §2.2's order, and works with no repo setup:
+
+```
+./services/data-ingestion/scripts/verify-bar-source.sh yahoo
+./services/data-ingestion/scripts/verify-bar-source.sh tiingo  "$TIINGO_TOKEN"
+./services/data-ingestion/scripts/verify-bar-source.sh all
+```
+
+It reports reachability **and** a consolidated-volume verdict, because the second
+check is the one that is easy to skip and fatal to get wrong. The method needs no
+reference provider: AAPL trades roughly 40–60 M shares a day consolidated, while a
+single venue like IEX reports low single-digit millions — a 20-40× gap that a
+magnitude test resolves unambiguously.
+
+Verified against the known-bad case: run from this host it correctly reports Yahoo's
+blanket 429 and explains that a rate setting cannot fix it.
+
+#### Measured provider comparison (2026-09-16) — Tiingo is the leading candidate
+
+Run with real keys from the proxied network, using the script above plus history-depth
+and rate-limit probes. **All four serve consolidated volume**; they separate on
+history depth and quota.
+
+| Provider | Reachable | AAPL volume | Consolidated | 3-yr history | Measured rate limit | Verdict |
+|---|---|---|---|---|---|---|
+| **Tiingo** | ✅ 200 | 31,748,183 | ✅ | ✅ **751 bars**, 2023-09-18 → 2026-09-15 | 12/12 in 7 s, no throttle (~1.7 req/s) | **Leading candidate** |
+| Twelve Data | ✅ 200 | 31,694,100 | ✅ | ✅ 751 bars | ❌ **8 requests/minute** hard cap | Fallback only |
+| Polygon.io | ✅ 200 | 31,748,183 | ✅ | ❌ **501 bars — 2 years only** | not probed | Fails §8.1.3's 3-year requirement |
+| EODHD | ✅ 200 | 31,694,100 | ✅ | ❌ **251 bars — 1 year only** | not probed | Out |
+| Yahoo | ❌ 429 | — | (was the reason it was chosen) | — | IP-reputation block | Unusable from this network |
+
+**Why the consolidated verdict is trustworthy rather than a heuristic.** Tiingo and
+Polygon report the identical figure to the share (31,748,183), as do Twelve Data and
+EODHD (31,694,100 — a different last-completed-session). Independent providers
+agreeing exactly means both are reading the official consolidated tape. A
+single-venue feed could not match, and IEX-scale volume for AAPL would be low
+single-digit millions — roughly a 10-30× gap.
+
+**Quota arithmetic at universe scale (~4,978 symbols):**
+
+- **Tiingo** — no per-minute throttle observed at ~1.7 req/s, which would put a full
+  pass near 50 minutes. Comfortable.
+- **Twelve Data** — 8 req/min measured means **≥ 10.4 hours** per pass even before
+  any daily cap, so it cannot be the primary.
+- **Polygon** — 2 years of history would require lowering `UNIVERSE_BACKFILL_YEARS`
+  from 3 to 2, which is a §2.3 change and needs a decision, not a config tweak.
+
+**The one thing still unverified for Tiingo, and it matters:** free-tier plans
+commonly meter *unique symbols per month* rather than requests per second. Twelve
+symbols were consumed measuring the above, and probing further would burn the very
+quota the backfill needs. Check the account dashboard or plan terms for a
+unique-symbol or monthly cap **before** writing an adapter — a 5,000-symbol pass
+against a 500-symbol monthly allowance fails on day one, and it fails silently
+partway through rather than at the first request.
+
+#### Twelve Data's real quota (2026-09-16) — no symbol cap, but a hard daily ceiling
+
+`GET /api_usage?apikey=…` reports the plan directly, so this needed no guessing:
+
+```
+plan_category: basic      (free)
+plan_limit: 8             requests per minute
+plan_daily_limit: 800     requests per DAY
+```
+
+Two things follow, and the second is the disqualifying one:
+
+- **There is no unique-symbol cap.** The quota is a pure request count that resets
+  daily, so the 8/min rate is not the binding constraint — 800/day is. A one-time
+  4,978-symbol backfill is therefore ~7 days of unattended running, which is
+  tolerable for a one-off.
+- **But §8.1.4's daily refresh needs one request per symbol per day.** At full
+  universe scale that is 4,978 requests/day against a ceiling of 800 — **6× over**.
+  No amount of patience fixes an ongoing requirement that exceeds a daily quota.
+
+So Twelve Data's free tier can sustain a universe of roughly **800 symbols
+indefinitely** (backfill inside a day, daily refresh comfortably within quota), and
+cannot sustain the full universe at all. That number is worth noting because it lands
+close to the size of a pilot subset, which makes it a viable *pilot* source rather
+than a rejected one.
+
+Tiingo showed no per-minute throttle but exposes **no usage endpoint** (`/api/test`
+and `/api/usage` 404; `/account/usage` redirects to a login wall) and its pricing and
+documentation pages are JS-rendered. Its unique-symbol allowance, and whether that
+allowance resets monthly or is cumulative-ever, are **only visible from the account
+dashboard**. That distinction decides whether the free tier offers one shot at N
+symbols or a rolling N per month, so it has to be read before any full-scale run.
+
+#### ⚠️ equity_ohlcv holds bars on TWO DIFFERENT adjustment conventions
+
+**Do not aggregate or compare `equity_ohlcv` rows across `source` values without
+handling this.** The two bar paths do not agree on what their prices mean:
+
+| Source | Adjustment | Determined by |
+|---|---|---|
+| `tiingo` | split **and** dividend adjusted | reads `adjOpen/adjHigh/adjLow/adjClose/adjVolume` |
+| `yahoo_finance` | **dividend adjustment definitely absent**; split adjustment unverified | reads `indicators.quote` only |
+
+The Yahoo finding is from code inspection and is not a guess: `chartResponse` in
+`internal/fetch/yahoo/bars.go` declares only `indicators.quote`, and the string
+`adjclose` appears nowhere in the package. Yahoo returns dividend-adjusted closes
+exclusively in `indicators.adjclose`, so a series that never decodes that field
+cannot contain dividend adjustment. Whether Yahoo's `quote` array is
+split-adjusted could not be checked — the endpoint returns a blanket 429 from
+this network — so treat that half as unknown rather than as either answer.
+
+§3's opening line requires bars that are "split/dividend-adjusted", so **the
+Yahoo path does not satisfy §3 as written.** For a dividend-paying symbol its
+prices drift from the adjusted series by the cumulative dividend, which shifts
+every price-derived feature: §3.7's 52-week ratio, §3.6's resistance level, and
+§3.3's `change_pct` across an ex-dividend date.
+
+It is tempting to note that the two providers write different `source` values so
+nothing mixes today. That is true and it is not a fix — it holds only for as long
+as nobody queries `equity_ohlcv` across both values without knowing to treat them
+differently, which is precisely the trap a future reader falls into. The
+conditions are all in place for it: the scanner filters by `UNIVERSE_BAR_SOURCE`,
+`data-technical` writes Yahoo bars for its own symbols independently, and
+`data-analyzer`'s bar reader already *prefers* `source = 'yahoo_finance'` when
+deduplicating across sources — so a symbol present under both would silently
+resolve to the unadjusted series.
+
+Options, none yet chosen: decode `indicators.adjclose` in the Yahoo adapter and
+use it (small change, but it only fixes the dividend half and Yahoo is currently
+unreachable anyway); confine the scanner to one source and assert it; or retire
+the Yahoo path once a reachable provider is settled. Whichever is chosen, the
+cross-source dedup preference in `data-analyzer` needs revisiting at the same
+time.
+
+#### Two bar providers, on purpose — do not "simplify" this to one
+
+Phase 1 uses **Tiingo and Twelve Data together**, because their free tiers fail in
+different directions and neither alone covers the job:
+
+| | Tiingo | Twelve Data |
+|---|---|---|
+| Quota shape | **500 unique symbols / month**, resets monthly | **800 credits / day**, ~8/min, resets daily |
+| Re-reading a known symbol | free (already counted this month) | costs a credit every time |
+| 3-year daily history | ✅ 751 bars | ✅ 751 bars |
+| Consolidated volume | ✅ | ✅ |
+| Full ~4,978-symbol universe | ✗ — 10 months of monthly allowances | ✓ one-off, ~6–7 days |
+| Sustained daily refresh at universe scale | ✗ | ✗ — needs 4,978/day against 800 |
+| Sustained daily refresh at ~450 symbols | ✅ indefinitely | ✅ comfortably |
+
+The split follows directly from those shapes:
+
+- **Tiingo drives the pilot subset** (`backfill_selected = true`, ~450 symbols). Its
+  monthly-unique-symbol model is *ideal* for a fixed subset refreshed daily — the
+  same 450 symbols re-counted each month stay inside 500 forever — and it has no
+  daily ceiling to pace around.
+- **Twelve Data drives the full-universe backfill**, once the pilot has cleared
+  §6's base-rate check. Its per-request model is the wrong shape for a small subset
+  refreshed daily but the right shape for a one-off sweep of thousands of symbols.
+- Neither can sustain a *daily refresh* of the full universe. That remains a paid-tier
+  question and is deliberately not solved here.
+
+**Why this is not over-engineering.** Using one provider for both jobs fails
+concretely: Tiingo alone cannot reach 4,978 symbols inside its monthly allowance,
+and Twelve Data alone burns 450 credits a day on the pilot's refresh — over half its
+daily budget — for data Tiingo would re-serve for free. The two-provider split is
+what makes the pilot and the full sweep both affordable on free tiers.
+
+Sequencing is manual and gated: Twelve Data is **not** wired to run automatically.
+The full-universe backfill is a deliberate go-ahead after §6's base rate is read, for
+the same reason Step 3b was gated — spending days of quota backfilling 5,000 symbols
+before knowing the score beats a base rate is backwards.
+
+**Consequence for the Yahoo question.** The hotspot test is now optional rather than
+blocking. Tiingo gives consolidated 3-year daily bars from the corporate network
+with API-key metering, so it does not share a rate budget with everyone behind the
+same egress — the failure mode that killed Yahoo here cannot recur. Salvaging Yahoo
+would save an adapter; it is no longer the only path forward.
+
 #### 2. Finnhub works — including the endpoint 3b depends on
 
 Verified with the configured key: `/quote` → 200, `/stock/metric` → 200 with a
@@ -918,3 +1124,65 @@ data-macro-intel → economic_calendar_events, earnings_calendar_events,
 
 **Limitations:**
 - `SEC EDGAR API`. Finnhub's `/stock/financials-reported` endpoint is a pre-parsed wrapper over SEC EDGAR filings. Finnhub downloads the 10-Q and 10-K XBRL filings from EDGAR, parses the XBRL tags, normalises the concept names, and serves the result through their REST API. Your code in data-fundamental/main.go calls Finnhub — it never touches sec.gov directly.
+
+---
+
+## Multi-source `equity_ohlcv`: the reader's preference is a correctness setting
+
+Once more than one provider writes `equity_ohlcv`, "which source wins" stops
+being a tie-break and becomes a correctness decision, because the providers do
+not agree on what their prices mean:
+
+| `source` | Split adjusted | Dividend adjusted | Volume |
+|---|---|---|---|
+| `tiingo` | yes (`adj*` fields) | **yes** | consolidated |
+| `yahoo_finance` | unverified | **no** | consolidated |
+| `alpaca` | n/a | n/a | IEX only — rejected by §2.2 |
+
+The Yahoo row is not a guess about Yahoo's API. It is a fact about this
+repository: `internal/fetch/yahoo` decodes `indicators.quote` and the string
+`adjclose` appears nowhere in the package, so whatever dividend adjustment Yahoo
+offers in `indicators.adjclose` is absent from our rows by construction.
+
+`data-analyzer`'s `QueryEquityBars` therefore prefers `tiingo` first. It
+previously preferred `yahoo_finance`, which meant a symbol covered by both
+silently resolved to the unadjusted series — **strictly worse than either source
+alone**, because the symbol looked fully covered while serving prices that drift
+from the adjusted series by the cumulative dividend. That shifts every
+price-derived feature across any ex-dividend date: 52-week ratios, resistance
+levels, and `change_pct`.
+
+Two properties of that preference are load-bearing and each has a test that
+fails when it is broken:
+
+- It is a **preference, not a filter**. A Yahoo-only symbol still returns its
+  Yahoo bars; preferring Tiingo must not drop coverage.
+- It applies **per timestamp, not per symbol**. A symbol whose history is partly
+  Yahoo and partly Tiingo keeps every distinct date, rather than being truncated
+  to the range Tiingo happens to cover.
+
+## Integration tests truncate tables and must never see a real database
+
+The destructive fixtures in `internal/store` call `clearUniverse`, which is a
+wholesale `DELETE FROM universe_symbols`. `requireScratchDB` refuses to run
+unless the connected database's **name** contains `test`.
+
+This was added after `TEST_DATABASE_URL` was pointed at a populated database
+during Phase 1 bring-up. The damage was silent in both directions: the real
+universe was deleted, and ~1,000 fixture symbols (`MKT0000`, `PNY0042`) were
+left behind marked `is_eligible`, where the next stratified pilot draw selected
+them. A sample containing `MKT0042` still has a perfectly normal row count.
+
+The guard checks the database name rather than row counts or symbol shapes
+because neither of those can separate the two cases: `seedPriced` legitimately
+creates 1,000 rows, and other tests in the package use bare tickers like `AAA`
+and `AAPL`. It is deliberately not an opt-in env flag — a flag gets set once and
+then forgotten, at which point it protects nothing. `clearUniverse` also now
+registers `t.Cleanup` so fixtures cannot outlive the test that created them.
+
+Run integration tests as:
+
+```bash
+TEST_DATABASE_URL="postgres://<user>:<password>@localhost:5432/trading_test?sslmode=disable" \
+  go test -tags=integration ./...
+```

@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/konsbe/trading-agent/services/data-ingestion/internal/fetch/yahoo"
+	"github.com/konsbe/trading-agent/services/data-ingestion/internal/fetch/barsource"
 	"github.com/konsbe/trading-agent/services/data-ingestion/internal/store"
 )
 
@@ -24,7 +24,8 @@ import (
 // without its data.
 func (w *worker) runBackfillRound(ctx context.Context) int {
 	claims, err := store.ClaimBackfillBatch(ctx, w.pool,
-		w.cfg.BackfillBatchSize, w.cfg.BackfillClaimLease, w.cfg.BackfillMaxAttempts)
+		w.cfg.BackfillBatchSize, w.cfg.BackfillClaimLease, w.cfg.BackfillMaxAttempts,
+		w.cfg.SubsetEnable)
 	if err != nil {
 		w.log.Error("claim backfill batch", "err", err)
 		return 0
@@ -61,7 +62,7 @@ func (w *worker) runBackfillRound(ctx context.Context) int {
 			mu.Lock()
 			defer mu.Unlock()
 			switch {
-			case errors.Is(err, yahoo.ErrNoData):
+			case errors.Is(err, barsource.ErrNoBars):
 				// Not a failure: a delisting, a bad ticker, or a listing with no
 				// history in the window. Recorded done-with-zero-bars so the rate
 				// budget is not spent re-asking every round.
@@ -137,7 +138,7 @@ func (w *worker) runBackfillRound(ctx context.Context) int {
 // The bars returned are the fetched set, so the caller can derive the true
 // oldest bar for the checkpoint.
 func (w *worker) fetchAndStore(ctx context.Context, symbol string, from, to time.Time) ([]store.EquityBar, int64, error) {
-	bars, err := w.yh.FetchBarsRange(ctx, symbol, w.cfg.BarInterval, from, to)
+	bars, err := w.bars.FetchBarsRange(ctx, symbol, w.cfg.BarInterval, from, to)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -165,6 +166,25 @@ func (w *worker) runDailyBars(ctx context.Context) {
 	if err != nil {
 		w.log.Error("load bar bounds", "err", err)
 		return
+	}
+	if w.cfg.SubsetEnable {
+		// Refresh only the pilot subset. Refreshing the full universe on the
+		// pilot provider would spend a quota sized for a few hundred symbols on
+		// several thousand.
+		sel, err := store.SelectedSubset(ctx, w.pool)
+		if err != nil {
+			w.log.Error("load selected subset", "err", err)
+			return
+		}
+		keep := make(map[string]struct{}, len(sel))
+		for _, m := range sel {
+			keep[m.Symbol] = struct{}{}
+		}
+		for sym := range bounds {
+			if _, ok := keep[sym]; !ok {
+				delete(bounds, sym)
+			}
+		}
 	}
 	if len(bounds) == 0 {
 		w.log.Info("daily bar refresh: no eligible symbols yet")
@@ -201,7 +221,7 @@ func (w *worker) runDailyBars(ctx context.Context) {
 			mu.Lock()
 			defer mu.Unlock()
 			switch {
-			case errors.Is(err, yahoo.ErrNoData):
+			case errors.Is(err, barsource.ErrNoBars):
 				noDataCount++
 			case err != nil:
 				failCount++
@@ -234,5 +254,38 @@ func (w *worker) runDailyBars(ctx context.Context) {
 	if attempted := okCount + noDataCount + failCount; attempted > 0 && failCount*2 > attempted {
 		w.log.Warn("more than half of daily bar requests failed; check Yahoo throttling (UNIVERSE_YAHOO_REQUESTS_PER_SEC) before trusting today's scan",
 			"failed", failCount, "attempted", attempted)
+	}
+}
+
+// reportSubsetConsistency re-reads the subset stats once real bars exist.
+//
+// Run after the backfill rather than after selection because the bucket-drift
+// comparison needs both sides: at selection time only the Finnhub quote
+// snapshot exists, so the check would trivially report zero and prove nothing.
+func (w *worker) reportSubsetConsistency(ctx context.Context) {
+	st, err := store.LoadSubsetStats(ctx, w.pool,
+		w.cfg.PriceInterval, w.cfg.PriceSource, w.cfg.BarInterval, w.cfg.BarSource, w.cfg.SubsetPennyMaxPrice)
+	if err != nil {
+		w.log.Warn("subset consistency", "err", err)
+		return
+	}
+
+	w.log.Info("subset backfill coverage",
+		"selected", st.Selected,
+		"with_bars", st.WithBars,
+		"missing_bars", st.Selected-st.WithBars,
+		"bucket_checked", st.BucketChecked,
+		"bucket_drifted", st.BucketDrifted)
+
+	if st.BucketDrifted > 0 {
+		// Expected in small numbers and accepted — the selection price is a live
+		// quote, the bar price is an adjusted close. Warned rather than ignored
+		// so a drifted symbol is known to be scored against the other bucket's
+		// thresholds instead of looking like a merely strange candidate.
+		w.log.Warn("symbols changed price bucket between selection and backfill; they will be scored against the bucket their adjusted close implies",
+			"drifted", st.BucketDrifted,
+			"of_checked", st.BucketChecked,
+			"penny_boundary", w.cfg.SubsetPennyMaxPrice,
+			"examples", st.BucketDriftExamples)
 	}
 }

@@ -73,8 +73,41 @@ EODHD's bulk endpoints are the right long-term answer (one call returns an entir
 > JavaScript proof-of-work challenge with an HTTP 200 status. The decisive
 > outstanding test is re-running Yahoo from a network with different egress, which
 > would distinguish "Yahoo is gone" from "Yahoo is unusable from that office".
-> Details and the consolidated-volume caveat in
+>
+> Separately confirmed: **Tiingo, Polygon.io, Twelve Data and EODHD are all
+> reachable from the blocked network**, returning auth rejections rather than IP
+> blocks. Providers metering by API key do not share a rate budget with everyone
+> behind the same egress, so that class of source sidesteps this failure mode
+> entirely and is the more durable fix even if Yahoo recovers. None is yet verified
+> for free-tier daily bars, history depth, or — the requirement that actually
+> matters — **consolidated volume**. Use
+> `services/data-ingestion/scripts/verify-bar-source.sh` to settle that before
+> naming a replacement here.
+>
+> **Measured 2026-09-16 — all four serve consolidated volume; they separate on
+> history depth and quota.** Tiingo returns the full 751 daily bars over 3 years
+> with no observed throttle and is the **leading replacement candidate**. Twelve
+> Data matches on history but hard-caps at 8 requests/minute (≥ 10 hours per
+> universe pass). Polygon's free tier stops at **2 years** and EODHD's at **1
+> year**, both short of §8.1.3's 3-year requirement. One gap remains before an
+> adapter is written: free tiers often meter *unique symbols per month*, which a
+> 12-symbol probe cannot reveal — confirm Tiingo's account limits first, because a
+> monthly cap fails silently partway through a 5,000-symbol pass. Full table in
 > `services/data-ingestion/data_ingestion.md`.
+
+> **Adjustment convention is a second, separate correctness requirement.** §3's
+> opening line asks for split/dividend-adjusted bars, and the two implemented bar
+> paths disagree: the Tiingo adapter reads Tiingo's `adj*` fields (split and
+> dividend adjusted, including `adjVolume`), while the Yahoo adapter reads
+> `indicators.quote` and never decodes `indicators.adjclose`, so its bars contain
+> **no dividend adjustment** — established by code inspection, not inference.
+> `equity_ohlcv` therefore holds rows on two conventions distinguished only by
+> `source`, which is a trap for anyone querying across them. See
+> `services/data-ingestion/data_ingestion.md`.
+>
+> Note `adjVolume` matters as much as the prices: raw volume is not rescaled
+> across a split, so a 20-day average spanning one mixes two share bases and
+> §3.4's RVOL reads the discontinuity as a genuine volume surge.
 
 **Critical constraint: volume must be consolidated volume.** Every volume feature in this spec (RVOL, acceleration, dollar volume) is meaningless on single-venue volume. Yahoo provides consolidated volume; IEX-only does not. If bar source ever changes, re-verify this.
 
@@ -533,8 +566,28 @@ Two new services, both following the existing `data-ingestion` worker pattern (o
 Responsibilities:
 1. **Weekly:** refresh `universe_symbols` from Finnhub US symbol list; apply §3.1 eligibility; record `excluded_reason` for audit.
 2. **Weekly:** refresh `shares_outstanding`, `market_cap`, `sector`, `industry` from existing fundamentals ingestion.
-3. **Once, resumable:** backfill 3 years of daily bars for every eligible symbol into `equity_ohlcv` via the existing Yahoo fetcher. Checkpoint per symbol.
-4. **Daily after close:** incremental bar refresh for all eligible symbols.
+3. **Once, before the pilot subset is drawn:** fetch an approximate current price for every eligible symbol from Finnhub `/quote`, stored as `equity_ohlcv` rows with `interval='quote_snapshot'`, `source='finnhub_quote'`. See §8.1.1.
+4. **Once, resumable:** backfill 3 years of split- and dividend-adjusted daily bars into `equity_ohlcv`, checkpointed per symbol. Bar provider is selected by `UNIVERSE_BAR_SOURCE`; an unrecognised value fails at startup rather than defaulting.
+5. **Daily after close:** incremental bar refresh.
+
+#### 8.1.1 The stratification bootstrap, and why pricing is a separate pass
+
+Stratifying the pilot subset by §3.2's price buckets needs a price per symbol. Prices come from the bar backfill. The backfill only runs over the subset the stratification chooses. That is a genuine circular dependency, and it has to be broken by a price source that is not the bar provider.
+
+It is **not** broken by drawing twice from the bar provider. Two candidate schemes were rejected:
+
+| Rejected approach | Why |
+|---|---|
+| Backfill ~100 symbols, then re-stratify against their prices | Spends ~550 of Tiingo's 500-unique-symbols/month allowance across the two draws, and the bootstrap's 100 symbols and the final 450 come from *different random processes* — nothing guarantees the bucket boundaries learned from the first 100 generalise before the real selection is committed |
+| Accept an unstratified first month | Trades away the penny bucket exactly when the base rate is being established; a 9 % sampling rate over a ~4 %-penny universe can plausibly return zero penny symbols, leaving half the gate logic unexercised |
+
+The resolution is to price the universe from a source the repo already pays for. Finnhub `/quote` is already integrated, already paced through the shared Postgres budget in `api_rate_budget`, and costs **zero** bar-provider symbols. At the existing 1 req/sec Finnhub budget, pricing ~4,978 eligible symbols takes roughly **83 minutes**, once. The stratified draw then runs against real bucket membership for the whole universe, and hands the resulting set to the bar backfill as its one and only touch.
+
+Beyond being cheaper, this is the more correct shape: one signal covering every symbol, one draw, and no bootstrap-versus-final consistency question to reason about.
+
+**Caveat, accepted and monitored:** Finnhub `/quote` is a live snapshot, not the adjusted close the bar provider will later serve. A handful of borderline symbols (the $1.98-versus-$2.02 case) can therefore land in a different bucket once real bars arrive. This is accepted rather than engineered around — but it is not ignored: `LoadSubsetStats` compares each selected symbol's selection-time bucket against its post-backfill bucket and warns with examples, reported on the backfill's drained edge. A drifted symbol is scored against the bucket its adjusted close implies.
+
+Symbols with no usable quote are left without a price rather than stored as zero; a zero close would bucket them as penny and quietly corrupt the stratification.
 
 New fetcher work needed: a per-symbol company-news method on the existing Finnhub client (for §3.11), writing to `catalyst_events`. Called only for gated candidates.
 

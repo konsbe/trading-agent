@@ -2,7 +2,6 @@ package yahoo
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -11,6 +10,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/konsbe/trading-agent/services/data-ingestion/internal/fetch/barsource"
 	"github.com/konsbe/trading-agent/services/data-ingestion/internal/httpclient"
 	"github.com/konsbe/trading-agent/services/data-ingestion/internal/store"
 	"golang.org/x/time/rate"
@@ -97,7 +97,15 @@ func NewWithOptions(o Options) *Client {
 // (a delisting, a bad ticker, a brand-new listing) from "the request failed".
 // The backfill records the former as a completed symbol with zero bars rather
 // than retrying it forever.
-var ErrNoData = errors.New("yahoo: no bars in range")
+//
+// Aliased to the shared sentinel so errors.Is(err, barsource.ErrNoBars) matches
+// regardless of which provider ran — the backfill must not name a provider.
+var ErrNoData = barsource.ErrNoBars
+
+// SourceName satisfies barsource.Fetcher.
+func (c *Client) SourceName() string { return SourceName }
+
+var _ barsource.Fetcher = (*Client)(nil)
 
 // FetchBarsRange fetches bars for an explicit [from, to] window.
 //

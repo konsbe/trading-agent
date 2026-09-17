@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"golang.org/x/time/rate"
 
 	"github.com/konsbe/trading-agent/services/data-ingestion/internal/fetch/finnhub"
 )
@@ -119,4 +120,75 @@ func durationEnv(key string, def time.Duration) time.Duration {
 		return def
 	}
 	return d
+}
+
+// TiingoBudgetKey names the Tiingo quota.
+const TiingoBudgetKey = "tiingo"
+
+// SharedTiingo builds the cross-process limiter for Tiingo.
+//
+// Note there is NO daily ceiling here, and that is deliberate rather than an
+// omission. Tiingo's free allowance is 500 UNIQUE SYMBOLS PER MONTH — not a rate
+// and not a daily request count — so api_rate_budget structurally cannot express
+// it, and pretending otherwise would give false confidence. Re-reading an
+// already-counted symbol is free, so a stable subset refreshed daily stays
+// inside the allowance indefinitely.
+//
+// Enforcement therefore lives in the subset-selection size assertion
+// (store.SubsetSizeError). The pacing configured here is politeness only.
+func SharedTiingo(ctx context.Context, pool *pgxpool.Pool, log *slog.Logger) barsourceLimiter {
+	if log == nil {
+		log = slog.Default()
+	}
+	if !boolEnv("TIINGO_SHARED_RATE_ENABLE", true) {
+		log.Info("shared Tiingo rate limiting disabled; using this process's own bucket")
+		return nil
+	}
+	if pool == nil {
+		log.Warn("no database pool for shared Tiingo rate limiting; using this process's own bucket")
+		return nil
+	}
+
+	perSec := floatEnv("TIINGO_RATE_PER_SEC", 1.5)
+	burst := floatEnv("TIINGO_RATE_BURST", 2.0)
+
+	s, err := NewShared(pool,
+		Budget{Key: TiingoBudgetKey, RefillPerSec: perSec, Burst: burst}, // DailyLimit nil on purpose
+		localBucket(perSec, burst),
+		Options{
+			AcquireTimeout: durationEnv("SHARED_RATE_ACQUIRE_TIMEOUT", 250*time.Millisecond),
+			MaxSleep:       durationEnv("SHARED_RATE_MAX_SLEEP", 5*time.Second),
+			WarnEvery:      durationEnv("SHARED_RATE_WARN_EVERY", 30*time.Second),
+		}, log)
+	if err != nil {
+		log.Warn("could not construct the shared Tiingo limiter; using this process's own bucket", "err", err)
+		return nil
+	}
+	ectx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	if err := s.EnsureBudget(ectx); err != nil {
+		log.Warn("could not register the shared Tiingo budget; the limiter will degrade to a local bucket until the database is reachable", "err", err)
+		return s
+	}
+	log.Info("shared Tiingo rate limiting active",
+		"budget", TiingoBudgetKey, "per_sec", perSec, "burst", burst,
+		"note", "no daily ceiling — Tiingo meters unique symbols per month, enforced by the subset size assertion")
+	return s
+}
+
+// barsourceLimiter is the shape the bar fetchers accept. Declared locally so this
+// package does not import fetch/barsource (which would invert the dependency).
+type barsourceLimiter interface {
+	Wait(ctx context.Context) error
+}
+
+// localBucket returns an in-process limiter at the given pace, used as the
+// fallback so a coordination outage degrades to a known rate rather than to
+// unlimited.
+func localBucket(perSec float64, burst float64) barsourceLimiter {
+	b := int(burst)
+	if b < 1 {
+		b = 1
+	}
+	return rate.NewLimiter(rate.Limit(perSec), b)
 }

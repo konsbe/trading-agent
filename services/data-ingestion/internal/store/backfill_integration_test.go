@@ -34,7 +34,7 @@ func TestBackfillClaim_LeasesPendingAndMarksInProgress(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	claims, err := ClaimBackfillBatch(ctx, pool, 2, testLease, testMaxAttempts)
+	claims, err := ClaimBackfillBatch(ctx, pool, 2, testLease, testMaxAttempts, false)
 	if err != nil {
 		t.Fatalf("claim: %v", err)
 	}
@@ -60,7 +60,7 @@ func TestBackfillClaim_LeasesPendingAndMarksInProgress(t *testing.T) {
 	}
 
 	// A second claim gets the remaining symbol, not the already-claimed ones.
-	more, err := ClaimBackfillBatch(ctx, pool, 10, testLease, testMaxAttempts)
+	more, err := ClaimBackfillBatch(ctx, pool, 10, testLease, testMaxAttempts, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -74,7 +74,7 @@ func TestBackfillClaim_LeasesPendingAndMarksInProgress(t *testing.T) {
 	}
 
 	// Everything is now claimed, so a third round finds nothing.
-	none, err := ClaimBackfillBatch(ctx, pool, 10, testLease, testMaxAttempts)
+	none, err := ClaimBackfillBatch(ctx, pool, 10, testLease, testMaxAttempts, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -98,14 +98,14 @@ func TestBackfillClaim_ReclaimsAbandonedClaimsAfterLease(t *testing.T) {
 	}
 
 	// Worker claims it...
-	claims, err := ClaimBackfillBatch(ctx, pool, 10, testLease, testMaxAttempts)
+	claims, err := ClaimBackfillBatch(ctx, pool, 10, testLease, testMaxAttempts, false)
 	if err != nil || len(claims) != 1 {
 		t.Fatalf("initial claim: %v (n=%d)", err, len(claims))
 	}
 
 	// ...and is killed. The row stays in_progress. Within the lease it must NOT
 	// be reclaimed, or two workers would duplicate work.
-	fresh, err := ClaimBackfillBatch(ctx, pool, 10, testLease, testMaxAttempts)
+	fresh, err := ClaimBackfillBatch(ctx, pool, 10, testLease, testMaxAttempts, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -120,7 +120,7 @@ func TestBackfillClaim_ReclaimsAbandonedClaimsAfterLease(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	reclaimed, err := ClaimBackfillBatch(ctx, pool, 10, testLease, testMaxAttempts)
+	reclaimed, err := ClaimBackfillBatch(ctx, pool, 10, testLease, testMaxAttempts, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -141,7 +141,7 @@ func TestBackfillClaim_RetriesFailedUntilMaxAttempts(t *testing.T) {
 	}
 
 	for attempt := 1; attempt <= testMaxAttempts; attempt++ {
-		claims, err := ClaimBackfillBatch(ctx, pool, 10, testLease, testMaxAttempts)
+		claims, err := ClaimBackfillBatch(ctx, pool, 10, testLease, testMaxAttempts, false)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -158,7 +158,7 @@ func TestBackfillClaim_RetriesFailedUntilMaxAttempts(t *testing.T) {
 
 	// Attempts are now exhausted: no further claims, and the error text is
 	// retained so the stall is diagnosable from SQL alone.
-	none, err := ClaimBackfillBatch(ctx, pool, 10, testLease, testMaxAttempts)
+	none, err := ClaimBackfillBatch(ctx, pool, 10, testLease, testMaxAttempts, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -200,7 +200,7 @@ func TestBackfillDone_ClearsClaimAndRecordsCursor(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := ClaimBackfillBatch(ctx, pool, 10, testLease, testMaxAttempts); err != nil {
+	if _, err := ClaimBackfillBatch(ctx, pool, 10, testLease, testMaxAttempts, false); err != nil {
 		t.Fatal(err)
 	}
 
@@ -254,7 +254,7 @@ FROM universe_symbols WHERE symbol='GOOD'`).Scan(&status, &cursor, &completed, &
 	}
 
 	// Completed symbols are never re-claimed.
-	none, err := ClaimBackfillBatch(ctx, pool, 10, testLease, testMaxAttempts)
+	none, err := ClaimBackfillBatch(ctx, pool, 10, testLease, testMaxAttempts, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -282,7 +282,7 @@ WHERE symbol='FAIL'`); err != nil {
 		t.Fatal(err)
 	}
 
-	claims, err := ClaimBackfillBatch(ctx, pool, 1, testLease, testMaxAttempts)
+	claims, err := ClaimBackfillBatch(ctx, pool, 1, testLease, testMaxAttempts, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -352,7 +352,7 @@ func TestResetBackfill_ClearsAllCheckpointState(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := ClaimBackfillBatch(ctx, pool, 10, testLease, testMaxAttempts); err != nil {
+	if _, err := ClaimBackfillBatch(ctx, pool, 10, testLease, testMaxAttempts, false); err != nil {
 		t.Fatal(err)
 	}
 	if err := MarkBackfillFailed(ctx, pool, "RST", "NASDAQ", "boom"); err != nil {
@@ -416,5 +416,44 @@ FROM generate_series(1, 4) g`); err != nil {
 	}
 	if nb.Count != 0 || nb.FirstTS != nil || nb.LastTS != nil {
 		t.Errorf("NOBARS = %+v, want zero/nil", nb)
+	}
+}
+
+// The pilot and the full universe use different providers with different
+// quotas, so the backfill must be able to claim only the selected subset —
+// running it over the wrong population spends the wrong budget.
+func TestClaimBackfillBatch_SelectedOnlyRestrictsToTheSubset(t *testing.T) {
+	ctx := context.Background()
+	pool := testPool(t)
+	clearUniverse(t, pool)
+
+	if _, err := UpsertUniverseSymbols(ctx, pool, []UniverseRow{
+		{Symbol: "INSUB", Exchange: "NASDAQ", Type: "Common Stock", IsEligible: true},
+		{Symbol: "OUTSUB", Exchange: "NASDAQ", Type: "Common Stock", IsEligible: true},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx,
+		`UPDATE universe_symbols SET backfill_selected = true WHERE symbol = 'INSUB'`); err != nil {
+		t.Fatal(err)
+	}
+
+	// selectedOnly = true claims only the subset.
+	claims, err := ClaimBackfillBatch(ctx, pool, 10, testLease, testMaxAttempts, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(claims) != 1 || claims[0].Symbol != "INSUB" {
+		t.Fatalf("claims = %+v, want only INSUB", claims)
+	}
+
+	// selectedOnly = false claims the whole eligible universe. INSUB is already
+	// in_progress from the claim above, so only OUTSUB is free.
+	all, err := ClaimBackfillBatch(ctx, pool, 10, testLease, testMaxAttempts, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(all) != 1 || all[0].Symbol != "OUTSUB" {
+		t.Fatalf("claims = %+v, want OUTSUB when unrestricted", all)
 	}
 }

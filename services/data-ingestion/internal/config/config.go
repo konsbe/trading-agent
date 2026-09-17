@@ -117,11 +117,11 @@ func LoadCrypto() (Crypto, error) {
 
 type Equity struct {
 	Base
-	PollAlpaca  time.Duration
-	PollFinnhub time.Duration
-	PollFred    time.Duration
-	AlpacaKey   string
-	AlpacaSecret string
+	PollAlpaca    time.Duration
+	PollFinnhub   time.Duration
+	PollFred      time.Duration
+	AlpacaKey     string
+	AlpacaSecret  string
 	AlpacaBaseURL string
 	Symbols       []string
 	FredAPIKey    string
@@ -207,11 +207,11 @@ func LoadSentiment() (Sentiment, error) {
 	}
 	return Sentiment{
 		Base:              b,
-		PollLunarCrush:   pollFor("DATA_SENTIMENT_LUNARCRUSH_POLL_INTERVAL", def),
-		PollFinnhubNews:  pollFor("DATA_SENTIMENT_FINNHUB_NEWS_POLL_INTERVAL", def),
-		LunarCrushKey:    os.Getenv("LUNARCRUSH_API_KEY"),
-		FinnhubKey:       os.Getenv("FINNHUB_API_KEY"),
-		NewsSymbols:      newsSyms,
+		PollLunarCrush:    pollFor("DATA_SENTIMENT_LUNARCRUSH_POLL_INTERVAL", def),
+		PollFinnhubNews:   pollFor("DATA_SENTIMENT_FINNHUB_NEWS_POLL_INTERVAL", def),
+		LunarCrushKey:     os.Getenv("LUNARCRUSH_API_KEY"),
+		FinnhubKey:        os.Getenv("FINNHUB_API_KEY"),
+		NewsSymbols:       newsSyms,
 		EquityNewsSymbols: equitySyms,
 	}, nil
 }
@@ -224,8 +224,8 @@ type MacroIntel struct {
 	FinnhubKey string
 
 	EnableEconomicCalendar bool
-	EnableEarningsCalendar  bool
-	EarningsSymbols         []string
+	EnableEarningsCalendar bool
+	EarningsSymbols        []string
 
 	EnableFinnhubGeneralNews bool
 
@@ -234,9 +234,9 @@ type MacroIntel struct {
 
 	GPRCSVURL string
 
-	GDELTEnabled bool
-	GDELTQuery string
-	GDELTMaxRec int
+	GDELTEnabled  bool
+	GDELTQuery    string
+	GDELTMaxRec   int
 	GDELTLookback time.Duration
 }
 
@@ -261,7 +261,7 @@ func LoadMacroIntel() (MacroIntel, error) {
 
 		EnableEconomicCalendar: env("MACRO_INTEL_ENABLE_ECONOMIC_CALENDAR", "true") == "true",
 		EnableEarningsCalendar: env("MACRO_INTEL_ENABLE_EARNINGS_CALENDAR", "true") == "true",
-		EarningsSymbols:         earn,
+		EarningsSymbols:        earn,
 
 		EnableFinnhubGeneralNews: env("MACRO_INTEL_ENABLE_FINNHUB_GENERAL", "true") == "true",
 
@@ -270,9 +270,9 @@ func LoadMacroIntel() (MacroIntel, error) {
 
 		GPRCSVURL: strings.TrimSpace(os.Getenv("GPR_CSV_URL")),
 
-		GDELTEnabled:    env("MACRO_INTEL_GDELT_ENABLE", "true") == "true",
-		GDELTQuery:      env("MACRO_INTEL_GDELT_QUERY", "(federal reserve OR FOMC OR inflation) sourcelang:english"),
-		GDELTMaxRec:     intEnv("MACRO_INTEL_GDELT_MAX_RECORDS", 120),
-		GDELTLookback:   durationEnv("MACRO_INTEL_GDELT_LOOKBACK", 7*24*time.Hour),
+		GDELTEnabled:  env("MACRO_INTEL_GDELT_ENABLE", "true") == "true",
+		GDELTQuery:    env("MACRO_INTEL_GDELT_QUERY", "(federal reserve OR FOMC OR inflation) sourcelang:english"),
+		GDELTMaxRec:   intEnv("MACRO_INTEL_GDELT_MAX_RECORDS", 120),
+		GDELTLookback: durationEnv("MACRO_INTEL_GDELT_LOOKBACK", 7*24*time.Hour),
 	}, nil
 }

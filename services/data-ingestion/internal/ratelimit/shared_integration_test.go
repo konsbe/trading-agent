@@ -4,6 +4,7 @@ package ratelimit
 
 import (
 	"context"
+	"errors"
 	"os"
 	"sync"
 	"testing"
@@ -295,5 +296,280 @@ func TestSharedBudget_KeysAreIndependent(t *testing.T) {
 	defer bcancel()
 	if err := b.Wait(bctx); err != nil {
 		t.Errorf("budget B has a token but was denied: %v", err)
+	}
+}
+
+// ── daily ceiling (migration 010) ──────────────────────────────────────────
+
+func f64(v float64) *float64 { return &v }
+
+func newDailyLimiter(t *testing.T, pool *pgxpool.Pool, key string, perSec, burst, daily float64) (*Shared, *countingLimiter) {
+	t.Helper()
+	fb := &countingLimiter{}
+	s, err := NewShared(pool,
+		Budget{Key: key, RefillPerSec: perSec, Burst: burst, DailyLimit: f64(daily)},
+		fb, Options{AcquireTimeout: 2 * time.Second, MaxSleep: 200 * time.Millisecond}, quietLogger())
+	if err != nil {
+		t.Fatalf("new: %v", err)
+	}
+	if err := s.EnsureBudget(context.Background()); err != nil {
+		t.Fatalf("ensure: %v", err)
+	}
+	return s, fb
+}
+
+// THE test for the hazard migration 010 introduces. A limiter whose guarantee is
+// "never unlimited" must not, when the daily quota is genuinely spent, fall back
+// to the local bucket and pace requests against an account with nothing left.
+// Coordination worked here; the answer is simply no.
+func TestDailyQuota_ExhaustionIsNotDegradationAndNeverUsesFallback(t *testing.T) {
+	ctx := context.Background()
+	pool := testPool(t)
+	key := "test_daily_exhaust"
+	if _, err := pool.Exec(ctx, `DELETE FROM api_rate_budget WHERE budget_key=$1`, key); err != nil {
+		t.Fatal(err)
+	}
+
+	// Generous rate so the per-second bucket is never the constraint; daily = 3.
+	s, fb := newDailyLimiter(t, pool, key, 1000, 1000, 3)
+
+	for i := 1; i <= 3; i++ {
+		if err := s.Wait(ctx); err != nil {
+			t.Fatalf("acquisition %d should have been granted: %v", i, err)
+		}
+	}
+
+	// The fourth must be refused, and refused in the specific way that tells the
+	// caller to come back tomorrow rather than to retry now.
+	err := s.Wait(ctx)
+	if !errors.Is(err, ErrDailyQuotaExhausted) {
+		t.Fatalf("err = %v, want ErrDailyQuotaExhausted", err)
+	}
+
+	st := s.Stats()
+	if st.QuotaExhausted != 1 {
+		t.Errorf("QuotaExhausted = %d, want 1", st.QuotaExhausted)
+	}
+	// The two assertions that matter most:
+	if fb.calls.Load() != 0 {
+		t.Errorf("fallback was used %d times — a spent quota must NEVER be served by the local limiter, or the ceiling becomes a firehose",
+			fb.calls.Load())
+	}
+	if st.Degraded != 0 {
+		t.Errorf("Degraded = %d, want 0 — quota exhaustion is not a coordination failure and must not hide inside a 'limiter unhealthy' metric",
+			st.Degraded)
+	}
+	if st.Granted != 3 {
+		t.Errorf("Granted = %d, want 3", st.Granted)
+	}
+}
+
+// Repeated attempts after exhaustion must keep refusing, not eventually leak
+// through, and must not accumulate degradation.
+func TestDailyQuota_StaysRefusedAndDoesNotLeak(t *testing.T) {
+	ctx := context.Background()
+	pool := testPool(t)
+	key := "test_daily_persist"
+	if _, err := pool.Exec(ctx, `DELETE FROM api_rate_budget WHERE budget_key=$1`, key); err != nil {
+		t.Fatal(err)
+	}
+	s, fb := newDailyLimiter(t, pool, key, 1000, 1000, 1)
+
+	if err := s.Wait(ctx); err != nil {
+		t.Fatalf("first acquisition: %v", err)
+	}
+	for i := 0; i < 5; i++ {
+		if err := s.Wait(ctx); !errors.Is(err, ErrDailyQuotaExhausted) {
+			t.Fatalf("attempt %d: err = %v, want ErrDailyQuotaExhausted", i, err)
+		}
+	}
+	if fb.calls.Load() != 0 || s.Stats().Degraded != 0 {
+		t.Errorf("fallback=%d degraded=%d, want 0/0", fb.calls.Load(), s.Stats().Degraded)
+	}
+	if s.Stats().QuotaExhausted != 5 {
+		t.Errorf("QuotaExhausted = %d, want 5", s.Stats().QuotaExhausted)
+	}
+
+	// The balance must not have gone negative: the daily counter is consumed only
+	// on a granted acquisition.
+	d, err := s.DailyState(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d.Used != 1 {
+		t.Errorf("daily_used = %v after 1 grant and 5 refusals, want 1 — refusals must not consume budget", d.Used)
+	}
+}
+
+// Rolling the window must restore the allowance, and must do so without any
+// worker action — the roll happens inside the acquisition statement.
+func TestDailyQuota_WindowRollRestoresAllowance(t *testing.T) {
+	ctx := context.Background()
+	pool := testPool(t)
+	key := "test_daily_roll"
+	if _, err := pool.Exec(ctx, `DELETE FROM api_rate_budget WHERE budget_key=$1`, key); err != nil {
+		t.Fatal(err)
+	}
+	s, _ := newDailyLimiter(t, pool, key, 1000, 1000, 2)
+
+	for i := 0; i < 2; i++ {
+		if err := s.Wait(ctx); err != nil {
+			t.Fatalf("acquisition %d: %v", i, err)
+		}
+	}
+	if err := s.Wait(ctx); !errors.Is(err, ErrDailyQuotaExhausted) {
+		t.Fatalf("expected exhaustion, got %v", err)
+	}
+
+	// Age the window into yesterday, as midnight UTC would.
+	if _, err := pool.Exec(ctx,
+		`UPDATE api_rate_budget SET daily_window_start = (now() AT TIME ZONE 'UTC')::date - 1 WHERE budget_key=$1`, key,
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := s.Wait(ctx); err != nil {
+		t.Fatalf("after the window rolled the allowance must be restored, got %v", err)
+	}
+	d, err := s.DailyState(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Counter restarted at 1 for the new window rather than continuing from 2.
+	if d.Used != 1 {
+		t.Errorf("daily_used = %v after the roll, want 1", d.Used)
+	}
+}
+
+// A nil DailyLimit must preserve the pre-010 behaviour exactly, so existing
+// budgets (finnhub, tiingo) are unaffected by the migration.
+func TestDailyQuota_NilLimitMeansNoCeiling(t *testing.T) {
+	ctx := context.Background()
+	pool := testPool(t)
+	key := "test_daily_none"
+	if _, err := pool.Exec(ctx, `DELETE FROM api_rate_budget WHERE budget_key=$1`, key); err != nil {
+		t.Fatal(err)
+	}
+	s := newTestLimiter(t, pool, key, 1000, 1000) // DailyLimit unset
+
+	for i := 0; i < 25; i++ {
+		if err := s.Wait(ctx); err != nil {
+			t.Fatalf("acquisition %d refused with no daily ceiling configured: %v", i, err)
+		}
+	}
+	if s.Stats().QuotaExhausted != 0 {
+		t.Errorf("QuotaExhausted = %d, want 0", s.Stats().QuotaExhausted)
+	}
+	d, err := s.DailyState(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d.Limit != nil {
+		t.Errorf("daily_limit = %v, want NULL", *d.Limit)
+	}
+}
+
+// The two dimensions must be independent: being rate-limited is a wait, being
+// quota-limited is a stop, and a rate denial must never be reported as quota
+// exhaustion.
+func TestDailyQuota_RateDenialIsNotReportedAsQuotaExhaustion(t *testing.T) {
+	ctx := context.Background()
+	pool := testPool(t)
+	key := "test_daily_vs_rate"
+	if _, err := pool.Exec(ctx, `DELETE FROM api_rate_budget WHERE budget_key=$1`, key); err != nil {
+		t.Fatal(err)
+	}
+	// Slow rate, generous daily: denials here are purely rate-driven.
+	s, fb := newDailyLimiter(t, pool, key, 4, 1, 1000)
+	resetBudget(t, pool, key, 1)
+
+	for i := 0; i < 4; i++ {
+		cctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+		err := s.Wait(cctx)
+		cancel()
+		if errors.Is(err, ErrDailyQuotaExhausted) {
+			t.Fatalf("acquisition %d reported quota exhaustion for a rate denial", i)
+		}
+		if err != nil {
+			t.Fatalf("acquisition %d: %v", i, err)
+		}
+	}
+	if s.Stats().Throttle == 0 {
+		t.Error("expected the rate dimension to have made us wait")
+	}
+	if s.Stats().QuotaExhausted != 0 || fb.calls.Load() != 0 {
+		t.Errorf("quota=%d fallback=%d, want 0/0", s.Stats().QuotaExhausted, fb.calls.Load())
+	}
+}
+
+// Reconciliation against the provider's own reported usage, which is what makes
+// the UTC-midnight boundary assumption verifiable rather than load-bearing.
+func TestSyncDailyUsage_OverwritesLocalCounter(t *testing.T) {
+	ctx := context.Background()
+	pool := testPool(t)
+	key := "test_daily_sync"
+	if _, err := pool.Exec(ctx, `DELETE FROM api_rate_budget WHERE budget_key=$1`, key); err != nil {
+		t.Fatal(err)
+	}
+	s, _ := newDailyLimiter(t, pool, key, 1000, 1000, 10)
+
+	if err := s.Wait(ctx); err != nil {
+		t.Fatal(err)
+	}
+	// The provider says we have actually used 9 — e.g. requests that consumed a
+	// credit upstream but failed locally.
+	if err := s.SyncDailyUsage(ctx, 9); err != nil {
+		t.Fatalf("sync: %v", err)
+	}
+	d, err := s.DailyState(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d.Used != 9 {
+		t.Errorf("daily_used = %v after sync, want 9", d.Used)
+	}
+	// One request left before the ceiling, then refusal.
+	if err := s.Wait(ctx); err != nil {
+		t.Fatalf("the 10th should be granted: %v", err)
+	}
+	if err := s.Wait(ctx); !errors.Is(err, ErrDailyQuotaExhausted) {
+		t.Errorf("err = %v, want exhaustion after the synced count was reached", err)
+	}
+}
+
+// Restarting a worker must not hand back a spent daily quota — the same property
+// EnsureBudget already guarantees for the token bucket.
+func TestEnsureBudget_DoesNotResetDailyUsage(t *testing.T) {
+	ctx := context.Background()
+	pool := testPool(t)
+	key := "test_daily_restart"
+	if _, err := pool.Exec(ctx, `DELETE FROM api_rate_budget WHERE budget_key=$1`, key); err != nil {
+		t.Fatal(err)
+	}
+	s, _ := newDailyLimiter(t, pool, key, 1000, 1000, 2)
+	for i := 0; i < 2; i++ {
+		if err := s.Wait(ctx); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Three "restarts".
+	for i := 0; i < 3; i++ {
+		if err := s.EnsureBudget(ctx); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := s.Wait(ctx); !errors.Is(err, ErrDailyQuotaExhausted) {
+		t.Errorf("err = %v; a restart must not refill the daily quota", err)
+	}
+}
+
+func TestNewShared_RejectsDailyLimitBelowOne(t *testing.T) {
+	pool := testPool(t)
+	_, err := NewShared(pool,
+		Budget{Key: "x", RefillPerSec: 1, Burst: 2, DailyLimit: f64(0.5)},
+		&countingLimiter{}, Options{}, quietLogger())
+	if err == nil {
+		t.Error("a DailyLimit below 1 can never grant a request and must be rejected at construction")
 	}
 }

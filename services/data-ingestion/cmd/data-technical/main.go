@@ -6,8 +6,9 @@
 //   - data-technical fills the gap with daily/weekly bars for both asset classes.
 //
 // Sources:
-//   Equity — Yahoo Finance (primary, free), Alpaca Data (fallback).
-//   Crypto — Binance REST.
+//
+//	Equity — Yahoo Finance (primary, free), Alpaca Data (fallback).
+//	Crypto — Binance REST.
 //
 // All bars are written to equity_ohlcv / crypto_ohlcv.
 // Indicator computation has been moved to services/data-analyzer/cmd/technical-analysis.
@@ -23,6 +24,7 @@ import (
 
 	"github.com/joho/godotenv"
 
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/konsbe/trading-agent/services/data-ingestion/internal/config"
 	"github.com/konsbe/trading-agent/services/data-ingestion/internal/db"
 	"github.com/konsbe/trading-agent/services/data-ingestion/internal/fetch/alpacadata"
@@ -30,7 +32,6 @@ import (
 	"github.com/konsbe/trading-agent/services/data-ingestion/internal/fetch/yahoo"
 	"github.com/konsbe/trading-agent/services/data-ingestion/internal/logx"
 	"github.com/konsbe/trading-agent/services/data-ingestion/internal/store"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func main() {

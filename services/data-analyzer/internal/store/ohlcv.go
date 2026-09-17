@@ -6,23 +6,44 @@ package store
 import (
 	"context"
 
-	"github.com/konsbe/trading-agent/services/data-analyzer/internal/compute"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/konsbe/trading-agent/services/data-analyzer/internal/compute"
 )
 
 // QueryEquityBars returns up to limit equity OHLCV bars for the given symbol
 // and interval, ordered oldest-first (chronological).
 //
 // DISTINCT ON (ts) ensures each timestamp appears only once even when multiple
-// sources (e.g. yahoo_finance and alpaca_data) have rows for the same bar.
-// Yahoo Finance rows are preferred when both exist for a timestamp.
+// sources have rows for the same bar.
+//
+// PREFERENCE ORDER IS A CORRECTNESS CONCERN, NOT A TIE-BREAK. The sources do not
+// agree on what their prices mean:
+//
+//	tiingo         split AND dividend adjusted (reads Tiingo's adj* fields)
+//	yahoo_finance  NOT dividend adjusted — internal/fetch/yahoo decodes
+//	               indicators.quote and never indicators.adjclose, so whatever
+//	               dividend adjustment Yahoo offers there is absent by
+//	               construction
+//	alpaca         IEX-only volume on the free tier (§2.2 rejects it outright)
+//
+// Tiingo is therefore preferred first. This ordering used to prefer
+// yahoo_finance, which meant a symbol covered by both silently resolved to the
+// unadjusted series — strictly worse than either source alone, because the
+// symbol *looked* fully covered while serving prices that drift from the
+// adjusted series by the cumulative dividend. That shifts every price-derived
+// feature: 52-week ratios, resistance levels, and change_pct across any
+// ex-dividend date.
+//
+// See services/data-ingestion/data_ingestion.md for the full caveat.
 func QueryEquityBars(ctx context.Context, pool *pgxpool.Pool, symbol, interval string, limit int) ([]compute.Bar, error) {
 	rows, err := pool.Query(ctx, `
 		SELECT ts, open, high, low, close, volume FROM (
 			SELECT DISTINCT ON (ts) ts, open, high, low, close, volume
 			FROM equity_ohlcv
 			WHERE symbol=$1 AND interval=$2
-			ORDER BY ts, (source = 'yahoo_finance') DESC
+			ORDER BY ts,
+				(source = 'tiingo')        DESC,
+				(source = 'yahoo_finance') DESC
 		) deduped
 		ORDER BY ts DESC
 		LIMIT $3`,
