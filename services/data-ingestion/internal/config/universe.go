@@ -173,6 +173,11 @@ type Universe struct {
 	RequestsPerSecond float64
 	RequestBurst      int
 
+	// TwelveDataToken / TwelveDataRequestsPerSecond apply when
+	// UNIVERSE_BAR_SOURCE is twelve_data, the Phase 1 primary provider.
+	TwelveDataToken             string
+	TwelveDataRequestsPerSecond float64
+
 	// TiingoToken / TiingoRequestsPerSecond apply when UNIVERSE_BAR_SOURCE is
 	// "tiingo". The rate is politeness only — Tiingo's real constraint is
 	// monthly unique symbols, guarded by the subset size cap.
@@ -219,7 +224,12 @@ func LoadUniverse() (Universe, error) {
 		MinBarsHistory: intEnv("UNIVERSE_MIN_BARS_HISTORY", 252),
 
 		BarInterval: env("UNIVERSE_BAR_INTERVAL", "1Day"),
-		BarSource:   env("UNIVERSE_BAR_SOURCE", "yahoo_finance"),
+		// Default is tiingo: it is the only source verified to apply ONE
+		// consistent adjustment factor across a series. twelve_data is faster but
+		// alternates between adjusted and unadjusted bars within a single
+		// response (see internal/barquality), and yahoo_finance carries no
+		// dividend adjustment at all.
+		BarSource: env("UNIVERSE_BAR_SOURCE", "tiingo"),
 
 		SubsetEnable:        env("UNIVERSE_SUBSET_ENABLE", "false") == "true",
 		SubsetStrategy:      env("UNIVERSE_SUBSET_STRATEGY", "stratified"),
@@ -247,17 +257,53 @@ func LoadUniverse() (Universe, error) {
 		BackfillMaxAttempts:  intEnv("UNIVERSE_BACKFILL_MAX_ATTEMPTS", 3),
 		BackfillIdleInterval: durationEnv("UNIVERSE_BACKFILL_IDLE_INTERVAL", time.Hour),
 
-		TiingoToken:             strings.TrimSpace(os.Getenv("TIINGO_API_KEY")),
-		TiingoRequestsPerSecond: floatEnv("TIINGO_RATE_PER_SEC", 1.5),
+		TwelveDataToken:             strings.TrimSpace(os.Getenv("TWELVE_DATA_API_KEY")),
+		TwelveDataRequestsPerSecond: floatEnv("TWELVE_DATA_RATE_PER_SEC", 0.125),
 
-		RequestsPerSecond: floatEnv("UNIVERSE_YAHOO_REQUESTS_PER_SEC", 2.0),
-		RequestBurst:      intEnv("UNIVERSE_YAHOO_BURST", 1),
-		RequestTimeout:    durationEnv("UNIVERSE_YAHOO_TIMEOUT", 30*time.Second),
-		RequestMaxRetries: intEnv("UNIVERSE_YAHOO_MAX_RETRIES", 3),
-		BackoffBase:       durationEnv("UNIVERSE_YAHOO_BACKOFF_BASE", 2*time.Second),
-		BackoffMax:        durationEnv("UNIVERSE_YAHOO_BACKOFF_MAX", 60*time.Second),
+		TiingoToken:             strings.TrimSpace(os.Getenv("TIINGO_API_KEY")),
+		TiingoRequestsPerSecond: floatEnv("TIINGO_RATE_PER_SEC", 0.0138),
+
+		// Generic HTTP knobs, applied to WHICHEVER provider UNIVERSE_BAR_SOURCE
+		// names. They were called UNIVERSE_YAHOO_* while feeding all three
+		// adapters, which is how Twelve Data silently inherited Yahoo's 30s
+		// timeout and then failed 12 symbols with "Client.Timeout exceeded while
+		// awaiting headers" — a 3-year daily response is ~100KB and this network
+		// is lossy. The UNIVERSE_YAHOO_* names remain as fallbacks so existing
+		// deployments keep working.
+		RequestsPerSecond: floatEnv2("UNIVERSE_BAR_REQUESTS_PER_SEC", "UNIVERSE_YAHOO_REQUESTS_PER_SEC", 2.0),
+		RequestBurst:      intEnv2("UNIVERSE_BAR_BURST", "UNIVERSE_YAHOO_BURST", 1),
+		RequestTimeout:    durationEnv2("UNIVERSE_BAR_TIMEOUT", "UNIVERSE_YAHOO_TIMEOUT", 90*time.Second),
+		RequestMaxRetries: intEnv2("UNIVERSE_BAR_MAX_RETRIES", "UNIVERSE_YAHOO_MAX_RETRIES", 3),
+		BackoffBase:       durationEnv2("UNIVERSE_BAR_BACKOFF_BASE", "UNIVERSE_YAHOO_BACKOFF_BASE", 2*time.Second),
+		BackoffMax:        durationEnv2("UNIVERSE_BAR_BACKOFF_MAX", "UNIVERSE_YAHOO_BACKOFF_MAX", 60*time.Second),
 
 		DailyBarsInterval:     durationEnv("UNIVERSE_DAILY_BARS_INTERVAL", 24*time.Hour),
 		DailyBarsLookbackDays: intEnv("UNIVERSE_DAILY_BARS_LOOKBACK_DAYS", 7),
 	}, nil
+}
+
+// ─── Preferred-name-with-fallback env readers ─────────────────────────────────
+//
+// Each reads `preferred` and falls back to `legacy`, so renaming a variable does
+// not silently reset a deployment's tuning to the default.
+
+func floatEnv2(preferred, legacy string, def float64) float64 {
+	if v := strings.TrimSpace(os.Getenv(preferred)); v != "" {
+		return floatEnv(preferred, def)
+	}
+	return floatEnv(legacy, def)
+}
+
+func intEnv2(preferred, legacy string, def int) int {
+	if v := strings.TrimSpace(os.Getenv(preferred)); v != "" {
+		return intEnv(preferred, def)
+	}
+	return intEnv(legacy, def)
+}
+
+func durationEnv2(preferred, legacy string, def time.Duration) time.Duration {
+	if v := strings.TrimSpace(os.Getenv(preferred)); v != "" {
+		return durationEnv(preferred, def)
+	}
+	return durationEnv(legacy, def)
 }

@@ -259,7 +259,27 @@ func (w *worker) fetchMetricsForSymbol(ctx context.Context, sym string, ts time.
 		upsert("net_margin_5y", floatPtr(metricMap, "netProfitMargin5Y"), nil)
 
 		// ── Market cap & shares (needed to derive FCF yield locally) ─────────
-		upsert("market_cap", floatPtr(metricMap, "marketCapitalization"), nil)
+		//
+		// Finnhub reports marketCapitalization in MILLIONS of dollars (AAPL comes
+		// back as 4851251, i.e. $4.85T). SCHEMAS.md has always specified that
+		// market_cap is stored as "USD absolute" and that "the writer multiplies
+		// by 1e6 because the §3.2 gates are stated in dollars ($300M-$10B)" —
+		// but the writer did not, so raw millions were stored.
+		//
+		// That silently INVERTED the §3.2 market-cap gate rather than merely
+		// skewing it: AA stored as 12208.45 reads as $12.2 thousand, so every
+		// symbol tested below the $300M floor. Market-bucket names all failed
+		// market_cap_below_min, and penny-bucket names all passed — on a
+		// meaningless basis, since the penny band has no lower bound. A gate that
+		// rejects everything in one bucket and waves through the other, while
+		// looking like it ran, is worse than one that errors.
+		upsert("market_cap", mulM(floatPtr(metricMap, "marketCapitalization")), nil)
+
+		// NOTE: shareOutstanding is NOT present on /stock/metric — verified absent
+		// even for AAPL, not merely null for micro-caps. This writes 450 null rows
+		// and leaves §3.9's market_cap_est proxy with no input at all, so the
+		// symbols the proxy exists to rescue stay ungateable. The value lives on
+		// /stock/profile2; wiring that is a separate change.
 		upsert("shares_outstanding", floatPtr(metricMap, "shareOutstanding"), nil)
 
 		// ── Tier 2: Return on capital & profitability efficiency ───────────────
@@ -949,6 +969,20 @@ func conceptVal(m map[string]any, concepts ...string) *float64 {
 // divM converts a raw XBRL dollar value to millions so it is consistent with
 // the Finnhub /stock/metric API, which already returns values in millions.
 // Per-share values (EPS, book value per share) should NOT be passed through divM.
+// mulM converts a Finnhub "$ millions" figure to USD absolute.
+//
+// The inverse of divM, and the unit boundary SCHEMAS.md specifies for
+// market_cap. Kept as a named helper rather than an inline *1e6 so the
+// conversion is greppable: the bug this fixes was invisible precisely because
+// nothing at the call site mentioned units.
+func mulM(v *float64) *float64 {
+	if v == nil {
+		return nil
+	}
+	out := *v * 1e6
+	return &out
+}
+
 func divM(v *float64) *float64 {
 	if v == nil {
 		return nil

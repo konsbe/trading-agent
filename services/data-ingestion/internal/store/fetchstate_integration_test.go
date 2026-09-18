@@ -50,7 +50,7 @@ func TestResolveMetricsSymbols_UnionsAndPreservesConfiguredETFs(t *testing.T) {
 	pool := testPool(t)
 
 	configured := []string{"AAPL", "MSFT", "SPY"} // SPY is an ETF, never eligible
-	got, err := ResolveMetricsSymbols(ctx, pool, configured)
+	got, err := ResolveMetricsSymbols(ctx, pool, configured, ScopeEligible)
 	if err != nil {
 		t.Fatalf("resolve: %v", err)
 	}
@@ -93,7 +93,7 @@ func TestResolveMetricsSymbols_EmptyUniverseKeepsConfiguredList(t *testing.T) {
 	setupFetchState(t, nil)
 	pool := testPool(t)
 
-	got, err := ResolveMetricsSymbols(ctx, pool, []string{"AAPL", "MSFT", "SPY"})
+	got, err := ResolveMetricsSymbols(ctx, pool, []string{"AAPL", "MSFT", "SPY"}, ScopeEligible)
 	if err != nil {
 		t.Fatalf("resolve: %v", err)
 	}
@@ -107,7 +107,7 @@ func TestSeedFundamentalFetchState_IsIdempotentAndPicksUpNewSymbols(t *testing.T
 	setupFetchState(t, []string{"AAA", "BBB"})
 	pool := testPool(t)
 
-	n, err := SeedFundamentalFetchState(ctx, pool, TaskMetrics)
+	n, err := SeedFundamentalFetchState(ctx, pool, TaskMetrics, ScopeEligible)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -115,7 +115,7 @@ func TestSeedFundamentalFetchState_IsIdempotentAndPicksUpNewSymbols(t *testing.T
 		t.Errorf("seeded %d, want 2", n)
 	}
 	// Re-seeding must add nothing.
-	if n, err = SeedFundamentalFetchState(ctx, pool, TaskMetrics); err != nil || n != 0 {
+	if n, err = SeedFundamentalFetchState(ctx, pool, TaskMetrics, ScopeEligible); err != nil || n != 0 {
 		t.Errorf("re-seed added %d rows (err %v), want 0", n, err)
 	}
 
@@ -128,7 +128,7 @@ func TestSeedFundamentalFetchState_IsIdempotentAndPicksUpNewSymbols(t *testing.T
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if n, err = SeedFundamentalFetchState(ctx, pool, TaskMetrics); err != nil || n != 1 {
+	if n, err = SeedFundamentalFetchState(ctx, pool, TaskMetrics, ScopeEligible); err != nil || n != 1 {
 		t.Errorf("seeded %d for the new symbol (err %v), want 1", n, err)
 	}
 
@@ -148,7 +148,7 @@ func TestClaimFundamentalFetch_LeasesPendingFirstAndSkipsFresh(t *testing.T) {
 	ctx := context.Background()
 	setupFetchState(t, []string{"FRESH", "STALE", "NEW"})
 	pool := testPool(t)
-	if _, err := SeedFundamentalFetchState(ctx, pool, TaskMetrics); err != nil {
+	if _, err := SeedFundamentalFetchState(ctx, pool, TaskMetrics, ScopeEligible); err != nil {
 		t.Fatal(err)
 	}
 
@@ -195,7 +195,7 @@ func TestClaimFundamentalFetch_ReclaimsAbandonedClaims(t *testing.T) {
 	ctx := context.Background()
 	setupFetchState(t, []string{"STUCK"})
 	pool := testPool(t)
-	if _, err := SeedFundamentalFetchState(ctx, pool, TaskMetrics); err != nil {
+	if _, err := SeedFundamentalFetchState(ctx, pool, TaskMetrics, ScopeEligible); err != nil {
 		t.Fatal(err)
 	}
 
@@ -233,7 +233,7 @@ func TestMarkFundamentalFetchFailed_DoesNotAdvanceFreshness(t *testing.T) {
 	ctx := context.Background()
 	setupFetchState(t, []string{"BROKEN"})
 	pool := testPool(t)
-	if _, err := SeedFundamentalFetchState(ctx, pool, TaskMetrics); err != nil {
+	if _, err := SeedFundamentalFetchState(ctx, pool, TaskMetrics, ScopeEligible); err != nil {
 		t.Fatal(err)
 	}
 
@@ -293,7 +293,7 @@ func TestMarkFundamentalFetchDone_ClearsClaimAndError(t *testing.T) {
 	ctx := context.Background()
 	setupFetchState(t, []string{"GOOD"})
 	pool := testPool(t)
-	if _, err := SeedFundamentalFetchState(ctx, pool, TaskMetrics); err != nil {
+	if _, err := SeedFundamentalFetchState(ctx, pool, TaskMetrics, ScopeEligible); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := ClaimFundamentalFetchBatch(ctx, pool, TaskMetrics, 10, ffsRefresh, ffsLease, ffsMaxAttempts); err != nil {
@@ -339,7 +339,7 @@ func TestFetchState_TasksAreIndependentPerSymbol(t *testing.T) {
 	ctx := context.Background()
 	setupFetchState(t, []string{"MULTI"})
 	pool := testPool(t)
-	if _, err := SeedFundamentalFetchState(ctx, pool, TaskMetrics); err != nil {
+	if _, err := SeedFundamentalFetchState(ctx, pool, TaskMetrics, ScopeEligible); err != nil {
 		t.Fatal(err)
 	}
 	// A hypothetical second widened task, as §8.4 anticipates for runOverview.
@@ -370,5 +370,97 @@ func TestFetchState_TasksAreIndependentPerSymbol(t *testing.T) {
 	}
 	if len(ovClaims) != 1 {
 		t.Errorf("overview claims = %d, want 1", len(ovClaims))
+	}
+}
+
+// The scope knob has to restrict BOTH halves of the fundamentals pass or it is
+// cosmetic: scoping the resolver while seeding the full universe would leave
+// ~4,500 permanently-pending checkpoint rows that the checkpointed pass would
+// then work through anyway.
+func TestMetricsScope_RestrictsBothResolutionAndSeeding(t *testing.T) {
+	ctx := context.Background()
+	pool := testPool(t)
+	clearUniverse(t, pool)
+
+	rows := []UniverseRow{
+		{Symbol: "SELA", Exchange: "NASDAQ", Type: "Common Stock", IsEligible: true},
+		{Symbol: "SELB", Exchange: "NASDAQ", Type: "Common Stock", IsEligible: true},
+		{Symbol: "WIDEA", Exchange: "NASDAQ", Type: "Common Stock", IsEligible: true},
+		{Symbol: "WIDEB", Exchange: "NASDAQ", Type: "Common Stock", IsEligible: true},
+	}
+	if _, err := UpsertUniverseSymbols(ctx, pool, rows); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx,
+		`UPDATE universe_symbols SET backfill_selected = true WHERE symbol IN ('SELA','SELB')`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, `DELETE FROM fundamental_fetch_state`); err != nil {
+		t.Fatal(err)
+	}
+
+	// Resolution.
+	sel, err := ResolveMetricsSymbols(ctx, pool, nil, ScopeSelected)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(sel) != 2 {
+		t.Errorf("ScopeSelected resolved %d symbols (%v), want the 2 selected", len(sel), sel)
+	}
+	wide, err := ResolveMetricsSymbols(ctx, pool, nil, ScopeEligible)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(wide) != 4 {
+		t.Errorf("ScopeEligible resolved %d symbols (%v), want all 4", len(wide), wide)
+	}
+
+	// Configured symbols survive regardless of scope: they are other consumers'
+	// watchlists, and a pilot flag must not narrow what already works.
+	withCfg, err := ResolveMetricsSymbols(ctx, pool, []string{"SPY", "QQQ"}, ScopeSelected)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(withCfg) != 4 {
+		t.Errorf("got %d (%v), want 2 configured + 2 selected", len(withCfg), withCfg)
+	}
+	if withCfg[0] != "SPY" || withCfg[1] != "QQQ" {
+		t.Errorf("configured symbols must keep their leading order, got %v", withCfg)
+	}
+
+	// Seeding.
+	n, err := SeedFundamentalFetchState(ctx, pool, TaskMetrics, ScopeSelected)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n != 2 {
+		t.Errorf("ScopeSelected seeded %d rows, want 2 — an unscoped seed makes the scope setting cosmetic", n)
+	}
+
+	// Widening later must top up rather than duplicate.
+	n, err = SeedFundamentalFetchState(ctx, pool, TaskMetrics, ScopeEligible)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n != 2 {
+		t.Errorf("widening seeded %d additional rows, want the 2 not already present", n)
+	}
+	var total int
+	pool.QueryRow(ctx, `SELECT count(*) FROM fundamental_fetch_state WHERE task=$1`, TaskMetrics).Scan(&total)
+	if total != 4 {
+		t.Errorf("total seeded rows = %d, want 4", total)
+	}
+}
+
+// An unrecognised scope must fail rather than silently choosing the expensive
+// branch — the same principle as UNIVERSE_BAR_SOURCE failing at startup.
+func TestMetricsScope_UnknownValueIsAnError(t *testing.T) {
+	ctx := context.Background()
+	pool := testPool(t)
+	if _, err := ResolveMetricsSymbols(ctx, pool, nil, MetricsScope("everything")); err == nil {
+		t.Error("an unknown scope must not silently resolve the full universe")
+	}
+	if _, err := SeedFundamentalFetchState(ctx, pool, TaskMetrics, MetricsScope("everything")); err == nil {
+		t.Error("an unknown scope must not silently seed the full universe")
 	}
 }

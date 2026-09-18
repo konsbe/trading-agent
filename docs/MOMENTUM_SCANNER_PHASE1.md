@@ -559,6 +559,68 @@ Nullable columns to include now for later use without migration: `short_interest
 
 Two new services, both following the existing `data-ingestion` worker pattern (own `cmd/` binary, own Compose service, env-var config only).
 
+### 2.2.1 Bar provider decision (resolved 2026-09-17)
+
+**RESOLVED AGAINST TWELVE DATA. Tiingo is the primary bar provider.**
+
+Twelve Data was adopted for throughput and withdrawn the same day: its
+`adjust=all` applies adjustment inconsistently bar-by-bar inside a single
+response, fabricating one-day moves up to **+1382%** across **12-17% of symbols
+and 41% of the penny bucket**. For a momentum scanner that is the worst possible
+defect — a fabricated +796% day is precisely the signal §3 hunts, so every
+corrupted symbol ranks top of scan. A hybrid was rejected because "clean" cannot
+be established locally: APAM, AQN and ARX disagree with Tiingo by 2-4% with no
+detectable discontinuity. Full evidence in `data_ingestion.md`; the detector and
+the ABTS fixture live in `internal/barquality`.
+
+Tiingo costs ~9 hours for 450 symbols at its hard 50 requests/clock-hour. That is
+accepted: the pilot is a one-off, unattended, checkpointed job, and correctness of
+the adjustment is the premise the whole scanner rests on.
+
+The throughput comparison below is retained because it was accurate.
+
+Both satisfy §3's split- and dividend-adjusted requirement and agree to
+**-0.0028% on close and +0.0000% on volume**. The decision was throughput and
+quota shape, measured rather than assumed:
+
+| | Twelve Data (free) | Tiingo Starter (free) |
+|---|---|---|
+| Rate | 8 credits/min (measured) | 50 req / **clock hour** (fixed-clock reset, measured) |
+| Daily | 800 | 1,000 |
+| Unique symbols | **none** | 500/month |
+| 450-symbol backfill | **~56 min** | **~9 h** |
+
+Tiingo's unique-symbol meter also leaves an unanswerable question after a failed
+run: the free tier exposes no account-usage endpoint, so whether ~136 rejected
+requests consumed allowance cannot be checked. Twelve Data removes the question.
+
+All 450 were redrawn on Twelve Data rather than only the 386 Tiingo had not
+reached, so the pilot has one adjustment methodology throughout. A 0.05%
+discrepancy between two "adjusted" series is negligible until it falls on a §3.2
+price threshold or a §3.6 breakout confirmation, at which point a single symbol
+gates differently for a reason no one would think to look for. The 64 symbols
+Tiingo had completed are kept, giving 64 names with two independent adjusted
+series as a correctness check on the new adapter.
+
+**`adjust=all` is mandatory.** Twelve Data's default is split-adjusted but NOT
+dividend-adjusted (a constant +6.32% / +7.52% above the adjusted close for ALL
+and AWR over three years). The adapter always sends it and a test pins it.
+
+**Volume adjustment was verified against a real split, not inferred.** Measured
+on NVDA's 10:1 split of 2024-06-10, last pre-split session:
+
+```
+                        close        volume
+Tiingo raw              1208.88      41,238,580
+Tiingo fully adjusted    120.5447    412,385,800
+Twelve Data adjust=all   120.5414    412,386,000   = 10.0000x raw
+```
+
+Volume is split-adjusted in both modes; `adjust=all` affects price only, which is
+correct because dividends do not change share count. This was checked because a
+provider rescaling OHLC but not volume would silently corrupt §3.4's RVOL for
+every symbol that ever split — the same defect class as the Yahoo dividend gap.
+
 ### 8.1 `data-universe` (Go)
 
 `services/data-ingestion/cmd/data-universe/main.go`

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -48,8 +49,15 @@ func TestFetchBarsRange_UsesAdjustedFieldsNotRaw(t *testing.T) {
 		if q.Get("startDate") == "" || q.Get("endDate") == "" {
 			t.Errorf("expected explicit startDate/endDate, got %v", q)
 		}
-		if q.Get("token") == "" {
-			t.Error("token not sent")
+		// The token must travel in the Authorization header and must NOT appear
+		// in the URL: *url.Error embeds the full request URL, so a credential in
+		// the query string ends up in error text, logs, and
+		// universe_symbols.backfill_last_error.
+		if got := r.Header.Get("Authorization"); got != "Token tok" {
+			t.Errorf("Authorization = %q, want \"Token tok\"", got)
+		}
+		if q.Get("token") != "" {
+			t.Errorf("token leaked into the query string (%q); it belongs in the Authorization header", q.Get("token"))
 		}
 		_, _ = w.Write([]byte(realBody))
 	}))
@@ -240,5 +248,56 @@ func TestClientSatisfiesFetcherAndReportsSource(t *testing.T) {
 	var f barsource.Fetcher = New("tok")
 	if f.SourceName() != "tiingo" {
 		t.Errorf("SourceName = %q, want tiingo", f.SourceName())
+	}
+}
+
+// Share-class tickers are spelled differently by the two providers: Finnhub and
+// universe_symbols use a dot (BRK.B), Tiingo uses a hyphen (BRK-B). Verified
+// against the live API — the dotted form returns
+// 404 {"detail":"Error: Ticker 'BRK.B' not found"}.
+//
+// Without the translation these fail as PERMANENT 404s, so they are never
+// retried and drop out of the universe silently. 20 of the 4,975 eligible
+// symbols are affected, including BRK.B, BF.B and HEI.A.
+func TestFetchBarsRange_TranslatesShareClassTickersForTheRequest(t *testing.T) {
+	var gotPath string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		_, _ = w.Write([]byte(realBody))
+	}))
+	defer srv.Close()
+
+	bars, err := testClient(t, srv, 0).FetchBarsRange(context.Background(), "BRK.B", "1Day",
+		time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC), time.Date(2026, 9, 10, 0, 0, 0, 0, time.UTC))
+	if err != nil {
+		t.Fatalf("fetch: %v", err)
+	}
+	if !strings.Contains(gotPath, "BRK-B") {
+		t.Errorf("request path %q should use Tiingo's hyphen spelling BRK-B", gotPath)
+	}
+	if strings.Contains(gotPath, "BRK.B") {
+		t.Errorf("request path %q still carries the dotted spelling, which 404s", gotPath)
+	}
+
+	// Stored rows must keep the CANONICAL dotted symbol: equity_ohlcv.symbol
+	// joins universe_symbols, and a second spelling nothing else knows about
+	// would be worse than the 404 it fixes.
+	for _, b := range bars {
+		if b.Symbol != "BRK.B" {
+			t.Errorf("stored symbol = %q, want the canonical BRK.B", b.Symbol)
+		}
+	}
+}
+
+func TestProviderSymbol_OnlyRewritesDots(t *testing.T) {
+	for _, c := range []struct{ in, want string }{
+		{"AAPL", "AAPL"},
+		{"BRK.B", "BRK-B"},
+		{"BF.A", "BF-A"},
+		{"BRK-B", "BRK-B"}, // already hyphenated, left alone
+	} {
+		if got := providerSymbol(c.in); got != c.want {
+			t.Errorf("providerSymbol(%q) = %q, want %q", c.in, got, c.want)
+		}
 	}
 }

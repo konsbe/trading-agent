@@ -573,3 +573,191 @@ func TestNewShared_RejectsDailyLimitBelowOne(t *testing.T) {
 		t.Error("a DailyLimit below 1 can never grant a request and must be rejected at construction")
 	}
 }
+
+// The daily window must roll on the PROVIDER's midnight, not ours.
+//
+// Tiingo's spec says "daily requests (reset at midnight EST)". With the window
+// hardcoded to UTC, our counter read fresh from 00:00 UTC while Tiingo's did not
+// reset until 05:00 UTC — so for five hours a day the ceiling was not real and a
+// second full allowance could be authorised on top of one already spent.
+//
+// This asserts the boundary directly rather than through Wait(), because the
+// symptom only appears inside that five-hour window and a test that waited for
+// real time to enter it would pass 19 hours out of 24.
+func TestDailyWindow_RollsOnTheProvidersMidnightNotUTC(t *testing.T) {
+	ctx := context.Background()
+	pool := testPool(t)
+	key := "test_reset_tz"
+	t.Cleanup(func() { pool.Exec(context.Background(), `DELETE FROM api_rate_budget WHERE budget_key=$1`, key) })
+
+	limit := 10.0
+	s, err := NewShared(pool,
+		Budget{Key: key, RefillPerSec: 1000, Burst: 1000, DailyLimit: &limit, DailyResetTZ: "EST"},
+		localBucket(1000, 1000), Options{}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.EnsureBudget(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	var tz string
+	if err := pool.QueryRow(ctx,
+		`SELECT daily_reset_tz FROM api_rate_budget WHERE budget_key=$1`, key).Scan(&tz); err != nil {
+		t.Fatal(err)
+	}
+	if tz != "EST" {
+		t.Fatalf("daily_reset_tz = %q, want EST — EnsureBudget must persist the boundary", tz)
+	}
+
+	// The two boundaries must actually differ, or this test proves nothing. EST is
+	// a FIXED UTC-5 offset in Postgres; America/New_York would follow DST and
+	// reset an hour early each summer, which is the unsafe direction.
+	var estDate, utcDate string
+	if err := pool.QueryRow(ctx,
+		`SELECT (now() AT TIME ZONE 'EST')::date::text, (now() AT TIME ZONE 'UTC')::date::text`).
+		Scan(&estDate, &utcDate); err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("EST window date = %s, UTC window date = %s", estDate, utcDate)
+
+	// Spend one token and confirm the stored window matches the PROVIDER's date.
+	if err := s.Wait(ctx); err != nil {
+		t.Fatalf("wait: %v", err)
+	}
+	var stored string
+	if err := pool.QueryRow(ctx,
+		`SELECT daily_window_start::text FROM api_rate_budget WHERE budget_key=$1`, key).Scan(&stored); err != nil {
+		t.Fatal(err)
+	}
+	if stored != estDate {
+		t.Errorf("daily_window_start = %s, want the EST date %s (UTC date is %s). "+
+			"Storing the UTC date is the bug: between 00:00 and 05:00 UTC it reads as a fresh "+
+			"window while the provider's allowance is still spent", stored, estDate, utcDate)
+	}
+}
+
+// A budget that does not set the timezone must keep behaving as before, so
+// adding the column cannot silently move Finnhub's boundary.
+func TestDailyWindow_DefaultsToUTCWhenUnset(t *testing.T) {
+	ctx := context.Background()
+	pool := testPool(t)
+	key := "test_reset_tz_default"
+	t.Cleanup(func() { pool.Exec(context.Background(), `DELETE FROM api_rate_budget WHERE budget_key=$1`, key) })
+
+	limit := 5.0
+	s, err := NewShared(pool,
+		Budget{Key: key, RefillPerSec: 1000, Burst: 1000, DailyLimit: &limit}, // DailyResetTZ unset
+		localBucket(1000, 1000), Options{}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.EnsureBudget(ctx); err != nil {
+		t.Fatal(err)
+	}
+	var tz string
+	if err := pool.QueryRow(ctx,
+		`SELECT daily_reset_tz FROM api_rate_budget WHERE budget_key=$1`, key).Scan(&tz); err != nil {
+		t.Fatal(err)
+	}
+	if tz != "UTC" {
+		t.Errorf("daily_reset_tz = %q, want UTC by default", tz)
+	}
+}
+
+// Correcting the boundary must not hand back a spent allowance: a mid-window
+// change to daily_reset_tz reconciles the configuration without resetting
+// daily_used, which would otherwise be a way to mint quota by restarting.
+func TestDailyWindow_ChangingTheBoundaryDoesNotRefundSpentQuota(t *testing.T) {
+	ctx := context.Background()
+	pool := testPool(t)
+	key := "test_reset_tz_change"
+	t.Cleanup(func() { pool.Exec(context.Background(), `DELETE FROM api_rate_budget WHERE budget_key=$1`, key) })
+
+	limit := 100.0
+	mk := func(tz string) *Shared {
+		s, err := NewShared(pool,
+			Budget{Key: key, RefillPerSec: 1000, Burst: 1000, DailyLimit: &limit, DailyResetTZ: tz},
+			localBucket(1000, 1000), Options{}, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := s.EnsureBudget(ctx); err != nil {
+			t.Fatal(err)
+		}
+		return s
+	}
+
+	s := mk("UTC")
+	for i := 0; i < 4; i++ {
+		if err := s.Wait(ctx); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var before float64
+	pool.QueryRow(ctx, `SELECT daily_used FROM api_rate_budget WHERE budget_key=$1`, key).Scan(&before)
+
+	mk("EST") // re-register with a corrected boundary
+	var after float64
+	var tz string
+	pool.QueryRow(ctx, `SELECT daily_used, daily_reset_tz FROM api_rate_budget WHERE budget_key=$1`, key).Scan(&after, &tz)
+
+	if tz != "EST" {
+		t.Errorf("daily_reset_tz = %q, want the corrected EST", tz)
+	}
+	if after < before {
+		t.Errorf("daily_used fell from %.0f to %.0f: changing the boundary must not refund spent quota", before, after)
+	}
+}
+
+// Proves the mechanism at the hour that actually matters, without waiting for
+// the clock to get there.
+//
+// The previous test compares the stored window against the EST date, which is
+// only discriminating between 00:00 and 05:00 UTC — for the other 19 hours the
+// EST and UTC dates coincide and a UTC-based implementation would pass it too.
+// This evaluates both boundaries against a FIXED timestamp inside the gap, so it
+// is discriminating every time it runs.
+func TestDailyWindow_UTCBoundaryIsWrongInsideTheFiveHourGap(t *testing.T) {
+	ctx := context.Background()
+	pool := testPool(t)
+
+	// 02:30 UTC on 18 Sep: past UTC midnight, but 21:30 EST on the 17th — so the
+	// provider's daily allowance has NOT reset.
+	const inGap = "2026-09-18 02:30:00+00"
+
+	var utcDate, estDate string
+	if err := pool.QueryRow(ctx,
+		`SELECT ($1::timestamptz AT TIME ZONE 'UTC')::date::text,
+		        ($1::timestamptz AT TIME ZONE 'EST')::date::text`, inGap).Scan(&utcDate, &estDate); err != nil {
+		t.Fatal(err)
+	}
+
+	if utcDate == estDate {
+		t.Fatalf("fixture is not inside the gap: UTC %s == EST %s", utcDate, estDate)
+	}
+	if utcDate != "2026-09-18" || estDate != "2026-09-17" {
+		t.Fatalf("unexpected boundaries: UTC %s, EST %s", utcDate, estDate)
+	}
+
+	// The consequence, stated as the assertion: a window stamped with the
+	// PREVIOUS EST day is still the current window under the EST boundary, but
+	// looks stale under UTC — which is what made the counter reset five hours
+	// early and hand out a second allowance.
+	var staleUnderUTC, staleUnderEST bool
+	if err := pool.QueryRow(ctx, `
+SELECT $2::date IS DISTINCT FROM ($1::timestamptz AT TIME ZONE 'UTC')::date,
+       $2::date IS DISTINCT FROM ($1::timestamptz AT TIME ZONE 'EST')::date`,
+		inGap, estDate).Scan(&staleUnderUTC, &staleUnderEST); err != nil {
+		t.Fatal(err)
+	}
+	if !staleUnderUTC {
+		t.Error("expected the UTC boundary to consider the provider's current window stale")
+	}
+	if staleUnderEST {
+		t.Error("the EST boundary must treat the provider's current window as current; " +
+			"if this fails the fix does not address the five-hour gap at all")
+	}
+	t.Logf("at %s: window %s is stale-under-UTC=%v (spends a second allowance), stale-under-EST=%v (correct)",
+		inGap, estDate, staleUnderUTC, staleUnderEST)
+}

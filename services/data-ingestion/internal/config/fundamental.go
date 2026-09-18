@@ -77,6 +77,19 @@ type Fundamental struct {
 	// has live consumers, so widening is opt-in.
 	MetricsUseUniverse bool
 
+	// MetricsScope selects how much of the universe the widened pass covers:
+	// "selected" (the pilot draw) or "eligible" (the full §3.1 universe).
+	//
+	// Explicit rather than hardcoded because it is a scope decision with a real
+	// cost attached, like UNIVERSE_SUBSET_* before it. At the shared 1 req/sec
+	// Finnhub budget the eligible universe is ~3.3 hours and the 450-symbol draw
+	// is ~15 minutes, and Step 7 evaluates only the draw — so the wide pass would
+	// spend hours on ~4,500 symbols that take no part in the evaluation.
+	//
+	// Defaults to "selected". An unrecognised value fails at startup rather than
+	// falling back to the expensive branch.
+	MetricsScope string
+
 	// MetricsUniverseCheckpointed runs the universe pass through
 	// fundamental_fetch_state so a multi-hour pass survives a restart. Without it
 	// the widened pass re-walks the whole universe on every tick.
@@ -170,6 +183,7 @@ func LoadFundamental() (Fundamental, error) {
 		InstitutionalOwnershipLimit:  instLimit,
 
 		MetricsUseUniverse:          env("FUNDAMENTAL_METRICS_SYMBOL_SOURCE", "env") == "env+universe",
+		MetricsScope:                env("FUNDAMENTAL_METRICS_SCOPE", "selected"),
 		MetricsUniverseCheckpointed: env("FUNDAMENTAL_METRICS_UNIVERSE_CHECKPOINTED", "true") == "true",
 
 		MetricsUniversePoll:            pollFor("FUNDAMENTAL_METRICS_UNIVERSE_POLL_INTERVAL", 168*time.Hour),

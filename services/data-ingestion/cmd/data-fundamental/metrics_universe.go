@@ -34,7 +34,8 @@ func (w *worker) runMetricsUniverse(ctx context.Context) int {
 
 	// Seeding is idempotent and cheap, and running it every round is what makes a
 	// newly-listed symbol appear without any cycle coordination.
-	seeded, err := store.SeedFundamentalFetchState(ctx, w.pool, store.TaskMetrics)
+	seeded, err := store.SeedFundamentalFetchState(ctx, w.pool, store.TaskMetrics,
+		store.MetricsScope(w.cfg.MetricsScope))
 	if err != nil {
 		w.log.Error("seed fundamental fetch state", "err", err)
 		return 0
@@ -124,12 +125,20 @@ func (w *worker) metricsSymbolsForStaticPass(ctx context.Context) []string {
 	if !w.cfg.MetricsUseUniverse {
 		return w.cfg.Symbols
 	}
-	syms, err := store.ResolveMetricsSymbols(ctx, w.pool, w.cfg.Symbols)
+	scope := store.MetricsScope(w.cfg.MetricsScope)
+	syms, err := store.ResolveMetricsSymbols(ctx, w.pool, w.cfg.Symbols, scope)
 	if err != nil {
-		w.log.Warn("could not read the eligible universe; falling back to the configured symbol list",
-			"configured", len(w.cfg.Symbols), "err", err)
+		// Includes an unrecognised scope. Degrading to the configured list is the
+		// right failure here for the same reason as a database error: the pass
+		// keeps working on the symbols it is sure about instead of fetching
+		// nothing, and the warning names the cause.
+		w.log.Warn("could not resolve the universe symbol list; falling back to the configured symbol list",
+			"scope", w.cfg.MetricsScope, "configured", len(w.cfg.Symbols), "err", err)
 		return w.cfg.Symbols
 	}
+	w.log.Info("metrics symbol source resolved",
+		"scope", scope, "configured", len(w.cfg.Symbols), "total", len(syms),
+		"note", "scope=selected covers the pilot draw only; scope=eligible covers the full §3.1 universe")
 	if len(syms) == 0 {
 		w.log.Warn("symbol resolution produced nothing; falling back to the configured list")
 		return w.cfg.Symbols

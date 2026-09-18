@@ -35,11 +35,27 @@ const (
 // Idempotent, and safe to call at the start of every round: newly-listed symbols
 // get a 'pending' row and are picked up immediately, while existing rows keep
 // their status, attempt count and success timestamp untouched.
-func SeedFundamentalFetchState(ctx context.Context, pool *pgxpool.Pool, task string) (int64, error) {
-	const q = `
+// scope restricts which symbols are seeded. It has to match the scope used by
+// ResolveMetricsSymbols: seeding the full eligible universe while the static
+// pass iterates only the pilot draw would leave ~4,500 permanently-pending
+// checkpoint rows, and the checkpointed pass would then work through all of them
+// anyway — making the scope setting cosmetic rather than a real cost saving.
+func SeedFundamentalFetchState(ctx context.Context, pool *pgxpool.Pool, task string, scope MetricsScope) (int64, error) {
+	var q string
+	switch scope {
+	case ScopeSelected:
+		q = `
+INSERT INTO fundamental_fetch_state (symbol, task)
+SELECT u.symbol, $1 FROM universe_symbols u WHERE u.is_eligible AND u.backfill_selected
+ON CONFLICT (symbol, task) DO NOTHING`
+	case ScopeEligible, "":
+		q = `
 INSERT INTO fundamental_fetch_state (symbol, task)
 SELECT u.symbol, $1 FROM universe_symbols u WHERE u.is_eligible
 ON CONFLICT (symbol, task) DO NOTHING`
+	default:
+		return 0, fmt.Errorf("seed fundamental fetch state (%s): unknown scope %q", task, scope)
+	}
 	ct, err := pool.Exec(ctx, q, task)
 	if err != nil {
 		return 0, fmt.Errorf("seed fundamental fetch state (%s): %w", task, err)
@@ -232,7 +248,37 @@ FROM fundamental_fetch_state WHERE task = $1`
 // On query failure the caller is expected to fall back to the configured list
 // alone rather than fetching nothing; this function surfaces the error so that
 // choice is explicit at the call site.
-func ResolveMetricsSymbols(ctx context.Context, pool *pgxpool.Pool, configured []string) ([]string, error) {
+// MetricsScope selects which slice of the universe the fundamentals pass covers.
+type MetricsScope string
+
+const (
+	// ScopeEligible is the full §3.1 eligible universe (~4,975 symbols).
+	ScopeEligible MetricsScope = "eligible"
+
+	// ScopeSelected restricts the universe half of the union to the pilot subset
+	// (universe_symbols.backfill_selected).
+	//
+	// This is the Phase 1 default, and it is a cost decision rather than a
+	// correctness one. Step 7 evaluates the 450-symbol draw and nothing else, so
+	// resolving the full eligible universe would spend ~3.3 hours of Finnhub
+	// budget on ~4,500 symbols that take no part in the evaluation. Scoped to the
+	// draw the same pass is ~15 minutes, which is the difference between getting
+	// a base-rate result today and getting one tomorrow.
+	//
+	// Widen to ScopeEligible only once the pilot has shown the scoring approach
+	// is worth extending — the same sequencing §2.2 applies to paying for data.
+	ScopeSelected MetricsScope = "selected"
+)
+
+// ResolveMetricsSymbols unions the configured symbol list with a slice of the
+// universe, preserving the configured ordering.
+//
+// scope controls only the universe half. Configured symbols are ALWAYS included
+// regardless of scope: they are existing consumers' watchlists, and silently
+// dropping them because a pilot flag was set would break unrelated features —
+// the union exists precisely so the momentum work cannot narrow what already
+// works.
+func ResolveMetricsSymbols(ctx context.Context, pool *pgxpool.Pool, configured []string, scope MetricsScope) ([]string, error) {
 	seen := make(map[string]struct{}, len(configured)+4096)
 	out := make([]string, 0, len(configured)+4096)
 
@@ -249,7 +295,18 @@ func ResolveMetricsSymbols(ctx context.Context, pool *pgxpool.Pool, configured [
 		out = append(out, s)
 	}
 
-	const q = `SELECT symbol FROM universe_symbols WHERE is_eligible ORDER BY symbol`
+	// A scope value that is neither known constant is a configuration mistake and
+	// must not silently fall back to the expensive branch.
+	var q string
+	switch scope {
+	case ScopeSelected:
+		q = `SELECT symbol FROM universe_symbols WHERE is_eligible AND backfill_selected ORDER BY symbol`
+	case ScopeEligible, "":
+		q = `SELECT symbol FROM universe_symbols WHERE is_eligible ORDER BY symbol`
+	default:
+		return out, fmt.Errorf("resolve metrics symbols: unknown scope %q (want %q or %q)",
+			scope, ScopeEligible, ScopeSelected)
+	}
 	rows, err := pool.Query(ctx, q)
 	if err != nil {
 		return out, fmt.Errorf("resolve metrics symbols: %w", err)

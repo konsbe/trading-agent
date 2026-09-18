@@ -383,7 +383,13 @@ acceleration, dollar volume) requires **consolidated** volume. Alpaca's free tie
 serves the IEX feed only, a single-venue fraction of consolidated volume, which
 would make all of them wrong.
 
-**Why `tiingo` and not `yahoo_finance`:** Tiingo's `adj*` fields are split *and*
+**Source roles.** `twelve_data` is the Phase 1 primary (split- and
+dividend-adjusted with `adjust=all`, volume split-adjusted, ~56 min for 450
+symbols). `tiingo` is equally correct but capped at 50 requests per clock hour,
+so it is retained for cross-validation rather than as a feed. `yahoo_finance` is
+unfit for §3. See `services/data-ingestion/data_ingestion.md`.
+
+**Why an adjusted source and not `yahoo_finance`:** Tiingo's `adj*` fields are split *and*
 dividend adjusted. Our Yahoo rows are not dividend adjusted — `internal/fetch/yahoo`
 decodes `indicators.quote` and the string `adjclose` appears nowhere in the
 package, so the adjustment is absent by construction. `data-analyzer`'s

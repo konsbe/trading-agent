@@ -302,3 +302,45 @@ WHERE u.is_eligible`
 	}
 	return out, rows.Err()
 }
+
+// QualityBar is one bar for the adjustment-quality audit.
+type QualityBar struct {
+	TS     time.Time
+	Open   float64
+	High   float64
+	Low    float64
+	Close  float64
+	Volume float64
+}
+
+// LoadBarsBySource returns every stored bar for one source and interval, grouped
+// by symbol and ordered chronologically, for the barquality audit.
+//
+// Loads whole series rather than streaming because the adjustment checks are
+// close-to-close comparisons that need neighbouring bars; 450 symbols x ~750
+// bars is a few hundred thousand rows, which is comfortable in memory and far
+// cheaper than 450 round trips.
+func LoadBarsBySource(ctx context.Context, pool *pgxpool.Pool, interval, source string, selectedOnly bool) (map[string][]QualityBar, error) {
+	const q = `
+SELECT o.symbol, o.ts, o.open, o.high, o.low, o.close, o.volume
+FROM equity_ohlcv o
+JOIN universe_symbols u ON u.symbol = o.symbol
+WHERE o.interval = $1 AND o.source = $2 AND (NOT $3 OR u.backfill_selected)
+ORDER BY o.symbol, o.ts`
+	rows, err := pool.Query(ctx, q, interval, source, selectedOnly)
+	if err != nil {
+		return nil, fmt.Errorf("load bars by source: %w", err)
+	}
+	defer rows.Close()
+
+	out := make(map[string][]QualityBar)
+	for rows.Next() {
+		var sym string
+		var b QualityBar
+		if err := rows.Scan(&sym, &b.TS, &b.Open, &b.High, &b.Low, &b.Close, &b.Volume); err != nil {
+			return nil, fmt.Errorf("scan quality bar: %w", err)
+		}
+		out[sym] = append(out[sym], b)
+	}
+	return out, rows.Err()
+}

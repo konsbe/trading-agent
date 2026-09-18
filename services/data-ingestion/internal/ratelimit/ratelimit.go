@@ -52,6 +52,23 @@ type Budget struct {
 	// Burst is the maximum accumulation, i.e. the largest allowed spike.
 	Burst float64
 
+	// DailyResetTZ is the timezone whose midnight ends the daily window.
+	//
+	// Empty means UTC. It exists because NO provider here resets at UTC
+	// midnight: Tiingo's spec says "daily requests (reset at midnight EST)", and
+	// rolling our counter at 00:00 UTC meant that for five hours a day the
+	// ceiling was not real — our counter read fresh while the provider's had not
+	// reset, so a second full allowance could be authorised on top of one
+	// already spent.
+	//
+	// Use "EST", not "America/New_York": Postgres resolves EST as a fixed UTC-5
+	// offset, which is what "midnight EST" means, whereas the named zone follows
+	// DST and would reset an hour EARLY every summer. The asymmetry matters —
+	// resetting later than the provider merely under-uses the allowance, while
+	// resetting earlier overspends it, so an undocumented reset should take the
+	// latest plausible boundary rather than the most convenient one.
+	DailyResetTZ string
+
 	// DailyLimit is a hard requests-per-day ceiling, or nil for none.
 	//
 	// A separate mechanism from the token bucket above, not a second rate: the
@@ -191,12 +208,17 @@ func NewShared(pool *pgxpool.Pool, b Budget, fallback Limiter, o Options, log *s
 }
 
 const ensureBudgetSQL = `
-INSERT INTO api_rate_budget (budget_key, tokens, refill_per_sec, burst, daily_limit, updated_at)
-VALUES ($1, $2, $2, $3, $4, now())
+INSERT INTO api_rate_budget (budget_key, tokens, refill_per_sec, burst, daily_limit, daily_reset_tz, updated_at)
+VALUES ($1, $2, $2, $3, $4, $5, now())
 ON CONFLICT (budget_key) DO UPDATE SET
     refill_per_sec = EXCLUDED.refill_per_sec,
     burst          = EXCLUDED.burst,
     daily_limit    = EXCLUDED.daily_limit,
+    -- Reconciled on every startup, unlike the counters below: this is
+    -- configuration, so a corrected boundary must take effect without a manual
+    -- UPDATE. Changing it does NOT reset daily_used, so a mid-window correction
+    -- cannot be used to hand back a spent allowance.
+    daily_reset_tz = EXCLUDED.daily_reset_tz,
     -- tokens and updated_at are deliberately NOT reset: a worker restarting
     -- must not refill the shared bucket, or a rolling restart would hand out a
     -- free burst per process. That is the Redis-TTL bug this design avoids.
@@ -213,7 +235,8 @@ ON CONFLICT (budget_key) DO UPDATE SET
 // cold start does not immediately spend the entire allowance.
 func (s *Shared) EnsureBudget(ctx context.Context) error {
 	_, err := s.pool.Exec(ctx, ensureBudgetSQL,
-		s.budget.Key, s.budget.RefillPerSec, s.budget.Burst, s.budget.DailyLimit)
+		s.budget.Key, s.budget.RefillPerSec, s.budget.Burst, s.budget.DailyLimit,
+		s.budget.resetTZ())
 	if err != nil {
 		return fmt.Errorf("ensure budget %q: %w", s.budget.Key, err)
 	}
@@ -234,16 +257,16 @@ UPDATE api_rate_budget SET
     -- Roll the daily window and consume in the same statement, so the counter
     -- can never be reset by one caller while another is mid-acquisition.
     daily_used = CASE
-        WHEN daily_window_start IS DISTINCT FROM (now() AT TIME ZONE 'UTC')::date THEN 1
+        WHEN daily_window_start IS DISTINCT FROM (now() AT TIME ZONE daily_reset_tz)::date THEN 1
         ELSE daily_used + 1
     END,
-    daily_window_start = (now() AT TIME ZONE 'UTC')::date
+    daily_window_start = (now() AT TIME ZONE daily_reset_tz)::date
 WHERE budget_key = $1
   AND LEAST(burst, tokens + refill_per_sec * GREATEST(0, EXTRACT(EPOCH FROM (now() - updated_at)))) >= 1
   AND (
        daily_limit IS NULL
        -- A window that has rolled is fresh regardless of the stored counter.
-    OR daily_window_start IS DISTINCT FROM (now() AT TIME ZONE 'UTC')::date
+    OR daily_window_start IS DISTINCT FROM (now() AT TIME ZONE daily_reset_tz)::date
     OR daily_used < daily_limit
   )
 RETURNING tokens`
@@ -257,7 +280,7 @@ RETURNING tokens`
 const denialSQL = `
 SELECT
     (daily_limit IS NOT NULL
-     AND daily_window_start = (now() AT TIME ZONE 'UTC')::date
+     AND daily_window_start = (now() AT TIME ZONE daily_reset_tz)::date
      AND daily_used >= daily_limit) AS daily_exhausted,
     GREATEST(0, (1 - LEAST(burst, tokens + refill_per_sec * GREATEST(0, EXTRACT(EPOCH FROM (now() - updated_at))))) / refill_per_sec) AS wait_secs
 FROM api_rate_budget
@@ -354,7 +377,7 @@ func (s *Shared) tryAcquire(ctx context.Context) (bool, time.Duration, error) {
 const syncDailyUsageSQL = `
 UPDATE api_rate_budget SET
     daily_used         = $2,
-    daily_window_start = (now() AT TIME ZONE 'UTC')::date,
+    daily_window_start = (now() AT TIME ZONE daily_reset_tz)::date,
     updated_at         = now()
 WHERE budget_key = $1`
 
@@ -421,4 +444,18 @@ func (s *Shared) warn(msg string, err error) {
 		"err", err,
 		"degraded_total", s.degraded.Load(),
 		"acquire_timeout", s.opts.AcquireTimeout.String())
+}
+
+// resetTZ returns the configured daily-window timezone, defaulting to UTC.
+//
+// Defaulting to UTC rather than to EST is deliberate: a budget with no daily
+// limit does not use this column at all, and silently giving every budget a
+// non-UTC boundary would make the setting invisible where it matters. Providers
+// with a documented non-UTC reset set it explicitly in SharedTiingo and
+// SharedTwelveData.
+func (b Budget) resetTZ() string {
+	if b.DailyResetTZ == "" {
+		return "UTC"
+	}
+	return b.DailyResetTZ
 }

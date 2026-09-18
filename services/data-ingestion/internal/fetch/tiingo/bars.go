@@ -6,10 +6,27 @@
 // unusable for a one-off sweep of thousands. The full-universe backfill uses
 // Twelve Data instead. See data_ingestion.md for why both exist.
 //
-// That quota shape is why this package has no daily ceiling and no monthly
-// counter: "500 distinct symbols per month" is not a rate and not a daily count,
-// so internal/ratelimit structurally cannot express it. Enforcement lives in the
-// subset-selection job's size assertion. The limiter here is politeness only.
+// CORRECTION (measured 2026-09-17, against this account). An earlier version of
+// this comment claimed the monthly unique-symbol cap was the only real
+// constraint and that pacing here was "politeness only". That was wrong, and it
+// cost a backfill run: the free tier ALSO enforces a hard hourly request cap.
+//
+// Tiingo Starter (free), per Tiingo's published limits:
+//
+//	50 requests / hour      reset on the clock hour
+//	1,000 requests / day    reset at midnight EST
+//	500 unique symbols / month
+//	1 GB bandwidth / month
+//	no per-minute or per-second limit
+//
+// Measured on this account: a burst throttled after ~74 successful requests
+// inside one clock hour (so enforcement lags the stated 50, and overshoot must
+// NOT be relied on), and the window recovered between 05:54 and 06:01 UTC —
+// i.e. on the hour, a fixed-clock reset, not a rolling 60-minute window.
+//
+// The practical consequence is a planning number, not a tuning knob: 50 req/hour
+// means a 450-symbol backfill takes ~9 hours of wall clock. RequestsPerSecond
+// cannot change that; setting it higher only converts the wait into 429s.
 package tiingo
 
 import (
@@ -22,6 +39,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/konsbe/trading-agent/services/data-ingestion/internal/fetch/barsource"
@@ -41,9 +59,11 @@ var ErrNoData = barsource.ErrNoBars
 
 // Options configures request pacing and retry.
 type Options struct {
-	// RequestsPerSecond is politeness pacing, not quota enforcement — Tiingo's
-	// constraint is monthly unique symbols, not a rate. 1.5/s was observed
-	// without throttling across a 12-symbol burst.
+	// RequestsPerSecond paces requests within an hour. It cannot raise
+	// throughput: the binding constraint is 50 requests per clock hour, so any
+	// value above ~0.014/s simply spends the hour's allowance sooner and then
+	// waits. The earlier default of 1.5/s came from a 12-symbol burst that was
+	// too short to reach the hourly cap.
 	RequestsPerSecond float64
 	Burst             int
 	Timeout           time.Duration
@@ -54,7 +74,7 @@ type Options struct {
 
 func DefaultOptions() Options {
 	return Options{
-		RequestsPerSecond: 1.5,
+		RequestsPerSecond: 0.0138, // 50/hour, the real ceiling
 		Burst:             2,
 		Timeout:           30 * time.Second,
 		MaxRetries:        3,
@@ -167,9 +187,12 @@ func (c *Client) FetchBarsRange(ctx context.Context, symbol, alpacaInterval stri
 	q.Set("endDate", to.UTC().Format(time.DateOnly))
 	q.Set("format", "json")
 	q.Set("resampleFreq", "daily")
-	q.Set("token", c.Token)
+	// Token deliberately NOT in the query string. Tiingo's spec documents
+	// "Authorization: Token <token>", and keeping the credential out of the URL
+	// keeps it out of *url.Error — which embeds the full URL and is what leaked
+	// the Twelve Data key into 23 database rows before this was fixed.
 
-	u := fmt.Sprintf("%s/%s/prices?%s", c.base(), url.PathEscape(symbol), q.Encode())
+	u := fmt.Sprintf("%s/%s/prices?%s", c.base(), url.PathEscape(providerSymbol(symbol)), q.Encode())
 
 	rows, err := c.doWithRetry(ctx, u, symbol)
 	if err != nil {
@@ -193,6 +216,26 @@ func (c *Client) FetchBarsRange(ctx context.Context, symbol, alpacaInterval stri
 		return nil, fmt.Errorf("%w (tiingo %s: %d rows, none usable)", barsource.ErrNoBars, symbol, len(rows))
 	}
 	return bars, nil
+}
+
+// providerSymbol translates our canonical ticker into Tiingo's spelling.
+//
+// Share classes are the only difference found: Finnhub — and therefore
+// universe_symbols — uses a DOT (BRK.B, BF.A), while Tiingo uses a HYPHEN.
+// Verified directly: /tiingo/daily/BRK.B/prices returns
+// 404 {"detail":"Error: Ticker 'BRK.B' not found"} while BRK-B returns bars.
+//
+// This was found because two pilot symbols failed the backfill as permanent
+// 404s. It is silent data loss rather than a crash: 20 of the 4,975 eligible
+// symbols carry a dot, including BRK.B, BF.B and HEI.A, and every one of them
+// would have been marked failed-permanent and quietly dropped from the universe.
+//
+// Only the REQUEST is translated. Stored rows keep the canonical dotted symbol,
+// because equity_ohlcv.symbol has to join universe_symbols — rewriting it here
+// would create a second spelling for the same company that nothing else knows
+// about, which is worse than the 404.
+func providerSymbol(symbol string) string {
+	return strings.ReplaceAll(symbol, ".", "-")
 }
 
 // barToStore converts one Tiingo row, using the ADJUSTED fields.
@@ -295,10 +338,14 @@ func (c *Client) attempt(ctx context.Context, u, symbol string) ([]priceRow, tim
 		return nil, -1, err
 	}
 	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Authorization", "Token "+c.Token)
 
 	resp, err := c.HTTP.Do(req)
 	if err != nil {
-		return nil, 0, fmt.Errorf("tiingo fetch %s: %w", symbol, err)
+		// Redacted as a second line of defence even though the token is now a
+		// header: a future change that puts it back in the URL must not silently
+		// reintroduce the leak.
+		return nil, 0, fmt.Errorf("tiingo fetch %s: %s", symbol, barsource.RedactSecrets(err.Error()))
 	}
 	defer resp.Body.Close()
 

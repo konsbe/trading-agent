@@ -155,7 +155,11 @@ func main() {
 		// "yahoo_req_per_sec" while UNIVERSE_BAR_SOURCE was tiingo, which
 		// invites exactly the wrong conclusion when someone is debugging pacing.
 		"bar_source", cfg.BarSource,
-		"bar_req_per_sec", cfg.RequestsPerSecond)
+		// The provider's own pace, not the generic knob: this field read
+		// "bar_req_per_sec=2" while the Twelve Data limiter was actually running
+		// at 0.125/s, which is the opposite of useful when debugging throughput.
+		"bar_req_per_sec", barPaceFor(cfg),
+		"bar_timeout", cfg.RequestTimeout.String())
 
 	// Tracks the backfill's drained/working edge so the post-backfill consistency
 

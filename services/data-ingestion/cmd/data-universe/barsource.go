@@ -12,6 +12,7 @@ import (
 	"github.com/konsbe/trading-agent/services/data-ingestion/internal/config"
 	"github.com/konsbe/trading-agent/services/data-ingestion/internal/fetch/barsource"
 	"github.com/konsbe/trading-agent/services/data-ingestion/internal/fetch/tiingo"
+	"github.com/konsbe/trading-agent/services/data-ingestion/internal/fetch/twelvedata"
 	"github.com/konsbe/trading-agent/services/data-ingestion/internal/fetch/yahoo"
 	"github.com/konsbe/trading-agent/services/data-ingestion/internal/ratelimit"
 	"github.com/konsbe/trading-agent/services/data-ingestion/internal/store"
@@ -29,6 +30,29 @@ import (
 // backfill rather than as a configuration error.
 func buildBarFetcher(ctx context.Context, cfg config.Universe, pool *pgxpool.Pool, log *slog.Logger) (barsource.Fetcher, error) {
 	switch strings.ToLower(strings.TrimSpace(cfg.BarSource)) {
+	case twelvedata.SourceName:
+		if cfg.TwelveDataToken == "" {
+			return nil, fmt.Errorf("UNIVERSE_BAR_SOURCE=%s requires TWELVE_DATA_API_KEY", twelvedata.SourceName)
+		}
+		lim := ratelimit.SharedTwelveData(ctx, pool, log)
+		// Loud, because this provider is fast, superficially correct, and WRONG
+		// in a way that flatters a momentum scanner: it alternates between
+		// adjusted and unadjusted bars inside a single response, fabricating
+		// one-day moves that the scanner then ranks as its best signals.
+		log.Warn("bar source: twelve_data — KNOWN DEFECTIVE for §3; do not use for the pilot",
+			"defect", "adjust=all applies adjustment inconsistently per bar within one response",
+			"observed", "fabricated one-day moves up to +1382%; 12-17% of symbols affected, 41% of the penny bucket",
+			"evidence", "internal/barquality holds the ABTS fixture; run `go run ./cmd/bar-audit -source twelve_data`",
+			"use_instead", "UNIVERSE_BAR_SOURCE=tiingo (~9h for 450 symbols, but one consistent adjustment factor)")
+		return twelvedata.NewWithLimiter(cfg.TwelveDataToken, lim, twelvedata.Options{
+			RequestsPerSecond: cfg.TwelveDataRequestsPerSecond,
+			Burst:             cfg.RequestBurst,
+			Timeout:           cfg.RequestTimeout,
+			MaxRetries:        cfg.RequestMaxRetries,
+			BackoffBase:       cfg.BackoffBase,
+			BackoffMax:        cfg.BackoffMax,
+		}), nil
+
 	case tiingo.SourceName:
 		if cfg.TiingoToken == "" {
 			return nil, fmt.Errorf("UNIVERSE_BAR_SOURCE=%s requires TIINGO_API_KEY", tiingo.SourceName)
@@ -37,9 +61,11 @@ func buildBarFetcher(ctx context.Context, cfg config.Universe, pool *pgxpool.Poo
 		// month, which a rate limiter cannot express. The subset size assertion
 		// is the real guard.
 		lim := ratelimit.SharedTiingo(ctx, pool, log)
-		log.Info("bar source: tiingo",
-			"adjusted", "split+dividend (adj* fields)",
-			"quota", "500 unique symbols/month — enforced by the subset size cap, not by the limiter")
+		log.Info("bar source: tiingo — the Phase 1 primary",
+			"adjusted", "split+dividend (adj* fields), ONE consistent factor per series (verified)",
+			"quota", "50 requests/clock-hour, 1,000/day, 500 unique symbols/month",
+			"backfill_estimate", "~9 hours for 450 symbols — this is the real ceiling, not a tuning choice",
+			"note", "chosen for correctness: twelve_data is 9x faster but alternates adjusted/unadjusted bars within one response")
 		return tiingo.NewWithLimiter(cfg.TiingoToken, lim, tiingo.Options{
 			RequestsPerSecond: cfg.TiingoRequestsPerSecond,
 			Burst:             cfg.RequestBurst,
@@ -169,4 +195,18 @@ func seedLabel(s string) string {
 		return "(unseeded — this draw is not reproducible)"
 	}
 	return s
+}
+
+// barPaceFor reports the request pace actually in force for the configured bar
+// provider, which is provider-specific rather than the generic
+// UNIVERSE_BAR_REQUESTS_PER_SEC knob.
+func barPaceFor(cfg config.Universe) float64 {
+	switch strings.ToLower(strings.TrimSpace(cfg.BarSource)) {
+	case twelvedata.SourceName:
+		return cfg.TwelveDataRequestsPerSecond
+	case tiingo.SourceName:
+		return cfg.TiingoRequestsPerSecond
+	default:
+		return cfg.RequestsPerSecond
+	}
 }

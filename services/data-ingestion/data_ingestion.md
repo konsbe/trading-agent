@@ -1186,3 +1186,207 @@ Run integration tests as:
 TEST_DATABASE_URL="postgres://<user>:<password>@localhost:5432/trading_test?sslmode=disable" \
   go test -tags=integration ./...
 ```
+
+---
+
+## Bar providers: Tiingo is primary, Twelve Data is disqualified
+
+> **Supersedes the section below.** Twelve Data was adopted as primary on
+> throughput grounds and withdrawn the same day when the Tiingo cross-validation
+> set exposed an adjustment defect. The original reasoning is kept underneath
+> because the throughput argument was correct and is worth not re-deriving — it
+> simply lost to a correctness problem.
+
+| `source` | Role | Adjustment | 450 symbols |
+|---|---|---|---|
+| `tiingo` | **PRIMARY** | split + dividend, **one consistent factor per series (verified)** | ~9 h (50 req/clock-hour) |
+| `twelve_data` | **disqualified** | alternates adjusted/unadjusted **within one response** | ~56 min |
+| `yahoo_finance` | legacy, unfit for §3 | no dividend adjustment | n/a |
+
+### The defect
+
+`adjust=all` applies adjustment inconsistently, bar by bar, inside a single
+response. ABTS across a 1-for-15 reverse split, alongside Tiingo for the same
+window:
+
+| date | Tiingo | Twelve Data | |
+|---|---|---|---|
+| 2025-02-26 | 6.3045 | 0.4200 | unadjusted |
+| 2025-02-27 | 6.3150 | 0.4210 | unadjusted |
+| 2025-02-28 | 6.2400 | **6.2400** | adjusted |
+| 2025-03-03 | 6.2250 | **6.2250** | adjusted |
+| 2025-03-04 | 5.2725 | 0.3520 | unadjusted again |
+| 2025-03-10 | 3.7320 | **3.7320** | adjusted again |
+
+Every individual bar is internally consistent, so nothing in the response looks
+malformed. The damage is at the seams, which fabricate one-day moves of
+**+1382%, -94%, +796%, +925%**.
+
+Scope on the 450-symbol pilot: **12-17% of symbols**, and **41% of the penny
+bucket** (37 of 90) versus 10.6% of the market bucket. The penny bucket is half
+the pilot's purpose.
+
+This is the worst possible failure for a momentum scanner, because a fabricated
++796% day is exactly the signal being hunted — every corrupted symbol sorts to
+the top of the scan looking like a flawless breakout.
+
+### Why a hybrid was rejected
+
+"Use Twelve Data where it looks clean" is not available, because clean cannot be
+established locally: **APAM, AQN and ARX disagree with Tiingo by 4.02%, 3.52% and
+2.09% with no detectable discontinuity anywhere in their series.** Any threshold
+low enough to catch those flags real penny-stock moves as well.
+
+NVDA's forward 10:1 split adjusts correctly, which is why the split fixture
+passed. The failures cluster on recent and reverse splits in micro-caps — the
+population the pilot deliberately over-samples.
+
+### What was kept from the episode
+
+- **`internal/barquality`** — an adjustment-seam detector, with the real ABTS
+  series as a permanent fixture. It finds this defect with ONE provider, which is
+  the gap that let it through: the original discovery needed a second provider.
+- **`cmd/bar-audit`** — runs that detector over stored rows and exits non-zero,
+  so it can gate a pipeline. `go run ./cmd/bar-audit -source tiingo`.
+- **The Twelve Data adapter**, tests and all, so the defect stays reproducible
+  and a future fix can be verified in minutes.
+
+`barquality` is a **screen, not a verdict**: measured false-positive rate is ~3%
+of symbols on a correct source (2 of 64), because a real gap-up can land near a
+round split factor. The `Signals` field supports triage —
+`dollar_volume_continuous` is strong evidence of a seam, while
+`overnight_gap_on_split_factor` alone with dollar volume above ~20x is usually a
+real move.
+
+### Tiingo's real limits (the earlier note was wrong)
+
+The Tiingo limiter previously paced at 1.5 req/sec and called itself "politeness
+only", reasoning that the monthly unique-symbol count was the only constraint a
+rate limiter could not express. That spent the hourly allowance in under a minute
+and failed 69 symbols, each burning 4 attempts against a refusal that could not
+clear for the rest of the hour.
+
+```
+50 requests / hour    HARD, fixed-clock reset (measured: blocked 05:54 UTC,
+                      recovered 06:01 UTC — not a rolling window)
+1,000 requests / day  resets midnight EST — expressible, now enforced
+500 unique symbols/mo the only part api_rate_budget cannot express
+```
+
+50/hour is **0.0139 req/sec**, and that is the true throughput: 450 symbols takes
+~9 hours and no setting shortens it. A higher value only converts waiting into
+429s.
+
+---
+
+## Bar providers: who is primary, who is a cross-check, and why
+
+**Tiingo is not abandoned. It is demoted to validation.** There is a working,
+fully tested Tiingo adapter sitting next to the one in use, and that is on
+purpose — it is the instrument that verifies the primary, not dead code awaiting
+deletion.
+
+| `source` | Role | Split adj. | Dividend adj. | Adjusted volume | Throughput for 450 symbols |
+|---|---|---|---|---|---|
+| `twelve_data` | ~~PRIMARY~~ **disqualified, see above** | yes | yes, **only with `adjust=all`** | yes | **~56 min** (8 credits/min) |
+| `tiingo` | ~~cross-validation~~ **PRIMARY** | yes | yes (`adj*` fields) | yes (`adjVolume`) | ~9 h (50 req/clock-hour) |
+| `yahoo_finance` | legacy, unfit for §3 | unverified | **no** | no | n/a |
+
+### Why Twelve Data became primary
+
+Not quality — the two agree to **-0.0028% on close and +0.0000% on volume**.
+Purely throughput and quota shape:
+
+- **Tiingo Starter (free):** 50 requests per *clock hour* (fixed-clock reset,
+  measured: blocked 05:54 UTC, recovered 06:01 UTC), 1,000/day, and **500 unique
+  symbols/month**. 450 symbols is therefore a **~9-hour** job, and the
+  unique-symbol meter raises an unanswerable question after a failed run — there
+  is no account-usage endpoint on this tier, so "did those 136 retries burn
+  allowance?" cannot be checked.
+- **Twelve Data (free):** **8 credits/minute** (measured; the 429 names the
+  count), 800/day, **no unique-symbol cap** for US equities. Same 450 symbols in
+  **~56 minutes**, and nothing to reason about afterwards.
+
+The full 450 were redrawn on Twelve Data rather than only the 386 that Tiingo had
+not reached. A single-source pilot avoids putting two different adjustment
+formulas into one dataset: 0.05% sounds negligible until it lands on a §3.2 price
+threshold or a §3.6 breakout confirmation for a handful of symbols, at which
+point "why did this one symbol gate differently" has the answer "half the rows
+came from a different provider" — which is exactly the class of hidden
+inconsistency this pipeline is built to avoid.
+
+The 64 symbols Tiingo had already completed were **kept**, giving 64 names with
+two independently adjusted series. That is a stronger correctness check on the
+new adapter than any unit test, and it was a bonus rather than the reason.
+
+### `adjust=all` is mandatory, and its absence is silent
+
+Twelve Data's default output is split-adjusted but **not** dividend-adjusted. The
+adapter always sends `adjust=all`, and a test pins it, because omitting it
+produces a completely plausible series that reproduces the exact defect that
+disqualified Yahoo. Evidence, against `ALL` and `AWR` over three years: the
+default sits a constant **+6.32%** and **+7.52%** above the adjusted close — the
+signature of cumulative dividends.
+
+### Volume adjustment was verified, not inferred from the parameter name
+
+A provider that rescales OHLC while leaving volume raw would silently corrupt
+§3.4's RVOL and volume acceleration for every symbol that ever split. `adjust=all`
+does not promise anything about volume, so it was measured against NVDA's 10:1
+split of 2024-06-10, using Tiingo's raw/adjusted pair as ground truth for the
+last pre-split session:
+
+```
+                        close        volume
+Tiingo raw              1208.88      41,238,580
+Tiingo fully adjusted    120.5447    412,385,800
+Twelve Data default      120.888     412,386,000   <- volume already split-adjusted
+Twelve Data adjust=all   120.5414    412,386,000   <- price now dividend-adjusted too
+```
+
+Volume is **10.0000x** Tiingo's raw figure, i.e. split-adjusted, in *both* modes.
+`adjust=all` changes price only — and that is correct, not a gap: a dividend does
+not change share count, so only splits may rescale volume. Both the hermetic
+fixture and a live test assert these absolute numbers.
+
+## Credentials must never reach an error string
+
+`*url.Error` — what `http.Client.Do` returns for every transport failure —
+embeds the **full request URL**. For a provider that authenticates by query
+parameter, the API key is therefore inside the error text, and that text travels
+wherever errors go. This was not hypothetical: a run wrote **23 Twelve Data API
+keys in plaintext** into `universe_symbols.backfill_last_error`.
+
+Three changes, in order of how much they help:
+
+1. **Tiingo's token moved to the `Authorization: Token <token>` header**, which
+   its own spec documents. The credential is no longer in the URL, so it cannot
+   be in a `*url.Error` at all. This is the real fix.
+2. **`barsource.RedactSecrets`** rewrites credential query values to `REDACTED`,
+   and every wrapper around a transport error passes through it. Note those
+   wrappers use `%s`, not `%w`: wrapping would keep the unredacted text
+   reachable via `errors.Unwrap`.
+3. Redaction preserves the symbol, endpoint and cause, so it does not trade a
+   leak for an unreadable log. A test asserts both halves.
+
+Worth stating because it is the easy mistake: the first draft of the redaction
+test pasted the real leaked error verbatim and thereby committed the live key —
+the same failure one layer up. **A fixture that needs a secret needs a fake one.**
+
+> **The exposed Twelve Data key should be rotated.** It was written to the
+> database and briefly existed in a working tree. Redaction prevents recurrence;
+> it does not un-expose what already leaked.
+
+## Bar-fetch HTTP knobs are provider-neutral
+
+`UNIVERSE_BAR_TIMEOUT`, `UNIVERSE_BAR_MAX_RETRIES`, `UNIVERSE_BAR_BACKOFF_*` and
+`UNIVERSE_BAR_BURST` apply to whichever provider `UNIVERSE_BAR_SOURCE` names. The
+`UNIVERSE_YAHOO_*` spellings still work as fallbacks.
+
+They were *only* called `UNIVERSE_YAHOO_*` while feeding all three adapters,
+which is how Twelve Data inherited Yahoo's 30-second timeout and failed 12
+symbols with `Client.Timeout exceeded while awaiting headers` — a three-year
+daily response is ~100KB, and each failure spent 4 requests of the daily
+allowance to produce nothing. The default is now 90s. The same misnaming made the
+startup log report `bar_req_per_sec=2` while the Twelve Data limiter was pacing at
+`0.125`; it now reports the provider's real rate.

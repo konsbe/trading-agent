@@ -127,15 +127,27 @@ const TiingoBudgetKey = "tiingo"
 
 // SharedTiingo builds the cross-process limiter for Tiingo.
 //
-// Note there is NO daily ceiling here, and that is deliberate rather than an
-// omission. Tiingo's free allowance is 500 UNIQUE SYMBOLS PER MONTH — not a rate
-// and not a daily request count — so api_rate_budget structurally cannot express
-// it, and pretending otherwise would give false confidence. Re-reading an
-// already-counted symbol is free, so a stable subset refreshed daily stays
-// inside the allowance indefinitely.
+// CORRECTED after a 429 storm. The previous version of this function paced at
+// 1.5 req/sec and described itself as "politeness only", on the reasoning that
+// Tiingo's real constraint is a monthly unique-symbol count that a rate limiter
+// cannot express. Two of those three claims were wrong:
 //
-// Enforcement therefore lives in the subset-selection size assertion
-// (store.SubsetSizeError). The pacing configured here is politeness only.
+//	50 requests / hour   HARD, resets on the clock hour (measured: blocked
+//	                     05:54 UTC, recovered 06:01 UTC — fixed clock, not a
+//	                     rolling window)
+//	1,000 requests / day resets at midnight EST — perfectly expressible
+//	500 unique symbols / month   this is the part api_rate_budget cannot express
+//
+// Pacing at 1.5/sec spent the hourly allowance in under a minute and then
+// failed 69 symbols, each burning 4 attempts on a refusal that could not clear
+// for the rest of the hour.
+//
+// So the limiter now carries BOTH an hourly-equivalent rate and the daily
+// ceiling. 50/hour is 0.0139 req/sec, which is the true throughput: a
+// 450-symbol backfill takes ~9 hours and no setting here can shorten it.
+//
+// Only the unique-symbol allowance still lives elsewhere, in the
+// subset-selection size assertion (store.SubsetSizeError).
 func SharedTiingo(ctx context.Context, pool *pgxpool.Pool, log *slog.Logger) barsourceLimiter {
 	if log == nil {
 		log = slog.Default()
@@ -149,11 +161,20 @@ func SharedTiingo(ctx context.Context, pool *pgxpool.Pool, log *slog.Logger) bar
 		return nil
 	}
 
-	perSec := floatEnv("TIINGO_RATE_PER_SEC", 1.5)
-	burst := floatEnv("TIINGO_RATE_BURST", 2.0)
+	// 50/hour = 0.013889/sec. The default trims to 0.0138 so clock skew against
+	// Tiingo's own hour boundary cannot push the last request of an hour over.
+	perSec := floatEnv("TIINGO_RATE_PER_SEC", 0.0138)
+	burst := floatEnv("TIINGO_RATE_BURST", 1.0)
+	daily := floatEnv("TIINGO_RATE_DAILY_LIMIT", 1000)
 
-	s, err := NewShared(pool,
-		Budget{Key: TiingoBudgetKey, RefillPerSec: perSec, Burst: burst}, // DailyLimit nil on purpose
+	// Tiingo's spec: "daily requests (reset at midnight EST)".
+	b := Budget{Key: TiingoBudgetKey, RefillPerSec: perSec, Burst: burst,
+		DailyResetTZ: env("TIINGO_RATE_RESET_TZ", "EST")}
+	if daily > 0 {
+		b.DailyLimit = &daily
+	}
+
+	s, err := NewShared(pool, b,
 		localBucket(perSec, burst),
 		Options{
 			AcquireTimeout: durationEnv("SHARED_RATE_ACQUIRE_TIMEOUT", 250*time.Millisecond),
@@ -171,8 +192,83 @@ func SharedTiingo(ctx context.Context, pool *pgxpool.Pool, log *slog.Logger) bar
 		return s
 	}
 	log.Info("shared Tiingo rate limiting active",
-		"budget", TiingoBudgetKey, "per_sec", perSec, "burst", burst,
-		"note", "no daily ceiling — Tiingo meters unique symbols per month, enforced by the subset size assertion")
+		"budget", TiingoBudgetKey, "per_sec", perSec, "burst", burst, "daily_limit", daily,
+		"effective_per_hour", perSec*3600,
+		"note", "50 req/clock-hour and 1,000/day are enforced here; the 500 unique-symbols/month cap is enforced by the subset size assertion")
+	return s
+}
+
+// TwelveDataBudgetKey names the Twelve Data quota.
+const TwelveDataBudgetKey = "twelve_data"
+
+// SharedTwelveData builds the cross-process limiter for Twelve Data.
+//
+// Unlike SharedTiingo this budget DOES carry a daily ceiling, because Twelve
+// Data's limits are both expressible as rate plus daily count:
+//
+//	8 credits / minute   measured on this account; the 429 names the count
+//	800 requests / day    published free-tier limit
+//	no unique-symbol cap for US equities
+//
+// That is the whole reason this provider replaced Tiingo as primary. Tiingo's
+// binding constraint is 50 requests per clock hour, which makes a 450-symbol
+// backfill a ~9-hour job; 8/minute makes the same job ~56 minutes, and the
+// absence of a unique-symbol meter removes the "have we burned the month's
+// allowance on retries" question entirely.
+//
+// The daily ceiling matters more here than the rate: exceeding 8/minute yields a
+// 429 that clears by itself within a minute, whereas exhausting 800/day strands
+// the backfill until midnight. Routing that through api_rate_budget means the
+// limiter reports ErrDailyQuotaExhausted — a distinguishable "come back
+// tomorrow" — instead of the caller seeing a wall of per-symbol failures.
+func SharedTwelveData(ctx context.Context, pool *pgxpool.Pool, log *slog.Logger) barsourceLimiter {
+	if log == nil {
+		log = slog.Default()
+	}
+	if !boolEnv("TWELVE_DATA_SHARED_RATE_ENABLE", true) {
+		log.Info("shared Twelve Data rate limiting disabled; using this process's own bucket")
+		return nil
+	}
+	if pool == nil {
+		log.Warn("no database pool for shared Twelve Data rate limiting; using this process's own bucket")
+		return nil
+	}
+
+	// 0.1333/s is 8/minute exactly; the default backs off to 0.125/s so clock
+	// skew against Twelve Data's own minute boundary cannot push a burst over.
+	perSec := floatEnv("TWELVE_DATA_RATE_PER_SEC", 0.125)
+	burst := floatEnv("TWELVE_DATA_RATE_BURST", 1.0)
+	daily := floatEnv("TWELVE_DATA_RATE_DAILY_LIMIT", 800)
+
+	// Twelve Data does not document its daily reset and it has not been measured
+	// here. EST is the conservative guess: if the real boundary is UTC midnight
+	// we wait five extra hours before reusing the allowance, whereas the opposite
+	// error overspends it.
+	b := Budget{Key: TwelveDataBudgetKey, RefillPerSec: perSec, Burst: burst,
+		DailyResetTZ: env("TWELVE_DATA_RATE_RESET_TZ", "EST")}
+	if daily > 0 {
+		b.DailyLimit = &daily
+	}
+
+	s, err := NewShared(pool, b, localBucket(perSec, burst),
+		Options{
+			AcquireTimeout: durationEnv("SHARED_RATE_ACQUIRE_TIMEOUT", 250*time.Millisecond),
+			MaxSleep:       durationEnv("SHARED_RATE_MAX_SLEEP", 5*time.Second),
+			WarnEvery:      durationEnv("SHARED_RATE_WARN_EVERY", 30*time.Second),
+		}, log)
+	if err != nil {
+		log.Warn("could not construct the shared Twelve Data limiter; using this process's own bucket", "err", err)
+		return nil
+	}
+	ectx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	if err := s.EnsureBudget(ectx); err != nil {
+		log.Warn("could not register the shared Twelve Data budget; the limiter will degrade to a local bucket until the database is reachable", "err", err)
+		return s
+	}
+	log.Info("shared Twelve Data rate limiting active",
+		"budget", TwelveDataBudgetKey, "per_sec", perSec, "burst", burst, "daily_limit", daily,
+		"note", "8 credits/min measured, 800/day published; no unique-symbol cap")
 	return s
 }
 
@@ -191,4 +287,12 @@ func localBucket(perSec float64, burst float64) barsourceLimiter {
 		b = 1
 	}
 	return rate.NewLimiter(rate.Limit(perSec), b)
+}
+
+// env reads a string setting with a default.
+func env(key, def string) string {
+	if v := strings.TrimSpace(os.Getenv(key)); v != "" {
+		return v
+	}
+	return def
 }
