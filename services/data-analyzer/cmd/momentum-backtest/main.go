@@ -44,6 +44,14 @@ func main() {
 	horizon := flag.Int("horizon", momentum.DefaultHorizon, "§6 forward window H, in trading days")
 	threshold := flag.Float64("threshold", 100, "primary hit threshold in percent")
 	minBars := flag.Int("min-bars", 252, "§3.1 history minimum; bars before this index are not scored")
+	dump := flag.String("dump-candidates", "", "write evaluable candidates as CSV to this path (symbol,date,score,bucket,fwd_max_gain_pct,hit100)")
+	// DIAGNOSTIC ONLY. Re-ranks the same candidates using a single component's
+	// sub-score instead of the total, to ask whether isolating the one proven
+	// component sharpens separation or whether the unresolved components are not
+	// diluting much. This is NOT a weight proposal: adopting a single-component
+	// score chosen on the same 218 candidates that identified it would be a third
+	// round of in-sample fitting.
+	isolate := flag.String("isolate", "", "diagnostic: rank by one component only (rvol|vol_accel|float|vwap|breakout|high52w)")
 	flag.Parse()
 
 	ctx := context.Background()
@@ -132,11 +140,57 @@ func main() {
 				incomplete++
 				continue
 			}
+			if *isolate != "" {
+				// Replace the total with the isolated component's own points,
+				// leaving every sub-score intact so the report still decomposes.
+				v, ok := componentValue(s, *isolate)
+				if !ok {
+					fmt.Fprintf(os.Stderr, "unknown component %q\n", *isolate)
+					os.Exit(2)
+				}
+				s.Raw = v
+				s.Total = int(math.Round(v))
+			}
 			rows = append(rows, row{sym, bs[i].TS.Format("2006-01-02"), s, *l, res.Bucket})
 		}
 	}
 
+	if *dump != "" {
+		if err := dumpCandidates(*dump, rows, *threshold); err != nil {
+			fmt.Fprintln(os.Stderr, "dump:", err)
+		} else {
+			fmt.Printf("wrote %d candidates to %s\n", len(rows), *dump)
+		}
+	}
+
+	if *isolate != "" {
+		fmt.Printf("\n  ⚑ DIAGNOSTIC MODE: candidates ranked by %q alone, not by momentum_score_100.\n", *isolate)
+		fmt.Println("    Not a weight proposal — selecting a single-component score on the same")
+		fmt.Println("    candidates that identified that component would be in-sample fitting again.")
+	}
+
 	report(rows, stats, evaluated, incomplete, *horizon, *threshold, len(bySymbol))
+}
+
+// componentValue extracts one sub-score by name, for -isolate.
+func componentValue(s momentum.Score, name string) (float64, bool) {
+	switch name {
+	case "rvol":
+		return s.Sub.RVol, true
+	case "vol_accel":
+		return s.Sub.VolAccel, true
+	case "float":
+		return s.Sub.Float, true
+	case "vwap":
+		return s.Sub.VWAP, true
+	case "breakout":
+		return s.Sub.Breakout, true
+	case "high52w":
+		return s.Sub.High52w, true
+	case "catalyst":
+		return s.Sub.Catalyst, true
+	}
+	return 0, false
 }
 
 func report(rows []row, stats *momentum.GateStats, evaluated, incomplete, horizon int, threshold float64, symbols int) {
@@ -579,4 +633,34 @@ func twoProp(p1, p2 float64, n int) (float64, float64) {
 	}
 	z := (p2 - p1) / se
 	return z, math.Erfc(math.Abs(z) / math.Sqrt2)
+}
+
+// dumpCandidates writes the evaluable candidate set so downstream work — §3.11's
+// catalyst evaluation in particular — can be tested against exactly the same
+// rows this report was computed on, rather than a re-derived approximation.
+func dumpCandidates(path string, rows []row, threshold float64) error {
+	f, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	if _, err := fmt.Fprintln(f, "symbol,date,score,bucket,fwd_max_gain_pct,hit100"); err != nil {
+		return err
+	}
+	sorted := make([]row, len(rows))
+	copy(sorted, rows)
+	sort.Slice(sorted, func(i, j int) bool {
+		if sorted[i].date != sorted[j].date {
+			return sorted[i].date < sorted[j].date
+		}
+		return sorted[i].symbol < sorted[j].symbol
+	})
+	for _, r := range sorted {
+		if _, err := fmt.Fprintf(f, "%s,%s,%d,%s,%.4f,%t\n",
+			r.symbol, r.date, r.score.Total, r.bucket, r.label.FwdMaxGainPct,
+			r.label.FwdMaxGainPct >= threshold); err != nil {
+			return err
+		}
+	}
+	return nil
 }

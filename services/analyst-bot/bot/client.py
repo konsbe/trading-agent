@@ -45,9 +45,14 @@ class TradingBot(discord.Bot):
         """Add cogs synchronously before bot.start() is called."""
         from bot.cogs.commands import CommandsCog
         from bot.cogs.admin import AdminCog
+        from bot.cogs.momentum import MomentumCog
 
         self.add_cog(CommandsCog(self))
         self.add_cog(AdminCog(self))
+        # Registered unconditionally, unlike the scheduled scan job: the slash
+        # commands are read-only inspection tools and are useful for looking at
+        # the scanner's output before anyone opts into posting alerts.
+        self.add_cog(MomentumCog(self))
         log.info("Cogs loaded: %s", [c for c in self.cogs])
 
     async def on_ready(self) -> None:

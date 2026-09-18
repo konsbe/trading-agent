@@ -339,7 +339,60 @@ Fetch Finnhub company news for candidate symbols only, window = **last 48 hours*
 
 Store **every** matched event in `catalyst_events` with its headline, source, matched keyword, and tier — not just the winning tier. Phase 2's most valuable analysis is which specific keywords preceded real runners, and that requires the raw matches retained.
 
-Keyword lists live in configuration (a YAML/JSON file or env-loaded config), so they can be tuned without a rebuild.
+Keyword lists live in configuration (a YAML/JSON file or env-loaded config), so they can be tuned without a rebuild. Shipped at
+`services/data-ingestion/config/catalyst_keywords.json`; the file **replaces** the
+built-in table rather than extending it, and a missing or malformed file is an
+error rather than a silent fallback to defaults.
+
+#### Step 8 result — catalyst is UNVALIDATED (measured 2026-09-18)
+
+Catalyst was the one scoring component never tested: null throughout every Step 7
+run, worth 15 of the 90 allocated points. It has now been measured, and the
+answer is that **it carries no detectable positive signal at this sample size.**
+
+Evaluated against the same candidate set §4.1 v2 was derived from, restricted to
+those inside the provider's news window — Finnhub's free company news reaches
+back roughly 12 months (measured: a 2026-01 window returns 243 AAPL articles,
+2025-09 returns 0), and §6's complete-label rule requires candidates be at least
+120 sessions old, so the two constraints intersect to **80 of the 218**:
+
+| Tier | n | hit% | lift |
+|---|---|---|---|
+| `A` | 9 | 11.11 | 0.56× |
+| `B` | 59 | 22.03 | 1.10× |
+| `none` | 10 | 20.00 | 1.00× |
+
+Base rate on the subset: 16/80 = 20.00%. **Tier A underperforms tier B**, which
+contradicts §4.2's assumed A > B > none ordering — but on n=9 carrying a single
+hit, that is not a finding.
+
+The `b_on_any_news` catch-all turns out to dominate the picture: only **18 of 78**
+candidates matched a real keyword at all, so roughly 50 of the 59 tier-B rows are
+there purely because coverage existed. Re-classifying with the catch-all off
+(free, from the cached headlines) separates the two:
+
+| Group | n | hit% |
+|---|---|---|
+| any keyword match (A or B) | 18 | 11.11 |
+| no keyword match | 62 | 22.58 |
+
+z=+1.07, **p=0.28 — not distinguishable from noise.** The direction is negative in
+both configurations, which is at least consistent with the §4.1 v2 finding that
+lateness markers score backwards, but 18 keyword-matched candidates carrying 2
+hits cannot establish that.
+
+**Consequences, stated plainly:**
+
+- Catalyst's 15 points are **unvalidated**, the same status as `vol_accel`,
+  `float` and `vwap` — not the proven component that §4.1 v2's reserved 10 points
+  could be assigned to. The reserved capacity stays reserved.
+- The **keyword vocabulary itself is a hypothesis**, not a validated instrument.
+  This is exactly why §3.11 requires every individual match be stored rather than
+  only the tier: which specific phrases precede runners remains measurable once
+  the sample is larger.
+- Raw headlines are cached (`catalyst-backfill -cache`), so vocabulary variants
+  can be re-tested offline at zero provider cost. Tuning a list that needs ~80
+  provider requests per iteration is not tuning.
 
 ### 3.12 Sector strength — `sector_strength_pct` (recorded, not scored)
 
@@ -682,7 +735,90 @@ and unallocated (§4.1 v2). With `catalyst_tier` null until §3.11 ships in Step
 the practical ceiling today is **75**. Any alert threshold has to be read against
 that ceiling rather than against 100.
 
-Alert threshold: post to Discord when `momentum_score_100 >= 60` (env-configurable, per bucket).
+#### Alert threshold — RECALIBRATED for v2 (2026-09-18)
+
+`>= 60` was set against v1's weight table, where `breakout` and `high52w`
+contributed up to 25 points. Under v2 those are zeroed, the allocated ceiling is
+90, and the practical ceiling is 75 while `catalyst_tier` is null — **so 60 no
+longer means what it meant, and carrying it over would silently change the alert
+rate rather than preserve it.**
+
+Measured against the 218 pilot candidates (base rate 15.60%):
+
+| Threshold | fires on | hit% | lift | |
+|---|---|---|---|---|
+| ≥ 55 | 115 | 15.65 | 1.00× | no better than random |
+| ≥ 60 | 75 (34.4%) | 18.67 | 1.20× | ← the carried-over value |
+| ≥ 65 | 42 | 21.43 | 1.37× | |
+| ≥ 69 (p90) | 23 | 26.09 | 1.67× | |
+| ≥ 72 (p95) | 14 | 42.86 | 2.75× | |
+
+v2 score distribution: min 26, p25 49, **median 55**, p75 63, p90 69, p95 72,
+max 75.
+
+Per bucket the picture is sharper, and it is why **the threshold must be
+per-bucket rather than global**:
+
+| Bucket | base rate | median | p90 | ≥60 lift | ≥p90 lift |
+|---|---|---|---|---|---|
+| `market` | 10.30% | 53 | 65 | 1.10× | **1.39×** (n=21) |
+| `penny` | 32.08% | 62 | 72 | **0.91×** | **1.39×** (n=9) |
+
+In the penny bucket a global 60 is **worse than useless**: penny's median score
+is 62, so `>= 60` selects candidates that hit *less* often than the penny base
+rate. A single global threshold does not mean the same thing in two buckets whose
+score distributions differ by nine points and whose base rates differ threefold.
+
+**Phase 1 defaults, each bucket's own 90th percentile:**
+
+```
+BOT_MOMENTUM_MIN_SCORE_MARKET=65
+BOT_MOMENTUM_MIN_SCORE_PENNY=72
+```
+
+That is roughly 30 alerts across 18 months of pilot history — under two a month,
+which is a scanner rather than a feed. **These percentiles are IN-SAMPLE**, drawn
+from the same candidates §4.1 v2 was derived from; recalibrate when the universe
+widens.
+
+> **The ~2-alerts-a-month figure is PILOT-SCALE, not a property of the approach.**
+> It is measured over 450 stratified symbols of the 4,975 eligible — roughly 9% of
+> the universe. Alert volume scales approximately with universe size, so the full
+> universe at the same percentile thresholds would produce on the order of 15–20
+> alerts a month, not two. Read as a rate per symbol-day rather than as an
+> absolute: a future reader who sees "two a month" and concludes the strategy
+> produces too few signals to be useful would be drawing the wrong conclusion from
+> a subset measurement. The percentile thresholds themselves are what to carry
+> forward; the absolute count is an artifact of pilot scope.
+
+#### Diagnostic: rvol alone separates where the full score does not
+
+Run because it is free and answers whether the unresolved components are merely
+failing to add or are actively diluting. Same 218 candidates, ranked by one
+component's sub-score instead of the total:
+
+| Ranking by | bottom third | top third | lift | z | p |
+|---|---|---|---|---|---|
+| **v2 total** | 16.67% | 19.44% | 1.17× | +0.43 | 0.665 |
+| **`rvol` alone** | 8.33% | 23.61% | **2.83×** | +2.50 | **0.012** |
+| `vol_accel` alone | 16.67% | 22.22% | 1.33× | — | 0.400 |
+| `float` alone | 16.67% | 13.89% | 0.83× | — | 0.643 |
+| `vwap` alone | 20.83% | 13.89% | 0.67× | — | 0.271 |
+
+Isolating `rvol` more than doubles the lift and crosses significance, while
+isolating any of the other three does not — so this is not an artifact of
+isolation itself. **The 40 points of unresolved components are substantially
+diluting the 35 points of proven signal.**
+
+That raises the urgency of resolving them, because they are costing separation
+rather than merely not adding any. It does **not** justify adopting an
+rvol-only score: that would be a third round of fitting on the same candidates
+that identified rvol. The dilution mechanism — adding uncorrelated noise to a
+signal reduces rank correlation — is more robust than the p-value attached to it,
+and is the part worth carrying forward.
+
+Alert threshold: post to Discord when a candidate clears its bucket's threshold
+above (env-configurable, per bucket).
 
 ---
 

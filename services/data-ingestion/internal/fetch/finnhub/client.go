@@ -142,6 +142,49 @@ func (c *Client) CompanyNews(ctx context.Context, symbol string) ([]map[string]a
 	return items, nil
 }
 
+// CompanyNewsRange fetches company headlines over an EXPLICIT date window.
+//
+// CompanyNews hardcodes a trailing 30 days, which is right for live scanning and
+// useless for §3.11's historical evaluation: testing whether a catalyst preceded
+// a runner needs the 48 hours before THAT candidate's date, not before today.
+//
+// Finnhub's free tier serves roughly the last 12 months of company news —
+// measured, not documented: a 2026-01 window returns 243 AAPL articles while
+// 2025-09 returns 0. Windows older than that come back as an empty list rather
+// than an error, so callers must treat "no articles" as possibly-unavailable
+// rather than definitely-no-coverage.
+func (c *Client) CompanyNewsRange(ctx context.Context, symbol string, from, to time.Time) ([]map[string]any, error) {
+	if !c.HasToken() {
+		return nil, fmt.Errorf("finnhub token missing")
+	}
+	if err := c.Limiter.Wait(ctx); err != nil {
+		return nil, err
+	}
+	q := url.Values{}
+	q.Set("symbol", symbol)
+	q.Set("from", from.UTC().Format("2006-01-02"))
+	q.Set("to", to.UTC().Format("2006-01-02"))
+	q.Set("token", c.Token)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, base+"/company-news?"+q.Encode(), nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := c.HTTP.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("finnhub company-news %s %s..%s: %s",
+			symbol, from.Format("2006-01-02"), to.Format("2006-01-02"), resp.Status)
+	}
+	var items []map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&items); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 // CryptoNews fetches recent crypto headlines (Finnhub category=crypto).
 func (c *Client) CryptoNews(ctx context.Context) ([]map[string]any, error) {
 	if !c.HasToken() {

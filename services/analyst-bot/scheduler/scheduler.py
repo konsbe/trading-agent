@@ -103,4 +103,50 @@ def build_scheduler(
         except Exception as exc:
             log.error("failed to schedule FOMC narrative: %s", exc)
 
+    # ── §8.3 momentum scan ───────────────────────────────────────────────────
+
+    #
+
+    # Gated on an explicit opt-in because momentum_score_100 is research-stage:
+
+    # of §4 v2's seven components only rvol is statistically validated, so
+
+    # posting to channels is a decision rather than something that begins on
+
+    # upgrade. The slash commands are always available for inspection.
+
+    if db_pool is not None and getattr(cfg, "bot_momentum_scan_enable", False):
+
+        from scheduler.jobs.momentum_scan import MomentumScanJob
+
+
+        momentum_job = MomentumScanJob(cfg, db_pool, notifiers)
+
+        try:
+
+            scheduler.add_job(
+
+                momentum_job.run,
+
+                trigger=CronTrigger(hour="22", minute="15", timezone="UTC"),
+
+                id="momentum_scan",
+
+                name="Momentum scan (§8.2 candidates)",
+
+                replace_existing=True,
+
+            )
+
+            log.info("momentum scan scheduled (22:15 UTC, after the US close)")
+
+        except Exception:
+
+            log.exception("could not schedule the momentum scan")
+
+    elif db_pool is not None:
+
+        log.info("momentum scan disabled (BOT_MOMENTUM_SCAN_ENABLE=false)")
+
+
     return scheduler

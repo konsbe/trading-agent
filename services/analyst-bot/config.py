@@ -91,6 +91,33 @@ class BotConfig(BaseSettings):
     discord_commands_channel_id: Optional[int] = None
     discord_actions_channel_id: Optional[int] = None
 
+    # ── Momentum scanner channels (§8.3) ─────────────────────────────────────
+    # Four channels: bucket x side. Following this service's existing convention,
+    # an unset ID logs a warning and produces nothing — it never crashes the bot.
+    # That matters more here than elsewhere because a partial rollout (market
+    # channels configured, penny not) is a normal intermediate state.
+    discord_penny_buy_channel_id: Optional[int] = None
+    discord_penny_sell_channel_id: Optional[int] = None
+    discord_market_buy_channel_id: Optional[int] = None
+    discord_market_sell_channel_id: Optional[int] = None
+
+    # ── Momentum scanner behaviour (§4.4, §8.3) ──────────────────────────────
+    bot_momentum_scan_enable: bool = False
+
+    # Per-bucket alert thresholds, each set at that bucket's own 90th percentile
+    # over the pilot's 218 candidates.
+    #
+    # NOT a single global number: the pilot's penny bucket has a median score of
+    # 62 against market's 53, and base rates of 32.1% against 10.3%, so a global
+    # 60 fired on two-thirds of penny candidates and selected worse than the
+    # penny base rate (0.91x lift). See §4.4 for the calibration table.
+    bot_momentum_min_score_market: int = 65
+    bot_momentum_min_score_penny: int = 72
+
+    # §8.3: one alert per symbol per bucket per 5 sessions, so a name that stays
+    # qualified for a week does not alert daily.
+    bot_momentum_cooldown_secs: int = 5 * 24 * 3600
+
     # ── Actions channel (actionable guidance — fires after every alert) ───────
     bot_actions_enabled: bool = True
     bot_actions_min_confluence: int = 2

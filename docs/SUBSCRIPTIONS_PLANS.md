@@ -125,13 +125,67 @@ Mapping the fix onto the three incidents, which is the part worth checking:
 - The usage-visibility gap is *not* addressed by the table. Higher limits make it
   moot rather than fixing it.
 
-**Upgrade trigger:** the moment §7's base-rate validation clears on the 450-symbol
-pilot. At that point the subset exists only because of the 500/month cap, and
-$30/month buys the full universe plus a 3-minute refresh — which also removes the
-stratified-sampling machinery, the pilot-subset selection, and the bootstrap
-pricing pass as ongoing concerns. Upgrading **before** the base rate clears would
-be paying to scale a score with no demonstrated edge, which §2.2 explicitly warns
-against.
+### Upgrade trigger — revised after Step 7 (2026-09-18)
+
+The original trigger read "once §7's base-rate validation clears." **That trigger
+no longer applies, because Step 7 did not return a clean pass or fail — it
+returned INCONCLUSIVE, and that result is itself the concrete case for paying.**
+
+What the 450-symbol pilot established, on 218 evaluable candidates against a
+15.60% base rate:
+
+| Component | Weight | Result |
+|---|---|---|
+| `rvol` | 35 | **predictive**, p=0.0090 |
+| `breakout` | 0 (was 20) | **inverted**, p=0.0008 — zeroed |
+| `high52w` | 0 (was 5) | **inverted**, p=0.0089 — zeroed |
+| `vol_accel` | 25 | **cannot be resolved** (p=0.71) |
+| `float` | 10 | **cannot be resolved** (p=0.70) |
+| `vwap` | 5 | **cannot be resolved** (p=0.22) |
+| `catalyst` | 15 | **cannot be resolved** (p=0.28, n=18 keyword-matched) |
+
+The pilot answered the questions it could answer. What it **cannot** answer is
+whether the 55 points still allocated to `vol_accel`, `float`, `vwap` and
+`catalyst` carry real signal. At n=72 per third with roughly 13 hits each, those
+four are statistically indistinguishable from noise — which is emphatically not
+the same as shown to be useless, and is exactly why they were left at their
+current weights rather than cut.
+
+**The trigger is therefore sample size, and it is a measured requirement rather
+than a preference.** Resolving a component whose true effect is of the order
+observed for `rvol` needs several times the current candidate count. Two ways to
+get there:
+
+1. **Widen the universe.** The pilot is 450 of 4,975 eligible symbols — roughly
+   11× more candidate-days available. This is the Tiingo upgrade: ~108,980 unique
+   symbols/month versus 500 removes the only reason the pilot is a subset, and
+   10,000 requests/hour versus 50 turns the ~9-hour backfill into ~3 minutes.
+2. **Wait for forward sessions.** Free, but slow, and §6's 120-session label
+   horizon means each new candidate takes roughly six months to become evaluable.
+
+So the decision is: **$30/month to resolve four components now, or several
+quarters of waiting to resolve them for free.** That is a sharper argument than
+the original trigger, because it names what the money buys — statistical power on
+a specific, enumerated question — rather than a generic "once it's worth it."
+
+**What upgrading does NOT buy:** validation of the revision itself. §4 v2's
+weights were chosen on these same 218 candidates, so re-running against a wider
+universe serves double duty as out-of-sample confirmation *and* as the power
+increase above. Those are different claims and should be reported separately.
+
+**A note on alert volume, so it is not misread as a reason not to bother.** At the
+pilot's 450 symbols the calibrated thresholds fire roughly twice a month. That is
+a scope artifact, not a property of the strategy: volume scales approximately with
+universe size, so the full 4,975-symbol universe would be on the order of 15–20
+alerts a month at the same percentiles. The pilot's low absolute count is a
+consequence of scanning 9% of the market, and is itself part of the case for
+widening — a scanner producing two candidates a month is hard to evaluate for
+reasons that have nothing to do with whether its scoring works.
+
+**Still not worth paying to scale a score with no demonstrated edge** — §2.2's
+warning stands. `rvol` is the one component with demonstrated edge, and one
+proven component out of seven is a reason to buy statistical power, not a reason
+to scale the pipeline into production.
 
 ---
 
