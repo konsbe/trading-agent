@@ -129,7 +129,19 @@ ORDER BY o.symbol, o.ts`, *interval, *source)
 			}
 			continue
 		}
-		s, ok := momentum.ScoreCandidate(&f, momentum.ScoreInput{}, g)
+		// §3.9: float_shares_est = shares_outstanding, a documented APPROXIMATION
+		// (insider and locked-up shares are not excluded, so it overstates float
+		// for recently-IPO'd and insider-heavy names). Stored absolute, so no
+		// further unit conversion here.
+		//
+		// CatalystTier is deliberately left unset: §3.11's news fetching is Step 8.
+		// Unset reads as null rather than as "none", which keeps "never fetched"
+		// distinguishable from "fetched and found nothing".
+		si := momentum.ScoreInput{}
+		if so, ok := sharesOut[sym]; ok && so > 0 {
+			si.FloatSharesEst = &so
+		}
+		s, ok := momentum.ScoreCandidate(&f, si, g)
 		if ok {
 			candidates = append(candidates, scored{sym, s})
 		}

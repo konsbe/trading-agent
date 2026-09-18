@@ -3,8 +3,11 @@ package store
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -40,4 +43,26 @@ func UpsertFundamental(
 	}
 	_, err := pool.Exec(ctx, upsertFundamentalSQL, ts, symbol, period, metric, value, jb, source)
 	return err
+}
+
+// LatestFundamental returns the most recent non-null value of one metric for a
+// symbol, or nil when none exists.
+//
+// Used by the /stock/profile2 fallback so it does not overwrite a value that
+// /stock/metric already supplied: the profile write is a gap-filler, and if the
+// primary endpoint ever starts returning shareOutstanding the fallback should
+// stand down rather than compete with it.
+func LatestFundamental(ctx context.Context, pool *pgxpool.Pool, symbol, metric string) (*float64, error) {
+	var v *float64
+	err := pool.QueryRow(ctx, `
+SELECT value FROM equity_fundamentals
+WHERE symbol = $1 AND metric = $2 AND value IS NOT NULL
+ORDER BY ts DESC LIMIT 1`, symbol, metric).Scan(&v)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("latest fundamental %s/%s: %w", symbol, metric, err)
+	}
+	return v, nil
 }

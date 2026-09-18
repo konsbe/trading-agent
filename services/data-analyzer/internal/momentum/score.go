@@ -26,21 +26,81 @@ const (
 	CatalystNone CatalystTier = "none"
 )
 
-// Weights are §4.1's corrected table. The original listed both "Volume +25" and
-// "Relative Volume +20", double-counting the same quantity; §4.1 resolves that
-// to volume ACCELERATION 25 plus relative volume 20, preserving the total of
-// 100 while removing the overlap.
+// §4 v2 weights — revised on Step 7 evidence. See docs/MOMENTUM_SCANNER_PHASE1.md
+// §4.1 for the full versioned reasoning, which keeps the v1 table alongside this
+// one rather than replacing it.
+//
+// # Why breakout and high52w are zero
+//
+// Not a tuning adjustment. The v1 score CONTRADICTED the gates it ranks within.
+// §3.2 excludes stocks already up more than 20-25% because, in the spec's own
+// words, "a stock up +60% today is not a Phase 1 candidate — it is already
+// gone." §4.2 v1 then awarded 25 points for a fresh 52-week high and a confirmed
+// breakout, which is the geometric signature of precisely that lateness. The gate
+// said don't chase; the score paid to chase.
+//
+// Measured over 218 evaluable candidates from the 450-symbol pilot (109 per
+// half, two-proportion z-tests against a 15.60% base rate):
+//
+//	component   weight  low-half  high-half      z      p        reading
+//	rvol            20    10 hits   24 hits   +2.61   0.0089   predictive
+//	breakout        20    26 hits    8 hits   -3.36   0.0008   INVERTED
+//	high52w          5    24 hits   10 hits   -2.61   0.0089   INVERTED
+//	vol_accel       25    16 hits   18 hits   +0.37   0.71     underpowered
+//	float           10    16 hits   18 hits   +0.37   0.71     underpowered
+//	vwap             5    18 hits   16 hits   -0.37   0.71     underpowered
+//
+// Both inversions are significant at p<0.01, point the SAME way, and share one
+// mechanistic explanation — which is what makes this a finding rather than
+// noise. Among candidates that have already cleared the gate, being at a fresh
+// high is a lateness marker, not a quality marker.
+//
+// The fields are still COMPUTED (§3.6 and §3.7 remain in Features): they are
+// useful review data, breakout_state is read elsewhere, and zeroing the weight
+// is reversible in a way that deleting the feature is not.
+//
+// # Why rvol only goes to 35, not 45
+//
+// rvol is the sole proven-positive component, but "proven" rests on one z-test
+// at n=109 per half from a single 450-symbol pilot. That is real signal, not a
+// number worth staking half the score on. 15 of the 25 freed points go to rvol;
+// the remaining 10 are RESERVED, unallocated, pending §3.11's catalyst tier
+// (null throughout the Step 7 run, so its 15 points were never exercised) and
+// re-validation at larger scale.
+//
+// Allocated weight is therefore 90, not 100. That gap is deliberate and must not
+// be quietly closed: assigning it needs evidence, and defaulting it into an
+// existing component would be exactly the unevidenced retune this revision
+// exists to avoid.
+//
+// # Why vol_accel, float and vwap are untouched
+//
+// "Underpowered to detect" is not "shown to be useless". At 34 total hits these
+// three cannot be distinguished from noise either way, and cutting them now would
+// treat absence of evidence as evidence of absence.
 const (
 	WeightVolAccel = 25
-	WeightRVol     = 20
-	WeightBreakout = 20
+	WeightRVol     = 35 // v1: 20 — the only component with measured positive signal
+	WeightBreakout = 0  // v1: 20 — INVERTED, p=0.0008; field still computed
 	WeightCatalyst = 15
 	WeightFloat    = 10
 	WeightVWAP     = 5
-	WeightHigh52w  = 5
-	WeightTotal    = WeightVolAccel + WeightRVol + WeightBreakout + WeightCatalyst + WeightFloat + WeightVWAP + WeightHigh52w
-	MaxScore       = 100
-	MinScore       = 0
+	WeightHigh52w  = 0 // v1: 5 — INVERTED, p=0.0089; field still computed
+
+	// WeightReserved is capacity deliberately left unassigned. Named so the
+	// arithmetic below balances explicitly and a future change has to decide what
+	// to do with it rather than silently absorbing it.
+	WeightReserved = 10
+
+	// WeightAllocated is the maximum a candidate can actually score today.
+	WeightAllocated = WeightVolAccel + WeightRVol + WeightBreakout + WeightCatalyst + WeightFloat + WeightVWAP + WeightHigh52w
+
+	// WeightTotal is the score's capacity, allocated plus reserved. Still 100, so
+	// momentum_score_100 keeps its name and its [0,100] range.
+	WeightTotal = WeightAllocated + WeightReserved
+
+	MaxScore = 100
+	MinScore = 0
 )
 
 // Penalty point values (§4.3), applied after summing, then clamped to [0,100].
@@ -151,11 +211,16 @@ func ScoreCandidate(f *Features, in ScoreInput, gate GateResult) (Score, bool) {
 	if f.RVol20 == nil {
 		s.NullInputs = append(s.NullInputs, NullRVol)
 	} else {
+		// v1's band SHAPE is preserved and rescaled to the new weight (x1.75),
+		// rather than redesigned. The evidence says rvol carries signal; it says
+		// nothing about where its breakpoints should sit, so changing the curve
+		// would be an unevidenced change riding along with an evidenced one.
+		const rvolScale = float64(WeightRVol) / 20.0
 		s.Sub.RVol = piecewise(*f.RVol20, []band{
 			{lo: 0, hi: 1.5, pLo: 0, pHi: 0},
-			{lo: 1.5, hi: 3.0, pLo: 0, pHi: 12},
-			{lo: 3.0, hi: 5.0, pLo: 12, pHi: 18},
-			{lo: 5.0, hi: 10.0, pLo: 18, pHi: 20},
+			{lo: 1.5, hi: 3.0, pLo: 0, pHi: 12 * rvolScale},
+			{lo: 3.0, hi: 5.0, pLo: 12 * rvolScale, pHi: 18 * rvolScale},
+			{lo: 5.0, hi: 10.0, pLo: 18 * rvolScale, pHi: 20 * rvolScale},
 		}, WeightRVol)
 	}
 
@@ -280,17 +345,27 @@ func piecewise(v float64, bands []band, maxPoints float64) float64 {
 	return maxPoints
 }
 
+// breakoutPoints scales v1's relative shape by WeightBreakout.
+//
+// Derived from the weight rather than hardcoded so the constant is the single
+// source of truth: with WeightBreakout = 0 every state contributes nothing, and
+// restoring the weight restores the original 20/14/8/0 shape without a second
+// edit. The alternative — returning literal zeros here — would let the constant
+// and the function disagree, which is how a "disabled" component comes back to
+// life by accident.
 func breakoutPoints(st BreakoutState) float64 {
+	var frac float64
 	switch st {
 	case BreakoutFromConsolidation:
-		return 20
+		frac = 1.0 // v1: 20/20
 	case Breakout:
-		return 14
+		frac = 0.7 // v1: 14/20
 	case BreakoutApproaching:
-		return 8
+		frac = 0.4 // v1: 8/20
 	default:
-		return 0
+		frac = 0
 	}
+	return frac * float64(WeightBreakout)
 }
 
 // floatPoints implements §4.2's float bands. Lower float scores higher: a small
@@ -310,19 +385,19 @@ func floatPoints(shares float64) float64 {
 	}
 }
 
-// high52wPoints implements §4.2's proximity bands.
-//
-// The >= 1.00 band IS the new-52-week-high case and is reachable because §3.7's
-// window excludes today; values above 1.0 clamp to 5 rather than extrapolating.
+// high52wPoints scales v1's relative shape by WeightHigh52w, for the same
+// single-source-of-truth reason as breakoutPoints.
 func high52wPoints(ratio float64) float64 {
+	var frac float64
 	switch {
 	case ratio >= 1.00:
-		return 5
+		frac = 1.0 // v1: 5/5
 	case ratio >= 0.95:
-		return 4
+		frac = 0.8 // v1: 4/5
 	case ratio >= 0.90:
-		return 2
+		frac = 0.4 // v1: 2/5
 	default:
-		return 0
+		frac = 0
 	}
+	return frac * float64(WeightHigh52w)
 }

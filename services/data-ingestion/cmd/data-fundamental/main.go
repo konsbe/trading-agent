@@ -275,11 +275,11 @@ func (w *worker) fetchMetricsForSymbol(ctx context.Context, sym string, ts time.
 		// looking like it ran, is worse than one that errors.
 		upsert("market_cap", mulM(floatPtr(metricMap, "marketCapitalization")), nil)
 
-		// NOTE: shareOutstanding is NOT present on /stock/metric — verified absent
-		// even for AAPL, not merely null for micro-caps. This writes 450 null rows
-		// and leaves §3.9's market_cap_est proxy with no input at all, so the
-		// symbols the proxy exists to rescue stay ungateable. The value lives on
-		// /stock/profile2; wiring that is a separate change.
+		// shareOutstanding is NOT on /stock/metric — verified absent even for
+		// AAPL, not merely null for micro-caps. It comes from /stock/profile2
+		// instead, fetched below. This line is kept because the field may return
+		// one day, and a present value should win over the profile fallback; the
+		// profile write is conditional on this being absent.
 		upsert("shares_outstanding", floatPtr(metricMap, "shareOutstanding"), nil)
 
 		// ── Tier 2: Return on capital & profitability efficiency ───────────────
@@ -312,6 +312,23 @@ func (w *worker) fetchMetricsForSymbol(ctx context.Context, sym string, ts time.
 		if err := store.UpsertFundamental(ctx, w.pool, ts, sym, "ttm", "metrics_raw", nil, metricMap, "finnhub_metric"); err != nil {
 			w.log.Error("upsert metrics_raw", "symbol", sym, "err", err)
 		}
+	}
+
+	// ── §3.9 float / market-cap proxy input, from /stock/profile2 ───────────
+	//
+	// A second request per symbol, deliberately inside the SAME checkpoint claim
+	// rather than as its own sub-task: the two values are useless apart. A
+	// separate task would double the checkpoint rows and allow a symbol to end up
+	// with a market cap and no share count, which is exactly the half-populated
+	// state §3.9's fallback cannot work with.
+	//
+	// Failure here is logged and swallowed rather than returned: the metrics
+	// above are already written, and failing the whole claim would discard them
+	// and retry ~80 fields to recover one. The absence then shows up honestly as
+	// a null share count.
+	if err := w.fetchProfileForSymbol(ctx, sym, ts); err != nil {
+		w.log.Warn("profile2 fetch failed; shares_outstanding stays null and §3.9's proxy will be unavailable for this symbol",
+			"symbol", sym, "err", err)
 	}
 
 	w.log.Debug("fundamentals metrics stored", "symbol", sym)
@@ -1065,4 +1082,43 @@ func abs(v float64) float64 {
 		return -v
 	}
 	return v
+}
+
+// fetchProfileForSymbol writes the §3.9 proxy inputs from /stock/profile2.
+//
+// Units: Finnhub reports shareOutstanding in MILLIONS of shares (AAPL comes back
+// as 14687.36, i.e. 14.69 billion). Stored absolute via mulM, matching the
+// market_cap convention — and named rather than inlined for the same reason:
+// the market_cap unit bug was invisible because nothing at the call site
+// mentioned the unit.
+func (w *worker) fetchProfileForSymbol(ctx context.Context, sym string, ts time.Time) error {
+	prof, err := w.fh.Profile2(ctx, sym)
+	if err != nil {
+		return err
+	}
+	if len(prof) == 0 {
+		// Finnhub answers with an empty object for symbols it has no profile for,
+		// rather than an error. Reported as such so it is distinguishable from a
+		// transport failure.
+		return fmt.Errorf("empty profile for %s", sym)
+	}
+
+	shares := mulM(floatPtr(prof, "shareOutstanding"))
+	if shares == nil {
+		return fmt.Errorf("no shareOutstanding in profile for %s", sym)
+	}
+
+	// Only fill the gap: a value already written from /stock/metric is preferred,
+	// so if that endpoint ever starts returning the field this write stands down
+	// instead of fighting it.
+	existing, err := store.LatestFundamental(ctx, w.pool, sym, "shares_outstanding")
+	if err == nil && existing != nil && *existing > 0 {
+		return nil
+	}
+
+	if err := store.UpsertFundamental(ctx, w.pool, ts, sym, "ttm",
+		"shares_outstanding", shares, nil, "finnhub_profile2"); err != nil {
+		return fmt.Errorf("upsert shares_outstanding %s: %w", sym, err)
+	}
+	return nil
 }

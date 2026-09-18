@@ -389,7 +389,184 @@ against a Finnhub budget that is already oversubscribed (see §8.1.2).
 
 One integer, 0–100, computed only for symbols that passed the hard gates.
 
-### 4.1 A correction to the original weight table
+### 4.1 Weight table — versioned
+
+Two revisions exist. **v1 is retained deliberately**, not as history but as the
+thing v2 is evidence *against*: a reader six months from now needs to see what
+changed and why, or v2 looks like an arbitrary retune.
+
+#### v1 — the original correction (superseded)
+
+The original brief listed both `Volume +25` and `Relative Volume +20`, which
+double-counts the same underlying quantity. v1 resolved that, preserving a total
+of 100:
+
+| Component | v1 Weight | Measures |
+|---|---|---|
+| Volume acceleration | 25 | Is volume *building* (`vol_accel`) |
+| Relative volume | 20 | Is today unusual vs. the month (`rvol_20`) |
+| Breakout | 20 | `breakout_state` |
+| Catalyst | 15 | `catalyst_tier` |
+| Float (est) | 10 | `float_shares_est` |
+| Above VWAP | 5 | `above_vwap` |
+| Near 52-week high | 5 | `pct_of_52w_high` |
+| **Total** | **100** | |
+
+#### v2 — revised on Step 7 evidence (current)
+
+| Component | v2 Weight | Δ | Basis |
+|---|---|---|---|
+| Relative volume | **35** | +15 | only component with measured positive signal |
+| Volume acceleration | 25 | — | underpowered to distinguish; unchanged |
+| Catalyst | 15 | — | never exercised (§3.11 is Step 8) |
+| Float (est) | 10 | — | underpowered to distinguish; unchanged |
+| Above VWAP | 5 | — | underpowered to distinguish; unchanged |
+| Breakout | **0** | −20 | **measured inverted**, p=0.0008 |
+| Near 52-week high | **0** | −5 | **measured inverted**, p=0.0089 |
+| **Allocated** | **90** | | |
+| **Reserved, unallocated** | **10** | | held pending §3.11 and re-validation at scale |
+| **Capacity** | **100** | | `momentum_score_100` keeps its name and range |
+
+Both zeroed fields are **still computed and stored**. `breakout_state` is read
+elsewhere, both are useful review data, and zeroing a weight is reversible in a
+way that deleting a feature is not. The sub-score functions derive their points
+from the weight constants rather than hardcoding zeros, so the constant is the
+single source of truth and restoring a weight restores v1's exact shape.
+
+##### The evidence
+
+Step 7, over the 450-symbol pilot: 180,460 symbol-days evaluated, 321 gate
+passes, 102 excluded as label-incomplete per §6, leaving **218 evaluable
+candidates** and a **15.60% base rate** (34/218 reached +100% within 120
+sessions).
+
+v1's total score did not merely fail to separate — it separated **backwards**:
+
+```
+bottom third (n=72): 25.00%    top third (n=72): 11.11%
+```
+
+Per-component, two-proportion z-tests, 109 candidates per half:
+
+| Component | v1 weight | low-half hits | high-half hits | z | p | Reading |
+|---|---|---|---|---|---|---|
+| `rvol` | 20 | 10 | 24 | +2.61 | 0.0089 | **predictive** |
+| `breakout` | 20 | 26 | 8 | −3.36 | 0.0008 | **inverted** |
+| `high52w` | 5 | 24 | 10 | −2.61 | 0.0089 | **inverted** |
+| `vol_accel` | 25 | 16 | 18 | +0.37 | 0.71 | underpowered |
+| `float` | 10 | 16 | 18 | +0.37 | 0.71 | underpowered |
+| `vwap` | 5 | 18 | 16 | −0.37 | 0.71 | underpowered |
+
+That accounts for the inversion arithmetically: **20 points of real signal
+against 25 points of inverted signal and 40 points of noise.**
+
+##### The confound check
+
+The bucket effect is stronger than the score effect (penny 32.08% vs market
+10.30%), which is a textbook Simpson's paradox setup — a score correlating with
+bucket membership would show separation, or inversion, without any of it being
+about the score. **It is not the explanation.** The inversion persists inside the
+market bucket alone:
+
+| Market-bucket quintile | Score | n | hit% | median drawdown% |
+|---|---|---|---|---|
+| Q1 | 20–48 | 33 | 24.24 | 45.6 |
+| Q2 | 50–59 | 33 | 6.06 | 36.3 |
+| Q3 | 59–64 | 33 | 9.09 | 35.1 |
+| Q4 | 64–70 | 33 | 6.06 | 28.0 |
+| Q5 | 70–84 | 33 | 6.06 | 32.0 |
+
+The penny bucket is U-shaped with 10–11 rows per quintile, which is noise.
+
+##### The structural reading
+
+This is not a tuning problem, it is a **contradiction in the design**.
+
+§3.2 excludes stocks already up more than 20–25% because, in this spec's own
+words, *"a stock up +60% today is not a Phase 1 candidate — it is already
+gone."* §4.2 v1 then awarded 25 points for a fresh 52-week high and a confirmed
+breakout, which is the geometric signature of precisely that lateness. **The gate
+said don't chase; the score paid to chase.**
+
+Among candidates that have *already cleared the gate*, being at a fresh high is a
+lateness marker, not a quality marker: it does not indicate a clean setup, it
+indicates the same setup further along its run. That both inverted components
+carry the same theoretical sign — rather than one being a fluke — is what makes
+this a confident finding rather than a noisy one.
+
+##### Why rvol did not absorb all 25 freed points
+
+`rvol` is the sole proven-positive component, but "proven" rests on a single
+z-test at n=109 per half from one 450-symbol pilot. Real signal; not a number
+worth staking half the score's weight on. 15 points go to `rvol`; **10 are
+reserved and explicitly unallocated**, pending §3.11's catalyst tier (null
+throughout the Step 7 run, so its 15 points were never exercised) and
+re-validation at larger scale. Assigning that capacity requires evidence —
+defaulting it into an existing component would be the unevidenced retune this
+revision exists to avoid.
+
+##### Why vol_accel, float and vwap were left alone
+
+"Underpowered to detect" is not "shown to be useless." At 34 total hits these
+three cannot be distinguished from noise in either direction, and cutting them
+now would treat absence of evidence as evidence of absence. `vol_accel` in
+particular is notable: it carries the largest single weight and §4.1 v1 was
+specifically corrected to prioritise it, yet it shows nothing at this sample
+size. That is a question for the next validation round, not a licence to cut it.
+
+##### ⚠ This revision is IN-SAMPLE and awaits out-of-sample confirmation
+
+The weights were revised using the same 218 candidates that revealed the
+problem. Re-running the decile report against the revised weighting on those
+same 218 candidates is a **sanity check that the logic is internally
+consistent** — it would show improvement almost by construction, because the
+components were selected on that data. **It is not evidence the revision
+generalises.**
+
+Real validation requires either the full-universe backfill or a fresh batch of
+forward sessions that this exact 450-symbol set did not already inform. Until
+one of those exists, v2 is a better-reasoned hypothesis than v1, not a validated
+scoring model.
+
+Standing limitations that apply to all of the above: survivorship bias is present
+and unmeasured (the universe was pulled today, so delisted tickers — which are
+disproportionately failures — are absent, making every hit rate optimistic);
+`market_cap` and `shares_outstanding` are point-in-time today applied to every
+historical row; and the pilot is 450 stratified symbols, not the full 4,975.
+
+##### Drawdown: a Phase 2 candidate feature, deliberately NOT folded in
+
+The score does not predict +100% hits, but it does predict **drawdown**,
+monotonically across market-bucket quintiles (45.6% → 36.3% → 35.1% → 28.0%) and
+across halves (43.4% vs 35.5%, a 7.9-point reduction for high scores). §6 tests
+hit rate only, so this would have gone unnoticed.
+
+It is recorded here and **kept separate from `momentum_score_100`**. A risk or
+quality signal is a different thing from a hit-rate signal, and folding it into
+the same number would make both harder to evaluate. It is a candidate for a
+distinct signal later — possibly feeding §5's exit logic — and receives the same
+treatment §3.12 gives `sector_strength_pct`: recorded, not scored.
+
+**Where the drawdown signal actually lives — measured, not assumed.** Re-running
+the report under v2 weights, the drawdown relationship **disappears**: 38.2% for
+the low-score half against 39.2% for the high-score half, i.e. no advantage. The
+monotonic 45.6% → 28.0% pattern was therefore being carried by `breakout` and
+`high52w` — the very components zeroed for hit-rate inversion — and not by the
+score as a whole.
+
+That is a sharper and more useful finding than the original. `breakout_state` and
+`pct_of_52w_high` are **inverted for predicting +100% moves and simultaneously
+informative about drawdown**, which is coherent rather than contradictory: a
+stock at a fresh high after a confirmed breakout is further along its run, so it
+has less room left to gain and less distance to give back. Both readings describe
+the same lateness.
+
+The Phase 2 candidate is therefore **`breakout` and `high52w` as a risk/exit
+signal**, not the total score. This is also why §4.1 v2 keeps both fields
+computed: zeroing their scoring weight while preserving the features is exactly
+what leaves that avenue open.
+
+### 4.1.1 Original correction rationale (v1, for reference)
 
 The original table listed both `Volume +25` and `Relative Volume +20`, which double-counts the same underlying quantity. Resolved as follows, preserving the total of 100:
 
@@ -419,22 +596,32 @@ All piecewise-linear and deterministic. Interpolate linearly inside each band; c
 | 2.5 – 4.0 | 20 → 25 |
 | > 4.0 | 25 |
 
-**Relative volume (0–20)** — input `rvol_20`
-| Band | Points |
-|---|---|
-| < 1.5 | 0 |
-| 1.5 – 3.0 | 0 → 12 |
-| 3.0 – 5.0 | 12 → 18 |
-| 5.0 – 10.0 | 18 → 20 |
-| > 10.0 | 20 |
+**Relative volume (0–35 in v2; 0–20 in v1)** — input `rvol_20`
 
-**Breakout (0–20)** — input `breakout_state`
-| Value | Points |
-|---|---|
-| `breakout_from_consolidation` | 20 |
-| `breakout` | 14 |
-| `approaching` | 8 |
-| `none` | 0 |
+v2 keeps v1's band **shape** and rescales it by 35/20 = 1.75. The evidence speaks
+to rvol's weight, not to where its breakpoints belong, so changing the curve
+would smuggle an unevidenced change in alongside an evidenced one.
+
+| Band | v2 Points | (v1) |
+|---|---|---|
+| < 1.5 | 0 | 0 |
+| 1.5 – 3.0 | 0 → 21 | 0 → 12 |
+| 3.0 – 5.0 | 21 → 31.5 | 12 → 18 |
+| 5.0 – 10.0 | 31.5 → 35 | 18 → 20 |
+| > 10.0 | 35 | 20 |
+
+**Breakout — ZEROED in v2** (was 0–20) — input `breakout_state`
+
+Measured inverted, p=0.0008. `breakout_state` is **still computed and stored**;
+it simply contributes no points. Implementation scales the v1 shape by
+`WeightBreakout`, so restoring the weight restores these exact values.
+
+| Value | v2 Points | (v1) | v1 fraction |
+|---|---|---|---|
+| `breakout_from_consolidation` | 0 | 20 | 1.0 |
+| `breakout` | 0 | 14 | 0.7 |
+| `approaching` | 0 | 8 | 0.4 |
+| `none` | 0 | 0 | 0 |
 
 **Catalyst (0–15)** — input `catalyst_tier`: `A` → 15, `B` → 8, `none` → 0.
 
@@ -449,16 +636,23 @@ All piecewise-linear and deterministic. Interpolate linearly inside each band; c
 
 **Above VWAP (0–5)** — `above_vwap` true → 5, false → 0.
 
-**Near 52-week high (0–5)** — input `pct_of_52w_high`
-| Band | Points |
-|---|---|
-| ≥ 1.00 (new high) | 5 |
-| 0.95 – 1.00 | 4 |
-| 0.90 – 0.95 | 2 |
-| < 0.90 | 0 |
+**Near 52-week high — ZEROED in v2** (was 0–5) — input `pct_of_52w_high`
 
-Since §3.7's window excludes today, `pct_of_52w_high` can exceed 1.0 and the top band is
-reachable: `>= 1.00` *is* the new-52-week-high case. Values above 1.0 clamp to 5.
+Measured inverted, p=0.0089. The ratio is **still computed and stored**. Note
+that v1 rewarded the new-high case *most heavily*, and that is precisely the
+signal that measured backwards: among already-gated candidates a fresh high marks
+lateness, not quality.
+
+| Band | v2 Points | (v1) | v1 fraction |
+|---|---|---|---|
+| ≥ 1.00 (new high) | 0 | 5 | 1.0 |
+| 0.95 – 1.00 | 0 | 4 | 0.8 |
+| 0.90 – 0.95 | 0 | 2 | 0.4 |
+| < 0.90 | 0 | 0 | 0 |
+
+§3.7's window excludes today, so `pct_of_52w_high` can exceed 1.0 and `>= 1.00`
+*is* the new-52-week-high case. That remains true of the **feature**; in v2 the
+band earns 0 points regardless.
 
 ### 4.3 Penalties
 
@@ -475,6 +669,18 @@ The "already extended" penalty enforces the core thesis in the score itself: the
 ### 4.4 Output contract
 
 Persist, per symbol per day: the total, **every sub-score separately**, each penalty applied, and which inputs were null. A score with no visible breakdown is undebuggable, and Phase 2 needs the components independently.
+
+This contract is what made §4.1 v2 possible. The per-component decomposition that
+identified `breakout` and `high52w` as inverted could only be computed because
+every sub-score was stored separately — a stored total alone would have shown
+that the score failed and given no way to find out which part of it was wrong.
+Zeroed components must keep being persisted for the same reason: their
+relationship to the outcome still needs measuring at larger scale.
+
+**The maximum attainable total is 90, not 100**, because 10 points are reserved
+and unallocated (§4.1 v2). With `catalyst_tier` null until §3.11 ships in Step 8,
+the practical ceiling today is **75**. Any alert threshold has to be read against
+that ceiling rather than against 100.
 
 Alert threshold: post to Discord when `momentum_score_100 >= 60` (env-configurable, per bucket).
 

@@ -29,33 +29,67 @@ func ptrState(s BreakoutState) *BreakoutState { return &s }
 
 // ─── The weight table (§4.1's correction) ──────────────────────────────────────
 
-// §4.1 resolved the original table's double-count (it listed both "Volume +25"
-// and "Relative Volume +20" for the same underlying quantity) into volume
-// ACCELERATION 25 plus relative volume 20. The total must still be 100, or the
-// score is no longer out of 100.
-func TestWeights_SumToOneHundred(t *testing.T) {
-	if WeightTotal != 100 {
-		t.Fatalf("weights sum to %d, want 100", WeightTotal)
-	}
+// §4 v2: capacity is still 100, but 10 points are deliberately RESERVED rather
+// than allocated. The gap must not be quietly closed — assigning it requires
+// evidence, and defaulting it into an existing component is the unevidenced
+// retune this revision exists to avoid.
+func TestWeights_AllocatedPlusReservedIsOneHundred(t *testing.T) {
 	sum := WeightVolAccel + WeightRVol + WeightBreakout + WeightCatalyst + WeightFloat + WeightVWAP + WeightHigh52w
-	if sum != 100 {
-		t.Errorf("component weights sum to %d, want 100", sum)
+	if sum != WeightAllocated {
+		t.Errorf("components sum to %d but WeightAllocated is %d", sum, WeightAllocated)
 	}
-	// Acceleration must outweigh relative volume: §4.1's whole point is "volume
-	// increasing, not just high volume".
-	if WeightVolAccel <= WeightRVol {
-		t.Errorf("vol_accel weight %d should exceed rvol weight %d", WeightVolAccel, WeightRVol)
+	if WeightAllocated != 90 {
+		t.Errorf("WeightAllocated = %d, want 90 (§4 v2)", WeightAllocated)
+	}
+	if WeightReserved != 10 {
+		t.Errorf("WeightReserved = %d, want 10 — held pending §3.11's catalyst tier and re-validation at scale", WeightReserved)
+	}
+	if WeightTotal != 100 {
+		t.Errorf("WeightTotal = %d, want 100 so momentum_score_100 keeps its name", WeightTotal)
 	}
 }
 
-// A perfect candidate must reach exactly 100, otherwise the scale is wrong.
-func TestScoreCandidate_PerfectCandidateScores100(t *testing.T) {
+// The two components Step 7 measured as INVERTED (p<0.01, same direction, one
+// shared mechanistic explanation) must contribute nothing.
+//
+// §3.2 excludes stocks already up 20-25% as "already gone"; §4.2 v1 then paid 25
+// points for a fresh high and a confirmed breakout, the geometric signature of
+// exactly that lateness. The gate said don't chase, the score paid to chase.
+func TestWeights_InvertedComponentsAreZeroed(t *testing.T) {
+	if WeightBreakout != 0 {
+		t.Errorf("WeightBreakout = %d, want 0 (inverted, p=0.0008)", WeightBreakout)
+	}
+	if WeightHigh52w != 0 {
+		t.Errorf("WeightHigh52w = %d, want 0 (inverted, p=0.0089)", WeightHigh52w)
+	}
+}
+
+// rvol is the only component with measured positive signal, but that rests on a
+// single z-test at n=109/half from one 450-symbol pilot — so it takes 15 of the
+// 25 freed points, not all 25.
+func TestWeights_RVolGainedFifteenNotTwentyFive(t *testing.T) {
+	if WeightRVol != 35 {
+		t.Errorf("WeightRVol = %d, want 35 (v1 20 + 15 freed)", WeightRVol)
+	}
+	// Underpowered is not useless: at 34 total hits these three cannot be
+	// distinguished from noise either way, so cutting them would treat absence of
+	// evidence as evidence of absence.
+	if WeightVolAccel != 25 || WeightFloat != 10 || WeightVWAP != 5 {
+		t.Errorf("vol_accel/float/vwap = %d/%d/%d, want 25/10/5 unchanged from v1",
+			WeightVolAccel, WeightFloat, WeightVWAP)
+	}
+}
+
+// A flawless candidate must reach exactly the ALLOCATED weight. Not 100 — the
+// reserved 10 points are unreachable by design, and a candidate hitting 100
+// would mean that capacity had leaked into a component.
+func TestScoreCandidate_PerfectCandidateScoresAllocatedWeight(t *testing.T) {
 	f := scoreFeatures()
-	f.VolAccel = ptr(5.0)                                 // > 4.0 -> 25
-	f.RVol20 = ptr(12.0)                                  // > 10  -> 20
-	f.BreakoutState = ptrState(BreakoutFromConsolidation) // -> 20
+	f.VolAccel = ptr(5.0)                                 // > 4.0  -> 25
+	f.RVol20 = ptr(12.0)                                  // > 10   -> 35 (v2)
+	f.BreakoutState = ptrState(BreakoutFromConsolidation) // -> 0 in v2
 	f.AboveVWAP = ptr(true)                               // -> 5
-	f.PctOf52wHigh = ptr(1.05)                            // >= 1.00 -> 5
+	f.PctOf52wHigh = ptr(1.05)                            // -> 0 in v2
 	f.RSI14 = ptr(70.0)                                   // no penalty
 	f.ChangePct = ptr(12.0)                               // no penalty
 
@@ -65,8 +99,11 @@ func TestScoreCandidate_PerfectCandidateScores100(t *testing.T) {
 	if !ok {
 		t.Fatal("should score")
 	}
-	if s.Total != 100 {
-		t.Errorf("Total = %d, want 100. Breakdown: %+v", s.Total, s.Sub)
+	if s.Total != WeightAllocated {
+		t.Errorf("Total = %d, want %d (allocated weight). Breakdown: %+v", s.Total, WeightAllocated, s.Sub)
+	}
+	if s.Total == 100 {
+		t.Error("a candidate reached 100; the reserved 10 points must be unreachable")
 	}
 	if len(s.Penalties) != 0 {
 		t.Errorf("unexpected penalties: %v", s.Penalties)
@@ -76,15 +113,15 @@ func TestScoreCandidate_PerfectCandidateScores100(t *testing.T) {
 	}
 }
 
-// Hand-computed, component by component, so a wrong band boundary fails on a
-// specific number rather than on a vague total.
+// Hand-computed component by component against §4 v2, so a wrong band boundary
+// fails on a specific number rather than a vague total.
 func TestScoreCandidate_HandComputedBreakdown(t *testing.T) {
 	f := scoreFeatures()
 	f.VolAccel = ptr(2.0)                // band 1.5-2.5 -> 10 + (0.5/1.0)*10 = 15
-	f.RVol20 = ptr(4.0)                  // band 3.0-5.0 -> 12 + (1.0/2.0)*6  = 15
-	f.BreakoutState = ptrState(Breakout) // 14
+	f.RVol20 = ptr(4.0)                  // v2 rescale x1.75: band 3.0-5.0 spans 21->31.5, midpoint = 26.25
+	f.BreakoutState = ptrState(Breakout) // v1 14 -> v2 0
 	f.AboveVWAP = ptr(true)              // 5
-	f.PctOf52wHigh = ptr(0.97)           // 0.95-1.00 -> 4
+	f.PctOf52wHigh = ptr(0.97)           // v1 4 -> v2 0
 	f.RSI14 = ptr(65.0)                  // no penalty
 	f.ChangePct = ptr(12.0)              // no penalty
 
@@ -100,23 +137,23 @@ func TestScoreCandidate_HandComputedBreakdown(t *testing.T) {
 		got, want float64
 	}{
 		{"vol_accel", s.Sub.VolAccel, 15},
-		{"rvol", s.Sub.RVol, 15},
-		{"breakout", s.Sub.Breakout, 14},
+		{"rvol", s.Sub.RVol, 26.25},
+		{"breakout", s.Sub.Breakout, 0},
 		{"catalyst", s.Sub.Catalyst, 8},
 		{"float", s.Sub.Float, 7},
 		{"vwap", s.Sub.VWAP, 5},
-		{"high52w", s.Sub.High52w, 4},
+		{"high52w", s.Sub.High52w, 0},
 	} {
 		if math.Abs(c.got-c.want) > 1e-9 {
 			t.Errorf("%s = %.4f, want %.4f", c.name, c.got, c.want)
 		}
 	}
-	// 15+15+14+8+7+5+4 = 68
-	if math.Abs(s.Raw-68) > 1e-9 {
-		t.Errorf("Raw = %.4f, want 68", s.Raw)
+	// 15 + 26.25 + 0 + 8 + 7 + 5 + 0 = 61.25
+	if math.Abs(s.Raw-61.25) > 1e-9 {
+		t.Errorf("Raw = %.4f, want 61.25", s.Raw)
 	}
-	if s.Total != 68 {
-		t.Errorf("Total = %d, want 68", s.Total)
+	if s.Total != 61 {
+		t.Errorf("Total = %d, want 61 (round of 61.25)", s.Total)
 	}
 }
 
@@ -147,9 +184,13 @@ func TestScoreCandidate_VolAccelBands(t *testing.T) {
 	}
 }
 
+// v2 keeps v1's band SHAPE and rescales it by 35/20 = 1.75. The evidence speaks
+// to rvol's weight, not to where its breakpoints belong, so changing the curve
+// would smuggle an unevidenced change in alongside an evidenced one.
 func TestScoreCandidate_RVolBands(t *testing.T) {
 	for _, c := range []struct{ rvol, want float64 }{
-		{1.0, 0}, {1.5, 0}, {2.25, 6}, {3.0, 12}, {4.0, 15}, {5.0, 18}, {7.5, 19}, {10.0, 20}, {50, 20},
+		{1.0, 0}, {1.5, 0}, {2.25, 10.5}, {3.0, 21}, {4.0, 26.25},
+		{5.0, 31.5}, {7.5, 33.25}, {10.0, 35}, {50, 35},
 	} {
 		f := scoreFeatures()
 		f.RVol20 = ptr(c.rvol)
@@ -159,11 +200,20 @@ func TestScoreCandidate_RVolBands(t *testing.T) {
 			t.Errorf("rvol %.2f -> %.4f, want %.4f", c.rvol, s.Sub.RVol, c.want)
 		}
 	}
+	// The top of the ramp must equal the weight exactly, or the component cannot
+	// contribute its full allocation.
+	f := scoreFeatures()
+	f.RVol20 = ptr(20.0)
+	f.VolAccel = ptr(2.0)
+	s, _ := ScoreCandidate(f, ScoreInput{CatalystTier: CatalystNone}, passingGate(BucketMarket))
+	if math.Abs(s.Sub.RVol-float64(WeightRVol)) > 1e-9 {
+		t.Errorf("saturated rvol = %.4f, want WeightRVol %d", s.Sub.RVol, WeightRVol)
+	}
 }
 
-// Float and 52-week proximity are STEP bands in §4.2, not ramps. Interpolating
-// float would invent precision the §3.9 estimate does not have.
-func TestScoreCandidate_FloatAndHigh52wAreStepsNotRamps(t *testing.T) {
+// Float is a STEP band in §4.2, not a ramp: interpolating would invent precision
+// the §3.9 estimate does not have. high52w is now zero at every ratio.
+func TestScoreCandidate_FloatIsStepsAndHigh52wIsZeroed(t *testing.T) {
 	for _, c := range []struct{ shares, want float64 }{
 		{5e6, 10}, {19.9e6, 10}, {20e6, 7}, {49e6, 7}, {50e6, 4}, {99e6, 4},
 		{100e6, 2}, {299e6, 2}, {300e6, 0}, {1e9, 0},
@@ -175,27 +225,31 @@ func TestScoreCandidate_FloatAndHigh52wAreStepsNotRamps(t *testing.T) {
 		}
 	}
 
-	for _, c := range []struct{ ratio, want float64 }{
-		{0.80, 0}, {0.899, 0}, {0.90, 2}, {0.949, 2}, {0.95, 4}, {0.999, 4}, {1.00, 5}, {1.30, 5},
-	} {
+	// Zero at every ratio in v2, including the new-high case v1 rewarded most —
+	// that reward is precisely what measured as inverted.
+	for _, ratio := range []float64{0.80, 0.899, 0.90, 0.949, 0.95, 0.999, 1.00, 1.30} {
 		f := scoreFeatures()
-		f.PctOf52wHigh = ptr(c.ratio)
+		f.PctOf52wHigh = ptr(ratio)
 		s, _ := ScoreCandidate(f, ScoreInput{CatalystTier: CatalystNone}, passingGate(BucketMarket))
-		if s.Sub.High52w != c.want {
-			t.Errorf("pct_of_52w_high %.3f -> %.1f, want %.1f", c.ratio, s.Sub.High52w, c.want)
+		if s.Sub.High52w != 0 {
+			t.Errorf("pct_of_52w_high %.3f contributed %.1f, want 0 in v2", ratio, s.Sub.High52w)
 		}
 	}
 }
 
 // §3.7's window excludes today, so a ratio above 1.0 IS the new-high case and
-// the top band is genuinely reachable. An earlier spec version capped the ratio
-// at 1.0, which made this band dead.
-func TestScoreCandidate_NewFiftyTwoWeekHighBandIsReachable(t *testing.T) {
+// the ratio is still computed and stored. In v2 it earns nothing: Step 7
+// measured a fresh high as a LATENESS marker among already-gated candidates
+// rather than a quality marker (p=0.0089, inverted).
+func TestScoreCandidate_NewFiftyTwoWeekHighIsComputedButUnrewarded(t *testing.T) {
 	f := scoreFeatures()
 	f.PctOf52wHigh = ptr(1.02)
 	s, _ := ScoreCandidate(f, ScoreInput{CatalystTier: CatalystNone}, passingGate(BucketMarket))
-	if s.Sub.High52w != WeightHigh52w {
-		t.Errorf("a ratio above 1.0 must score the full %d, got %.1f", WeightHigh52w, s.Sub.High52w)
+	if f.PctOf52wHigh == nil || *f.PctOf52wHigh <= 1.0 {
+		t.Error("the ratio must still exceed 1.0 for a new high — §3.7's window excludes today")
+	}
+	if s.Sub.High52w != 0 {
+		t.Errorf("a new 52-week high contributed %.1f, want 0 in v2", s.Sub.High52w)
 	}
 }
 
@@ -403,21 +457,48 @@ func TestScoreCandidate_CatalystTiers(t *testing.T) {
 	}
 }
 
-func TestScoreCandidate_BreakoutStatePoints(t *testing.T) {
-	for _, c := range []struct {
-		st   BreakoutState
-		want float64
-	}{
-		{BreakoutFromConsolidation, 20},
-		{Breakout, 14},
-		{BreakoutApproaching, 8},
-		{BreakoutNone, 0},
+// Every breakout state now contributes 0 because WeightBreakout is 0 — while
+// breakout_state itself is still computed and stored for review.
+func TestScoreCandidate_BreakoutContributesNothingInV2(t *testing.T) {
+	for _, st := range []BreakoutState{
+		BreakoutFromConsolidation, Breakout, BreakoutApproaching, BreakoutNone,
 	} {
 		f := scoreFeatures()
-		f.BreakoutState = ptrState(c.st)
+		f.BreakoutState = ptrState(st)
 		s, _ := ScoreCandidate(f, ScoreInput{CatalystTier: CatalystNone}, passingGate(BucketMarket))
-		if s.Sub.Breakout != c.want {
-			t.Errorf("breakout %q -> %.1f, want %.1f", c.st, s.Sub.Breakout, c.want)
+		if s.Sub.Breakout != 0 {
+			t.Errorf("breakout %q contributed %.1f, want 0 (weight zeroed in v2)", st, s.Sub.Breakout)
+		}
+		if f.BreakoutState == nil {
+			t.Error("breakout_state must still be computed; zeroing a weight is reversible, deleting a feature is not")
+		}
+	}
+}
+
+// The points functions derive from the weight rather than hardcoding zeros, so
+// restoring the weight restores v1's exact shape without a second edit. This
+// guards the property that made zeroing safe: the constant is the single source
+// of truth and the function cannot disagree with it.
+func TestBreakoutAndHigh52wShapeSurvivesAWeightRestore(t *testing.T) {
+	for _, c := range []struct {
+		label string
+		v1    float64
+		frac  float64
+	}{
+		{"breakout_from_consolidation", 20, 1.0},
+		{"breakout", 14, 0.7},
+		{"approaching", 8, 0.4},
+		{"high52w new high", 5, 1.0},
+		{"high52w 0.95-1.00", 4, 0.8},
+		{"high52w 0.90-0.95", 2, 0.4},
+	} {
+		base := 20.0
+		if c.v1 <= 5 {
+			base = 5.0
+		}
+		if got := c.frac * base; math.Abs(got-c.v1) > 1e-9 {
+			t.Errorf("%s: fraction %.2f x v1 weight %.0f = %.2f, want v1 value %.0f",
+				c.label, c.frac, base, got, c.v1)
 		}
 	}
 }

@@ -208,6 +208,48 @@ func (c *Client) Metrics(ctx context.Context, symbol string) (map[string]any, er
 	return m, nil
 }
 
+// Profile2 fetches the company profile.
+//
+// Endpoint: GET /stock/profile2?symbol=<sym>
+//
+// This exists because shareOutstanding is NOT on /stock/metric — verified absent
+// even for AAPL, not merely null for micro-caps. Without it §3.9's
+// market_cap_est fallback (shares_outstanding x close) has no input, so the
+// symbols that fallback exists to rescue stay ungateable, and §4.2's float
+// sub-score is permanently null.
+//
+// Returns the raw response map; callers extract what they need. NOTE the units:
+// both shareOutstanding and marketCapitalization come back in MILLIONS
+// (AAPL: shareOutstanding 14687.36 = 14.69 billion shares).
+func (c *Client) Profile2(ctx context.Context, symbol string) (map[string]any, error) {
+	if !c.HasToken() {
+		return nil, fmt.Errorf("finnhub token missing")
+	}
+	if err := c.Limiter.Wait(ctx); err != nil {
+		return nil, err
+	}
+	q := url.Values{}
+	q.Set("symbol", symbol)
+	q.Set("token", c.Token)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, base+"/stock/profile2?"+q.Encode(), nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := c.HTTP.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("finnhub profile2 %s: %s", symbol, resp.Status)
+	}
+	var m map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
 // FinancialsReported fetches the most recent reported quarterly or annual financials.
 // freq: "quarterly" or "annual"
 // Endpoint: GET /stock/financials-reported?symbol=<sym>&freq=<freq>
