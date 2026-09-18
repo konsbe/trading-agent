@@ -842,6 +842,63 @@ Record the realized outcome (`max_gain_pct` while active, `exit_pct`) on the tra
 
 **These exit rules are a starting default, not a validated strategy.** They are deliberately mechanical so the backtest can evaluate and replace them. Nothing in this document constitutes trading advice, and the score is a research output, not a recommendation.
 
+#### Step 10 replay — first measurement of §5 (2026-09-18)
+
+`cmd/momentum-tracker -replay` walks the stored history with the same
+`EvaluateExit` the live daily path uses, so replay and live results are
+comparable rather than two implementations. It writes nothing. At the §4.4
+thresholds over the 450-symbol pilot it produced **43 closed positions**:
+
+| Exit reason | n | med exit% | med peak% | med sessions | gave back |
+|---|---|---|---|---|---|
+| `breakout_failed` | 19 | −6.19 | **0.00** | **1** | 6.19 pts |
+| `lost_vwap` | 7 | −0.18 | 9.09 | 3 | 9.27 pts |
+| `momentum_stalled` | 17 | +2.01 | 4.76 | 4 | 2.74 pts |
+| `stop_atr` | 0 | — | — | — | never fired first |
+| `timeout` | 0 | — | — | — | never true |
+
+Overall: median exit −2.00%, median peak +1.87%.
+
+**Two structural problems, both visible only because every matching condition is
+recorded rather than just the acted-on one.**
+
+**1. `breakout_failed` behaves as a same-day stop, not a breakout-failure rule.**
+It fires on **median session 1** with a **median peak of 0.00%** — closing 19 of
+43 positions before they ever traded above the alert price, at a median −6.19%.
+The mechanism is arithmetic rather than mysterious: §3.6's `resistance_20`
+excludes today, so a breakout candidate closes *above* it by construction, and
+any next-session pullback through that level trips the exit. The rule as written
+cannot distinguish "the breakout failed" from "the stock had one red day."
+
+This is the rule §4.1 v2 already flagged for scrutiny, since it keys on the
+geometry that measured inverted for entry. The replay says the concern was
+warranted, though for a different reason than expected — the problem is the
+rule's *sensitivity*, not the direction of its signal.
+
+**2. Two of the five conditions are effectively unreachable.**
+
+| Condition | fired first | also true | reading |
+|---|---|---|---|
+| `breakout_failed` | 19 | 0 | |
+| `lost_vwap` | 7 | 11 | outranked more often than it fires |
+| `momentum_stalled` | 17 | 0 | |
+| `stop_atr` | **0** | 3 | **always outranked — never got to fire** |
+| `timeout` | 0 | 0 | never true; untested by this data |
+
+`stop_atr` was true three times and outranked every time. `timeout` never became
+true at all, because the faster conditions always closed the position first — its
+20-session horizon is unreachable when the median exit arrives on session 1–4.
+
+So §5's ordering, not just its thresholds, is doing most of the work. A priority
+list where positions 4 and 5 can never be reached is not five rules; it is three.
+
+**None of this is a fix, and none of it is applied.** The rules are unchanged and
+still exactly as §5 specifies. What exists now is the dataset to judge them on,
+plus a replay harness to test an alternative ordering or a less twitchy
+`breakout_failed` without touching the live path. Standard caveats apply: 43
+positions is small, survivorship bias is present, and fundamentals are
+point-in-time today.
+
 ---
 
 ## 6. The labeled dataset — the real Phase 1 deliverable
