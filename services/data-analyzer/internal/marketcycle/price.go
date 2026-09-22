@@ -10,14 +10,14 @@ import (
 
 // Thresholds tune classification vs macro_analysis_reference.html Market Cycles panel.
 type Thresholds struct {
-	PullbackPct       float64 // e.g. -0.03  (−3% from peak)
-	CorrectionPct     float64 // e.g. -0.10
-	BearPct           float64 // e.g. -0.20
-	CrashVs10DHighPct float64 // e.g. -0.12 vs max high last 10 sessions
-	CrashVs5BarPct    float64 // e.g. -0.10 vs close 5 bars ago
+	PullbackPct        float64 // e.g. -0.03  (−3% from peak)
+	CorrectionPct      float64 // e.g. -0.10
+	BearPct            float64 // e.g. -0.20
+	CrashVs10DHighPct  float64 // e.g. -0.12 vs max high last 10 sessions
+	CrashVs5BarPct     float64 // e.g. -0.10 vs close 5 bars ago
 	BullExtendedSMAPct float64 // close >= SMA200 × (1+x) e.g. 0.05
-	PeakLookback      int     // trading bars for peak (e.g. 252)
-	SMAPeriod         int     // e.g. 200
+	PeakLookback       int     // trading bars for peak (e.g. 252)
+	SMAPeriod          int     // e.g. 200
 }
 
 // PriceResult is derived from daily OHLCV only.
@@ -32,7 +32,7 @@ type PriceResult struct {
 	SMA200       float64
 	HasSMA200    bool
 	PctVsSMA200  float64 // (close/sma-1)*100
-	Phase        string // crash, bear, correction, pullback, bull_extended, bull, below_sma, insufficient_data
+	Phase        string  // crash, bear, correction, pullback, bull_extended, bull, below_sma, insufficient_data
 	CrashWarning bool
 }
 

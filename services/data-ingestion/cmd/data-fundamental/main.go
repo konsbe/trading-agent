@@ -1103,6 +1103,36 @@ func (w *worker) fetchProfileForSymbol(ctx context.Context, sym string, ts time.
 		return fmt.Errorf("empty profile for %s", sym)
 	}
 
+	// ── P2-4: industry, stored FIRST and unconditionally ────────────────────
+	//
+	// Order matters, and getting it wrong would have silently lost most of the
+	// coverage. The shareOutstanding path below returns early in two common
+	// cases — no shareOutstanding in the profile, and a value already written
+	// by /stock/metric. Capturing the industry after either return would have
+	// collected it only for the subset of symbols that happen to need §3.9's
+	// fallback, which is the opposite of the intended universe-wide coverage.
+	//
+	// Cost is zero: this is the SAME response already being fetched for
+	// shareOutstanding. That is what Phase 2 §3.4 means by the sector data
+	// being effectively free, and why Phase 1 §3.13's cost objection lapses.
+	if ind, ok := prof["finnhubIndustry"].(string); ok && strings.TrimSpace(ind) != "" {
+		payload := map[string]any{
+			"industry": strings.TrimSpace(ind),
+			// Finnhub exposes ONE classification level, not a sector/industry
+			// pair. The same value is carried under both keys so downstream
+			// grouping has a stable field name, and the note records that they
+			// are one classification rather than two independent ones.
+			"sector": strings.TrimSpace(ind),
+			"note":   "finnhubIndustry: single-level, CURRENT classification (not point-in-time)",
+		}
+		if err := store.UpsertFundamental(ctx, w.pool, ts, sym, "ttm",
+			"sector_profile", nil, payload, "finnhub_profile2"); err != nil {
+			// Logged, not returned: the share count below is why this request
+			// exists, and losing it to a sector write would be a bad trade.
+			w.log.Warn("sector_profile upsert failed", "symbol", sym, "err", err)
+		}
+	}
+
 	shares := mulM(floatPtr(prof, "shareOutstanding"))
 	if shares == nil {
 		return fmt.Errorf("no shareOutstanding in profile for %s", sym)

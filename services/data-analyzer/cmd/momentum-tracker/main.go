@@ -35,6 +35,7 @@ import (
 
 	"github.com/konsbe/trading-agent/services/data-analyzer/internal/compute"
 	"github.com/konsbe/trading-agent/services/data-analyzer/internal/momentum"
+	"github.com/konsbe/trading-agent/services/data-analyzer/internal/reportscope"
 	"github.com/konsbe/trading-agent/services/data-analyzer/internal/store"
 )
 
@@ -56,6 +57,7 @@ func main() {
 	// later with real tracked positions.
 	replay := flag.Bool("replay", false, "replay §5 over stored history and report outcomes (writes nothing)")
 	minBars := flag.Int("min-bars", 252, "§3.1 history minimum")
+	scopeFlag := flag.String("scope", "eligible", "symbol scope: eligible (full §3.1 universe) or pilot (the frozen 450, in-sample for v2)")
 	flag.Parse()
 
 	ctx := context.Background()
@@ -66,7 +68,12 @@ func main() {
 	}
 	defer pool.Close()
 
-	bars, err := loadBars(ctx, pool, *interval, *source)
+	sc, err := reportscope.Parse(*scopeFlag)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(2)
+	}
+	bars, err := loadBars(ctx, pool, *interval, *source, sc)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "load bars:", err)
 		os.Exit(1)
@@ -76,11 +83,34 @@ func main() {
 		return
 	}
 
+	// DENOMINATOR GUARD, before any position is opened. A replay that silently
+	// covers the pilot subset produces a plausible exit table over the wrong
+	// population, and an unopened position leaves no trace to notice.
+	expected, err := sc.ExpectedBarSymbols(ctx, pool, *interval, *source)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	loadedSet := map[string]struct{}{}
+	totalBars := 0
+	for sym, series := range bars {
+		loadedSet[sym] = struct{}{}
+		totalBars += len(series)
+	}
+	if err := reportscope.VerifySet(sc, expected, loadedSet); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	reportscope.Denominators{
+		Scope: sc, Expected: len(expected), Loaded: len(bars),
+		Scored: len(bars), Bars: totalBars,
+	}.Print()
+
 	fcfg := momentum.DefaultConfig()
 	ecfg := momentum.DefaultExitConfig()
 
 	if *replay {
-		replayHistory(ctx, pool, bars, fcfg, ecfg, *minBars, *minMarket, *minPenny)
+		replayHistory(ctx, pool, bars, fcfg, ecfg, *minBars, *minMarket, *minPenny, sc)
 		return
 	}
 
@@ -92,7 +122,7 @@ func main() {
 	// of elapsed time.
 	closed, advanced := evaluateExits(ctx, pool, bars, fcfg, ecfg, *dryRun)
 
-	opened := openNewPositions(ctx, pool, bars, fcfg, *minMarket, *minPenny, *dryRun)
+	opened := openNewPositions(ctx, pool, bars, fcfg, *minMarket, *minPenny, *dryRun, sc)
 
 	fmt.Printf("\n§5 tracker: %d opened, %d advanced, %d closed", opened, advanced, len(closed))
 	if *dryRun {
@@ -184,10 +214,13 @@ func openNewPositions(
 	fcfg momentum.Config,
 	minMarket, minPenny int,
 	dry bool,
+	scope reportscope.Scope,
 ) int {
 	gcfg := momentum.DefaultGateConfig()
-	marketCaps := loadMetric(ctx, pool, "market_cap")
-	sharesOut := loadMetric(ctx, pool, "shares_outstanding")
+	marketCaps := loadMetric(ctx, pool, "market_cap", scope)
+	sharesOut := loadMetric(ctx, pool, "shares_outstanding", scope)
+	reportscope.ReportMetricCoverage("market_cap", len(marketCaps), len(bars))
+	reportscope.ReportMetricCoverage("shares_outstanding", len(sharesOut), len(bars))
 
 	opened := 0
 	for sym, series := range bars {
@@ -279,11 +312,19 @@ func reportOutcomes(ctx context.Context, pool *pgxpool.Pool) {
 	fmt.Println("    Neither the five conditions nor their ordering is validated (§5).")
 }
 
-func loadBars(ctx context.Context, pool *pgxpool.Pool, interval, source string) (map[string][]compute.Bar, error) {
+// loadBars reads bar history for the declared scope.
+//
+// Carried a hardcoded `u.backfill_selected` join until 2026-09-21, which meant
+// the §5 exit replay silently ran over the 450-symbol pilot even after the
+// full-universe backfill. The replay reported "119 positions on the widened
+// data"; the widening it actually saw was ten years of history for the same
+// 450 symbols. Same bug as momentum-backtest, same invisibility: a position
+// that is never opened leaves no trace in the output.
+func loadBars(ctx context.Context, pool *pgxpool.Pool, interval, source string, scope reportscope.Scope) (map[string][]compute.Bar, error) {
 	rows, err := pool.Query(ctx, `
 SELECT o.symbol, o.ts, o.open, o.high, o.low, o.close, o.volume
 FROM equity_ohlcv o
-JOIN universe_symbols u ON u.symbol = o.symbol AND u.backfill_selected
+`+scope.JoinOn("o")+`
 WHERE o.interval = $1 AND o.source = $2 AND o.close > 0
 ORDER BY o.symbol, o.ts`, interval, source)
 	if err != nil {
@@ -302,14 +343,18 @@ ORDER BY o.symbol, o.ts`, interval, source)
 	return out, rows.Err()
 }
 
-func loadMetric(ctx context.Context, pool *pgxpool.Pool, metric string) map[string]float64 {
+// loadMetric reads one fundamental metric per symbol, for the declared scope.
+// Takes the same Scope value as loadBars so the two cannot diverge.
+func loadMetric(ctx context.Context, pool *pgxpool.Pool, metric string, scope reportscope.Scope) map[string]float64 {
 	out := map[string]float64{}
 	rows, err := pool.Query(ctx, `
 SELECT DISTINCT ON (f.symbol) f.symbol, f.value
 FROM equity_fundamentals f
-JOIN universe_symbols u ON u.symbol = f.symbol AND u.backfill_selected
+`+scope.JoinOn("f")+`
 WHERE f.metric = $1 AND f.value IS NOT NULL AND f.value > 0
-ORDER BY f.symbol, f.ts DESC`, metric)
+-- Source rank for determinism: the NOT NULL filter stops this picking a
+-- NULL, but two sources can report the same metric at the same ts.
+ORDER BY f.symbol, f.ts DESC, fundamental_source_rank(f.source) DESC`, metric)
 	if err != nil {
 		return out
 	}
@@ -349,11 +394,14 @@ func replayHistory(
 	fcfg momentum.Config,
 	ecfg momentum.ExitConfig,
 	minBars, minMarket, minPenny int,
+	scope reportscope.Scope,
 ) {
 	gcfg := momentum.DefaultGateConfig()
 	gcfg.MinBars = minBars
-	marketCaps := loadMetric(ctx, pool, "market_cap")
-	sharesOut := loadMetric(ctx, pool, "shares_outstanding")
+	marketCaps := loadMetric(ctx, pool, "market_cap", scope)
+	sharesOut := loadMetric(ctx, pool, "shares_outstanding", scope)
+	reportscope.ReportMetricCoverage("market_cap", len(marketCaps), len(bars))
+	reportscope.ReportMetricCoverage("shares_outstanding", len(sharesOut), len(bars))
 
 	var outcomes []replayOutcome
 	stillOpen := 0
@@ -474,6 +522,21 @@ func reportReplay(outcomes []replayOutcome, stillOpen, minMarket, minPenny int) 
 		// firing too late.
 		fmt.Printf("  %-20s %-6d %-12.2f %-12.2f %-12.0f %.2f pts\n", r, len(g), ex, pk, se, pk-ex)
 	}
+
+	// Session-survival distribution. This is what separates the two
+	// unreachability findings: a condition suppressed by ORDERING would surface
+	// if reordered, whereas one whose trigger is never reached at all would not.
+	maxSessions, reached20 := 0, 0
+	for _, o := range outcomes {
+		if o.sessions > maxSessions {
+			maxSessions = o.sessions
+		}
+		if o.sessions >= 20 {
+			reached20++
+		}
+	}
+	fmt.Printf("\n  session survival: longest %d sessions; %d of %d positions reached 20+\n",
+		maxSessions, reached20, len(outcomes))
 
 	allEx := medianOf(outcomes, func(o replayOutcome) float64 { return o.exitPct })
 	allPk := medianOf(outcomes, func(o replayOutcome) float64 { return o.peakPct })

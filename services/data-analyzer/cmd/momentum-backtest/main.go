@@ -23,11 +23,13 @@ import (
 	"math"
 	"os"
 	"sort"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/konsbe/trading-agent/services/data-analyzer/internal/compute"
 	"github.com/konsbe/trading-agent/services/data-analyzer/internal/momentum"
+	"github.com/konsbe/trading-agent/services/data-analyzer/internal/reportscope"
 )
 
 type row struct {
@@ -36,6 +38,16 @@ type row struct {
 	score  momentum.Score
 	label  momentum.Labels
 	bucket momentum.Bucket
+
+	// barIndex is the row's position in the symbol's own bar series. Episode
+	// grouping needs a gap measured in TRADING SESSIONS, and a calendar date
+	// cannot supply that: weekends, holidays and halts would all read as
+	// sessions the symbol did not trade.
+	barIndex int
+
+	// feat is the full feature vector, carried so the wide dump can emit the
+	// raw inputs behind each sub-score without recomputing them.
+	feat momentum.Features
 }
 
 func main() {
@@ -52,6 +64,10 @@ func main() {
 	// score chosen on the same 218 candidates that identified it would be a third
 	// round of in-sample fitting.
 	isolate := flag.String("isolate", "", "diagnostic: rank by one component only (rvol|vol_accel|float|vwap|breakout|high52w)")
+	dumpWide := flag.String("dump-full", "", "write every gate-passing complete-label candidate as CSV with sub-scores, features and the episode flag")
+	episodeGap := flag.Int("episode-gap", 5, "sessions without a gate pass that start a new episode; matches the alert cooldown")
+	gateVersion := flag.Int("gate-version", 1, "§3.2 market-cap definition: 1 = today's cap (LOOKAHEAD, ablation only), 2 = point-in-time")
+	scope := flag.String("scope", "eligible", "symbol scope: eligible (full §3.1 universe) or pilot (the frozen 450, in-sample for v2)")
 	flag.Parse()
 
 	ctx := context.Background()
@@ -62,21 +78,62 @@ func main() {
 	}
 	defer pool.Close()
 
-	bySymbol, err := loadBars(ctx, pool, *interval, *source)
+	sc, err := reportscope.Parse(*scope)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(2)
+	}
+	bySymbol, err := loadBars(ctx, pool, *interval, *source, sc)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "load bars:", err)
 		os.Exit(1)
+	}
+
+	// DENOMINATOR GUARD. Runs before any scoring, so a mis-scoped run dies
+	// instead of publishing a confident number about a fraction of the data.
+	expected, err := sc.ExpectedBarSymbols(ctx, pool, *interval, *source)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	loadedSet := map[string]struct{}{}
+	for sym := range bySymbol {
+		loadedSet[sym] = struct{}{}
+	}
+	if err := reportscope.VerifySet(sc, expected, loadedSet); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	totalBars, scorable := 0, 0
+	for _, series := range bySymbol {
+		totalBars += len(series)
+		if len(series) > *minBars {
+			scorable++
+		}
+	}
+	denom := reportscope.Denominators{
+		Scope: sc, Expected: len(expected), Loaded: len(bySymbol),
+		Scored: scorable, Bars: totalBars,
 	}
 	if len(bySymbol) == 0 {
 		fmt.Printf("no bars for source=%s interval=%s\n", *source, *interval)
 		return
 	}
-	marketCaps := loadMetric(ctx, pool, "market_cap")
-	sharesOut := loadMetric(ctx, pool, "shares_outstanding")
+	marketCaps := loadMetric(ctx, pool, "market_cap", sc)
+	sharesOut := loadMetric(ctx, pool, "shares_outstanding", sc)
+	var sharesPIT map[string]*pitSeries
+	if *gateVersion == 2 {
+		sharesPIT = loadSharesPIT(ctx, pool)
+		fmt.Printf("  point-in-time share series: %d symbols\n", len(sharesPIT))
+	}
+	denom.Print()
+	reportscope.ReportMetricCoverage("market_cap", len(marketCaps), denom.Loaded)
+	reportscope.ReportMetricCoverage("shares_outstanding", len(sharesOut), denom.Loaded)
 
 	fcfg := momentum.DefaultConfig()
 	gcfg := momentum.DefaultGateConfig()
 	gcfg.MinBars = *minBars
+	gcfg.Version = momentum.GateVersion(*gateVersion)
 
 	var rows []row
 	stats := momentum.NewGateStats()
@@ -119,6 +176,19 @@ func main() {
 				est := sharesOut[sym] * *f.Close
 				g.MarketCap = &est
 			}
+			if *gateVersion == 2 {
+				// raw_close[t] x shares(filed <= t). BOTH factors unadjusted:
+				// an adjusted price against an unadjusted share count is wrong
+				// by the cumulative split factor, 10-100x for reverse-split
+				// penny names, which is enough to cross a band edge.
+				if ps := sharesPIT[sym]; ps != nil && cb[i].RawClose != nil {
+					if sh, ok := ps.asOf(cb[i].TS.Format("2006-01-02")); ok {
+						pit := *cb[i].RawClose * sh
+						g.MarketCapPIT = &pit
+						g.MarketCapPITMultiClass = ps.multiClass
+					}
+				}
+			}
 
 			res := momentum.EvaluateGates(&f, g, gcfg)
 			stats.Add(res)
@@ -151,8 +221,20 @@ func main() {
 				s.Raw = v
 				s.Total = int(math.Round(v))
 			}
-			rows = append(rows, row{sym, bs[i].TS.Format("2006-01-02"), s, *l, res.Bucket})
+			rows = append(rows, row{
+				symbol: sym, date: bs[i].TS.Format("2006-01-02"),
+				score: s, label: *l, bucket: res.Bucket,
+				barIndex: i, feat: f,
+			})
 		}
+	}
+
+	if *dumpWide != "" {
+		if err := dumpFull(*dumpWide, rows, *episodeGap); err != nil {
+			fmt.Fprintln(os.Stderr, "dump-full:", err)
+			os.Exit(1)
+		}
+		fmt.Printf("wrote %d candidates (episode gap %d sessions) to %s\n", len(rows), *episodeGap, *dumpWide)
 	}
 
 	if *dump != "" {
@@ -567,11 +649,22 @@ func median(xs []float64) float64 {
 	return (s[m-1] + s[m]) / 2
 }
 
-func loadBars(ctx context.Context, pool *pgxpool.Pool, interval, source string) (map[string][]compute.Bar, error) {
+// loadBars reads the bar history for the requested scope.
+//
+// The scope USED to be hardcoded to `u.backfill_selected`, which silently
+// limited every backtest to the 450-symbol pilot. That was correct while the
+// pilot was the only backfilled data and invisible once it was not: after the
+// full-universe backfill the query still returned 450 symbols and the report
+// still looked complete, just describing a twentieth of the data.
+//
+// The clause now comes from internal/reportscope, and the caller verifies the
+// loaded symbol set against the database before scoring anything. See that
+// package for why printing the denominator is not enough on its own.
+func loadBars(ctx context.Context, pool *pgxpool.Pool, interval, source string, scope reportscope.Scope) (map[string][]compute.Bar, error) {
 	rows, err := pool.Query(ctx, `
-SELECT o.symbol, o.ts, o.open, o.high, o.low, o.close, o.volume
+SELECT o.symbol, o.ts, o.open, o.high, o.low, o.close, o.volume, o.raw_close
 FROM equity_ohlcv o
-JOIN universe_symbols u ON u.symbol = o.symbol AND u.backfill_selected
+`+scope.JoinOn("o")+`
 WHERE o.interval = $1 AND o.source = $2 AND o.close > 0
 ORDER BY o.symbol, o.ts`, interval, source)
 	if err != nil {
@@ -582,7 +675,7 @@ ORDER BY o.symbol, o.ts`, interval, source)
 	for rows.Next() {
 		var sym string
 		var b compute.Bar
-		if err := rows.Scan(&sym, &b.TS, &b.Open, &b.High, &b.Low, &b.Close, &b.Volume); err != nil {
+		if err := rows.Scan(&sym, &b.TS, &b.Open, &b.High, &b.Low, &b.Close, &b.Volume, &b.RawClose); err != nil {
 			return nil, err
 		}
 		out[sym] = append(out[sym], b)
@@ -590,14 +683,85 @@ ORDER BY o.symbol, o.ts`, interval, source)
 	return out, rows.Err()
 }
 
-func loadMetric(ctx context.Context, pool *pgxpool.Pool, metric string) map[string]float64 {
+// loadSharesPIT reads the point-in-time share series per symbol, oldest first.
+//
+// Returned as parallel slices of (filed_date, shares) so an as-of lookup is a
+// binary search. Keyed on FILED date, never period_end: the period end precedes
+// the filing by weeks, and joining on it would use a share count before it was
+// public — swapping one lookahead for a subtler one.
+func loadSharesPIT(ctx context.Context, pool *pgxpool.Pool) map[string]*pitSeries {
+	out := map[string]*pitSeries{}
+	rows, err := pool.Query(ctx, `
+SELECT symbol, filed_date, shares, multi_class
+FROM shares_outstanding_pit
+ORDER BY symbol, filed_date`)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "load shares_outstanding_pit:", err)
+		return out
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var sym string
+		var d time.Time
+		var sh float64
+		var mc bool
+		if err := rows.Scan(&sym, &d, &sh, &mc); err != nil {
+			return out
+		}
+		ps := out[sym]
+		if ps == nil {
+			ps = &pitSeries{}
+			out[sym] = ps
+		}
+		ps.filed = append(ps.filed, d.Format("2006-01-02"))
+		ps.shares = append(ps.shares, sh)
+		ps.multiClass = ps.multiClass || mc
+	}
+	return out
+}
+
+type pitSeries struct {
+	filed      []string
+	shares     []float64
+	multiClass bool
+}
+
+// asOf returns the most recent share count FILED on or before date.
+//
+// Returns false when no filing exists yet. That is not a gap to be patched: a
+// symbol-day before the company's first filing is UNMEASURABLE, and gate v2
+// rejects it with market_cap_pit_unavailable rather than substituting today's
+// value, which would restore the leak exactly where it is largest.
+func (p *pitSeries) asOf(date string) (float64, bool) {
+	i := sort.SearchStrings(p.filed, date)
+	// SearchStrings gives the first index >= date; step back unless it is exact.
+	if i < len(p.filed) && p.filed[i] == date {
+		return p.shares[i], true
+	}
+	if i == 0 {
+		return 0, false
+	}
+	return p.shares[i-1], true
+}
+
+// loadMetric reads the most recent value of one fundamental metric per symbol.
+//
+// Scoped the same way as loadBars, from the same Scope value, and that sharing
+// is the point. This query carried its own hardcoded `backfill_selected` join,
+// which was the more damaging of the two: with the bars widened but the metrics
+// still pilot-only, every non-pilot symbol-day failed the §3.2 gate with
+// `market_cap_unavailable` and was counted as an ordinary gate rejection. The
+// backtest reported 4,971 symbols while scoring 450, and nothing errored.
+func loadMetric(ctx context.Context, pool *pgxpool.Pool, metric string, scope reportscope.Scope) map[string]float64 {
 	out := map[string]float64{}
 	rows, err := pool.Query(ctx, `
 SELECT DISTINCT ON (f.symbol) f.symbol, f.value
 FROM equity_fundamentals f
-JOIN universe_symbols u ON u.symbol = f.symbol AND u.backfill_selected
+`+scope.JoinOn("f")+`
 WHERE f.metric = $1 AND f.value IS NOT NULL AND f.value > 0
-ORDER BY f.symbol, f.ts DESC`, metric)
+-- Source rank for determinism: the NOT NULL filter stops this picking a
+-- NULL, but two sources can report the same metric at the same ts.
+ORDER BY f.symbol, f.ts DESC, fundamental_source_rank(f.source) DESC`, metric)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "load %s: %v\n", metric, err)
 		return out

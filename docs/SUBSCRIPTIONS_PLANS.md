@@ -56,7 +56,68 @@ than once. Neither is true in Phase 1.
 
 ---
 
-## Tiingo — free, primary provider, and the clearest upgrade case
+## Tiingo — UPGRADED to Power, 2026-09-21
+
+> **Purchased:** 2026-09-21 · **Plan:** Power · **Price paid: $30/month**
+>
+> **This resolves the $10-vs-$30 discrepancy this document flagged as an open
+> item.** Tiingo's own pricing table was correct at $30/month; the third-party
+> comparison site listing $10/month was wrong. Recording it because the open item
+> existed precisely so a purchase decision would not be made on an unverified
+> number — and the verification came from making the purchase, which is the one
+> way that particular question could be settled.
+
+### Limits as MEASURED on 2026-09-21 (not as advertised)
+
+| Limit | Free (Starter) | Power, documented | Power, measured here |
+|---|---|---|---|
+| Requests/hour | 50 | 10,000 | **>179 with zero 429s** |
+| Requests/day | 1,000 | 100,000 | not exhaustively tested |
+| Unique symbols/month | 500 | ~108,980 | not exhaustively tested |
+| Bandwidth/month | 1 GB | 40 GB | measured per-request; see §2 projection |
+
+Method: the same burst-until-refusal test used on the free tier, capped at 180
+requests so the test could not be mistaken for the ceiling. **179 successes in
+111 seconds, no 429.** The free tier refused at 51–74 in the same test, so the
+50/hour ceiling is definitively gone.
+
+**What this does NOT establish.** The ceiling is above 179/hour; it does not
+confirm it is exactly 10,000. Verifying that would cost 10,000 requests to learn
+something the documentation already states and which nothing here depends on —
+the configured pace is set well below it either way. Stated explicitly because
+this document's own evaluation checklist says to plan against the documented
+number, never the observed one.
+
+Measured payload: **~2,843 bytes** per short-window daily request (Sept 2026
+only, ~12 bars). Used for the §2 bandwidth projection rather than assumed.
+
+**The token did not change.** The same `TIINGO_API_KEY` works unchanged — the
+upgrade is account-level, so no credential rotation was needed.
+
+Incidentally re-confirmed during the burst: `AGM.A` returned
+`404 Ticker 'AGM.A' not found` when requested raw. That is the share-class
+dot-versus-hyphen mismatch the adapter translates (`AGM-A`); the raw test
+bypasses the adapter. The fix is still load-bearing on the paid plan.
+
+### Configured pace, deliberately below the ceilings
+
+```
+TIINGO_RATE_PER_SEC=2.0          ->  7,200/hour against a 10,000/hour ceiling
+TIINGO_RATE_DAILY_LIMIT=90000    ->  against a 100,000/day ceiling
+```
+
+Same principle as the free-tier configuration: leave headroom rather than run at
+the documented edge, because the documented number is the provider's and the
+enforcement may lag it in either direction.
+
+---
+
+## Tiingo — the free-tier record, retained (superseded 2026-09-21)
+
+Kept because the upgrade case was built on these measurements, and because the
+free-tier limits still apply to anyone running this repo without the paid plan.
+
+
 
 **Tier:** free ("Starter"). **Limits, published and measured:**
 
@@ -411,3 +472,26 @@ and cost the most.
    `*url.Error` from `http.Client.Do` contains it. That leaked 23 keys into
    `universe_symbols.backfill_last_error` here. Prefer header auth; redact
    regardless (`barsource.RedactSecrets`).
+7. **Do the date/range parameters actually filter?** Request an OLD window and
+   check the dates that come back. Do not assume the parameters are honoured
+   because the request returns 200 and plausible data.
+
+   **Case: Tiingo News `startDate` / `endDate` are silently ignored.**
+   Requesting `tickers=aapl&startDate=2017-01-01&endDate=2017-03-31&limit=100`
+   returns 100 articles dated **2026-06-23 to 2026-06-24** — zero inside the
+   requested window, HTTP 200, no warning. Every historical window returns the
+   same recent articles.
+
+   This is worse than a truncated response (step 1), because the data looks
+   correct in isolation. A catalyst backfill written against the documented
+   parameters would have appeared to work and would have stored **recent
+   articles under historical dates** — manufacturing lookahead in the dataset,
+   with no error anywhere to catch it, and with a plausible article attached to
+   each historical row to make it convincing.
+
+   How to test it in one request: ask for a window that ended years ago and
+   assert every returned timestamp falls inside it. If the parameters are
+   ignored, the assertion fails immediately. Where filtering is unavailable,
+   check whether offset/cursor paging works instead — Tiingo News pages
+   correctly even though it does not filter, which is how its true ~3-month
+   depth was established (§3.5.1 of the Phase 2 spec).

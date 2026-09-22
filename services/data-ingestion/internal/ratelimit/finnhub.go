@@ -144,7 +144,8 @@ const TiingoBudgetKey = "tiingo"
 //
 // So the limiter now carries BOTH an hourly-equivalent rate and the daily
 // ceiling. 50/hour is 0.0139 req/sec, which is the true throughput: a
-// 450-symbol backfill takes ~9 hours and no setting here can shorten it.
+// 450-symbol backfill took ~9 hours and no setting here could shorten it. The
+// 2026-09-21 Power upgrade removed that constraint; see SUBSCRIPTIONS_PLANS.md.
 //
 // Only the unique-symbol allowance still lives elsewhere, in the
 // subset-selection size assertion (store.SubsetSizeError).
@@ -194,7 +195,7 @@ func SharedTiingo(ctx context.Context, pool *pgxpool.Pool, log *slog.Logger) bar
 	log.Info("shared Tiingo rate limiting active",
 		"budget", TiingoBudgetKey, "per_sec", perSec, "burst", burst, "daily_limit", daily,
 		"effective_per_hour", perSec*3600,
-		"note", "50 req/clock-hour and 1,000/day are enforced here; the 500 unique-symbols/month cap is enforced by the subset size assertion")
+		"note", "Tiingo Power since 2026-09-21: 10,000/hour and 100,000/day are the provider ceilings; the configured rate sits below both")
 	return s
 }
 
@@ -211,7 +212,7 @@ const TwelveDataBudgetKey = "twelve_data"
 //	no unique-symbol cap for US equities
 //
 // That is the whole reason this provider replaced Tiingo as primary. Tiingo's
-// binding constraint is 50 requests per clock hour, which makes a 450-symbol
+// binding constraint WAS 50 requests per clock hour (free tier), which made a 450-symbol
 // backfill a ~9-hour job; 8/minute makes the same job ~56 minutes, and the
 // absence of a unique-symbol meter removes the "have we burned the month's
 // allowance on retries" question entirely.

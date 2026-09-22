@@ -97,6 +97,18 @@ class BotConfig(BaseSettings):
     # That matters more here than elsewhere because a partial rollout (market
     # channels configured, penny not) is a normal intermediate state.
     discord_penny_buy_channel_id: Optional[int] = None
+    #: screener | score. Screener alerts on a gate pass per bucket and shows no
+    #: score; score restores the 65/72 threshold behaviour. Default screener,
+    #: because the score does not separate outcomes within a bucket
+    #: out-of-sample (MH OR 0.991, p=0.947) and a threshold on it implies a
+    #: ranking that is not there.
+    bot_momentum_alert_mode: str = "screener"
+    #: Max screener alerts posted per channel per day; 0 disables the cap.
+    #: Gate passes are bursty — mean 4.5/day, median 3, p90 9, worst day 157
+    #: (2024-11-06, the session after the US election) — and a 157-message burst
+    #: is unreadable. The overflow is summarised in one
+    #: line rather than dropped silently.
+    bot_momentum_max_alerts_per_channel: int = 10
     discord_penny_sell_channel_id: Optional[int] = None
     discord_market_buy_channel_id: Optional[int] = None
     discord_market_sell_channel_id: Optional[int] = None

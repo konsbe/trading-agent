@@ -13,9 +13,9 @@
 //
 // Tiingo Starter (free), per Tiingo's published limits:
 //
-//	50 requests / hour      reset on the clock hour
+//	10,000 requests / hour  (Power, since 2026-09-21; was 50 on the free tier)
 //	1,000 requests / day    reset at midnight EST
-//	500 unique symbols / month
+//	~108,980 unique symbols / month  (Power; was 500 on the free tier)
 //	1 GB bandwidth / month
 //	no per-minute or per-second limit
 //
@@ -24,8 +24,9 @@
 // NOT be relied on), and the window recovered between 05:54 and 06:01 UTC —
 // i.e. on the hour, a fixed-clock reset, not a rolling 60-minute window.
 //
-// The practical consequence is a planning number, not a tuning knob: 50 req/hour
-// means a 450-symbol backfill takes ~9 hours of wall clock. RequestsPerSecond
+// The practical consequence is a planning number, not a tuning knob. On the free
+// tier 50 req/hour meant a 450-symbol backfill took ~9 hours; on Power at the
+// configured 2 req/s a 4,975-symbol backfill takes ~42 minutes. RequestsPerSecond
 // cannot change that; setting it higher only converts the wait into 429s.
 package tiingo
 
@@ -60,7 +61,7 @@ var ErrNoData = barsource.ErrNoBars
 // Options configures request pacing and retry.
 type Options struct {
 	// RequestsPerSecond paces requests within an hour. It cannot raise
-	// throughput: the binding constraint is 50 requests per clock hour, so any
+	// throughput: the binding constraint is the provider's hourly ceiling, so any
 	// value above ~0.014/s simply spends the hour's allowance sooner and then
 	// waits. The earlier default of 1.5/s came from a 12-symbol burst that was
 	// too short to reach the hourly cap.
@@ -251,6 +252,12 @@ func providerSymbol(symbol string) string {
 //
 // Rows with a non-positive close or zero volume are skipped, matching the Yahoo
 // adapter's filtering so the two providers yield comparable series.
+//
+// The UNADJUSTED close and splitFactor are ALSO captured, into RawClose and
+// SplitFactor. They are not used by any feature and must not be: Phase 2 §3.2
+// needs an unadjusted price to pair with an unadjusted share count for
+// point-in-time market cap. Tiingo returns them in the same response as the
+// adjusted fields, so capturing them costs nothing — see migration 012.
 func barToStore(symbol, interval string, r priceRow) (store.EquityBar, bool) {
 	ts, err := parseTiingoDate(r.Date)
 	if err != nil {
@@ -260,7 +267,7 @@ func barToStore(symbol, interval string, r priceRow) (store.EquityBar, bool) {
 	if isBad(o) || isBad(h) || isBad(l) || isBad(c) || isBad(v) || c <= 0 || v == 0 {
 		return store.EquityBar{}, false
 	}
-	return store.EquityBar{
+	b := store.EquityBar{
 		TS:       ts,
 		Symbol:   symbol,
 		Interval: interval,
@@ -270,7 +277,28 @@ func barToStore(symbol, interval string, r priceRow) (store.EquityBar, bool) {
 		Close:    c,
 		Volume:   v,
 		Source:   SourceName,
-	}, true
+	}
+	// Validated independently of the adjusted fields and left NULL when absent
+	// or nonsensical, rather than substituted. A wrong raw close is worse than a
+	// missing one: §3.2 would silently compute a market cap off by the
+	// cumulative split factor, and nothing downstream could tell.
+	if !isBad(r.Close) && r.Close > 0 {
+		raw := r.Close
+		b.RawClose = &raw
+	}
+	// splitFactor is 1.0 on an ordinary session. Zero means Tiingo omitted the
+	// field, since a zero ratio is not a corporate action anyone can express.
+	if !isBad(r.SplitFactor) && r.SplitFactor > 0 {
+		sf := r.SplitFactor
+		b.SplitFactor = &sf
+	}
+	// divCash is 0.0 on an ordinary session, so unlike the fields above a zero
+	// is MEANINGFUL and must be stored. Only a NaN/Inf is treated as absent.
+	if !isBad(r.DivCash) {
+		dc := r.DivCash
+		b.DivCash = &dc
+	}
+	return b, true
 }
 
 func isBad(f float64) bool { return math.IsNaN(f) || math.IsInf(f, 0) }

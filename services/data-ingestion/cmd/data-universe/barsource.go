@@ -63,8 +63,8 @@ func buildBarFetcher(ctx context.Context, cfg config.Universe, pool *pgxpool.Poo
 		lim := ratelimit.SharedTiingo(ctx, pool, log)
 		log.Info("bar source: tiingo — the Phase 1 primary",
 			"adjusted", "split+dividend (adj* fields), ONE consistent factor per series (verified)",
-			"quota", "50 requests/clock-hour, 1,000/day, 500 unique symbols/month",
-			"backfill_estimate", "~9 hours for 450 symbols — this is the real ceiling, not a tuning choice",
+			"quota", "Power plan: 10,000/hour, 100,000/day, ~108,980 unique symbols/month (upgraded 2026-09-21)",
+			"backfill_estimate", "~42 minutes for 4,975 symbols at the configured 2 req/s",
 			"note", "chosen for correctness: twelve_data is 9x faster but alternates adjusted/unadjusted bars within one response")
 		return tiingo.NewWithLimiter(cfg.TiingoToken, lim, tiingo.Options{
 			RequestsPerSecond: cfg.TiingoRequestsPerSecond,

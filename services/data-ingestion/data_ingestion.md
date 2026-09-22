@@ -1390,3 +1390,41 @@ daily response is ~100KB, and each failure spent 4 requests of the daily
 allowance to produce nothing. The default is now 90s. The same misnaming made the
 startup log report `bar_req_per_sec=2` while the Twelve Data limiter was pacing at
 `0.125`; it now reports the provider's real rate.
+
+## SEC EDGAR — the 403 that is not a rate limit or an IP block
+
+Phase 2 §3.2 reads point-in-time share counts from SEC's XBRL API. Reachability
+was verified from this network on 2026-09-21, and the way it fails is worth
+knowing before you spend an hour on it.
+
+**SEC denylists some contact domains in the User-Agent.** Measured:
+
+| User-Agent | Result |
+|---|---|
+| `TradingAgentResearch <your-contact-email>` | **200** |
+| `Trading Agent Research <your-contact-email>` | **200** |
+| `TradingAgentResearch` (no email at all) | **200** |
+| `TradingAgentResearch berdelis@users.noreply.github.com` | **403** |
+
+Only the `users.noreply.github.com` contact fails. The identical UA with a real
+domain succeeds, and so does one with no email.
+
+**The error text actively misdirects.** The 403 bodies are titled
+*"SEC.gov | Request Rate Threshold Exceeded"* and *"Your Request Originates from
+an Undeclared Automated Tool"* — after about five requests. Both point at rate
+limiting or bot detection. Neither is the cause. This egress is a shared
+Zscaler corporate proxy (a shared corporate proxy), which makes "our IP is
+blocked" the obvious hypothesis and the wrong one.
+
+**If EDGAR returns 403: check `SEC_EDGAR_USER_AGENT` first.** Use a real domain
+you control. The value is an env var, not a literal, precisely because it is the
+single setting that decides whether requests succeed.
+
+**Rate.** SEC documents ~10 req/s fair access. `SEC_EDGAR_RATE_PER_SEC` defaults
+to 3. Lower on purpose: the published rate is per IP, and on a shared proxy our
+share of it is not ours to assume.
+
+**A 403 mid-run stops the backfill.** `scripts/edgar_backfill.py` halts rather
+than continuing, because a 403 is a request problem, not a coverage fact, and
+recording thousands of them as "no EDGAR data" would turn our own error into a
+permanent bias in the dataset.

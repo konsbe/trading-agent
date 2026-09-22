@@ -225,15 +225,19 @@ func onlyMarketCapMissing(failures []string) bool {
 }
 
 // loadMetric returns the latest value per symbol for one equity_fundamentals
-// metric, restricted to the pilot draw.
+// metric, over the eligible universe (was restricted to the pilot draw until
+// the scope fix; see internal/reportscope).
 func loadMetric(ctx context.Context, pool *pgxpool.Pool, metric string) map[string]float64 {
 	out := map[string]float64{}
 	rows, err := pool.Query(ctx, `
 SELECT DISTINCT ON (f.symbol) f.symbol, f.value
 FROM equity_fundamentals f
-JOIN universe_symbols u ON u.symbol = f.symbol AND u.backfill_selected
+JOIN universe_symbols u ON u.symbol = f.symbol AND u.is_eligible
 WHERE f.metric = $1 AND f.value IS NOT NULL
-ORDER BY f.symbol, f.ts DESC`, metric)
+-- Source rank for determinism: the NOT NULL filter stops this picking a NULL,
+-- but equity_fundamentals has five writers and two can report the same metric
+-- at the same ts.
+ORDER BY f.symbol, f.ts DESC, fundamental_source_rank(f.source) DESC`, metric)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "load %s: %v\n", metric, err)
 		return out

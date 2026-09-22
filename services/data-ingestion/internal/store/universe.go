@@ -85,63 +85,6 @@ func UpsertUniverseSymbols(ctx context.Context, pool *pgxpool.Pool, rows []Unive
 	return n, nil
 }
 
-// UniverseFundamentals carries the weekly sector/shares/cap refresh (§8.1.2).
-//
-// Units are ABSOLUTE, already converted from the provider's millions — see the
-// unit conventions at the top of 007_momentum.sql. Nil means "not available",
-// which is distinct from zero and must stay nil so the §3.2 gate and the §3.9
-// market-cap proxy can tell them apart.
-type UniverseFundamentals struct {
-	Symbol            string
-	Exchange          string
-	Sector            *string
-	Industry          *string
-	SharesOutstanding *float64
-	MarketCap         *float64
-}
-
-const updateUniverseFundamentalsSQL = `
-UPDATE universe_symbols SET
-    sector             = COALESCE($3, sector),
-    industry           = COALESCE($4, industry),
-    shares_outstanding = COALESCE($5, shares_outstanding),
-    market_cap         = COALESCE($6, market_cap),
-    fundamentals_ts    = now(),
-    updated_at         = now()
-WHERE symbol = $1 AND exchange = $2`
-
-// UpdateUniverseFundamentals applies the weekly fundamentals refresh.
-//
-// COALESCE means a provider returning null for one field preserves the previous
-// value rather than erasing it: a transient gap in coverage should not drop a
-// symbol out of the §3.2 market-cap gate. fundamentals_ts still advances, so
-// staleness remains visible even when nothing changed.
-func UpdateUniverseFundamentals(ctx context.Context, pool *pgxpool.Pool, rows []UniverseFundamentals) (int64, error) {
-	if len(rows) == 0 {
-		return 0, nil
-	}
-	batch := &pgx.Batch{}
-	for _, r := range rows {
-		batch.Queue(updateUniverseFundamentalsSQL,
-			r.Symbol, r.Exchange, r.Sector, r.Industry, r.SharesOutstanding, r.MarketCap)
-	}
-	br := pool.SendBatch(ctx, batch)
-	var n int64
-	for i := 0; i < len(rows); i++ {
-		ct, err := br.Exec()
-		if err != nil {
-			br.Close() //nolint:errcheck
-			return 0, fmt.Errorf("update universe fundamentals %s: %w", rows[i].Symbol, err)
-		}
-		n += ct.RowsAffected()
-	}
-	if err := br.Close(); err != nil {
-		return 0, fmt.Errorf("close fundamentals batch: %w", err)
-	}
-	return n, nil
-}
-
-// UniverseMember identifies an eligible symbol for downstream jobs.
 type UniverseMember struct {
 	Symbol   string
 	Exchange string
@@ -199,75 +142,6 @@ WHERE u.symbol = b.symbol`
 	return ct.RowsAffected(), nil
 }
 
-// LoadFundamentalsFromEquityFundamentals reads the latest sector, industry,
-// shares outstanding and market cap already ingested into equity_fundamentals,
-// for the eligible universe only.
-//
-// §8.1.2 specifies refreshing these "from existing fundamentals ingestion", so
-// this reads the table rather than issuing new API calls. That is also the only
-// affordable option: /stock/metric is rate-limited to one request per two
-// seconds, which is over four hours for a 7,500-symbol universe (§2.3 names the
-// free quota as the binding constraint).
-//
-// UNIT CONVERSION HAPPENS HERE. equity_fundamentals stores market_cap in $
-// millions and shares_outstanding in millions, as documented in SCHEMAS.md,
-// while universe_symbols and the §3.2 gates are in absolute dollars and shares.
-// Both are multiplied by 1e6 on the way out.
-//
-// Coverage is limited to whatever data-fundamental was configured to fetch
-// (FUNDAMENTAL_SYMBOLS), which is typically far narrower than the universe. The
-// caller reports the shortfall rather than hiding it.
-func LoadFundamentalsFromEquityFundamentals(ctx context.Context, pool *pgxpool.Pool) ([]UniverseFundamentals, error) {
-	const q = `
-WITH latest AS (
-    SELECT DISTINCT ON (ef.symbol, ef.metric)
-           ef.symbol, ef.metric, ef.value, ef.payload
-    FROM equity_fundamentals ef
-    JOIN universe_symbols u ON u.symbol = ef.symbol AND u.is_eligible
-    WHERE ef.period = 'ttm'
-      AND ef.metric IN ('market_cap', 'shares_outstanding', 'sector_profile')
-    ORDER BY ef.symbol, ef.metric, ef.ts DESC
-)
-SELECT u.symbol,
-       u.exchange,
-       max(l.payload ->> 'sector')   FILTER (WHERE l.metric = 'sector_profile')   AS sector,
-       max(l.payload ->> 'industry') FILTER (WHERE l.metric = 'sector_profile')   AS industry,
-       max(l.value)                  FILTER (WHERE l.metric = 'shares_outstanding') AS shares_m,
-       max(l.value)                  FILTER (WHERE l.metric = 'market_cap')         AS market_cap_m
-FROM latest l
-JOIN universe_symbols u ON u.symbol = l.symbol
-GROUP BY u.symbol, u.exchange`
-
-	rows, err := pool.Query(ctx, q)
-	if err != nil {
-		return nil, fmt.Errorf("load fundamentals for universe: %w", err)
-	}
-	defer rows.Close()
-
-	const millions = 1e6
-	var out []UniverseFundamentals
-	for rows.Next() {
-		var r UniverseFundamentals
-		var sharesM, capM *float64
-		if err := rows.Scan(&r.Symbol, &r.Exchange, &r.Sector, &r.Industry, &sharesM, &capM); err != nil {
-			return nil, fmt.Errorf("scan universe fundamentals: %w", err)
-		}
-		if sharesM != nil {
-			v := *sharesM * millions
-			r.SharesOutstanding = &v
-		}
-		if capM != nil {
-			v := *capM * millions
-			r.MarketCap = &v
-		}
-		out = append(out, r)
-	}
-	return out, rows.Err()
-}
-
-// FundamentalsCoverage counts how much of the eligible universe actually has
-// each field, so a thin provider list is visible as a number rather than as an
-// unexplained empty penny bucket at scan time.
 type FundamentalsCoverage struct {
 	Eligible          int
 	WithSector        int

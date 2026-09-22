@@ -27,7 +27,12 @@ async def latest_derived(
             metric, value, payload, ts
         FROM equity_fundamentals
         WHERE symbol = $1 AND period = 'derived'
-        ORDER BY metric, ts DESC
+        -- NULL-last then source rank: equity_fundamentals has five writers
+        -- and 4,912 (symbol, metric, period, ts) groups have more than one,
+        -- so ts alone does not pick a winner.
+        ORDER BY metric, ts DESC,
+                 (value IS NULL AND payload IS NULL),
+                 fundamental_source_rank(source) DESC
         """,
         symbol,
     )
@@ -61,7 +66,12 @@ async def latest_ttm(
             metric, value
         FROM equity_fundamentals
         WHERE symbol = $1 AND period = 'ttm'
-        ORDER BY metric, ts DESC
+        -- NULL-last then source rank: equity_fundamentals has five writers
+        -- and 4,912 (symbol, metric, period, ts) groups have more than one,
+        -- so ts alone does not pick a winner.
+        ORDER BY metric, ts DESC,
+                 (value IS NULL AND payload IS NULL),
+                 fundamental_source_rank(source) DESC
         """,
         symbol,
     )

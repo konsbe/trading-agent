@@ -64,18 +64,47 @@ type EquityBar struct {
 	Close    float64
 	Volume   float64
 	Source   string
+
+	// RawClose is the UNADJUSTED close and SplitFactor the session's split
+	// ratio (1.0 on an ordinary day). Both are pointers so that "this provider
+	// does not report it" stores NULL rather than a plausible-looking zero.
+	//
+	// Only the Tiingo adapter sets these; Twelve Data and Yahoo leave them nil.
+	// Migration 012 explains why they exist: Phase 2 §3.2's point-in-time market
+	// cap must multiply an unadjusted price by an unadjusted share count, and
+	// Close on this struct is the ADJUSTED series that every feature reads.
+	//
+	// Never default RawClose to Close. For a split-adjusted history the two
+	// differ by exactly the cumulative split factor, which is the quantity §3.2
+	// is trying to recover.
+	RawClose    *float64
+	SplitFactor *float64
+
+	// DivCash is the cash dividend with an ex-date on this bar, 0.0 on an
+	// ordinary session. Paired with SplitFactor it is the complete
+	// corporate-action signal: BOTH rewrite the adjusted series backwards, so
+	// the daily refresh must re-fetch a symbol's full history when either
+	// fires. Detecting only splits would leave dividend-only seams.
+	DivCash *float64
 }
 
 func UpsertEquityOHLCV(ctx context.Context, pool *pgxpool.Pool, rows []EquityBar) error {
+	// COALESCE on the conflict path so a provider that does not report the
+	// unadjusted fields cannot erase values another provider already captured.
+	// Plain EXCLUDED.raw_close would overwrite a real number with NULL on every
+	// refresh from a non-Tiingo source.
 	const q = `
-INSERT INTO equity_ohlcv (ts, symbol, interval, open, high, low, close, volume, source)
-VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+INSERT INTO equity_ohlcv (ts, symbol, interval, open, high, low, close, volume, source, raw_close, split_factor, div_cash)
+VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
 ON CONFLICT (symbol, interval, ts, source) DO UPDATE SET
   open = EXCLUDED.open, high = EXCLUDED.high, low = EXCLUDED.low,
-  close = EXCLUDED.close, volume = EXCLUDED.volume
+  close = EXCLUDED.close, volume = EXCLUDED.volume,
+  raw_close = COALESCE(EXCLUDED.raw_close, equity_ohlcv.raw_close),
+  split_factor = COALESCE(EXCLUDED.split_factor, equity_ohlcv.split_factor),
+  div_cash = COALESCE(EXCLUDED.div_cash, equity_ohlcv.div_cash)
 `
 	for _, r := range rows {
-		if _, err := pool.Exec(ctx, q, r.TS, r.Symbol, r.Interval, r.Open, r.High, r.Low, r.Close, r.Volume, r.Source); err != nil {
+		if _, err := pool.Exec(ctx, q, r.TS, r.Symbol, r.Interval, r.Open, r.High, r.Low, r.Close, r.Volume, r.Source, r.RawClose, r.SplitFactor, r.DivCash); err != nil {
 			return err
 		}
 	}

@@ -63,7 +63,8 @@ type SubsetSizeError struct {
 
 func (e *SubsetSizeError) Error() string {
 	return fmt.Sprintf(
-		"pilot subset of %d exceeds the cap of %d: Tiingo's free allowance is 500 unique symbols per month "+
+		"selected subset of %d exceeds the cap of %d (TIINGO_MAX_SELECTED_SYMBOLS): this no longer guards a billing limit "+
+			"(Power allows ~108,980 unique symbols/month) but still catches an order-of-magnitude selection bug "+
 			"and nothing else enforces it — widening the subset silently spends the month, and the failure "+
 			"surfaces later as unexplained rejections. Raise the cap deliberately or shrink the subset",
 		e.Requested, e.Max)

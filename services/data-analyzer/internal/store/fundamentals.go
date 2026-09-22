@@ -57,7 +57,12 @@ func QueryLatestMetrics(ctx context.Context, pool *pgxpool.Pool, symbol string) 
 		FROM equity_fundamentals
 		WHERE symbol = $1
 		  AND source != 'fundamental_analysis'
-		ORDER BY metric, period, ts DESC`,
+		-- NULL-last then source rank: equity_fundamentals is written by five
+		-- sources and 4,912 (symbol, metric, period, ts) groups have more than
+		-- one, so ts alone does not determine a winner.
+		ORDER BY metric, period, ts DESC,
+		         (value IS NULL AND payload IS NULL),
+		         fundamental_source_rank(source) DESC`,
 		symbol)
 	if err != nil {
 		return nil, err
@@ -85,7 +90,11 @@ func QueryLatestDerived(ctx context.Context, pool *pgxpool.Pool, symbol string) 
 		FROM equity_fundamentals
 		WHERE symbol = $1
 		  AND source = 'fundamental_analysis'
-		ORDER BY metric, ts DESC`,
+		-- This query pins source = fundamental_analysis, so it is NOT exposed
+		-- to the multi-source tie. It was still ambiguous on PERIOD: the same
+		-- derived metric can exist as annual and quarterly, and ordering by ts
+		-- alone could return either depending on ingestion order.
+		ORDER BY metric, ts DESC, period, (value IS NULL AND payload IS NULL)`,
 		symbol)
 	if err != nil {
 		return nil, err
@@ -117,7 +126,9 @@ func QueryMetricSeries(ctx context.Context, pool *pgxpool.Pool, symbol, metric s
 		  AND metric  = $2
 		  AND source  = 'finnhub_financials_reported'
 		  AND value IS NOT NULL
-		ORDER BY period DESC, ts DESC
+		ORDER BY period DESC, ts DESC,
+		         (value IS NULL AND payload IS NULL),
+		         fundamental_source_rank(source) DESC
 		LIMIT $3`,
 		symbol, metric, limit)
 	if err != nil {

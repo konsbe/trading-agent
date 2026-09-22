@@ -5,7 +5,6 @@
 // switchable:
 //
 //	runSymbols        weekly   refresh the symbol list, apply §3.1 eligibility
-//	runFundamentals   weekly   refresh sector / shares outstanding / market cap
 //	runBackfillRound  looping  resumable 3-year bar backfill (§8.1.3)
 //	runDailyBars      daily    incremental bar refresh after the US close (§8.1.4)
 //
@@ -23,6 +22,7 @@ import (
 
 	"github.com/joho/godotenv"
 
+	"github.com/konsbe/trading-agent/services/data-ingestion/internal/buildinfo"
 	"github.com/konsbe/trading-agent/services/data-ingestion/internal/config"
 	"github.com/konsbe/trading-agent/services/data-ingestion/internal/db"
 	"github.com/konsbe/trading-agent/services/data-ingestion/internal/fetch/barsource"
@@ -50,7 +50,7 @@ func main() {
 	// Pricing and subset selection are passes in their own right: running them
 	// alone is the normal way to prepare a pilot draw without spending any bar
 	// provider quota. Omitting them here made a pricing-only run exit at startup.
-	if !cfg.EnableSymbols && !cfg.EnableFundamentals && !cfg.EnableBackfill &&
+	if !cfg.EnableSymbols && !cfg.EnableBackfill &&
 		!cfg.EnableDailyBars && !cfg.PricingEnable && !cfg.SubsetEnable {
 		log.Info("all universe passes disabled; exiting")
 		return
@@ -80,7 +80,7 @@ func main() {
 		log.Warn("FINNHUB_API_KEY not set; universe pricing disabled — the stratified subset draw has no bucketing signal without it")
 		cfg.PricingEnable = false
 	}
-	if !cfg.EnableSymbols && !cfg.EnableFundamentals && !cfg.EnableBackfill &&
+	if !cfg.EnableSymbols && !cfg.EnableBackfill &&
 		!cfg.EnableDailyBars && !cfg.PricingEnable && !cfg.SubsetEnable {
 		log.Info("no usable universe passes after config checks; exiting")
 		return
@@ -118,9 +118,6 @@ func main() {
 	if cfg.EnableSymbols {
 		w.runSymbols(ctx)
 	}
-	if cfg.EnableFundamentals {
-		w.runFundamentals(ctx)
-	}
 	// Pricing must precede selection: stratification buckets symbols by price.
 	if cfg.PricingEnable {
 		w.runUniversePricing(ctx)
@@ -131,8 +128,6 @@ func main() {
 
 	tSymbols := time.NewTicker(cfg.PollSymbols)
 	defer tSymbols.Stop()
-	tFundamentals := time.NewTicker(cfg.PollFundamentals)
-	defer tFundamentals.Stop()
 	tDailyBars := time.NewTicker(cfg.DailyBarsInterval)
 	defer tDailyBars.Stop()
 
@@ -145,9 +140,15 @@ func main() {
 	}
 	defer backfillTimer.Stop()
 
+	// Build version at startup, so a log line is enough to tell whether the
+	// process you are looking at is the binary you just built. Rebuilding a
+	// file does not restart a running daemon, and an hour was lost to exactly
+	// that: an old process and a new one working the same claim queue.
+	log.Info("build version", "version", buildinfo.Version(),
+		"note", "stamped onto every claimed row; see scripts/worker_versions.sql")
+
 	log.Info("data-universe running",
 		"symbols_every", cfg.PollSymbols.String(),
-		"fundamentals_every", cfg.PollFundamentals.String(),
 		"daily_bars_every", cfg.DailyBarsInterval.String(),
 		"backfill_enabled", cfg.EnableBackfill,
 		"backfill_years", cfg.BackfillYears,
@@ -175,10 +176,6 @@ func main() {
 		case <-tSymbols.C:
 			if cfg.EnableSymbols {
 				w.runSymbols(ctx)
-			}
-		case <-tFundamentals.C:
-			if cfg.EnableFundamentals {
-				w.runFundamentals(ctx)
 			}
 		case <-tDailyBars.C:
 			if cfg.EnableDailyBars {
@@ -320,61 +317,6 @@ func (w *worker) runSymbols(ctx context.Context) {
 	}
 }
 
-// runFundamentals copies sector, industry, shares outstanding and market cap
-// from equity_fundamentals onto the universe rows, converting the provider's
-// millions to absolute units.
-//
-// It deliberately makes no API calls — §8.1.2 says to refresh "from existing
-// fundamentals ingestion", and a per-symbol metric fetch across the whole
-// universe would take hours against the free rate limit (§2.3).
-func (w *worker) runFundamentals(ctx context.Context) {
-	started := time.Now()
-
-	rows, err := store.LoadFundamentalsFromEquityFundamentals(ctx, w.pool)
-	if err != nil {
-		w.log.Error("load fundamentals for universe", "err", err)
-		return
-	}
-
-	updated, err := store.UpdateUniverseFundamentals(ctx, w.pool, rows)
-	if err != nil {
-		w.log.Error("update universe fundamentals", "err", err)
-		return
-	}
-
-	cov, err := store.LoadFundamentalsCoverage(ctx, w.pool)
-	if err != nil {
-		w.log.Warn("fundamentals coverage", "err", err)
-		return
-	}
-
-	w.log.Info("universe fundamentals refresh complete",
-		"matched", len(rows),
-		"updated", updated,
-		"eligible", cov.Eligible,
-		"with_sector", cov.WithSector,
-		"with_shares", cov.WithShares,
-		"with_market_cap", cov.WithMarketCap,
-		"took", time.Since(started).Round(time.Millisecond).String())
-
-	// Coverage drives two later steps, so a shortfall is logged loudly now rather
-	// than discovered as an empty candidate set at step 5.
-	if cov.Eligible > 0 && cov.WithNeitherCapNor == cov.Eligible {
-		w.log.Warn("no eligible symbol has market cap or shares outstanding; the §3.2 market-cap gate and the §3.9 market_cap_est proxy will both be unavailable — point FUNDAMENTAL_SYMBOLS at the universe or add a metric fetch pass",
-			"eligible", cov.Eligible)
-		return
-	}
-	if cov.WithNeitherCapNor > 0 {
-		w.log.Warn("symbols with neither market cap nor shares outstanding will fail the §3.2 market-cap gate (market_cap_est cannot be computed)",
-			"affected", cov.WithNeitherCapNor,
-			"of_eligible", cov.Eligible)
-	}
-	if cov.WithSector == 0 && cov.Eligible > 0 {
-		w.log.Warn("no eligible symbol has a sector; §3.12 sector_strength_pct will be null for the whole universe (sector comes from the Alpha Vantage overview pass)")
-	}
-}
-
-// sleepCtx waits for d, returning false if the context is cancelled first.
 func sleepCtx(ctx context.Context, d time.Duration) bool {
 	t := time.NewTimer(d)
 	defer t.Stop()

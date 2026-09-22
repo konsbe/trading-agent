@@ -49,6 +49,10 @@ type BucketThresholds struct {
 
 // GateConfig holds both buckets plus the shared history requirement.
 type GateConfig struct {
+	// Version selects the market-cap definition (§3.2). Zero value is GateV1,
+	// so callers that predate v2 keep their behaviour until they opt in.
+	Version GateVersion
+
 	Market BucketThresholds
 	Penny  BucketThresholds
 
@@ -126,6 +130,17 @@ const (
 	GateMarketCapTooLow      = "market_cap_below_min"
 	GateMarketCapTooHigh     = "market_cap_above_max"
 	GateUnbucketable         = "no_bucket_for_price"
+
+	// GateMarketCapPITUnavailable is gate v2's rejection when no SEC filing
+	// exists on or before t, so a point-in-time market cap cannot be computed.
+	//
+	// A REJECTION, never a fallback. Substituting today's market cap here would
+	// reinstate the exact lookahead v2 removes, and would do it precisely on the
+	// rows where it cannot be checked — the oldest bars, where today's value is
+	// furthest from the truth. An unmeasurable symbol-day is excluded and
+	// counted, so the exclusion is visible in the candidate counts rather than
+	// hidden inside a plausible number.
+	GateMarketCapPITUnavailable = "market_cap_pit_unavailable"
 )
 
 // GateInput is everything §3.2 needs beyond the computed Features: the
@@ -144,7 +159,47 @@ type GateInput struct {
 	// this the pilot could not answer "how many candidates exist only because we
 	// guessed their market cap".
 	MarketCapIsProxy bool
+
+	// MarketCapPIT is the POINT-IN-TIME market cap for this symbol-day:
+	//
+	//	raw_close[t] x shares_outstanding(filed <= t)
+	//
+	// Nil means no SEC filing exists on or before t, which gate v2 treats as a
+	// rejection (GateMarketCapPITUnavailable), not as a reason to fall back.
+	//
+	// Both factors are UNADJUSTED. Multiplying an adjusted price by an
+	// unadjusted share count is wrong by the cumulative split factor — 10-100x
+	// for reverse-split penny names — which is large enough to move a symbol
+	// between buckets, i.e. exactly the error this field exists to fix.
+	MarketCapPIT *float64
+
+	// MarketCapPITMultiClass records that the share count behind MarketCapPIT
+	// is the SUM of several share classes priced at the traded class's price.
+	// That is the standard market-cap approximation and it is an approximation,
+	// so it is flagged rather than assumed, and Phase 2 §3.2 runs a sensitivity
+	// check excluding these symbols.
+	MarketCapPITMultiClass bool
 }
+
+// GateVersion selects which market-cap definition §3.2 evaluates.
+//
+// Versioned rather than switched, because this changes WHICH SETUPS ARE
+// STUDIED, not just how they score. On a 71-symbol sample, 20.1% of historical
+// bar-days and 12.1% of gate-passing candidates change bucket between the two
+// (Phase 2 §3.2.1). Results computed under different versions are not
+// comparable and must never be pooled.
+type GateVersion int
+
+const (
+	// GateV1 uses TODAY's market cap for every historical row. This is
+	// lookahead: it selects the candidate set using information from after the
+	// setup. Retained ONLY as an ablation, so the size of the change is
+	// measurable. Do not use it for new results.
+	GateV1 GateVersion = 1
+
+	// GateV2 uses the point-in-time market cap. The default for all new work.
+	GateV2 GateVersion = 2
+)
 
 // GateResult is the verdict for one symbol on one day.
 type GateResult struct {
@@ -206,6 +261,8 @@ func AssignBucket(close *float64, cfg GateConfig) (Bucket, bool) {
 // recorded with its own reason so "we lack the data" is distinguishable from
 // "the data says no" — the distinction that decides whether a thin candidate set
 // is a market condition or an ingestion bug.
+// EvaluateGates applies §3.2 under cfg.Version (default GateV1 when unset, so
+// existing callers keep their behaviour until they opt in).
 func EvaluateGates(f *Features, in GateInput, cfg GateConfig) GateResult {
 	res := GateResult{MarketCapWasProxy: in.MarketCapIsProxy}
 
@@ -271,17 +328,30 @@ func EvaluateGates(f *Features, in GateInput, cfg GateConfig) GateResult {
 	// Market cap. §3.2 routes through §3.9's estimate when Finnhub is null, and
 	// keeps market_cap_null recorded even when the proxy carries the gate, so the
 	// proxy's contribution stays measurable.
-	if in.MarketCapIsProxy {
+	mcap := in.MarketCap
+	if cfg.Version == GateV2 {
+		// v2 reads ONLY the point-in-time value. No fallback to today's cap:
+		// falling back would restore the lookahead on exactly the rows where it
+		// is largest and least checkable.
+		mcap = in.MarketCapPIT
+		if mcap == nil {
+			res.Failures = append(res.Failures, GateMarketCapPITUnavailable)
+		}
+	} else if in.MarketCapIsProxy {
+		// Provenance marker, v1 only. v2 has no proxy path: §3.9's estimate is
+		// built from today's share count and is the same leak in another form.
 		res.Failures = append(res.Failures, GateMarketCapNull)
 	}
 	switch {
-	case in.MarketCap == nil:
-		// No Finnhub value and no usable proxy: the gate cannot be evaluated, so
-		// it cannot pass. A distinct reason from the provenance marker above.
-		res.Failures = append(res.Failures, GateMarketCapUnavailable)
-	case t.MinMarketCap > 0 && *in.MarketCap < t.MinMarketCap:
+	case mcap == nil:
+		if cfg.Version != GateV2 {
+			// v1: no Finnhub value and no usable proxy. v2 has already recorded
+			// the more specific PIT reason, so it is not doubled up here.
+			res.Failures = append(res.Failures, GateMarketCapUnavailable)
+		}
+	case t.MinMarketCap > 0 && *mcap < t.MinMarketCap:
 		res.Failures = append(res.Failures, GateMarketCapTooLow)
-	case t.MaxMarketCap > 0 && *in.MarketCap > t.MaxMarketCap:
+	case t.MaxMarketCap > 0 && *mcap > t.MaxMarketCap:
 		res.Failures = append(res.Failures, GateMarketCapTooHigh)
 	}
 

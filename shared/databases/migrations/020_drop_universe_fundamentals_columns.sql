@@ -1,0 +1,56 @@
+-- 020: drop the universe_symbols fundamentals columns and their write path.
+--
+-- WHAT IS BEING REMOVED
+--
+--   universe_symbols.shares_outstanding
+--   universe_symbols.market_cap
+--   universe_symbols.fundamentals_ts
+--
+-- plus, in Go: store.LoadFundamentalsFromEquityFundamentals,
+-- store.UpdateUniverseFundamentals, store.UniverseFundamentals, the
+-- data-universe runFundamentals pass and its UNIVERSE_ENABLE_FUNDAMENTALS flag.
+--
+-- WHY DELETE RATHER THAN FIX
+--
+-- Three facts together:
+--
+--   1. NOTHING READS THEM. A search across both Go services and the Python bot
+--      returns no consumer. Every actual consumer of market cap and share
+--      count reads equity_fundamentals directly.
+--   2. THE WRITER WAS BROKEN. Its latest-row query did not disambiguate
+--      `source`, so it chose the NULL-by-design finnhub_metric row over the
+--      finnhub_profile2 value for 2,951 of 4,975 eligible symbols (59%).
+--   3. IT HAD NEVER RUN HERE. All three columns are NULL across all 4,975
+--      eligible rows, so there is no data to lose.
+--
+-- A broken write path with no readers is worse than no path at all. It looks
+-- available. The next person to need universe-level fundamentals would wire a
+-- consumer onto a column that silently reads NULL for most of the universe,
+-- and would inherit a bug they did not write and have no reason to suspect.
+-- Fixing the query would leave that trap in place with fresh paint: still
+-- untested, because nothing exercises it, and still redundant, because the
+-- correct source is one join away.
+--
+-- WHAT REPLACES IT
+--
+-- Nothing, deliberately. Read equity_fundamentals with the canonical ordering:
+--
+--   SELECT DISTINCT ON (symbol) value
+--   FROM equity_fundamentals
+--   WHERE metric = '...' 
+--   ORDER BY symbol, ts DESC,
+--            (value IS NULL AND payload IS NULL),
+--            fundamental_source_rank(source) DESC
+--
+-- That ordering is pinned by tests in internal/store (see
+-- source_preference_integration_test.go), which assert the CONTRACT rather
+-- than any one caller -- precisely so they survive a caller being deleted, as
+-- one just was.
+--
+-- Point-in-time market cap, which is what the gates now use, comes from
+-- shares_outstanding_pit (migration 017), not from here.
+
+ALTER TABLE universe_symbols
+    DROP COLUMN IF EXISTS shares_outstanding,
+    DROP COLUMN IF EXISTS market_cap,
+    DROP COLUMN IF EXISTS fundamentals_ts;

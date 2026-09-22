@@ -66,18 +66,54 @@ def sample_row(**over):
 
 class TestMomentumOutput(unittest.TestCase):
 
-    def test_scheduled_alert_states_the_evidence_level(self):
+    def test_scheduled_alert_makes_the_screener_claim_and_no_other(self):
+        """The alert must claim a FILTER, not a ranking.
+
+        This test previously asserted the opposite — that the alert names rvol
+        as "the only statistically validated component". That claim died with
+        the gate-v2 re-measure (MH OR 0.991, p = 0.947): rvol's apparent edge
+        was the backtest selecting on today's market cap. The assertion is
+        inverted here rather than deleted, so the old claim cannot come back
+        without a test failing.
+        """
         e = m.build_momentum_embed(sample_row(), embed_cls=FakeEmbed)
-        text = e.all_text()
-        assert "rvol" in text and "only statistically validated" in text, (
-            "the alert must name which component is validated; a bare score implies "
-            "more confidence than the pilot supports"
+        text = e.all_text().lower()
+
+        assert "screener" in text, "the alert must say what it is"
+        assert "not a forecast" in text or "forecast" in text
+        assert "no component of the ranking has shown predictive value" in text, (
+            "the alert must state that nothing in it predicts outcomes"
         )
-        assert "unproven" in text
-        # The session note must not be the ONLY caveat — on its own it implies the
-        # single limitation is timing.
+        for banned in ("only statistically validated", "validated component"):
+            assert banned not in text, (
+                f"{banned!r} is a validity claim the evidence no longer supports"
+            )
+
+        # The session note must not be the ONLY caveat — on its own it implies
+        # the single limitation is timing.
         assert m.SESSION_CAVEAT in e.footer
         assert m.EVIDENCE_CAVEAT in e.footer
+
+    def test_scheduled_alert_shows_no_score_anywhere(self):
+        """No score, and no per-component point breakdown, in the alert path.
+
+        A "68/75" headline reads as a quality rating, and an itemised breakdown
+        is worse: it implies each component earned its weight. Neither survives
+        a stratified out-of-sample test, so neither appears.
+        """
+        row = sample_row()
+        e = m.build_momentum_embed(row, embed_cls=FakeEmbed)
+        text = e.all_text()
+
+        score = str(row["momentum_score_100"])
+        assert f"{score}/" not in text, "the alert still renders a score line"
+        assert "Scored components" not in text, (
+            "the per-component point breakdown implies each component earned its weight"
+        )
+        for weight_marker in ("/35", "/25", "/15", "/10"):
+            assert weight_marker not in text, (
+                f"{weight_marker} is a component weight; weights imply a validated ranking"
+            )
 
     def test_missing_symbol_explains_why_rather_than_returning_empty(self):
         out = m.build_score_breakdown(None, "ZZZZ")
@@ -114,15 +150,14 @@ class TestMomentumOutput(unittest.TestCase):
         """
         e = m.build_momentum_embed(sample_row(), embed_cls=FakeEmbed)
         names = [n for n, _, _ in e.fields]
-        assert any("not scored" in n for n in names), names
+        # In screener mode there is no "scored" anything, so these are simply
+        # Context: measurements shown without any claim attached.
+        assert any("Context" in n for n in names), names
+        ctx = next(v for n, v, _ in e.fields if "Context" in n)
+        assert "Breakout" in ctx and "52W" in ctx
 
-        diag_field = next(v for n, v, _ in e.fields if "not scored" in n)
-        assert "inverted" in diag_field
-
-        # And they must not appear among the scored components.
-        scored_field = next(v for n, v, _ in e.fields if n == "Scored components")
-        assert "Breakout" not in scored_field
-        assert "52W" not in scored_field
+        # There must be no scored-components field at all to contrast against.
+        assert not any(n == "Scored components" for n in names)
 
     def test_nulls_render_as_dash_never_zero(self):
         """A zero that means 'missing' is indistinguishable from a measured zero.
@@ -132,19 +167,32 @@ class TestMomentumOutput(unittest.TestCase):
         """
         row = sample_row(rvol_20=None, vol_accel=None, rsi_14=None, pct_of_52w_high=None)
         e = m.build_momentum_embed(row, embed_cls=FakeEmbed)
-        inputs = next(v for n, v, _ in e.fields if n == "Inputs")
+        inputs = next(v for n, v, _ in e.fields if "Measured inputs" in n)
         assert "—" in inputs
         assert "0.0x" not in inputs, "a missing RVOL must not render as 0.0x"
 
     def test_penalties_shown_only_when_present(self):
-        without = m.build_momentum_embed(sample_row(penalties=""), embed_cls=FakeEmbed)
-        assert not any("Penalt" in n for n, _, _ in without.fields)
+        """Penalties are a SCORING artefact, so they live with the score.
 
-        with_pen = m.build_momentum_embed(
+        They no longer appear in the alert — a penalty only means something
+        relative to a score, and the alert has none. They remain in /score,
+        under the research heading, where the score they modify is shown.
+        """
+        alert = m.build_momentum_embed(
             sample_row(penalties="already_extended_change_gt_20"), embed_cls=FakeEmbed
         )
-        assert any("Penalt" in n for n, _, _ in with_pen.fields)
-        assert "already_extended" in with_pen.all_text()
+        assert not any("Penalt" in n for n, _, _ in alert.fields), (
+            "a penalty is meaningless without the score it reduces"
+        )
+
+        without = m.build_score_breakdown(sample_row(penalties=""), "NEXR")
+        assert "Penalties" not in without
+
+        with_pen = m.build_score_breakdown(
+            sample_row(penalties="already_extended_change_gt_20"), "NEXR"
+        )
+        assert "Penalties" in with_pen
+        assert "already_extended" in with_pen
 
     def test_component_weights_match_section_four_v2(self):
         weights = {k: w for k, _, w in m.COMPONENTS}
@@ -167,13 +215,13 @@ class TestMomentumOutput(unittest.TestCase):
         assert "72% of attainable" in line, line
 
     def test_scored_components_show_their_weight_ceiling(self):
-        e = m.build_momentum_embed(sample_row(), embed_cls=FakeEmbed)
-        scored = next(v for n, v, _ in e.fields if n == "Scored components")
-        # "26.2/35" tells a reader how much was left on the table; a bare "26.2"
-        # does not.
-        assert "/35" in scored
-        assert "/25" in scored
-        assert "/15" in scored
+        # Weight ceilings belong with the research score, which now lives only
+        # in /score. "26.2 / 35" tells a reader how much was left on the table;
+        # a bare "26.2" does not.
+        out = m.build_score_breakdown(sample_row(), "NEXR")
+        assert "/ 35" in out
+        assert "/ 25" in out
+        assert "/ 15" in out
 
     def test_missing_inputs_are_listed_explicitly(self):
         e = m.build_momentum_embed(sample_row(), embed_cls=FakeEmbed)
@@ -182,10 +230,55 @@ class TestMomentumOutput(unittest.TestCase):
 
     def test_float_is_labelled_as_an_estimate(self):
         # §3.9: never present float_shares_est as "Float" without qualification.
-        e = m.build_momentum_embed(sample_row(), embed_cls=FakeEmbed)
-        assert "Float (est)" in e.all_text()
+        # The float component is part of the research score, so its label is
+        # checked where the score is rendered. §3.9's rule is unchanged: never
+        # present float_shares_est as "Float" without qualification.
         out = m.build_score_breakdown(sample_row(), "NEXR")
         assert "Float (est)" in out
+
+    def test_list_columns_render_without_python_or_json_syntax(self):
+        """asyncpg returns three different types for three similar columns.
+
+        The original tests used plain strings, so Discord rendered
+        "Penalties applied: []" and "Missing inputs: ['catalyst_tier']" —
+        literal JSON and Python repr in a user-facing embed. Only a real post
+        surfaced it.
+        """
+        # Penalties render in /score now rather than in the alert, but the
+        # asyncpg type-coercion question this test exists for is unchanged.
+        #
+        # jsonb arrives as JSON text; an empty array must hide the field entirely.
+        out = m.build_score_breakdown(sample_row(penalties="[]"), "NEXR")
+        assert "Penalties" not in out, \
+            "an empty JSON array must not render a Penalties line"
+
+        out = m.build_score_breakdown(
+            sample_row(penalties='["already_extended_change_gt_20"]'), "NEXR"
+        )
+        assert "already_extended_change_gt_20" in out, out
+        # The literal JSON syntax must never reach a user-facing surface.
+        assert "[" not in out and '"' not in out
+
+        # text[] arrives as a Python list.
+        e = m.build_momentum_embed(
+            sample_row(null_inputs=["catalyst_tier", "rsi_14"]), embed_cls=FakeEmbed
+        )
+        val = next(v for n, v, _ in e.fields if "Missing inputs" in n)
+        assert val == "catalyst_tier, rsi_14", val
+        assert "[" not in val and "'" not in val
+
+    def test_pct_of_52w_high_keeps_precision_for_reverse_split_names(self):
+        """A heavily reverse-split symbol sits at a tiny fraction of its ADJUSTED
+        52-week high — NEXR at $1.64 against an adjusted high of $847, i.e.
+        0.19%. One decimal place renders that as a flat "0.0", discarding a
+        genuinely striking fact about the symbol.
+        """
+        e = m.build_momentum_embed(sample_row(pct_of_52w_high=0.0019), embed_cls=FakeEmbed)
+        ctx = next(v for n, v, _ in e.fields if "Context" in n)
+        assert "0.19% of high" in ctx, ctx
+
+        out = m.build_score_breakdown(sample_row(pct_of_52w_high=0.0019), "NEXR")
+        assert "0.19% of high" in out
 
 
 if __name__ == "__main__":

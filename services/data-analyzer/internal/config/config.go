@@ -140,9 +140,9 @@ type TechnicalAnalysis struct {
 	ComputeLookback int
 	PollInterval    time.Duration
 
-	SMAPeriods []int
-	EMAPeriods []int
-	RSIPeriod  int
+	SMAPeriods   []int
+	EMAPeriods   []int
+	RSIPeriod    int
 	VolSMAPeriod int
 
 	SRSwingStrength int
@@ -240,21 +240,21 @@ type TechnicalAnalysis struct {
 	CandleWindow int // last N bars to scan for candle patterns  default 3
 
 	// ── Head & Shoulders ─────────────────────────────────────────────────────
-	HSSwingStrength  int
-	HSTolerancePct   float64
-	HSLookback       int
+	HSSwingStrength int
+	HSTolerancePct  float64
+	HSLookback      int
 
 	// ── Triangle Patterns ────────────────────────────────────────────────────
-	TriangleSwingStrength   int
-	TriangleMinPivots       int
+	TriangleSwingStrength    int
+	TriangleMinPivots        int
 	TriangleFlatThresholdPct float64
-	TriangleLookback        int
+	TriangleLookback         int
 
 	// ── Flag / Pennant ───────────────────────────────────────────────────────
-	FlagPolePct          float64
-	FlagMaxRetracePct    float64
-	FlagPoleLen          int
-	FlagLen              int
+	FlagPolePct       float64
+	FlagMaxRetracePct float64
+	FlagPoleLen       int
+	FlagLen           int
 
 	// Feature toggles.
 	EnableMA               bool
@@ -295,16 +295,16 @@ type TechnicalAnalysis struct {
 	EnableRSBenchmark      bool
 	EnableMTFConfluence    bool
 	// New SMC / pattern toggles.
-	EnableOrderBlocks     bool
-	EnableFVG             bool
-	EnableLiquiditySweep  bool
-	EnableBBSqueeze       bool
-	EnableVIXRegime       bool
-	EnableWeeklyPivots    bool
-	EnableMonthlyPivots   bool
-	EnableHSPattern       bool
-	EnableTriangle        bool
-	EnableFlag            bool
+	EnableOrderBlocks    bool
+	EnableFVG            bool
+	EnableLiquiditySweep bool
+	EnableBBSqueeze      bool
+	EnableVIXRegime      bool
+	EnableWeeklyPivots   bool
+	EnableMonthlyPivots  bool
+	EnableHSPattern      bool
+	EnableTriangle       bool
+	EnableFlag           bool
 }
 
 func LoadTechnicalAnalysis() (TechnicalAnalysis, error) {
@@ -637,10 +637,10 @@ type FundamentalAnalysis struct {
 
 	// ── Tier 2: Dividend sustainability ──────────────────────────────────────
 	// 3–6% yield + <60% payout = ideal sustainable income.
-	DividendYieldMin   float64 // below this = "none/minimal"     default 2
-	DividendYieldHigh  float64 // above this = verify payout      default 6
-	PayoutRatioSafe    float64 // <this = sustainable             default 60
-	PayoutRatioDanger  float64 // >this = cut risk                default 80
+	DividendYieldMin  float64 // below this = "none/minimal"     default 2
+	DividendYieldHigh float64 // above this = verify payout      default 6
+	PayoutRatioSafe   float64 // <this = sustainable             default 60
+	PayoutRatioDanger float64 // >this = cut risk                default 80
 
 	// ── Tier 2: CapEx intensity ───────────────────────────────────────────────
 	// <5% asset-light, 5–15% moderate, >20% capital-intensive / FCF constrained.
@@ -685,7 +685,7 @@ type FundamentalAnalysis struct {
 	// ── Tier 3: Analyst Target Price (rank 17) ────────────────────────────────
 	// Source: Alpha Vantage AnalystTargetPrice (stored as analyst_target_price).
 	// Upside = (target - price) / price × 100.
-	AnalystUpsideBullish  float64 // upside % above this = bullish consensus  default 15
+	AnalystUpsideBullish   float64 // upside % above this = bullish consensus  default 15
 	AnalystDownsideBearish float64 // upside % below this = bearish consensus default -5
 
 	// ── Tier 3: Analyst Recommendation Trend (rank 17 extended) ─────────────
@@ -709,8 +709,8 @@ type FundamentalAnalysis struct {
 	// Insider cluster detection window and minimum unique-buyer threshold.
 	// cluster_buy is triggered when ≥ InsiderClusterMinBuyers distinct insiders
 	// submit Form 4 purchase filings within InsiderClusterWindowDays.
-	InsiderClusterWindowDays int     // default 90
-	InsiderClusterMinBuyers  int     // default 3
+	InsiderClusterWindowDays int // default 90
+	InsiderClusterMinBuyers  int // default 3
 
 	// Number of quarterly gross-margin data points used to compute the moat
 	// stability score (std dev of quarterly gross margin).
@@ -783,7 +783,7 @@ type MacroAnalysis struct {
 	// ── Fed Balance Sheet (WALCL — weekly, in millions USD) ──────────────────
 	// WALCL is in millions; thresholds are stored/compared in billions.
 	// QE/QT detection: compare latest to value 4 weeks ago.
-	BSExpandThresholdBn  float64 // 4w change > +this Bn = "qe"  default 100
+	BSExpandThresholdBn   float64 // 4w change > +this Bn = "qe"  default 100
 	BSContractThresholdBn float64 // 4w change < -this Bn = "qt"  default 100
 
 	// ── Credit Spreads (BAMLH0A0HYM2 — HY OAS, in %, displayed in bps) ───────
@@ -827,10 +827,10 @@ type GrowthCycle struct {
 	// ── PMI (NAPM — ISM Manufacturing, monthly, index 0–100) ─────────────────
 	// Above 50 = expansion, below 50 = contraction.  New Orders sub-component
 	// leads the headline by 1–2 months but is not a separate free FRED series.
-	PMIStrong     float64 // >this = "strong_expansion"   default 55
-	PMIExpansion  float64 // >this = "expansion"           default 50
-	PMISlow       float64 // <this = "slowing"             default 45
-	PMISevere     float64 // <this = "severe_contraction"  default 40
+	PMIStrong    float64 // >this = "strong_expansion"   default 55
+	PMIExpansion float64 // >this = "expansion"           default 50
+	PMISlow      float64 // <this = "slowing"             default 45
+	PMISevere    float64 // <this = "severe_contraction"  default 40
 
 	// ── LEI (USSLIND — Conference Board Leading Economic Index, monthly) ──────
 	// Tracks the 6-month annualized rate of change.
@@ -882,7 +882,7 @@ type GrowthCycle struct {
 	CapexWarning   float64 // 3m trend < this = "warning"    default -3.0
 
 	// ── Composite Growth Stance score boundaries ──────────────────────────────
-	GrowthExpansionScore  float64 // weighted score > this = "expansion"   default 0.4
+	GrowthExpansionScore   float64 // weighted score > this = "expansion"   default 0.4
 	GrowthContractionScore float64 // weighted score < this = "contraction" default -0.4
 }
 
@@ -1049,9 +1049,9 @@ type GlobalGeopolitical struct {
 	USDJPYLookbackObs       int     // trading days approx — obs index  default 22
 
 	// China GDP YoY % (CHNGDPNQDSMEI, OECD quarterly).
-	ChinaGDPContract   float64 // YoY < this = contraction  default 3
-	ChinaGDPStable     float64 // YoY < this = stable  default 5
-	ChinaGDPExpansion  float64 // YoY ≥ this = expansion  default 6
+	ChinaGDPContract  float64 // YoY < this = contraction  default 3
+	ChinaGDPStable    float64 // YoY < this = stable  default 5
+	ChinaGDPExpansion float64 // YoY ≥ this = expansion  default 6
 
 	// US federal deficit % of nominal GDP (FYFSD millions, GDP billions SAAR).
 	FiscalManageablePct float64 // < this = manageable  default 3
@@ -1093,14 +1093,14 @@ type MarketCycle struct {
 	FetchLimit int
 	MinBars    int
 	// Drawdown thresholds as negative fractions (e.g. -0.03 = −3% from peak high).
-	PullbackPct          float64
-	CorrectionPct        float64
-	BearPct              float64
-	CrashVs10DHighPct    float64
-	CrashVs5BarPct       float64
-	BullExtendedSMAPct   float64
-	PeakLookback         int
-	SMAPeriod            int
+	PullbackPct        float64
+	CorrectionPct      float64
+	BearPct            float64
+	CrashVs10DHighPct  float64
+	CrashVs5BarPct     float64
+	BullExtendedSMAPct float64
+	PeakLookback       int
+	SMAPeriod          int
 }
 
 // LoadMarketCycle reads MARKET_CYCLE_* env vars.

@@ -41,9 +41,11 @@ func QueryEquityBars(ctx context.Context, pool *pgxpool.Pool, symbol, interval s
 			SELECT DISTINCT ON (ts) ts, open, high, low, close, volume
 			FROM equity_ohlcv
 			WHERE symbol=$1 AND interval=$2
-			ORDER BY ts,
-				(source = 'tiingo')        DESC,
-				(source = 'yahoo_finance') DESC
+			-- This was the ONE latest-row query in the repo that broke the
+			-- source tie explicitly, and it was right. Migration 015 promotes
+			-- the same ranking to a shared function so the other callers
+			-- inherit it instead of each remembering.
+			ORDER BY ts, bar_source_rank(source) DESC
 		) deduped
 		ORDER BY ts DESC
 		LIMIT $3`,

@@ -79,13 +79,21 @@ class MomentumCog(commands.Cog):
                 f"{len(rows)} shown"
                 + (f" · bucket={bucket}" if bucket else "")
                 + (f" · score ≥ {min_score}" if min_score is not None else "")
+                # The sort order is stated in the embed itself. A ranked-looking
+                # list is read as a ranking unless it says otherwise, and this
+                # order carries no claim about which entries are more likely to
+                # run.
+                + f"\n_{fmt.SORT_CAVEAT}_"
             ),
             color=0x3498DB,
         )
         for r in rows:
-            denom = fmt.score_denominator(r.get("catalyst_tier"))
+            # No score in the entry title. The heading is the symbol and its
+            # bucket; the body is measured inputs. A "68/75" here would make
+            # the list look ranked by quality, which is exactly the claim the
+            # out-of-sample result withdraws.
             embed.add_field(
-                name=f"{r['symbol']} · {r['bucket']} · {r['momentum_score_100']}/{denom}",
+                name=f"{r['symbol']} · {r['bucket']}",
                 value=(
                     f"chg {_d(r.get('change_pct'), '%')} · "
                     f"RVOL {_d(r.get('rvol_20'), 'x')} · "

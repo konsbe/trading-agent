@@ -195,6 +195,71 @@ class TestMomentumScanJob(unittest.TestCase):
         b = _COOLDOWN_KEY.format(bucket="market", symbol="XYZ")
         self.assertNotEqual(a, b)
 
+    def test_burst_day_is_capped_per_channel_with_an_overflow_line(self):
+        """The real worst day: 2024-11-06 produced 157 candidates (155 market,
+        2 penny) under gate v2.
+
+        Posting 157 embeds is unreadable, and it happens exactly on the days a
+        reader most wants to skim the feed. The cap keeps the top N by RVOL —
+        the ordering the query already applies — and says how many were cut.
+        """
+        rows = [row(f"M{i:03d}", "market") for i in range(155)] + [
+            row("P001", "penny"), row("P002", "penny")
+        ]
+        job, notifier = self._job(rows)
+        run(job.run())
+
+        market_ch = FakeCfg.discord_market_buy_channel_id
+        penny_ch = FakeCfg.discord_penny_buy_channel_id
+        market_msgs = [m for c, m in notifier.sent if c == market_ch]
+        penny_msgs = [m for c, m in notifier.sent if c == penny_ch]
+
+        # 10 embeds + 1 overflow line for market; penny is under the cap so no line.
+        embeds = [m for m in market_msgs if not isinstance(m, str)]
+        summaries = [m for m in market_msgs if isinstance(m, str)]
+        self.assertEqual(len(embeds), 10, f"expected the cap of 10 embeds, got {len(embeds)}")
+        self.assertEqual(len(summaries), 1, "a truncated day must post exactly one overflow line")
+        self.assertIn("145 more", summaries[0], summaries[0])
+        self.assertIn("/scanner", summaries[0])
+
+        self.assertEqual(len([m for m in penny_msgs if not isinstance(m, str)]), 2)
+        self.assertFalse(
+            [m for m in penny_msgs if isinstance(m, str)],
+            "a channel under the cap must not get an overflow line",
+        )
+
+    def test_cap_is_per_channel_so_a_busy_bucket_cannot_starve_a_quiet_one(self):
+        """A GLOBAL cap would let 155 market candidates consume the whole
+        allowance and post nothing for penny — the bucket with the higher base
+        rate and the fewer candidates."""
+        rows = [row(f"M{i:03d}", "market") for i in range(155)] + [row("P001", "penny")]
+        job, notifier = self._job(rows)
+        run(job.run())
+        penny = [m for c, m in notifier.sent if c == FakeCfg.discord_penny_buy_channel_id]
+        self.assertTrue(
+            [m for m in penny if not isinstance(m, str)],
+            "the penny candidate was starved by the market bucket's volume",
+        )
+
+    def test_cooldown_is_applied_before_the_cap(self):
+        """Order matters: a symbol suppressed by cooldown must not consume one
+        of the day's slots, or a few repeat symbols crowd out everything new."""
+        rows = [row(f"M{i:03d}", "market") for i in range(15)]
+        job, notifier = self._job(rows)
+
+        # First five are on cooldown.
+        async def on_cd(symbol, bucket):
+            return symbol in {f"M{i:03d}" for i in range(5)}
+
+        job._on_cooldown = on_cd  # type: ignore[assignment]
+        run(job.run())
+        embeds = [m for c, m in notifier.sent if not isinstance(m, str)]
+        self.assertEqual(
+            len(embeds), 10,
+            "cooldown-suppressed symbols consumed cap slots; 10 fresh candidates "
+            "were available and fewer were posted",
+        )
+
     def test_posted_embed_carries_the_evidence_caveat(self):
         job, notifier = self._job([row()])
         run(job.run())

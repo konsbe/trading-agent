@@ -98,6 +98,80 @@ func TestFetchBarsRange_UsesAdjustedFieldsNotRaw(t *testing.T) {
 	}
 }
 
+// Migration 012 / Phase 2 §3.2: the UNADJUSTED close and splitFactor must be
+// captured alongside the adjusted series, without disturbing it.
+//
+// The fixture's first row is a 2:1 split, so raw (316.22) and adjusted (158.11)
+// differ by exactly 2×. That makes the two assertions independent: reading the
+// wrong field for either one fails on a specific number rather than by accident.
+func TestFetchBarsRange_CapturesUnadjustedCloseAndSplitFactor(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(realBody))
+	}))
+	defer srv.Close()
+
+	bars, err := testClient(t, srv, 0).FetchBarsRange(context.Background(), "AAPL", "1Day",
+		time.Date(2026, 9, 8, 0, 0, 0, 0, time.UTC), time.Date(2026, 9, 9, 0, 0, 0, 0, time.UTC))
+	if err != nil {
+		t.Fatalf("fetch: %v", err)
+	}
+
+	if bars[0].RawClose == nil {
+		t.Fatal("RawClose is nil — Phase 2 §3.2 cannot compute point-in-time market cap without it, and the field is right there in the same response")
+	}
+	if *bars[0].RawClose != 316.22 {
+		t.Errorf("RawClose = %v, want the UNADJUSTED 316.22 (adjusted is 158.11)", *bars[0].RawClose)
+	}
+	if bars[0].SplitFactor == nil || *bars[0].SplitFactor != 2.0 {
+		t.Errorf("SplitFactor = %v, want 2.0 for the 2:1 split row", bars[0].SplitFactor)
+	}
+
+	// The whole point of the pointer types: the ordinary second row still
+	// carries 1.0, so "no split" is a stored fact, not an absence.
+	if bars[1].SplitFactor == nil || *bars[1].SplitFactor != 1.0 {
+		t.Errorf("SplitFactor[1] = %v, want 1.0 — an ordinary session records 1.0, it does not record nothing", bars[1].SplitFactor)
+	}
+
+	// Capturing the raw fields must not have disturbed the adjusted ones. This
+	// is the regression that would matter: every feature reads Close.
+	if bars[0].Close != 158.11 {
+		t.Errorf("Close = %v, want the ADJUSTED 158.11 — adding raw capture must not change what features read", bars[0].Close)
+	}
+}
+
+// A zero or absent splitFactor must store NULL rather than 0.0. A zero ratio is
+// not a corporate action anyone can express, so treating it as data would put a
+// number into §3.2 that means "Tiingo omitted the field".
+func TestFetchBarsRange_AbsentUnadjustedFieldsStoreNullNotZero(t *testing.T) {
+	const noRawBody = `[
+	 {"date":"2026-09-08T00:00:00.000Z","close":0,"high":320.7,"low":314.9,"open":317.1,"volume":35477090,
+	  "adjClose":158.11,"adjHigh":160.35,"adjLow":157.45,"adjOpen":158.55,"adjVolume":70954180,"divCash":0.0,"splitFactor":0}
+	]`
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(noRawBody))
+	}))
+	defer srv.Close()
+
+	bars, err := testClient(t, srv, 0).FetchBarsRange(context.Background(), "AAPL", "1Day",
+		time.Date(2026, 9, 8, 0, 0, 0, 0, time.UTC), time.Date(2026, 9, 9, 0, 0, 0, 0, time.UTC))
+	if err != nil {
+		t.Fatalf("fetch: %v", err)
+	}
+	if len(bars) != 1 {
+		t.Fatalf("bars = %d, want 1 — the row is usable on its adjusted fields and must not be dropped for missing raw ones", len(bars))
+	}
+	if bars[0].RawClose != nil {
+		t.Errorf("RawClose = %v, want nil — a zero raw close is missing data, and storing 0.0 would make §3.2 compute a market cap of zero rather than skip the row", *bars[0].RawClose)
+	}
+	if bars[0].SplitFactor != nil {
+		t.Errorf("SplitFactor = %v, want nil for an omitted field", *bars[0].SplitFactor)
+	}
+	// The row itself still survives on its adjusted fields.
+	if bars[0].Close != 158.11 {
+		t.Errorf("Close = %v, want 158.11", bars[0].Close)
+	}
+}
+
 // A 404 is Tiingo's answer for an unknown or delisted ticker. Retrying it across
 // a multi-thousand-symbol sweep spends quota on a certain failure.
 func TestFetchBarsRange_NotFoundIsPermanent(t *testing.T) {

@@ -92,9 +92,17 @@ type Universe struct {
 	// SubsetSize is how many symbols to select.
 	SubsetSize int
 
-	// SubsetMaxSize is the hard cap the selection asserts before writing. This
-	// is Tiingo's quota guard — its 500-unique-symbols/month allowance is not
-	// expressible as a rate, so nothing else enforces it.
+	// SubsetMaxSize is the hard cap the selection asserts before writing.
+	//
+	// Was 450, which was Tiingo's free tier metering 500 unique symbols per
+	// month — a billing cap wearing the costume of a design decision. The Power
+	// upgrade (2026-09-21) allows ~108,980, so the number that set 450 is gone.
+	//
+	// The assertion is KEPT, not removed. It no longer guards a bill, but it
+	// still catches an order-of-magnitude error: a selection query that tried to
+	// claim 50,000 symbols would be a bug rather than a plan, and this is where
+	// that surfaces instead of at the provider. Default set above the current
+	// eligible count (~4,975) so ordinary universe growth does not trip it.
 	SubsetMaxSize int
 
 	// SubsetPennyFloorPct is the minimum share drawn from §3.2's penny bucket.
@@ -128,13 +136,12 @@ type Universe struct {
 	// SubsetSymbols is the verbatim list for the "explicit" strategy.
 	SubsetSymbols []string
 
-	// EnableSymbols / EnableFundamentals / EnableBackfill / EnableDailyBars allow
+	// EnableSymbols / EnableBackfill / EnableDailyBars allow
 	// each pass to be turned off independently, following the
 	// FUNDAMENTAL_ENABLE_* convention.
-	EnableSymbols      bool
-	EnableFundamentals bool
-	EnableBackfill     bool
-	EnableDailyBars    bool
+	EnableSymbols   bool
+	EnableBackfill  bool
+	EnableDailyBars bool
 
 	// ── §8.1.3 resumable bar backfill ──────────────────────────────────────
 
@@ -234,7 +241,7 @@ func LoadUniverse() (Universe, error) {
 		SubsetEnable:        env("UNIVERSE_SUBSET_ENABLE", "false") == "true",
 		SubsetStrategy:      env("UNIVERSE_SUBSET_STRATEGY", "stratified"),
 		SubsetSize:          intEnv("UNIVERSE_SUBSET_SIZE", 450),
-		SubsetMaxSize:       intEnv("TIINGO_MAX_SELECTED_SYMBOLS", 450),
+		SubsetMaxSize:       intEnv("TIINGO_MAX_SELECTED_SYMBOLS", 6000),
 		SubsetPennyFloorPct: floatEnv("UNIVERSE_SUBSET_PENNY_FLOOR_PCT", 0.20),
 		PricingEnable:       env("UNIVERSE_PRICING_ENABLE", "false") == "true",
 		PriceInterval:       env("UNIVERSE_PRICE_INTERVAL", "quote_snapshot"),
@@ -245,10 +252,9 @@ func LoadUniverse() (Universe, error) {
 		SubsetSeed:          env("UNIVERSE_SUBSET_SEED", ""),
 		SubsetSymbols:       splitCSV("UNIVERSE_SUBSET_SYMBOLS"),
 
-		EnableSymbols:      env("UNIVERSE_ENABLE_SYMBOLS", "true") == "true",
-		EnableFundamentals: env("UNIVERSE_ENABLE_FUNDAMENTALS", "true") == "true",
-		EnableBackfill:     env("UNIVERSE_ENABLE_BACKFILL", "true") == "true",
-		EnableDailyBars:    env("UNIVERSE_ENABLE_DAILY_BARS", "true") == "true",
+		EnableSymbols:   env("UNIVERSE_ENABLE_SYMBOLS", "true") == "true",
+		EnableBackfill:  env("UNIVERSE_ENABLE_BACKFILL", "true") == "true",
+		EnableDailyBars: env("UNIVERSE_ENABLE_DAILY_BARS", "true") == "true",
 
 		BackfillYears:        intEnv("UNIVERSE_BACKFILL_YEARS", 3),
 		BackfillBatchSize:    intEnv("UNIVERSE_BACKFILL_BATCH_SIZE", 200),

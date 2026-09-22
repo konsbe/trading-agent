@@ -35,7 +35,7 @@ _SCORE_COLUMNS = """
     s.score_catalyst,
     s.score_float,
     s.score_vwap,
-    s.score_high52w,
+    s.score_52w AS score_high52w,  -- real column is score_52w; aliased so the formatter key stays stable
     s.penalties,
     s.null_inputs,
     f.change_pct,
@@ -57,12 +57,21 @@ async def top_candidates(
     min_score: int | None = None,
     limit: int = 10,
 ) -> Sequence[Mapping[str, Any]]:
-    """Today's highest-scoring candidates, independent of any watchlist.
+    """Today's candidates for /scanner, ORDERED BY RVOL.
 
-    `min_score` is optional here on purpose. The scheduled alert applies a
-    per-bucket threshold, but /scanner is an inspection tool — forcing the alert
-    threshold on it would hide exactly the near-miss candidates someone runs the
-    command to look at.
+    The sort is by `rvol_20`, not by `momentum_score_100`, and it is
+    DESCRIPTIVE. A list needs an order; this one does not claim that the top of
+    it is more likely to run. Score-ordering implied exactly that claim, and on
+    a lookahead-free candidate set the score does not separate outcomes within
+    a bucket (MH OR 0.991, p = 0.947).
+
+    RVOL was chosen over the alternatives because it is the input the gates
+    already key on, so the ordering matches the screener's own criterion rather
+    than introducing a second, unstated one. It is NOT chosen because RVOL
+    predicts anything — it does not, on the same measurement.
+
+    `min_score` is retained for research queries and defaults to off. The
+    scheduled alert no longer uses a score threshold at all.
     """
     where = ["s.ts::date = (SELECT max(ts)::date FROM momentum_scores)"]
     args: list[Any] = []
@@ -79,7 +88,7 @@ async def top_candidates(
         FROM momentum_scores s
         JOIN momentum_features f ON f.symbol = s.symbol AND f.ts = s.ts
         WHERE {' AND '.join(where)}
-        ORDER BY s.momentum_score_100 DESC, s.symbol
+        ORDER BY f.rvol_20 DESC NULLS LAST, s.symbol
         LIMIT ${len(args)}
     """
     async with pool.acquire() as conn:
@@ -89,7 +98,43 @@ async def top_candidates(
 async def alertable_candidates(
     pool, *, min_score_market: int, min_score_penny: int
 ) -> Sequence[Mapping[str, Any]]:
-    """Candidates clearing their OWN bucket's threshold.
+    """Candidates to alert on, in SCREENER mode: every gate pass, per bucket.
+
+    NO SCORE THRESHOLD. The 65/72 cut points were percentile cuts on a score
+    that does not rank within a bucket, so filtering on them selected an
+    arbitrary tenth of the candidates while implying the selected tenth was
+    better. Presence in momentum_scores already means the symbol passed §3.2 —
+    the row only exists for gate-passers — so the gate pass IS the criterion.
+
+    The per-bucket structure is kept because the GATES differ per bucket
+    (penny requires 10-40% change and RVOL >= 4.0; market 8-25% and >= 3.0), so
+    a candidate is always a candidate *of its bucket*. What changed is that the
+    bucket no longer carries a threshold on top of the gate.
+
+    `min_score_market` / `min_score_penny` are accepted and ignored in screener
+    mode. They are kept in the signature rather than removed so
+    BOT_MOMENTUM_ALERT_MODE=score can be selected without a code change, and so
+    the caller's configuration stays honest about what mode it is in.
+    """
+    sql = f"""
+        SELECT {_SCORE_COLUMNS}
+        FROM momentum_scores s
+        JOIN momentum_features f ON f.symbol = s.symbol AND f.ts = s.ts
+        WHERE s.ts::date = (SELECT max(ts)::date FROM momentum_scores)
+        ORDER BY f.rvol_20 DESC NULLS LAST, s.symbol
+    """
+    async with pool.acquire() as conn:
+        return await conn.fetch(sql)
+
+
+async def alertable_candidates_by_score(
+    pool, *, min_score_market: int, min_score_penny: int
+) -> Sequence[Mapping[str, Any]]:
+    """The pre-screener behaviour: candidates clearing their OWN bucket's threshold.
+
+    Retained for BOT_MOMENTUM_ALERT_MODE=score and for research comparisons.
+    Not the default, and not recommended: the thresholds are cut points on a
+    score with no demonstrated within-bucket ranking ability.
 
     Per-bucket rather than global because a single number does not mean the same
     thing in both: the pilot's penny bucket has a median score of 62 against
@@ -161,11 +206,14 @@ async def tracked_positions(pool, *, status: str = "active") -> Sequence[Mapping
             SELECT DISTINCT ON (symbol) symbol, close, ts
             FROM equity_ohlcv
             WHERE interval = '1Day'
-            ORDER BY symbol, ts DESC
+            -- bar_source_rank, else the displayed price can come from a
+            -- finnhub_quote row rather than the tiingo bar series the rest
+            -- of the scanner reads. equity_ohlcv has three writers.
+            ORDER BY symbol, ts DESC, bar_source_rank(source) DESC
         )
         SELECT t.symbol,
                t.status,
-               t.alert_ts,
+               t.alerted_ts AS alert_ts,
                t.reference_price,
                t.bucket,
                l.close        AS current_close,

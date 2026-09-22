@@ -7,6 +7,8 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/konsbe/trading-agent/services/data-ingestion/internal/buildinfo"
 )
 
 // Backfill status values for universe_symbols.backfill_status.
@@ -60,6 +62,10 @@ WITH claimable AS (
     SELECT symbol, exchange
     FROM universe_symbols
     WHERE is_eligible
+      -- Never claim a symbol the provider no longer serves: the fetch
+      -- returns nothing, the row churns through attempts, and its stored
+      -- bars stay a frozen remnant regardless. See migration 022.
+      AND data_unavailable_reason IS NULL
       AND (NOT $4 OR backfill_selected)
       AND (
             backfill_status = 'pending'
@@ -79,14 +85,18 @@ WITH claimable AS (
     FOR UPDATE SKIP LOCKED
 )
 UPDATE universe_symbols u SET
-    backfill_status     = 'in_progress',
-    backfill_claimed_at = now(),
-    updated_at          = now()
+    backfill_status         = 'in_progress',
+    backfill_claimed_at     = now(),
+    -- Stamped on CLAIM, not on completion: the point is to see which build is
+    -- working the queue right now, including a build that claims rows and then
+    -- dies. See migration 022 and internal/buildinfo.
+    backfill_worker_version = $5,
+    updated_at              = now()
 FROM claimable c
 WHERE u.symbol = c.symbol AND u.exchange = c.exchange
 RETURNING u.symbol, u.exchange, u.backfill_attempts`
 
-	rows, err := pool.Query(ctx, q, limit, lease, maxAttempts, selectedOnly)
+	rows, err := pool.Query(ctx, q, limit, lease, maxAttempts, selectedOnly, buildinfo.Version())
 	if err != nil {
 		return nil, fmt.Errorf("claim backfill batch: %w", err)
 	}
@@ -227,12 +237,19 @@ func UpsertEquityOHLCVBatch(ctx context.Context, pool *pgxpool.Pool, rows []Equi
 	if len(rows) == 0 {
 		return 0, nil
 	}
+	// COALESCE on the conflict path so a provider that does not report the
+	// unadjusted fields cannot erase values another provider already captured.
+	// Plain EXCLUDED.raw_close would overwrite a real number with NULL on every
+	// refresh from a non-Tiingo source.
 	const q = `
-INSERT INTO equity_ohlcv (ts, symbol, interval, open, high, low, close, volume, source)
-VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+INSERT INTO equity_ohlcv (ts, symbol, interval, open, high, low, close, volume, source, raw_close, split_factor, div_cash)
+VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
 ON CONFLICT (symbol, interval, ts, source) DO UPDATE SET
   open = EXCLUDED.open, high = EXCLUDED.high, low = EXCLUDED.low,
-  close = EXCLUDED.close, volume = EXCLUDED.volume`
+  close = EXCLUDED.close, volume = EXCLUDED.volume,
+  raw_close = COALESCE(EXCLUDED.raw_close, equity_ohlcv.raw_close),
+  split_factor = COALESCE(EXCLUDED.split_factor, equity_ohlcv.split_factor),
+  div_cash = COALESCE(EXCLUDED.div_cash, equity_ohlcv.div_cash)`
 
 	tx, err := pool.Begin(ctx)
 	if err != nil {
@@ -242,7 +259,7 @@ ON CONFLICT (symbol, interval, ts, source) DO UPDATE SET
 
 	batch := &pgx.Batch{}
 	for _, r := range rows {
-		batch.Queue(q, r.TS, r.Symbol, r.Interval, r.Open, r.High, r.Low, r.Close, r.Volume, r.Source)
+		batch.Queue(q, r.TS, r.Symbol, r.Interval, r.Open, r.High, r.Low, r.Close, r.Volume, r.Source, r.RawClose, r.SplitFactor, r.DivCash)
 	}
 	br := tx.SendBatch(ctx, batch)
 	var n int64

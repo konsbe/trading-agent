@@ -123,7 +123,78 @@ After filtering (§3.1) expect roughly **5,000–7,500 US common stocks**.
 > Phase 1 baseline. Breakdown and method in
 > `services/data-ingestion/data_ingestion.md`.
 
-- Initial backfill: 3 years of daily bars per symbol. At ~5 requests/second this is a multi-hour, run-once job. Make it resumable — checkpoint progress per symbol so a crash doesn't restart from zero.
+- Initial backfill: ~~3 years~~ **10 years** of daily bars per symbol — see the
+  superseding note below. Resumable, checkpointed per symbol.
+
+> #### The 3-year requirement is superseded (2026-09-21)
+>
+> **10 years, `UNIVERSE_BACKFILL_YEARS=10`.** Three years was chosen under the
+> free tier, where 500 unique symbols per month was the binding constraint and
+> history depth was not the thing worth spending on. The Tiingo Power upgrade
+> removed that constraint, and two reasons now argue for the longer window:
+>
+> 1. **Labels need room.** Phase 2 validates with purged walk-forward folds and a
+>    120-session label horizon. Three years of bars leaves roughly 1.5 years of
+>    candidates whose labels have matured — the horizon eats the tail, and the
+>    purge removes more around every fold boundary. That is not enough to cut
+>    into honest folds.
+> 2. **One regime is not evidence.** 2023-09 to 2026-09 is a single market
+>    environment. A rule fitted inside one regime cannot be distinguished from a
+>    rule that merely describes it. Ten years spans the 2016-19 expansion, the
+>    2020 crash and recovery, the 2021 small-cap mania, the 2022 drawdown, and
+>    2023-26.
+>
+> **Measured cost, not estimated.** A 20-symbol probe put the full backfill at
+> **2.25 GB**, or 5.6% of Power's 40 GB/month allowance (2.95 GB at the
+> pessimistic 75th percentile). Completed run: **4,975 symbols, 8,622,252 bars,
+> 2016-09-21 to 2026-09-18.**
+>
+> #### Survivorship bias gets WORSE with the longer window, not better
+>
+> This has to be stated plainly, because a ten-year history reads like strictly
+> more evidence and it is not.
+>
+> The universe is today's eligible symbols. Every company that delisted over the
+> last ten years — bankruptcies, failed micro-caps, deregistrations — is absent,
+> and those are disproportionately the failures. The bias is therefore a function
+> of how far back the window reaches: a candidate from 2017 is drawn from a
+> population already filtered by nine years of survival, while one from 2025 has
+> been filtered by a few months. **Extending 3 years to 10 does not add 7 clean
+> years; it adds 7 increasingly optimistic ones.**
+>
+> Nothing in this phase corrects it. Delisted-symbol coverage is Phase 2 §3.3,
+> and until that lands the bias is unmeasured rather than removed. What this
+> phase does instead is make it **visible**: hit rates are reported by calendar
+> year in the post-upgrade validation section, so the drift is on the page rather
+> than buried in a pooled average. If older years look better, that is the
+> expected signature of the bias and not a finding about those years.
+>
+> #### Bar quality over the widened data
+>
+> `bar-audit` over the full result: **548 of 4,971 symbols carry at least one
+> suspected adjustment seam (11.0%)**, against the pilot's ~8%.
+>
+> The increase is the **window, not the universe**. Re-running the audit over the
+> same 450 pilot symbols across the new 10-year history gives **11.6%** — worse
+> than the full universe's 11.0%. The metric is "has at least one seam ever", so
+> it rises with observation length by construction. The ~4,500 newly-added
+> symbols are, if anything, slightly cleaner than the pilot draw.
+>
+> **A new check the raw-close capture makes possible.** With `split_factor` now
+> stored per bar, each flagged seam can be asked whether Tiingo itself reports a
+> corporate action on that session. Of 1,003 flagged seams, only **15** coincide
+> with a reported split — **21** if the window is widened to ±2 sessions, so an
+> off-by-one is not the explanation. Sub-penny rounding (Tiingo rounds close to 4
+> decimals, so a genuine sub-cent price oscillates between 0.0000 and 0.0001)
+> accounts for 147 more, across just 6 symbols.
+>
+> That leaves ~840 flagged seams above the rounding floor with no reported
+> corporate action. **This does not establish that they are provider defects.**
+> `splitFactor` covers splits only; a dividend adjustment also produces a seam
+> while leaving the factor at 1.0, and `divCash` was not captured. The more likely
+> reading is that the detector over-flags genuine micro-cap volatility, which is
+> the conservative failure direction for a data-quality check. Recorded as
+> unresolved, and capturing `divCash` would close it.
 - Daily incremental refresh: one recent-bars request per symbol, ~25–40 minutes at the same rate. Runs after US close.
 - Fundamentals (shares outstanding, sector, market cap): refresh **weekly**, not daily. These do not move intraday and Finnhub's free quota is the binding constraint.
 - News: fetch only for symbols that passed the hard gates (§3.2) — typically tens to low hundreds per day, not the whole universe.
@@ -169,6 +240,45 @@ instrument-type allowlist is configurable precisely so this is a one-line change
 later rather than a code edit.
 
 ### 3.2 Hard gates (the candidate filter)
+
+> #### VERSIONED 2026-09-21: gate v2 uses point-in-time market cap
+>
+> **v1 (original):** market cap is TODAY's value, applied to every historical
+> row. **Retained only as an ablation** (`-gate-version 1`), because it is the
+> definition every Phase 1 result was computed under and the size of the change
+> has to stay measurable.
+>
+> **v2 (default for all new work):** market cap is
+> `raw_close[t] x shares_outstanding(filed <= t)`, from SEC EDGAR
+> (`shares_outstanding_pit`, migration 017). Both factors unadjusted.
+>
+> **Why:** v1 selects the candidate set using information from after the setup.
+> A company worth $1bn in 2017 and $20bn today was judged by the $20bn, so it
+> failed the market band on a day it would have passed; one that has since
+> diluted was admitted to days it never qualified for. Measured on a 71-symbol
+> sample, **20.1% of historical bar-days carry a materially different market cap
+> than the gates used** (Phase 2 §3.2.1).
+>
+> **What v2 does NOT change: the bucket.** Buckets are assigned from the close
+> PRICE (penny $0.30-$2.00, market >= $2.00); market cap is a band check *within*
+> the price-determined bucket. So v2 changes whether a symbol-day PASSES, not
+> which bucket it is judged in.
+>
+> **New rejection reason, `market_cap_pit_unavailable`.** A symbol-day with no
+> SEC filing on or before `t` FAILS the gate. There is deliberately **no
+> fallback to today's value**: a fallback would restore the lookahead precisely
+> on the oldest rows, where today's share count is furthest from the truth and
+> where nobody can check it. An unmeasurable day is excluded and counted, so the
+> exclusion shows up in the candidate totals instead of hiding inside a
+> plausible number.
+>
+> **v2 also has no §3.9 proxy path.** The proxy is today's share count times
+> close, which is the same leak in another form.
+>
+> Coverage is incomplete by design: EDGAR supplies the concept for roughly four
+> fifths of the universe (Phase 2 §3.2.1), and the remainder are excluded rather
+> than approximated. Who they are, and whether excluding them biases the sample,
+> is characterised in Phase 2 §3.2.3.
 
 Hard gates produce the candidate set. **Scoring only ranks within the candidate set — a gate failure means excluded, not low-scored.** Every threshold below is an env-var default, not a constant.
 
@@ -781,6 +891,31 @@ which is a scanner rather than a feed. **These percentiles are IN-SAMPLE**, draw
 from the same candidates §4.1 v2 was derived from; recalibrate when the universe
 widens.
 
+##### Running log: where the threshold sits relative to real candidates
+
+Append one line per observed candidate. This exists so a future recalibration
+reads *accumulated* observations rather than reconstructing them, and so no
+single day's result gets mistaken for a pattern.
+
+**Read the n before the numbers.** Every entry below is one symbol on one day.
+The calibrated thresholds came from 218 candidates; a handful of live
+observations cannot revise them and are not meant to.
+
+| Date | Symbol | Bucket | Score | Threshold | Outcome | Note |
+|---|---|---|---|---|---|---|
+| 2026-09-17 | NEXR | penny | 68 | 72 | near miss, −4 | `rvol` contributed 32.7 of its 35; the one validated component did almost all the work |
+
+**n=1. Nothing follows from this yet.** It is logged because it is the first real
+candidate the calibrated thresholds were ever measured against, not because one
+near miss says the threshold is wrong. A −4 gap is exactly what a 90th-percentile
+cut is supposed to produce most of the time.
+
+The question worth revisiting once there are perhaps 20–30 entries: whether
+near-miss candidates go on to behave like the ones that cleared. That is
+answerable from `momentum_features` — gate-passing rows are persisted regardless
+of whether they cleared the alert threshold, which is what makes the comparison
+possible without changing anything now.
+
 > **The ~2-alerts-a-month figure is PILOT-SCALE, not a property of the approach.**
 > It is measured over 450 stratified symbols of the 4,975 eligible — roughly 9% of
 > the universe. Alert volume scales approximately with universe size, so the full
@@ -857,7 +992,9 @@ thresholds over the 450-symbol pilot it produced **43 closed positions**:
 | `stop_atr` | 0 | — | — | — | never fired first |
 | `timeout` | 0 | — | — | — | never true |
 
-Overall: median exit −2.00%, median peak +1.87%.
+Overall: median exit −2.00%, median peak +1.87%. **Session survival: longest
+position 9 sessions, 0 of 43 reached 20** — the figure that makes finding 2
+interpretable.
 
 **Two structural problems, both visible only because every matching condition is
 recorded rather than just the acted-on one.**
@@ -875,29 +1012,54 @@ geometry that measured inverted for entry. The replay says the concern was
 warranted, though for a different reason than expected — the problem is the
 rule's *sensitivity*, not the direction of its signal.
 
-**2. Two of the five conditions are effectively unreachable.**
+**2. Conditions 4 and 5 never fire — but for two DIFFERENT reasons, and the
+difference decides what a fix would even look like.**
 
-| Condition | fired first | also true | reading |
+| Condition | fired first | also true | why it never fired |
 |---|---|---|---|
 | `breakout_failed` | 19 | 0 | |
 | `lost_vwap` | 7 | 11 | outranked more often than it fires |
 | `momentum_stalled` | 17 | 0 | |
-| `stop_atr` | **0** | 3 | **always outranked — never got to fire** |
-| `timeout` | 0 | 0 | never true; untested by this data |
+| `stop_atr` | **0** | **3** | **suppressed by ORDERING** |
+| `timeout` | **0** | **0** | **its trigger is never reached** |
 
-`stop_atr` was true three times and outranked every time. `timeout` never became
-true at all, because the faster conditions always closed the position first — its
-20-session horizon is unreachable when the median exit arrives on session 1–4.
+These look like one finding in a summary table and are not. Anyone reordering
+§5's priority list needs to know which is which:
 
-So §5's ordering, not just its thresholds, is doing most of the work. A priority
-list where positions 4 and 5 can never be reached is not five rules; it is three.
+- **`stop_atr` is an ordering artifact.** It became true three times and lost the
+  priority contest every time. It is a working condition that never gets a turn,
+  and **reordering would surface it immediately.**
+
+- **`timeout` is not an ordering artifact, and reordering would not help.** It
+  never became true at all. Measured session survival: **the longest-held
+  position lasted 9 sessions, and 0 of 43 reached 20.** `timeout` requires 20
+  sessions *and* no new high, so its trigger is simply never reached. Promoting
+  it to first priority would change nothing. The only thing that would expose it
+  is making the faster conditions less trigger-happy — which is finding 1.
+
+So §5's ordering is doing more work than its thresholds for `stop_atr`, while for
+`timeout` the ordering is irrelevant. A priority list whose 4th entry is
+suppressed and whose 5th is unreachable is **three active rules plus two that
+read as safety nets without functioning as one** — `timeout` in particular
+appears to be a backstop against positions drifting indefinitely, and currently
+cannot catch anything.
 
 **None of this is a fix, and none of it is applied.** The rules are unchanged and
-still exactly as §5 specifies. What exists now is the dataset to judge them on,
-plus a replay harness to test an alternative ordering or a less twitchy
-`breakout_failed` without touching the live path. Standard caveats apply: 43
-positions is small, survivorship bias is present, and fundamentals are
-point-in-time today.
+still exactly as §5 specifies.
+
+That restraint is deliberate, not incompleteness. Tuning exit rules on 43 closed
+positions drawn from the same 450-symbol pilot that produced §4.1 v2's in-sample
+weights would be a fourth round of fitting the same data — and this document has
+already recorded three corrections that were only possible because the full
+decomposition was stored instead of the outcome (§3.2's gate failures, §4.4's
+sub-scores, §5's matched-condition list). Replacing a measured baseline with a
+hand-tuned one would trade that position away for an improvement nobody could
+verify.
+
+What exists now is the baseline, the dataset, and a replay harness that can test
+an alternative ordering or a less twitchy `breakout_failed` without touching the
+live path. Standard caveats apply: 43 positions is small, survivorship bias is
+present, and fundamentals are point-in-time today.
 
 ---
 
@@ -1300,6 +1462,1140 @@ because step 5 is where it bites and step 7 is where it becomes unrecoverable.
 
 ---
 
+## 10.1 Phase 1 — post-upgrade validation (2026-09-21)
+
+Run after the Tiingo Power upgrade. **A measurement step, not a tuning step:**
+no weight, threshold, gate or exit rule was changed. Everything below is
+reported as measured, including the results that go against the design.
+
+### 10.1.0-STATUS Final status: the scanner is a screener (2026-09-22)
+
+**Phase 1 is complete. Its scoring model is not validated and will not be
+used for ranking.**
+
+The pre-registered routing measurement (Phase 2 §2.1) returned **feature
+research only**: on a candidate set selected without lookahead, `rvol_20`'s
+stratified odds ratio is **0.991 (p = 0.947)**, and no other component
+separates either. The user confirmed the route on the rule, unamended.
+
+What Phase 1 delivered, stated plainly:
+
+- **A working screener.** The §3.2 gates are a real, reproducible filter:
+  ~4.5 candidates/day across a 4,975-symbol universe that are up 8-15%
+  (10-40% penny) on unusual volume and clear the liquidity and size bands.
+  That ships.
+- **No demonstrated ranking ability.** `momentum_score_100` is retained as a
+  Phase 2 research baseline and is absent from every alert.
+- **A measurement of why the earlier answer was wrong.** Gate v1 applied
+  today's market cap to historical rows, which preferentially admitted
+  companies that grew — and companies that grew are companies that ran. The
+  leak-corrected group hit at 20.06% against 8.73% in the retained set, and
+  `rvol`'s apparent edge lived there (§10.1.5c).
+
+The bot runs in screener mode (Phase 2 §8.5). Scanning stays disabled until
+enabled explicitly.
+
+### 10.1.0-CA Corporate actions in the daily refresh — a seam we were about to create
+
+Found 2026-09-22 while investigating an apparent NEXR feature discrepancy. The
+discrepancy was not real (see below); the defect it prompted a look at was.
+
+**The defect.** Adjusted prices are rewritten BACKWARDS on every split and every
+dividend. `runDailyBars` fetched only `[now - lookback, now]` and upserted. So
+the first corporate action after a symbol's backfill would leave its stored
+history on the OLD adjustment basis and the newly written bars on the NEW one.
+Every windowed feature spanning the boundary — 20-bar RVOL, 252-bar highs —
+would then be computed across two price scales.
+
+**This is the Twelve Data seam defect, self-inflicted.** That provider was
+rejected in §2.2.1 for alternating adjustment bases within one response. This
+would have produced the same corruption from our own refresh loop, one symbol
+at a time, invisibly — because each individual refresh looks correct in
+isolation and only the join is wrong.
+
+**Nothing is currently corrupted.** The 10-year backfill ran as a single pass on
+2026-09-21, so every bar is on one basis by construction, and the daily refresh
+has not run since. NEXR — five reverse splits, most recently 2026-07-31 — shows
+a cumulative adjustment factor of exactly 11.0000 before that split and 1.0000
+after, with no unexplained step. The exposure was entirely forward-looking.
+
+**The fix.** The action is the trigger: when any bar in the refresh window
+carries `splitFactor != 1` or `divCash != 0`, the symbol's FULL history is
+re-fetched onto one basis. Checked on both fields, because either alone leaves
+the other's seams — dividends rewrite the series exactly as splits do, and they
+are far more frequent. `div_cash` is now captured (migration 021), which also
+closes §2.3's open question.
+
+**A direct seam detector, now possible.** With `raw_close` stored,
+`close / raw_close` is the cumulative adjustment factor, which must be constant
+between corporate actions and step only at one. A step with no split and no
+dividend has no legitimate mechanism. That is arithmetic rather than the
+inference `barquality` makes from price shape, and it is what
+`scripts/seam_audit.py` checks.
+
+First run flagged **52,403 steps across 1,869 symbols** — and they are **not
+seams**. They are dividend adjustments that the audit could not attribute
+because `div_cash` is NULL on every pre-migration bar. Confirmed directly:
+symbol A steps on 2016-09-30, 2016-12-29, 2017-03-31 (quarterly), and Tiingo
+reports `divCash = 0.115` on 2016-09-30. A universe-wide re-fetch is populating
+`div_cash` so the audit can discriminate; until it completes the audit
+over-reports, which is the conservative direction.
+
+#### A stale daemon silently wrote half the re-fetch on the old code path
+
+Worth recording because the symptom was indistinguishable from a data bug.
+
+After deploying `div_cash` capture and re-fetching the universe, the backfill
+reported `done=4975` while only **64.5% of bars** carried `div_cash` — 1,773
+symbols had none at all, despite clearly having been re-fetched (their newest
+bar was later than the previous run's).
+
+The source was correct, the binary was newer than the source, and Tiingo
+returns `divCash: 0.0` for the affected symbols. Nothing about the code
+explained it.
+
+**Cause: a `data-universe` process launched the previous evening was still
+running, 13.5 hours later, on the OLD binary.** Rebuilding `/tmp/data-universe`
+replaced the file but not the running process, and both instances were claiming
+symbols from the same `backfill_status='pending'` queue. The old one wrote bars
+without `div_cash`; the new one wrote them with. The 64.5% was the race's split.
+
+Three things generalise:
+
+1. **A rebuilt binary does not restart a running daemon**, and this repo's
+   workers are daemons with internal timers, not one-shot jobs. Any
+   deploy-then-verify cycle has to kill the old process explicitly.
+2. **A shared work queue makes two versions look like one inconsistent
+   version.** Because claims are atomic, neither process errored and neither
+   log showed anything unusual. The only visible artefact was a column that
+   was populated for some rows and not others — which reads as a bug in the
+   column.
+3. **`done` meant "every symbol was claimed and written by someone"**, which
+   is a weaker statement than it appears when more than one writer exists.
+
+Repair: stale processes killed, symbols with any missing `div_cash` requeued,
+re-fetched by a single verified instance. The seam audit runs only after that
+completes, because running it against a half-old dataset would have produced
+exactly the unattributed steps it is meant to detect — and they would have been
+our own artefact, not a provider one.
+
+#### Seam-audit acceptance criterion — set 2026-09-22, BEFORE the re-fetch finished
+
+Written before the result, for the same reason the routing rule was.
+
+> **Criterion.** After the `div_cash` re-fetch, every step in
+> `close / raw_close` must be attributable to a `split_factor` or a `div_cash`
+> recorded on that same session.
+>
+> **Tolerance: a step is REAL when the relative change exceeds 1e-3
+> (0.1%); an attribution MATCHES when predicted and observed factors agree to
+> within 1e-3 relative.**
+>
+> **Clean = ZERO unattributed steps, or a short list where each one is
+> individually explained.** A count alone does not clear it.
+>
+> **Any unexplained step blocks P2-3 until it is understood.**
+
+**Why 1e-3, both ways.** Two numbers set the floor and the ceiling:
+
+- *Floor.* `close` and `raw_close` are stored as `double precision` but arrive
+  from Tiingo already rounded to 4 decimal places. On a sub-dollar penny name
+  a 4-dp rounding is worth up to ~1e-4 relative on each of the two values, so
+  their ratio carries a few parts in 10,000 of pure quantisation noise. A
+  tolerance at 1e-4 would flag rounding; 1e-3 sits an order of magnitude above
+  it.
+- *Ceiling.* The smallest real adjustment we need to catch is a modest
+  quarterly dividend. Symbol A's 2016-09-30 dividend of $0.115 on a $47 close
+  moved the factor from 0.9249 to 0.9272 — **2.5e-3 relative**. That is above
+  1e-3, so the tolerance still catches the smallest economically meaningful
+  action in this dataset, with roughly 2.5x margin.
+
+Anything between those bounds is unresolvable with 4-dp inputs and is
+deliberately not chased.
+
+**Also reported:** how many full re-fetches the corporate-action trigger causes
+per day on average, measured from recent history, so the ongoing daily cost of
+the fix is a known number rather than an assumption.
+
+#### Audit RESULT (2026-09-22) — criterion met, and it caught a real seam we made
+
+Final state after the `div_cash` re-fetch. LIVE, from `scripts/seam_audit.py`:
+
+```
+bars: 9,205,082 across 4,971 symbols   raw_close 100%  split_factor 100%  div_cash 100%
+steps flagged by the ratio test:   336
+  spanning >=1 missed session:     332   EXPLAINED (action fell on an unstored session)
+  UNATTRIBUTED:                      4
+```
+
+**The criterion permits a short individually-explained list. All four:**
+
+| # | Step | Explanation |
+|---|---|---|
+| 1 | ADTN 2023-08-16 | Tiingo begins a dividend adjustment ~2 sessions BEFORE the ex-date. The step magnitude is exactly `1/(1 + 0.09/8.14)` — error **4e-7**. The dividend is real and recorded; only its start date is early. |
+| 2 | BRN 2023-08-21 | Same, `1/(1 + 0.015/2.46)`, error **4e-7**. |
+| 3-4 | JCSE 2024-12-10, 2026-01-29 | `div_cash` NULL. Tiingo now serves **1 bar total** for JCSE over an 11-year window, so its 1,107 stored bars are an unrefreshable remnant. `HWH` is the same, returning **0 bars** (`no_bars_returned`). |
+
+**Zero seams of our own making remain.** 1 and 2 are a provider timing quirk with
+the magnitude exactly right; 3 and 4 are symbols whose history the provider no
+longer serves.
+
+That last class is worth carrying into P2-3: **Tiingo silently stops serving
+back history for some delisted names**, which is survivorship acting at the
+provider layer rather than in our universe filter.
+
+#### The audit caught a seam the REPAIR created
+
+Not a hypothetical. The first clean-ish run left 13 flags all on **2016-09-22**,
+the second bar of the window. Cause:
+
+```
+2026-09-21  backfill stores bars from 2016-09-21
+2026-09-21  DTE, EPM, WHF go EX-DIVIDEND -> adjusted history rewritten backwards
+2026-09-22  re-fetch uses now-10y = 2016-09-22 as its start
+            -> the 2016-09-21 bar falls OUTSIDE the window, keeps the OLD basis
+```
+
+A rolling `now - N years` window advances daily, so **every re-run orphans the
+previous run's oldest bar**. `refetchFullHistory` now anchors to the earliest
+STORED bar instead, with a one-week buffer.
+
+The audit found this within hours of the mechanism being introduced, on 17
+symbols, which is the strongest available evidence that it works: it detected a
+one-bar, 1%-scale inconsistency in 9.2M bars.
+
+#### Ongoing cost of the corporate-action trigger
+
+LIVE, last 250 sessions:
+
+| | full re-fetches/day |
+|---|---|
+| mean | **27.1** |
+| median | 21 |
+| p90 | 60 |
+| worst day | 110 |
+
+At ~2,500 bars per 10-year re-fetch and 2 req/s, a median day adds ~21 requests
+(one per symbol) to the ~4,975 of the daily refresh — **under 0.5%** of the
+90,000/day budget. Even the worst day is 110 extra requests. The fix is
+effectively free; what it costs is wall clock on the write path, not quota.
+
+#### The NEXR "discrepancy" was a synthetic test fixture
+
+Reported as: the same symbol-day showing RVOL 6.7x / RSI 36 / 52W 0.19% in the
+live test and 4.2x / 68 / 41% in a later report, with the hypothesis that the
+10-year re-backfill fetched a different adjusted history.
+
+**It did not.** The second set of numbers came from `sample_row()`, the
+hardcoded fixture in `test_momentum.py`, rendered while demonstrating the
+screener embed. Only `change_pct` and `dollar_volume` in that fixture were
+copied from real data, which is what made it look like the same bar.
+
+Querying the stored series for that exact day returns RVOL **6.74** and 52W
+high **0.22%** — reproducing the live test. The re-backfill changed nothing.
+
+Recorded because the inference was correct given what was shown, and because
+the lesson is about presentation rather than data: **rendering fixture output
+as "the actual output" invites exactly this**, and it cost a real investigation
+to rule out. The investigation was still worth it — it found the refresh
+defect.
+
+### 10.1.0 Rulings (recorded 2026-09-21, after review)
+
+**1. §4.1 v2 is NOT CONFIRMED out-of-sample.**
+
+The pooled B+C test returned p = 0.017 and that verdict is withdrawn. The
+separation is a **bucket-composition artifact**: v2 separates in neither bucket
+(penny p = 0.891, market p = 0.645), the top third holds six times the penny
+share of the bottom third (9.2% against 1.6%), penny names hit at 35% against
+market names' 9%, and 97% of the apparent effect is explained by that mix alone
+— leaving 0.07pp within buckets on 6,924 episodes. Full decomposition in
+§10.1.4.
+
+**The pooled criterion was a flaw in the pre-registration itself, not in the
+analysis.** Criterion 1 was written as a single pooled B+C test, and pooling
+across buckets is precisely what allows composition to pose as ranking. The
+analysis applied the criterion correctly and the criterion was wrong. This is
+worth recording plainly because the pre-registration was supposed to be the
+safeguard, and a safeguard that can be satisfied by an artifact is the more
+dangerous kind of error — it converts a wrong answer into an authorised one.
+
+Consequence for Phase 2, now binding in its §4.2: **every acceptance test must
+be bucket-stratified**, reported per bucket and/or combined with a stratified
+test such as Cochran-Mantel-Haenszel. **Pooled-across-bucket tests are forbidden
+as acceptance evidence.**
+
+**2. Three findings recorded. No weight changes.**
+
+| Finding | Status |
+|---|---|
+| `rvol_20` replicated out-of-sample | **SUPERSEDED 2026-09-21.** Confirmed on the gate-v1 sample (§10.1.5a), but that sample was selected with today's market cap. On the gate-v2 sample it does **not** separate within either bucket and the MH odds ratio is 0.983 (§10.1.5b) |
+| The `high52w` inversion replicated | **CONFIRMED** (-7.65pp, p < 0.001) |
+| `breakout_state` is two opposite effects under one name | **RECORDED** as a design finding: plain `breakout` hits 20.89%, `breakout_from_consolidation` 6.42% |
+
+Weights, thresholds, gates and exits are unchanged.
+`BOT_MOMENTUM_SCAN_ENABLE` remains **false** — the 70/67 threshold agreement
+(§10.1.8) governs alert *volume*, and volume calibration is not a reason to
+alert on a score that does not rank within buckets.
+
+**3. `rvol_20` is genuine but small — and falls BELOW Phase 2's own minimum
+effect size.**
+
+It survives stratification (CMH p = 0.017 by bucket, p = 0.037 by bucket x atr
+tercile), so it is a real signal. But:
+
+- **MH common odds ratio 1.215** (bucket) and **1.192** (bucket x atr tercile).
+- **Phase 2 §4.2.0 Rule 2 sets the floor at MH OR >= 1.25.**
+- **Therefore, under Phase 2's own binding rule, `rvol_20` is NOT a validated
+  component.** It is a real effect that is too small to accept as evidence for
+  shipping anything.
+- ~64% of its pooled effect was composition, and what survives is concentrated
+  in the top `atr_pct` tercile (+9.68pp there, +0.26pp in the bottom).
+
+**The bar stays where it is.** Two reasons worth recording:
+
+1. **It was set in the same batch as this test, and it cuts against the known
+   result rather than admitting it.** An effect-size floor chosen after seeing
+   that rvol lands at 1.19-1.215, and set at 1.15 so that rvol passes, would be
+   the same in-sample fitting this whole protocol exists to prevent — only
+   applied to the acceptance rule instead of the weights. The floor was written
+   to exclude results of the size this project has actually been producing, and
+   it does, including the one result we like.
+2. Raising rvol to "validated" would license exactly the decision that has
+   already been declined twice: staking alerts on a small effect concentrated in
+   the names with the worst drawdowns (§4.1).
+
+**No switch to an rvol-only score.** It is now out-of-sample supported and
+stratification-robust, so it is defensible in principle, and it still fails the
+effect-size floor. It remains a Phase 2 baseline (§5.3) and a model feature, not
+an alerting rule.
+
+**4. What this implies for Phase 2's expected outcome.**
+
+The only signal found across the whole post-upgrade validation is small, below
+the acceptance floor, and concentrated in the most volatile names — which are
+also the names that crash hardest. **"No edge on daily bars" is now a realistic
+Phase 2 outcome rather than a tail risk.** Phase 2 §1 records this, and §12's
+rule stands: that is a complete deliverable, not a failure to be avoided by
+searching harder.
+
+### 10.1.0a Reconciliation: the two `shares_outstanding` statements (2026-09-21)
+
+Two claims in these reports appeared to contradict each other:
+
+1. "Coverage is 98.1%, and the pipeline always read the right value; only the
+   report query was wrong." (§10.1.2)
+2. "The production universe loader wrote NULL for 59% of symbols."
+   (§10.1.10, the DISTINCT ON audit)
+
+**Both are true. They describe different consumers, and only one of them feeds
+scoring.** Establishing which is not a formality: if scoring had read the
+NULL-laden column, then the float sub-score and the §3.9 `market_cap_est`
+fallback were missing for most of the universe, and the float component's
+"resolved" status would rest on mostly-absent data.
+
+#### What the scoring path actually reads
+
+**`equity_fundamentals`, directly, with a `value IS NOT NULL AND value > 0`
+filter** — not `universe_symbols`. This holds for all four consumers:
+`momentum-backtest` (Step 7 and the post-upgrade run), `momentum-scanner` (the
+live daily path), `momentum-tracker`, and `momentum-dryrun`. Each calls its own
+`loadMetric` and feeds the result into `ScoreInput.FloatSharesEst`.
+
+Because the NOT NULL filter sits in the `WHERE` clause, `DISTINCT ON` chooses
+among **non-null rows only**. The tie that broke the universe loader could not
+arise: the NULL-by-design `finnhub_metric` row was excluded before the ordering
+was applied. The missing `ORDER BY ... source` was a determinism gap in these
+queries, not a correctness one, and it has been closed anyway (migration 015).
+
+#### Coverage at scoring time, measured
+
+| Quantity | Value |
+|---|---|
+| Candidate rows in the post-upgrade extract | 9,571 |
+| Rows whose symbol **had** a usable share count | **9,567 (100.0%)** |
+| Rows with no share count | **4 (0.0%)** |
+| Distinct candidate symbols with a share count | **2,015 / 2,018 (99.9%)** |
+| Rows with a real `market_cap` | **9,571 (100.0%)** |
+| Rows that fell back to `market_cap_est` | **0** |
+
+`market_cap_est` was used **zero times** among candidates, which follows from
+the gate itself: a symbol with no market cap fails §3.2 with
+`market_cap_unavailable` and never becomes a candidate.
+
+#### The 59% figure: a real defect in a path with no readers
+
+`LoadFundamentalsFromEquityFundamentals` populates
+`universe_symbols.shares_outstanding` / `.market_cap`. Two facts about it:
+
+1. **Nothing in the repository reads those two columns.** A search across both
+   Go services and the Python bot returns no consumer.
+2. **It never ran during this work.** `universe_symbols.shares_outstanding`,
+   `.market_cap` and `.fundamentals_ts` are all **0 populated across all 4,975
+   eligible symbols.**
+
+So the 59% was measured by executing the loader's query by hand, not by
+observing damaged data. It was a genuine latent defect — it would have written
+NULL the moment the loader ran — in a write path whose output nothing consumes.
+Worth fixing, and it changes no result.
+
+#### Annotation of the affected Phase 1 results
+
+Every result below is hereby recorded as **computed with 99.9% share-count
+coverage among candidates**:
+
+| Result | Status after reconciliation |
+|---|---|
+| `float` sub-score (§4.2 band scores) | Computed on real data for 9,567 of 9,571 candidate rows. **Not affected.** |
+| `float` component's resolved/unresolved status | Not driven by missing data. See the caveat below on what it *is* driven by. |
+| §3.9 `market_cap_est` fallback | **Never exercised** among candidates (0 rows). Its behaviour remains untested by this dataset. |
+| §3.2 market-cap gate | 100% of candidates had a real market cap. |
+| Step 7 (the original 218) and the post-upgrade run | Both read `equity_fundamentals`; neither touched `universe_symbols`. |
+
+**One caveat that does apply to the float component.** `sub_float = 0` is
+ambiguous in the extract: `floatPoints` returns 0 both for a missing estimate
+and for a genuine float of 300M shares or more. 913 of 9,571 candidates score
+0, and on the coverage measured above essentially all of them are **real
+large-float names**, not gaps. Anyone reading the extract's `sub_float` column
+as a coverage proxy will get 90.5% and be wrong by nine points; coverage has to
+be measured against `equity_fundamentals`, as above. The component's status is
+therefore limited by the **band design and by the point-in-time problem**
+(§3.2), not by absent data.
+
+---
+
+### 10.1.1 What was done
+
+| Step | Result |
+|---|---|
+| Tiingo Power verified | Token unchanged; **179 requests in 111s, zero 429s** (free tier refused at 51-74). $30/mo, purchased 2026-09-21. See `SUBSCRIPTIONS_PLANS.md`. |
+| Subset constraint lifted | `TIINGO_MAX_SELECTED_SYMBOLS` 450 -> 6,000; assertion kept. Pilot cohort frozen in `momentum_pilot_cohort` (migration 013), hash `718ea0e2d6c9d67f63e1c8206ffcc298`. |
+| History 3y -> 10y | **4,975 symbols, 8,622,252 bars, 2016-09-21 .. 2026-09-18.** Projected 2.25 GB, 5.6% of the 40 GB/month allowance. |
+| Raw close + splitFactor | Migration 012. **100% of Tiingo bars carry both.** No feature reads them. |
+| Bar-audit | 548/4,971 symbols flagged (**11.0%**) vs the pilot's ~8%. Decomposed in §2.3: the rise is the longer window, not the wider universe. |
+| Fundamentals, full universe | `market_cap` **4,865/4,975 (97.8%)**; `shares_outstanding` **4,881/4,975 (98.1%)** (first reported as 38.4% — query bug, corrected in §10.1.2). |
+| Lockbox reserved | 1,783 rows / 1,626 episodes / 1,037 symbols, 2025-03-28 .. 2026-03-27. Reserved **before** any evaluation. Phase 2 §4.3. |
+| OOS report | 9,571 evaluable candidates (Phase 1 had 218). Populations A/B/C, row and episode level. |
+| Exit replay | **1,545 positions** (Phase 1 had 43). First reported as 119 on a pilot-scoped run; corrected in §10.1.9. |
+| Daily refresh | 4,975 req/day = **5.5%** of the configured daily budget. |
+
+`BOT_MOMENTUM_SCAN_ENABLE` remains **false**.
+
+### 10.1.2 Fundamentals coverage (step 3)
+
+> **CORRECTED 2026-09-21.** This section first reported `shares_outstanding`
+> coverage as **1,910 / 4,975 (38.4%)**. That figure was wrong, and the error was
+> in the reporting query, not the data. See the correction note below.
+
+| Field | Eligible symbols covered | Note |
+|---|---|---|
+| `market_cap` | 4,865 / 4,975 (**97.8%**) | from Finnhub `/stock/metric` |
+| `shares_outstanding` | 4,881 / 4,975 (**98.1%**) | from `/stock/profile2` |
+| relying on `market_cap_est` | **34** | no market cap, but shares available |
+| no bucket assignable | **76** (1.5%) | neither field usable; never gated or scored |
+
+Bucket split among symbols with a usable market cap: **1,800 penny / 3,065 market**.
+
+#### The 38.4% figure was a query bug of exactly the kind this project keeps finding
+
+Each symbol carries **two** `shares_outstanding` rows at the same timestamp,
+because two Finnhub endpoints are written under one metric name:
+
+```
+A  2026-09-21 14:36:25  ttm  finnhub_metric     (NULL)
+A  2026-09-21 14:36:25  ttm  finnhub_profile2   282430000
+```
+
+`/stock/metric` does not report a share count, so its row is NULL by design;
+`/stock/profile2` carries the value. Both are legitimate rows — the primary key
+is `(symbol, period, metric, source, ts)`.
+
+The reporting query used `DISTINCT ON (symbol) ... ORDER BY symbol, ts DESC`
+**without disambiguating `source`**. The two rows tie on `ts`, so Postgres was
+free to return either, and it returned the NULL one for most symbols. Every
+scoring consumer (`loadMetric`) filters `value IS NOT NULL` before taking the
+latest, so **the scoring path was always reading the right value** — only the
+coverage report was wrong. §10.1.0a reconciles this against the 59% figure from
+the DISTINCT ON audit, which concerns a different consumer with no readers.
+
+It surfaced because the rescoped exit replay printed metric coverage from the
+rows it actually used (98.2%) next to a section claiming 38.4%. That is the
+denominator guard of §10.1.10 earning its place on its first run: the
+contradiction was visible because two independent paths were made to state their
+denominators.
+
+**What this changes.** The EDGAR work in Phase 2 §3.2 is **still necessary, but
+not for this reason.** Its actual justification is lookahead: today's share count
+applied to a 2017 row is information from the future, and small caps that run
+issue shares into the run, so the contamination is systematic rather than random.
+That argument is untouched. The *coverage* argument — "three fifths of the
+universe has no share count" — was never true and is withdrawn. §3.9's float
+proxy is likewise in better shape than reported.
+
+### 10.1.3 The out-of-sample result on frozen v2
+
+Populations, reported separately and never pooled (Phase 2 §4.2.1):
+
+| Pop | Rows | Episodes | Symbols | Definition |
+|---|---|---|---|---|
+| A | 328 | 311 | 135 | pilot symbols, 2023-09 onward — **in-sample, reference only** |
+| B | 2,065 | 1,923 | 1,109 | new symbols, 2023-09 onward — OOS |
+| C | 5,395 | 5,001 | 1,411 | all symbols, before 2023-09 — OOS |
+| **B+C** | **7,460** | **6,924** | **1,702** | **the headline OOS number** |
+
+Lockbox rows (1,783) are excluded from all of them.
+
+#### v2 top-vs-bottom third, episode level (the authoritative cut)
+
+| Pop | top | bottom | delta | p | verdict |
+|---|---|---|---|---|---|
+| A (in-sample) | 17.48% | 11.65% | +5.83pp | 0.236 | not significant even in-sample |
+| B | 12.79% | 9.52% | +3.28pp | 0.062 | **not significant** |
+| C | 11.88% | 10.14% | +1.74pp | 0.109 | **not significant** |
+| **B+C** | **12.22%** | **10.01%** | **+2.21pp** | **0.017** | meets criterion 1 |
+
+Against the pre-registered criteria as written, criterion 1 is met. **The
+verdict is withdrawn** — see §10.1.0 and the decomposition in §10.1.4. The
+criterion was pooled, and a pooled test cannot separate ranking from
+composition.
+
+### 10.1.4 The finding that matters: v2's separation is bucket composition
+
+v2 separates on B+C pooled (p = 0.017) and separates in **neither bucket**:
+
+| Bucket | n (episodes) | base rate | top | bottom | p |
+|---|---|---|---|---|---|
+| penny | 362 | 35.08% | 34.17% | 33.33% | 0.891 |
+| market | 6,562 | 9.17% | 9.42% | 9.83% | 0.645 |
+
+A score that discriminates in no stratum but discriminates when the strata are
+combined is not discriminating. It is sorting on stratum membership. The penny
+bucket hits at 35% and the market bucket at 9%, so any score that puts more
+penny names in its top third will show separation without ranking anything
+within either group.
+
+That is exactly what it does:
+
+| Third | penny share | hit rate |
+|---|---|---|
+| bottom | 36 / 2,308 = **1.6%** | 10.01% |
+| top | 212 / 2,308 = **9.2%** | 12.05% |
+
+Applying the two base rates to those mixes:
+
+```
+bottom third   expected from mix alone  9.58%    observed 10.01%
+top third      expected from mix alone 11.55%    observed 12.05%
+
+separation predicted by composition alone   1.97pp
+separation observed                         2.04pp
+                                            ------
+share of the effect explained by mix          97%
+```
+
+**97% of v2's apparent out-of-sample separation is bucket composition.** The
+within-bucket residual is 0.07pp, on 6,924 episodes.
+
+This is not a small caveat on a positive result; it inverts it. v2 is scored
+separately per bucket precisely so that penny and market names are ranked
+against their own kind, and the pooled statistic quietly undoes that. A
+pre-registered criterion was met by a mechanism the criterion was not written to
+detect — which is an argument for reporting per-stratum results always, not for
+a better criterion.
+
+**Reading:** v2 as a ranker is **NOT CONFIRMED out-of-sample** (ruling,
+§10.1.0). The pooled test passed and the stratified tests — the ones that
+correspond to how the score is actually used, since v2 is scored and thresholded
+per bucket — did not.
+
+### 10.1.5 rvol replicates; the inversion replicates
+
+**`rvol_20` (criterion 2): CONFIRMED.** Same direction as Phase 1, at far
+greater strength, and in both OOS populations independently:
+
+| Pop | rvol-alone top | bottom | delta | p |
+|---|---|---|---|---|
+| A | 20.39% | 6.80% | +13.59pp | 0.004 |
+| B | 15.44% | 7.96% | +7.49pp | <0.001 |
+| C | 13.62% | 8.04% | +5.58pp | <0.001 |
+| **B+C** | **13.91%** | **8.23%** | **+5.68pp** | **<0.001** |
+
+Phase 1 saw p = 0.012 on 218 candidates and called it the one component with
+evidence behind it. On 6,924 out-of-sample episodes it holds, in the same
+direction, in every population separately. This is the clearest positive result
+of the phase — and note that **rvol-alone separates more strongly than the full
+v2 score does** (+5.68pp against +2.21pp).
+
+**`high52w` inversion (criterion 3): CONFIRMED.** Episodes above the median
+`pct_of_52w_high` hit at 6.70% against 14.36% below it, **-7.65pp, p < 0.001**.
+Phase 1's finding that proximity to the 52-week high is *negatively* related to
+a subsequent double is not noise. Zeroing it in v2 was right, and the sign is
+now established well enough to use as a feature in Phase 2 with the model
+learning the direction.
+
+**`breakout`: the inversion is state-specific, and the pooled sign was hiding
+that.**
+
+| `breakout_state` | n | hit% |
+|---|---|---|
+| `breakout_from_consolidation` | 4,109 | **6.42%** |
+| `none` | 1,618 | 15.57% |
+| `breakout` | 876 | **20.89%** |
+| `approaching` | 321 | 9.35% |
+
+`breakout_from_consolidation` vs `none` is -9.15pp (p < 0.001), so the negative
+direction replicates for that state. But a plain `breakout` is the **best**
+state in the table at 20.89%, well above the 10.53% base rate. Phase 1 measured
+"breakout geometry" as one inverted component; it is two effects with opposite
+signs, and the dominant state (4,109 of 6,924 episodes) carries the negative
+one.
+
+That is a **new** finding and it is a design observation, not a tuning one: the
+component collapses four states onto one axis, and no single weight can be right
+for both `breakout` at 20.89% and `breakout_from_consolidation` at 6.42%.
+
+### 10.1.5a Does `rvol_20` survive stratification? Yes — at a third of the size
+
+Because v2's pooled pass turned out to be composition, `rvol_20` had to face the
+same question. "Independently significant in B and C" separates by **time
+period**, not by bucket, so it did not answer it.
+
+Every rvol split below is computed **within** its stratum. Splitting globally
+and then counting per stratum would reintroduce the exact confound being tested.
+Population B+C, episode level, lockbox and population A excluded, n = 6,924.
+Harness: `scripts/rvol_stratification_check.py`.
+
+**Within each bucket**
+
+| Bucket | n | base rate | rvol top tercile | bottom | delta | RR | p |
+|---|---|---|---|---|---|---|---|
+| market | 6,562 | 9.17% | 10.43% | 8.14% | **+2.29pp** | 1.28 | **0.009** |
+| penny | 362 | 35.08% | 34.17% | 31.40% | +2.76pp | 1.09 | 0.648 |
+
+**Within `atr_pct` terciles** (volatility held roughly constant)
+
+| Tercile | n | base rate | rvol top | bottom | delta | RR | p |
+|---|---|---|---|---|---|---|---|
+| atr low | 2,309 | 1.34% | 1.30% | 1.04% | +0.26pp | 1.25 | 0.633 |
+| atr mid | 2,308 | 7.76% | 8.71% | 6.23% | +2.48pp | 1.40 | 0.064 |
+| atr high | 2,307 | 22.50% | 28.26% | 18.57% | **+9.68pp** | 1.52 | **<0.001** |
+
+**Cochran-Mantel-Haenszel** — pools evidence across strata without ever
+comparing across them, which is the property the pooled v2 test lacked:
+
+| Stratification | strata | CMH chi-sq (1 df) | p | MH common OR |
+|---|---|---|---|---|
+| by bucket | 2 | 5.72 | **0.017** | **1.215** |
+| by bucket x atr tercile | 5 | 4.35 | **0.037** | **1.192** |
+
+**Verdict: `rvol_20` SURVIVES both stratified tests.** It is a genuine signal,
+not a composition artifact. That is the answer to the question asked.
+
+**But most of its pooled effect was composition too.** On the same median split
+throughout, so the comparison is like-for-like:
+
+```
+crude, unstratified                       OR 1.529   excess odds 0.529
+stratified by bucket                      OR 1.215   excess odds 0.215   (59% was bucket mix)
+stratified by bucket x atr tercile        OR 1.192   excess odds 0.192   (64% was bucket + volatility)
+```
+
+**The surviving effect is 2.8x smaller than the pooled number advertised.** The
+headline "+5.68pp, p < 0.001" becomes +2.29pp within the market bucket and an
+odds ratio of 1.19 once volatility is also held constant.
+
+Two qualifications that matter more than the p-values:
+
+1. **The signal lives almost entirely in high-volatility names.** +9.68pp in the
+   top atr tercile, +2.48pp in the middle (p = 0.064), +0.26pp in the bottom
+   (p = 0.633). So the honest statement is *"among already-volatile names,
+   higher relative volume helps"* — not *"rvol predicts doubles."* It is
+   entangled with the volatility confound rather than independent of it.
+2. **The penny bucket is unresolved, not negative.** n = 362 with a 35% base
+   rate has little power; +2.76pp at p = 0.648 is an absence of evidence. Per
+   criterion 4 it stays **unresolved**. Note also that penny and volatility are
+   nearly collinear here — 329 of 362 penny episodes sit in the top atr tercile,
+   and the penny/atr-low cell holds 2 episodes — so "bucket" and "volatility"
+   are not cleanly separable strata in this data.
+
+**Practical reading:** rvol is defensible as a signal in the market bucket and
+unproven in the penny bucket, at roughly a third of the strength the pooled
+report suggested. That is enough to build on in Phase 2 as a baseline and a
+feature. It is not enough to justify switching the live score to rvol-only,
+which would stake alerting on a 1.19 odds ratio concentrated in the names that
+also crash hardest (§4.1's drawdown finding).
+
+### 10.1.5b `rvol_20` does NOT survive on the gate-v2 candidate set (2026-09-21)
+
+§10.1.5a concluded that `rvol_20` survives bucket and volatility stratification.
+**That conclusion is withdrawn.** It was measured on a candidate set selected
+with today's market cap, and on the corrected set it does not hold.
+
+Descriptive re-measure, episode level, lockbox region excluded. Identical code,
+identical statistics; the only change is which symbol-days passed §3.2.
+
+| Test | gate v1 (as reported in §10.1.5a) | **gate v2 (corrected sample)** |
+|---|---|---|
+| within market bucket | +2.29pp, RR 1.28, **p = 0.009** | **+0.39pp, RR 1.06, p = 0.622** |
+| within penny bucket | +2.76pp, p = 0.648 | **−0.32pp, p = 0.951** |
+| CMH by bucket | χ² 5.72, **p = 0.017**, MH OR **1.215** | **χ² 0.02, p = 0.877, MH OR 0.983** |
+| CMH by bucket × atr tercile | χ² 4.35, **p = 0.037**, MH OR **1.192** | **χ² 0.02, p = 0.897, MH OR 0.985** |
+
+**The Mantel-Haenszel common odds ratio falls from 1.215 to 0.983.** Not reduced
+— gone. 0.983 is indistinguishable from no effect, and slightly the wrong side
+of 1.
+
+#### The change is the gate, not the lockbox
+
+Both changed in the same batch, so attribution was checked rather than assumed.
+Re-running **gate v1 under the new region-based lockbox** reproduces §10.1.5a
+exactly: +2.29pp, p = 0.009, CMH p = 0.017, MH OR 1.215 — identical to three
+decimal places. The region and the old row list coincide for gate-v1
+candidates, which is expected, since the row list *was* the gate-v1 candidates
+in that window.
+
+**So the entire change is attributable to gate v2.**
+
+#### What survives, and what it turns out to be
+
+The pooled result is still strong (+7.05pp, p < 0.001), and so is the
+unstratified `atr_pct`-tercile split (+14.61pp in the top tercile, p < 0.001).
+Crossing the two explains both:
+
+| stratum | high-rvol hit% | low-rvol hit% |
+|---|---|---|
+| market / atr high | 14.42% | **15.22%** |
+| penny / atr high | 41.70% | **46.56%** |
+| market / atr mid | 7.20% | 5.92% |
+| market / atr low | 1.25% | 1.07% |
+
+**In the high-volatility cells — the ones carrying the pooled effect — rvol
+points the WRONG WAY in both buckets.** The apparent "+14.61pp in the top atr
+tercile" from §10.1.5a was itself a bucket-composition artifact: the top
+`atr_pct` tercile mixes penny names (42% base rate) with market names (7%), and
+sorting on rvol within that mixture sorts partly on bucket.
+
+That is the same failure mode as v2's score, one level down, and it survived the
+first stratified check because the *candidate set* was contaminated even though
+the *strata* were clean.
+
+#### Consequences
+
+1. **`rvol_20` is not a validated component and is no longer even a replicated
+   one** on the corrected sample. Phase 1 §10.1.0's ruling 3 said it was
+   "genuine but small and below the effect-size floor"; the honest statement now
+   is **unresolved at best, absent at worst**.
+2. **The Phase 2 entry gate (§2 of that spec) must be re-read.** Its table says
+   the full plan proceeds if `rvol` replicates out-of-sample, and the
+   feature-research-only path applies if **nothing replicates**. On the
+   gate-v2 sample, nothing does. That is a decision for the user, not the agent,
+   and it is flagged rather than acted on.
+3. **This is descriptive, not a new test.** No weight, threshold, gate band or
+   exit rule changed. It re-runs the same pre-registered statistics on a
+   candidate set that is no longer chosen with information from the future.
+4. **Nothing here is evidence that the strategy is worse than believed.** It is
+   evidence that the earlier measurement was made on the wrong sample. The
+   corrected sample is smaller in overlap than either version's total (§3.2.2:
+   42.3% churn), so this is the first measurement of this question on data
+   selected without lookahead.
+
+Base rates also move materially, which is worth noting before anything is
+compared across versions: market 9.17% → **6.94%**, penny 35.08% → **42.20%**.
+Results computed under different gate versions are not comparable and must never
+be pooled.
+
+### 10.1.5c Decomposing the gate change: the `rvol` signal was in the LEAK group
+
+§10.1.5b showed `rvol` losing its separation under gate v2. Gate v2 bundled two
+changes, so that result could not be read yet:
+
+- **the leak correction** — rows whose point-in-time cap falls outside the
+  bucket's band are rejected. The actual fix.
+- **a coverage exclusion** — rows with no EDGAR share count are rejected too.
+  Not random: 48.7% of uncovered symbols listed after 2023-09, against 16.2% of
+  covered ones, and post-IPO months are exactly where momentum runs plausibly
+  live.
+
+If the signal sat in the leak group it was an artifact. If it sat in the
+coverage groups, v2 was a coverage question, not a verdict. Decomposed
+descriptively (`scripts/decompose_gate_change.py`), episode level, lockbox
+region and population A excluded:
+
+| Group | episodes | hit% | penny hit% | market hit% |
+|---|---|---|---|---|
+| in both v1 and v2 | 4,877 | 8.73% | 36.22% | 6.79% |
+| **v1-only: PIT cap outside band [LEAK]** | **982** | **20.06%** | 22.22% | 20.04% |
+| v1-only: no EDGAR series [COVERAGE] | 832 | 8.65% | 30.43% | 8.03% |
+| v1-only: bar predates 1st filing [COVERAGE] | 233 | 14.59% | 14.29% | 14.60% |
+| v2-only: eligible, never studied | 1,844 | 12.53% | 50.90% | 7.27% |
+
+**The leak group hits at 20.06% against 8.73% in the retained set — 2.3x the
+base rate.** That is the signature of lookahead doing exactly what it does:
+today's large market cap identifies companies that *grew*, and companies that
+grew are companies that ran. Gate v1 was preferentially admitting winners.
+
+`rvol_20` within-bucket separation, computed **within each group**:
+
+| Group | bucket | n | delta | p |
+|---|---|---|---|---|
+| in both v1 and v2 | market | 4,554 | +0.53pp | 0.560 |
+| **v1-only [LEAK]** | market | 973 | **+4.63pp** | 0.140 |
+| v1-only: no EDGAR series [COVERAGE] | market | 809 | **−2.60pp** | 0.266 |
+| v1-only: pre-first-filing [COVERAGE] | market | 226 | +2.67pp | 0.631 |
+| v2-only | market | 1,622 | −0.56pp | 0.732 |
+
+**`rvol`'s positive separation is concentrated in the leak group (+4.63pp),
+absent in the retained rows (+0.53pp), and NEGATIVE in the largest coverage
+group (−2.60pp).** None reaches p < 0.05 individually — the groups are small
+once split — but the pattern is unambiguous, and it is the opposite of the
+coverage explanation.
+
+#### The coverage confound turned out to be near-empty, for a reason nobody planned
+
+Listing age by group was **0.0–0.2% in every group**. The hypothesis that the
+coverage exclusion removes recent listings is true of *symbols* and false of
+*candidates*:
+
+- symbols listed after 2023-09: **1,100 of 4,971**
+- candidate rows they supply: **173 of 9,571 (1.81%)**
+- of those, inside the lockbox window: **164 (95%)** — leaving **~9 rows**
+
+§3.1's 252-bar history minimum plus §6's 120-session label horizon mean a
+symbol listed after 2023-09 cannot produce a complete-label candidate until
+roughly 2025-03, which is where the lockbox begins. **Recent listings were
+already absent from the evaluable set, for reasons that have nothing to do with
+EDGAR.**
+
+So the coverage exclusion could not have removed `rvol`'s signal, because the
+names it removes were never in the measurement. Worth recording that this is
+luck rather than design, and it expires: as the history rolls forward,
+post-IPO months become a growing share of the candidate set (Phase 2 §3.2.3a).
+
+### 10.1.6 Other components — resolved, with a caveat that applies to most of them
+
+Median-split z-tests on B+C episodes, Benjamini-Hochberg applied across the
+family of seven. All survive BH:
+
+| Component | above median | below median | delta | p | direction |
+|---|---|---|---|---|---|
+| `atr_pct` | 18.46% | 2.60% | **+15.86pp** | <0.001 | positive |
+| `high52w` | 6.70% | 14.36% | -7.65pp | <0.001 | **negative** |
+| `log(dollar_volume)` | 7.48% | 13.58% | **-6.09pp** | <0.001 | **negative** |
+| `rvol_20` | 12.51% | 8.55% | +3.96pp | <0.001 | positive |
+| `vol_accel` | 12.39% | 8.67% | +3.73pp | <0.001 | positive |
+| `rsi_14` | 9.13% | 11.93% | -2.80pp | <0.001 | **negative** |
+| `vwap_dist_pct` | 11.32% | 9.73% | +1.59pp | 0.031 | positive |
+
+Every component is now "resolved" under criterion 4, which after Phase 1's
+sea of unresolved components looks like a breakthrough. It mostly is not, and
+the reason should be recorded before anyone builds on these numbers.
+
+**The three strongest results are close to tautologies.** The label is "did the
+close double within 120 sessions". `atr_pct` is realised volatility, and a
+volatile stock is mechanically more likely to reach any distant price level.
+`log(dollar_volume)` being negative says smaller, less liquid names double more
+often, which is the same statement. `high52w` being negative says a stock that
+has already fallen a long way has more room to double, again the same statement.
+**A +15.86pp result that says "volatile things move more" is not an edge**; it
+predicts the magnitude of the move without saying anything about its direction,
+and §4.1's drawdown finding already showed these are the names that get there
+through the worst drawdowns.
+
+`rvol_20` and `vol_accel` are the two that are *not* restatements of volatility
+— they are relative-volume measures, and they are the ones Phase 1 identified.
+They are also, tellingly, much smaller effects (+3.96pp, +3.73pp).
+
+The honest ordering of confidence coming out of this phase:
+
+1. `rvol_20` is real, replicated, and modest.
+2. The `high52w` and `dollar_volume` effects are real and probably mechanical.
+3. `breakout` is two opposite effects wearing one name.
+4. v2 as a composite is not demonstrated (§10.1.4).
+
+### 10.1.7 Hit rate by calendar year — and a regime that owns the dataset
+
+B+C, episode level:
+
+| Year | n | hits | hit% | median gain% | median drawdown% |
+|---|---|---|---|---|---|
+| 2017 | 183 | 19 | 10.38% | 24.68% | 25.21% |
+| 2018 | 660 | 39 | 5.91% | 17.36% | 29.94% |
+| 2019 | 699 | 38 | 5.44% | 14.92% | 37.79% |
+| **2020** | **968** | **269** | **27.79%** | **57.13%** | 34.96% |
+| 2021 | 945 | 63 | 6.67% | 18.75% | 37.65% |
+| 2022 | 775 | 52 | 6.71% | 20.00% | 37.86% |
+| 2023 | 1,019 | 77 | 7.56% | 21.86% | 30.97% |
+| 2024 | 1,378 | 147 | 10.67% | 20.24% | 35.10% |
+| 2025 | 297 | 25 | 8.42% | 15.78% | 38.64% |
+
+Two things to take from this.
+
+**2020 supplies 269 of 729 total hits — 37% of every positive outcome in the
+dataset, from 14% of the episodes.** The base rate that year is 27.79% against
+5-11% in every other year. Any statistic pooled across ten years is substantially
+a statement about the post-COVID-crash recovery. This is the strongest argument
+in the report for Phase 2's purged walk-forward folds: a model trained on data
+containing 2020 and tested on data containing 2020 will look excellent and will
+be describing one quarter of 2020.
+
+**The survivorship signature is not visible here, which does not mean it is
+absent.** §2.3 predicts older years should look inflated because the universe is
+filtered by survival to today. The years do not trend that way — 2018 and 2019
+are the *worst* in the table. The likely reason is that 2020 and the differing
+episode counts swamp a monotonic drift, not that the bias is gone. It stays
+recorded as **unmeasured**, and Phase 2 §3.3's delisted-symbol work is what
+would measure it. Reporting by year was the commitment; the commitment is met
+and the answer is inconclusive.
+
+### 10.1.8 Per-bucket p90 thresholds (step 6) — REPORT ONLY
+
+Recomputed on B+C. **The defaults are unchanged; this is a measurement.**
+
+| Bucket | n (episodes) | current | p90 here | p95 | median |
+|---|---|---|---|---|---|
+| penny | 362 | **72** | 70.0 | 72.0 | 62.0 |
+| market | 6,562 | **65** | 67.0 | 69.0 | 55.0 |
+
+Row-level figures are identical to episode-level ones to one decimal.
+
+Both current thresholds sit within 2 points of the recomputed p90, on a dataset
+roughly 35x the one that set them. §4.4's thresholds were chosen to alert on
+about the top decile per bucket, and on ten years of out-of-sample data they
+still do. That is a genuine, if narrow, piece of good news: the *alert volume*
+calibration held even though the *ranking* underneath it (§10.1.4) did not.
+
+The NEXR observation logged in §4.4 (68/75 in the penny bucket, below the 72
+threshold) is now joined by a population-level reading: a penny threshold of 70
+would have admitted it. **No change is made here.**
+
+### 10.1.9 §5 exit replay on the widened data (step 7) — no rule changes
+
+> **CORRECTED 2026-09-21.** The first run of this section reported **119
+> positions** and described them as "the widened data". `momentum-tracker`
+> carried the same hardcoded `backfill_selected` join as `momentum-backtest`
+> (§10.1.10), so it replayed the **450-symbol pilot** over ten years of history.
+> The widening it saw was in time, not in symbols. Re-run under
+> `-scope eligible` with the denominator guard active: **1,545 positions.** All
+> figures below are the corrected full-universe run.
+
+Denominators printed by the run itself: scope `eligible`, 4,971 symbols in scope,
+4,971 loaded, 4,971 scored, 8,617,103 bars read.
+
+**1,545 positions closed** (Phase 1: 43), 5 still open and excluded.
+
+**Exit reasons**
+
+| Reason | n | median exit% | median peak% | median sessions | gave back |
+|---|---|---|---|---|---|
+| `momentum_stalled` | 757 | +2.25% | 5.02% | 5 | 2.77 pts |
+| `breakout_failed` | 651 | -5.03% | **0.00%** | **1** | 5.03 pts |
+| `lost_vwap` | 106 | -3.23% | 5.24% | 3 | 8.47 pts |
+| `stop_atr` | 31 | -8.06% | 0.00% | 2 | 8.06 pts |
+| `timeout` | **0** | — | — | — | **never fired** |
+
+Overall: median exit -1.20%, median peak +1.50%, median gave back 2.70 pts.
+
+**Fired-first vs also-true**
+
+| Condition | fired 1st | also true | note |
+|---|---|---|---|
+| `momentum_stalled` | 757 | 42 | |
+| `breakout_failed` | 651 | 0 | |
+| `lost_vwap` | 106 | **276** | outranked more often than it fires |
+| `stop_atr` | **31** | **85** | outranked more often than it fires |
+| `timeout` | 0 | 0 | never true |
+
+**Session survival:** longest position **17 sessions**; **0 of 1,545 reached 20+**.
+
+All three Phase 1 findings replicate, now on **36x** Phase 1's 43 positions:
+
+1. **`breakout_failed` fires on session 1 at a median peak of 0.00%**, on 651 of
+   1,545 exits. It is not exiting a trade that went wrong; it closes positions
+   that never moved, immediately, at a median -5.03%. The wider data makes this
+   worse, not better: the median exit fell from -4.18% to -5.03%.
+2. **`timeout` is structurally unreachable, now beyond reasonable doubt.** The
+   longest position across 1,545 positions and ten years ran **17 sessions**
+   against a 20-session threshold. Phase 1 saw 9 of 43; the pilot-scoped run saw
+   16 of 119. Three independent samples, the maximum creeping toward the
+   threshold without reaching it, and zero fires. The faster rules always
+   pre-empt it.
+3. **`stop_atr` is suppressed by ordering**, now on decisive evidence: true
+   **116** times, fired first **31**. Phase 1 saw 3 and 0.
+
+The Phase 1 distinction holds exactly and is now well powered: **reordering
+would surface `stop_atr` but would never surface `timeout`.** The first is an
+ordering artefact — the condition is true 116 times and something faster wins 85
+of them. The second is structural: no amount of reordering reaches a horizon the
+data never attains. No rule was changed; these are Phase 2 §8's inputs.
+
+### 10.1.10 Three harness bugs found, all the same bug — and the guard for it
+
+The report harnesses hardcoded the pilot subset in **three** places across two
+commands:
+
+```
+momentum-backtest  loadBars()    JOIN universe_symbols u ON ... AND u.backfill_selected
+momentum-backtest  loadMetric()  JOIN universe_symbols u ON ... AND u.backfill_selected
+momentum-tracker   loadBars()    JOIN universe_symbols u ON ... AND u.backfill_selected
+momentum-tracker   loadMetric()  JOIN universe_symbols u ON ... AND u.backfill_selected
+momentum-dryrun    loadMetric()  JOIN universe_symbols u ON ... AND u.backfill_selected
+```
+
+The tracker one was found only after the first version of §10.1.9 had already
+been written and reported, which is the point: **the first two were found by
+looking, and looking is not a control.**
+
+Fixing only the first produced a run reporting **"symbols: 4,971"** that scored
+450 of them: with bars widened but fundamentals still pilot-scoped, every
+non-pilot symbol-day failed §3.2 with `market_cap_unavailable` and was counted as
+an ordinary gate rejection. 9,571 candidates were reported as 739. **Nothing
+errored.** A gate rejection is a normal outcome, so a report describing a
+twentieth of the data looked exactly like a complete one.
+
+This is the same lesson as the six integration bugs that closed Phase 1: the
+scanner's daily path had never been run end-to-end, and here the backtest's wide
+path had never been run wide. All of it was correct code whose *scope* was frozen
+at the moment it was written.
+
+#### The denominator guard (`internal/reportscope`)
+
+Remembering to pass a scope is not a fix, so the scope is now checked rather
+than trusted. Two mechanisms, both needed:
+
+1. **One `Scope` value drives every query in a run.** A harness cannot widen its
+   bars while leaving its fundamentals narrow, because both clauses come from
+   the same value via `Scope.JoinOn(alias)`. This makes the original divergence
+   unexpressible.
+2. **The denominator is verified before any scoring.** The harness asks the
+   database how many symbols the declared scope actually contains *with bars*,
+   compares that against the set it loaded, and **exits non-zero** on any
+   disagreement. Mechanism 1 cannot catch someone editing the SQL string
+   directly; mechanism 2 can.
+
+Equality is exact, deliberately. 450 against 4,971 is not a rounding
+difference, and a guard that accepts "close enough" invites a later one that is.
+A legitimate reason to differ belongs in `ExpectedBarSymbols` as a reviewable
+rule, not in a fuzzy comparison.
+
+Every report now prints denominators computed **from the rows it actually
+handled**, so a reader can check the arithmetic without trusting the narration:
+
+```
+scope:                   eligible
+symbols in scope:        4971 (verified against the database)
+symbols loaded:          4971
+symbols scored:          4971
+bars read:               8617103
+market_cap:            4865/4971 symbols (97.9%)
+shares_outstanding:    4881/4971 symbols (98.2%)
+```
+
+Metric coverage is printed rather than asserted, because coverage genuinely
+varies by metric. That printout earned itself on its first run: it contradicted
+§10.1.2's claimed 38.4% share-count coverage and exposed a bug in that
+section's query (see the correction there).
+
+**Mutation-tested against the live database.** Re-introducing the original
+hardcoded join verbatim and running `-scope eligible`:
+
+```
+SCOPE MISMATCH: declared scope "eligible" contains 4971 symbols with bars, but the harness loaded 450.
+This is the silent-narrowing failure the denominator guard exists to catch:
+a report that covers part of the data looks identical to one that covers all of it,
+because the symbols it never saw simply never appear as candidates.
+  4521 in scope but NOT loaded, e.g. A, AAC, AACI, AACO, AACP, AADX, AAL, AAME, ...
+  -> usually a query still restricted to the pilot subset (backfill_selected).
+exit=1
+```
+
+The guard also fails on the inverse error (a pilot-scoped report that loads the
+whole universe) and on equal-cardinality-but-different-membership, since
+counting alone would pass a scope that swapped one symbol for another. Unit
+tests in `reportscope_test.go`.
+
+There is a second-order point worth keeping. `backfill_selected` was serving as
+both the backfill's working set **and** the identity of the in-sample cohort,
+and the subset-selection job begins by clearing it for every row. Widening the
+universe would have erased the only record of which 450 symbols score v2 was
+fitted on — silently, and in a way that makes the OOS report look *better*,
+since in-sample rows would have merged into population B. That is why the cohort
+was copied into `momentum_pilot_cohort` with a content hash before anything else
+ran (migration 013).
+
+### 10.1.11 Daily refresh fits the budget (step 8)
+
+Measured, not estimated: a single-session request averages **226 bytes** across
+10 symbols.
+
+| Dimension | Daily refresh, full universe | Budget | Used |
+|---|---|---|---|
+| requests | 4,975/day | 90,000 configured (100,000 provider) | **5.5%** |
+| peak rate | 4,975/hour at 2 req/s | 10,000/hour | 49.8% |
+| wall clock | ~41 min | after US close | — |
+| bandwidth | 1.1 MB/day, 0.02 GB/month | 40 GB/month | **0.05%** |
+
+The daily budget absorbs **18x** the current universe before it binds.
+`BOT_MOMENTUM_SCAN_ENABLE` stays **false**.
+
+### 10.1.12 Scorecard against the pre-registered criteria
+
+Criteria were written into Phase 2 §4.2.1 **before** the report was run.
+
+| # | Criterion | Result |
+|---|---|---|
+| 1 | v2 confirmed OOS: B+C episode top-third > bottom-third, p < 0.05 | **NOT CONFIRMED.** Met on the letter (p = 0.017), **verdict withdrawn** — 97% of the separation is bucket composition and v2 separates in neither bucket. **The criterion itself was flawed**, being pooled across buckets (§10.1.0, §10.1.4) |
+| 2 | `rvol` replicates, same direction, p < 0.05, episode level | **CONFIRMED**, and it survives bucket and volatility stratification: CMH p = 0.017 by bucket, p = 0.037 by bucket x atr tercile. But 64% of the pooled effect was composition, the surviving effect is 2.8x smaller, and it is concentrated in high-volatility names (§10.1.5a) |
+| 3 | `breakout`/`high52w` inversion replicates, negative, p < 0.05 | **CONFIRMED for `high52w`** (-7.65pp, p < 0.001) and for `breakout_from_consolidation` (-9.15pp). **Not for plain `breakout`**, which is the best state at 20.89% |
+| 4 | Other components resolved only at p < 0.05 | All seven cleared p < 0.05, which at n = 6,924 is close to uninformative. Three of the strongest are volatility restatements (§10.1.6). **Phase 2 §4.2 now requires a pre-registered minimum effect size, not just a p-value** |
+
+**Phase 2 entry gate (§2 of the Phase 2 spec):** `rvol` replicates
+out-of-sample **and survives stratification**, so Phase 2 proceeds as **the full
+plan**, not the feature-research-only path. The `breakout`/`high52w` row of that
+table also applies: they stay zeroed in v2 and enter the model as ordinary
+features whose sign the model learns.
+
+#### What the pre-registration got wrong, for the next one
+
+Criterion 1 was pooled. Criterion 4 was a bare p-value. Both were satisfiable by
+artifacts:
+
+- **Pooling let composition pose as ranking.** Phase 2 §4.2 now forbids
+  pooled-across-bucket tests as acceptance evidence and requires per-bucket
+  and/or CMH.
+- **A bare p < 0.05 at n ~ 7,000 resolves almost anything.** All seven
+  components "resolved", including three that restate "volatile things move
+  more". Phase 2 §4.2 now requires a minimum effect size alongside the p-value.
+
+Neither flaw was in the analysis. The pre-registration is the safeguard, and
+these are the two ways this one could be passed without learning anything.
+
+### 10.1.13 What this phase did NOT establish
+
+Recorded because a list of confirmations reads as more than it is.
+
+- **v2 is not a demonstrated ranker.** §10.1.4, and now a formal ruling
+  (§10.1.0). The pooled pass is composition.
+- **`rvol` in the penny bucket is unresolved**, not confirmed: n = 362,
+  +2.76pp, p = 0.648. And its surviving effect overall is concentrated in
+  high-volatility names, so it is entangled with the volatility confound rather
+  than independent of it (§10.1.5a).
+- **Survivorship bias is still unmeasured**, and the ten-year window makes it
+  larger. Hit rates by year are reported and are inconclusive (§10.1.7).
+- **Point-in-time fundamentals are still absent.** Today's market cap and share
+  count were applied to every historical row, including 2016 ones. Phase 2 §3.2
+  calls this lookahead rather than a limitation, and that argument stands on its
+  own — **not** on share-count coverage, which is 98.1% and was misreported as
+  38.4% (§10.1.2).
+- **The bar-audit seam question is open.** ~840 flagged seams have no reported
+  corporate action, but `divCash` was not captured, so provider defect and
+  detector over-flagging cannot be separated (§2.3).
+- **2020 dominates the outcomes** (37% of hits) and no result here is
+  regime-controlled. That is Phase 2 §4.1's job.
+- **The lockbox is untouched**, as it must be.
+- **Nothing was tuned.** No weight, threshold, gate or exit rule changed.
+
+---
+
 ## 11. Phase 2 and Phase 3 (context only — do not build)
 
 **Phase 2 — the model.** Using `momentum_labels`, train per-threshold binary classifiers (or one ordinal model) on the §3 feature vector, with proper time-series cross-validation (train on earlier periods, test on later — never random splits on time-series data) and probability calibration. *Then* the multi-division display becomes meaningful, because "+200%: 85" can mean a calibrated 85% probability rather than an arbitrary number. Feature importance from this step is also what tells you which catalyst keywords and which of the currently-unscored features (sector strength, gap %, ATR%) deserve weight.
@@ -1311,6 +2607,46 @@ because step 5 is where it bites and step 7 is where it becomes unrecoverable.
 ---
 
 ## 12. Notes for the implementing agent
+
+- **Checkpoint commit before and after every step, and before any multi-file
+  or scripted edit. Push at the end of each step.**
+
+  Not hygiene — recovery. A scripted edit to
+  `services/data-ingestion/cmd/data-fundamental/main.go` used an inverted
+  string slice, so `old` was the empty string and `str.replace("", new)`
+  inserted the replacement between **every character** of the file. It went
+  from ~42 KB to 121 MB in one call, and no backup of that file existed
+  anywhere on the machine.
+
+  It was recovered only because the corruption happened to be uniform: the
+  inserted text could be removed again to reconstruct the original byte for
+  byte. **That was luck, not a plan.** A slice that had merely mangled part of
+  the file, or a script that had written partial output, would have been
+  unrecoverable.
+
+  With a checkpoint commit it is `git checkout -- <file>`, one line, no
+  cleverness required. The cost of a commit is a few seconds; the cost of not
+  having one is however long it takes to rewrite work from memory, plus the
+  risk of rewriting it subtly differently.
+
+- **Label every example output `LIVE` or `FIXTURE`. No exceptions.**
+
+  `LIVE` output must be accompanied by the query, command or script that
+  produced it, so a reader can re-run it. `FIXTURE` output must say so in the
+  same breath as the numbers, not in a footnote.
+
+  This exists because of a real cost. A screener embed was rendered from
+  `sample_row()` — a hardcoded test fixture — and presented as "the actual
+  output". Two of its fields (`change_pct`, `dollar_volume`) had been copied
+  from real data, so it read as a genuine bar, and the mismatch against an
+  earlier live test looked exactly like a data-corruption bug: the same
+  symbol-day with different RVOL, RSI and 52-week-high. It triggered a full
+  investigation of adjusted-history handling before the fixture was identified.
+
+  The investigation happened to find a genuine defect, which is luck and not a
+  defence. A fixture presented as live data is indistinguishable from corrupted
+  live data, and the reader has no way to tell them apart — so the labelling is
+  the writer's job, every time.
 
 - **Do not invent data sources.** If a required field has no free source, leave it null and record why. Several fields in this spec are deliberately null in Phase 1 (§3.13).
 - **Do not silently substitute defaults for missing inputs.** A null RVOL must stay null and fail the gate, never become 0 or 1.

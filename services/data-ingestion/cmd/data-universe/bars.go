@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"math"
 	"sync"
 	"time"
 
@@ -197,6 +198,7 @@ func (w *worker) runDailyBars(ctx context.Context) {
 	var (
 		mu                                    sync.Mutex
 		okCount, noDataCount, failCount, skip int
+		repairedCount                         int
 		barsTotal                             int64
 	)
 	sem := make(chan struct{}, max(1, w.cfg.BackfillConcurrency))
@@ -216,7 +218,36 @@ func (w *worker) runDailyBars(ctx context.Context) {
 			defer wg.Done()
 			defer func() { <-sem }()
 
-			_, stored, err := w.fetchAndStore(ctx, sym, from, to)
+			bars, stored, err := w.fetchAndStore(ctx, sym, from, to)
+
+			// CORPORATE-ACTION RE-FETCH.
+			//
+			// Adjusted prices are rewritten BACKWARDS on every split and every
+			// dividend. This refresh fetches only a short recent window, so the
+			// moment a symbol has a corporate action after its backfill, the
+			// stored history is on the OLD adjustment basis and the bars just
+			// written are on the NEW one. Windowed features then read a step
+			// that no market participant experienced — the same defect that
+			// disqualified Twelve Data, except self-inflicted and invisible,
+			// because each individual refresh looks correct in isolation.
+			//
+			// So the action is the trigger: re-fetch the symbol's FULL history
+			// onto one basis. Checked BOTH on splitFactor and divCash, because
+			// either alone leaves the other's seams behind.
+			var repaired bool
+			if err == nil && hasCorporateAction(bars) {
+				if n, rerr := w.refetchFullHistory(ctx, sym); rerr != nil {
+					w.log.Error("corporate action detected but full re-fetch FAILED; "+
+						"this symbol's history is now on two adjustment bases and its "+
+						"windowed features are wrong until repaired",
+						"symbol", sym, "err", rerr)
+				} else {
+					repaired = true
+					stored += n
+					w.log.Info("corporate action: re-fetched full history onto one adjustment basis",
+						"symbol", sym, "bars", n)
+				}
+			}
 
 			mu.Lock()
 			defer mu.Unlock()
@@ -229,6 +260,9 @@ func (w *worker) runDailyBars(ctx context.Context) {
 			default:
 				okCount++
 				barsTotal += stored
+				if repaired {
+					repairedCount++
+				}
 			}
 		}(sym)
 	}
@@ -241,6 +275,7 @@ func (w *worker) runDailyBars(ctx context.Context) {
 	w.log.Info("daily bar refresh complete",
 		"symbols", len(bounds),
 		"ok", okCount,
+		"corporate_action_refetches", repairedCount,
 		"no_data", noDataCount,
 		"failed", failCount,
 		"skipped_never_backfilled", skip,
@@ -288,4 +323,57 @@ func (w *worker) reportSubsetConsistency(ctx context.Context) {
 			"penny_boundary", w.cfg.SubsetPennyMaxPrice,
 			"examples", st.BucketDriftExamples)
 	}
+}
+
+// hasCorporateAction reports whether any bar in the window carries a split or a
+// dividend, either of which rewrites the adjusted series backwards.
+//
+// A nil field means the provider did not report it, which is NOT the same as
+// "no action" — but it also cannot be used as evidence of one, so it is
+// ignored here and surfaces instead as the NULL columns the seam audit reads.
+func hasCorporateAction(bars []store.EquityBar) bool {
+	for _, b := range bars {
+		if b.SplitFactor != nil && math.Abs(*b.SplitFactor-1.0) > 1e-9 {
+			return true
+		}
+		if b.DivCash != nil && *b.DivCash > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+// refetchFullHistory re-fetches a symbol's whole STORED range and upserts it,
+// putting every bar on the current adjustment basis.
+//
+// The start date comes from the earliest bar we already hold, NOT from
+// now-BackfillYears. That distinction is not pedantic — getting it wrong
+// created a real seam:
+//
+//	backfill run on 2026-09-21 stored bars from 2016-09-21
+//	DTE went ex-dividend on 2026-09-21, rewriting its adjusted history
+//	re-fetch run on 2026-09-22 used now-10y = 2016-09-22 as its start
+//	-> the 2016-09-21 bar fell OUTSIDE the new window and kept the
+//	   pre-dividend basis, while every later bar moved to the new one
+//
+// A rolling window advances by a day on every run, so it orphans the oldest
+// bar of the previous run every time. Anchoring to the stored minimum makes
+// the repair cover exactly what needs repairing, which is everything we hold.
+//
+// A one-week buffer is subtracted so a boundary bar cannot be missed to
+// timezone or half-open-interval effects.
+func (w *worker) refetchFullHistory(ctx context.Context, sym string) (int64, error) {
+	var earliest time.Time
+	err := w.pool.QueryRow(ctx, `
+SELECT min(ts) FROM equity_ohlcv
+WHERE symbol = $1 AND interval = $2 AND source = $3`,
+		sym, w.cfg.BarInterval, w.cfg.BarSource).Scan(&earliest)
+
+	to := time.Now().UTC()
+	from := to.AddDate(-max(1, w.cfg.BackfillYears), 0, 0)
+	if err == nil && !earliest.IsZero() && earliest.Before(from) {
+		from = earliest.AddDate(0, 0, -7)
+	}
+	_, stored, ferr := w.fetchAndStore(ctx, sym, from, to)
+	return stored, ferr
 }
