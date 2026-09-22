@@ -51,6 +51,12 @@ func dumpFull(path string, rows []row, gap int) error {
 		"dollar_volume", "rsi_14", "vwap_dist_pct", "above_vwap",
 		"breakout_state", "pct_of_52w_high", "range_20",
 		"fwd_max_gain_pct", "fwd_max_drawdown_pct", "days_to_peak",
+		// Round 1 (Phase 2 §2.2). Empty means NOT EVALUABLE, which the
+		// analysis drops from a test rather than counting as a miss.
+		"fp_100_dd50", "fp_100_dd50_sessions",
+		"fp_100_atr", "fp_100_atr_sessions",
+		"hit_20_10s",
+		"sector", "spy_ret20", "iwm_ret20", "vix",
 	}
 	for i, c := range cols {
 		sep := ","
@@ -84,7 +90,9 @@ func dumpFull(path string, rows []row, gap int) error {
 			"%s,%s,%d,%s,%t,%d,"+
 				"%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,"+
 				"%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,"+
-				"%.4f,%.4f,%d\n",
+				"%.4f,%.4f,%d,"+
+				"%s,%s,%s,%s,%s,"+
+				"%s,%s,%s,%s\n",
 			r.symbol, r.date, r.barIndex, r.bucket, start, r.score.Total,
 			r.score.Sub.RVol, r.score.Sub.VolAccel, r.score.Sub.Catalyst,
 			r.score.Sub.Float, r.score.Sub.VWAP, r.score.Sub.Breakout, r.score.Sub.High52w,
@@ -93,6 +101,10 @@ func dumpFull(path string, rows []row, gap int) error {
 			fnum(r.feat.RSI14), fnum(r.feat.VWAPDistPct), fbool(r.feat.AboveVWAP),
 			fstate(r.feat.BreakoutState), fnum(r.feat.PctOf52wHigh), fnum(r.feat.Range20),
 			r.label.FwdMaxGainPct, r.label.FwdMaxDrawdownPct, r.label.DaysToPeak,
+			fpHit(r.fpDD50), fpSessions(r.fpDD50),
+			fpHit(r.fpATR), fpSessions(r.fpATR),
+			fbool(r.hit20),
+			csvSafe(r.sector), fnum(r.spy20), fnum(r.iwm20), fnum(r.vix),
 		); err != nil {
 			return err
 		}
@@ -125,4 +137,38 @@ func fstate(p *momentum.BreakoutState) string {
 		return ""
 	}
 	return string(*p)
+}
+
+// fpHit renders a first-passage outcome as true/false, or empty when the
+// label could not be computed.
+//
+// Empty is NOT false. A window with no usable stop, or one that could not be
+// evaluated, is not a miss — and conflating the two would bias every
+// first-passage rate downward in the same way §6 warns about incomplete
+// hit_100 windows.
+func fpHit(fp *momentum.FirstPassage) string {
+	if fp == nil {
+		return ""
+	}
+	return fmt.Sprintf("%t", fp.Hit)
+}
+
+func fpSessions(fp *momentum.FirstPassage) string {
+	if fp == nil {
+		return ""
+	}
+	return fmt.Sprintf("%d", fp.SessionsToResolve)
+}
+
+// csvSafe strips commas from a free-text field so it cannot split a CSV row.
+// Sector labels are provider-supplied strings such as "Financial Services".
+func csvSafe(s string) string {
+	out := make([]rune, 0, len(s))
+	for _, r := range s {
+		if r == ',' || r == '\n' || r == '"' {
+			r = ' '
+		}
+		out = append(out, r)
+	}
+	return string(out)
 }

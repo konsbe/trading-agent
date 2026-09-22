@@ -48,6 +48,20 @@ type row struct {
 	// feat is the full feature vector, carried so the wide dump can emit the
 	// raw inputs behind each sub-score without recomputing them.
 	feat momentum.Features
+
+	// Round-1 labels (Phase 2 §2.2 hypotheses (a) and (b)). Pointers, so
+	// "not evaluable" is distinguishable from "did not happen" — an
+	// incomplete window is not a miss (§6).
+	fpDD50 *momentum.FirstPassage
+	fpATR  *momentum.FirstPassage
+	hit20  *bool
+
+	// Round-1 features. sector is empty when unknown; the analysis side
+	// carries an explicit missing indicator and never imputes (§5.2).
+	sector string
+	spy20  *float64
+	iwm20  *float64
+	vix    *float64
 }
 
 func main() {
@@ -121,6 +135,11 @@ func main() {
 	}
 	marketCaps := loadMetric(ctx, pool, "market_cap", sc)
 	sharesOut := loadMetric(ctx, pool, "shares_outstanding", sc)
+	sectors := loadSectors(ctx, pool)
+	regime := loadRegime(ctx, pool)
+	fmt.Printf("  sector classifications: %d symbols\n", len(sectors))
+	fmt.Printf("  regime sessions (as-of t-1): %d\n", len(regime))
+
 	var sharesPIT map[string]*pitSeries
 	if *gateVersion == 2 {
 		sharesPIT = loadSharesPIT(ctx, pool)
@@ -221,11 +240,34 @@ func main() {
 				s.Raw = v
 				s.Total = int(math.Round(v))
 			}
-			rows = append(rows, row{
+			r := row{
 				symbol: sym, date: bs[i].TS.Format("2006-01-02"),
 				score: s, label: *l, bucket: res.Bucket,
 				barIndex: i, feat: f,
-			})
+			}
+
+			// Round-1 labels (§2.2 a, b). Computed here so they share the
+			// candidate set, the horizon and the exclusion rules with the
+			// existing labels — a separate pass could silently drift from any
+			// of the three.
+			atr := 0.0
+			if f.ATR14 != nil {
+				atr = *f.ATR14
+			}
+			r.fpDD50 = momentum.FirstPassageAt(cb, i, *horizon, 100, 50, 0, 0)
+			r.fpATR = momentum.FirstPassageAt(cb, i, *horizon, 100, 0, 2, atr)
+			if h, ok := momentum.ShortHorizonHit(cb, i, 10, 20); ok {
+				hv := h
+				r.hit20 = &hv
+			}
+
+			// Round-1 features (§2.2 d, e). Absent stays absent.
+			r.sector = sectors[sym]
+			if rg, ok := regime[r.date]; ok {
+				r.spy20, r.iwm20, r.vix = rg.spy20, rg.iwm20, rg.vix
+			}
+
+			rows = append(rows, r)
 		}
 	}
 
@@ -681,6 +723,123 @@ ORDER BY o.symbol, o.ts`, interval, source)
 		out[sym] = append(out[sym], b)
 	}
 	return out, rows.Err()
+}
+
+// loadSectors reads the current industry classification per symbol.
+//
+// CURRENT, not point-in-time: Finnhub exposes one classification and it is
+// today's. A company reclassified since the setup carries today's label on
+// every historical row. That is a mild version of the §3.2 problem — mild
+// because reclassification is rare and, unlike share count, is not
+// systematically related to whether the stock ran.
+//
+// A symbol with no row, or an explicit "N/A", is simply absent from the map.
+// §5.2 forbids imputation: the analysis carries a missing indicator rather
+// than substituting a universe average, because "we do not know this
+// company's sector" and "this company is in the average sector" are different
+// statements and only one of them is true.
+func loadSectors(ctx context.Context, pool *pgxpool.Pool) map[string]string {
+	out := map[string]string{}
+	rows, err := pool.Query(ctx, `
+SELECT DISTINCT ON (symbol) symbol, payload->>'industry'
+FROM equity_fundamentals
+WHERE metric = 'sector_profile' AND payload->>'industry' IS NOT NULL
+  AND payload->>'industry' <> 'N/A' AND payload->>'industry' <> ''
+ORDER BY symbol, ts DESC`)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "load sectors:", err)
+		return out
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var sym, ind string
+		if err := rows.Scan(&sym, &ind); err != nil {
+			return out
+		}
+		out[sym] = ind
+	}
+	return out
+}
+
+// regimeRow is the market context for one session.
+type regimeRow struct {
+	spy20 *float64 // SPY 20-session return, %
+	iwm20 *float64 // IWM 20-session return, %
+	vix   *float64
+}
+
+// loadRegime builds the §3.6 regime series, keyed by the date the values
+// become USABLE — that is, shifted forward one session.
+//
+// AS-OF t-1, and the shift is applied here rather than at the join so it
+// cannot be forgotten by a caller. Two reasons it is required:
+//
+//   - FRED publishes after the close, so a VIX value stamped t may not have
+//     existed when a t-dated scan ran.
+//   - An index return computed THROUGH t uses the same session the
+//     candidate's own features come from, letting the market's move on that
+//     day inform a feature about that day.
+func loadRegime(ctx context.Context, pool *pgxpool.Pool) map[string]regimeRow {
+	type pt struct {
+		d string
+		v float64
+	}
+	series := map[string][]pt{}
+	rows, err := pool.Query(ctx, `
+SELECT series_id, ts::text, value FROM reference_series ORDER BY series_id, ts`)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "load reference_series:", err)
+		return map[string]regimeRow{}
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id, d string
+		var v float64
+		if err := rows.Scan(&id, &d, &v); err != nil {
+			return map[string]regimeRow{}
+		}
+		series[id] = append(series[id], pt{d, v})
+	}
+
+	// 20-session return per index, computed on its own calendar.
+	ret20 := func(id string) map[string]float64 {
+		out := map[string]float64{}
+		ps := series[id]
+		for i := 20; i < len(ps); i++ {
+			if ps[i-20].v > 0 {
+				out[ps[i].d] = (ps[i].v/ps[i-20].v - 1) * 100
+			}
+		}
+		return out
+	}
+	spy, iwm := ret20("SPY"), ret20("IWM")
+	vix := map[string]float64{}
+	for _, p := range series["VIXCLS"] {
+		vix[p.d] = p.v
+	}
+
+	// Shift forward one SESSION on SPY's calendar, so the value available on
+	// date d is the one computed through the previous session.
+	out := map[string]regimeRow{}
+	ps := series["SPY"]
+	for i := 1; i < len(ps); i++ {
+		prev, cur := ps[i-1].d, ps[i].d
+		r := regimeRow{}
+		if v, ok := spy[prev]; ok {
+			vv := v
+			r.spy20 = &vv
+		}
+		if v, ok := iwm[prev]; ok {
+			vv := v
+			r.iwm20 = &vv
+		}
+		if v, ok := vix[prev]; ok {
+			vv := v
+			r.vix = &vv
+		}
+		out[cur] = r
+	}
+	return out
 }
 
 // loadSharesPIT reads the point-in-time share series per symbol, oldest first.

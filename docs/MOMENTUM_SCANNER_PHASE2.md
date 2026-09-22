@@ -272,6 +272,103 @@ mid-round is reported as abandoned, with the reason.
 
 ---
 
+### 2.3 Round 1 results — LIVE, 2026-09-22
+
+Run: `python3 scripts/research_round1.py` against `.work/data/cand_round1.csv`
+(gate v2, `-scope eligible`, 4,969 symbols, episode gap 5). **7,579 episodes**
+after excluding the §4.3 lockbox region and the in-sample pilot window.
+16 walk-forward folds x 126 sessions, used as a stratum alongside bucket and
+ATR tercile. **The lockbox was not read.**
+
+Base rates: `hit_100` 9.47%, `fp_100_dd50` 9.29%, `fp_100_atr` 6.79%,
+`hit_20_10s` 11.80%.
+
+#### The table
+
+| # | Pre-registered bar | Best effect, MH OR [95% CI] | Without 2020 | Per bucket | Verdict |
+|---|---|---|---|---|---|
+| **(a)** `fp_100_dd50` | OR ≥ 1.25, CI lower > 1.05, **and novel vs `hit_100`** | 1.178 [0.992, 1.399] | 1.288 | market / penny both flat | **FAIL** |
+| **(a)** `fp_100_atr` | same | 1.195 [0.986, 1.449] | 1.263 | same | **FAIL** |
+| **(b)** `hit_20_10s` | OR ≥ 1.25, CI > 1.05, **≥ 3.0pp** | 1.616 [1.389, 1.880] | 1.526 | market +14.90pp, penny +0.82pp | **PASS**, mechanically |
+| **(d)** sector strength | OR ≥ 1.25, CI > 1.05 | 1.014 [0.830, 1.239] | 0.956 | flat both | **FAIL** |
+| **(d)** sector strength on `fp` | same | 1.013 [0.828, 1.238] | 0.947 | flat both | **FAIL** |
+| **(e)** SPY 20-day | same | 0.870 [0.733, 1.032] | 0.859 | flat both | **FAIL** |
+| **(e)** IWM 20-day | same | 1.059 [0.893, 1.255] | 1.032 | flat both | **FAIL** |
+| **(e)** VIX | same | 1.071 [0.903, 1.269] | 1.105 | flat both | **FAIL** |
+| **(e)** VIX on `fp` | same | 1.081 [0.911, 1.283] | 1.128 | flat both | **FAIL** |
+
+#### (a) fails on its own written terms, and the control is why
+
+(a) was not "some feature clears the bar on a path-aware label". It was that
+features "may separate on it **where they do not on `hit_100`**". That clause
+is part of the pre-registered text, so the control is part of the test.
+Running the identical test against `hit_100`:
+
+| feature | `hit_100` | `fp_100_dd50` | `fp_100_atr` |
+|---|---|---|---|
+| `atr_pct` | **1.752** | 1.726 | 1.766 |
+| `vwap_dist_pct` | **1.353** | 1.341 | 1.217 |
+| `range_20` | 1.172 | 1.178 | 1.195 |
+| `rvol_20` | 1.014 | 1.010 | 0.940 |
+
+Every feature that clears the bar on a path-aware label clears it **just as
+well, or better, on `hit_100`**. Nothing is novel to the new labels. The
+premise — that touch-anytime is volatility-dominated in a way first-passage
+is not — is **refuted**: both labels are dominated to the same degree. The
+labels are still correct and worth keeping (they are honest about path), but
+they revealed nothing `hit_100` had been hiding.
+
+#### (b) clears its written bar, and the reason it should not count
+
+(b)'s pre-registered bar contains no comparison clause, so `atr_pct` at
+1.616 [1.389, 1.880] with +14.90pp in the market bucket clears it as written.
+Recorded as PASS because that is what the rule says.
+
+Two facts sit against it, and both were visible only after the control:
+
+1. **The passing feature is the stratification variable.** The test is "CMH by
+   bucket x **ATR tercile**", and the feature that passes is `atr_pct`. The
+   strata control coarse volatility and the test then asks whether finer
+   volatility within a tercile still separates. It does — but that is a
+   statement about volatility, not about the shorter horizon. **This is a flaw
+   in the pre-registration**: §5.2's feature set contains the stratifier, and
+   nobody noticed when the rule was written. It is the same class of error as
+   the §10.1.0 pooling flaw — the rule was written carefully and was still
+   wrong in a way only the data exposed.
+
+2. **The shorter horizon did not help.** `atr_pct` scores 1.752 on `hit_100`
+   and 1.616 on `hit_20_10s`. (b)'s claim was that a 10-session target is
+   closer to what a daily-bar signal can carry. It is slightly **worse**.
+
+What the effect actually is, in raw rates (LIVE, same run):
+
+| bucket | ATR half | n | `hit_100` | `fp_100_dd50` | `hit_20_10s` |
+|---|---|---|---|---|---|
+| market | low | 3,504 | 1.60% | 1.60% | 2.45% |
+| market | high | 3,504 | 11.93% | 11.82% | 17.35% |
+| penny | low | 286 | 34.97% | 33.57% | 34.62% |
+| penny | high | 285 | 50.53% | 48.42% | 35.44% |
+
+High-ATR stocks reach +100% more often than low-ATR stocks, on every label
+alike. That is close to a restatement of what ATR measures, and it is not
+something a scanner can act on: "volatile stocks move more" does not tell you
+which ones, or when. It is the third appearance of the same confound that
+already killed the v2 score and `rvol` twice.
+
+#### Reading
+
+**All four hypotheses fail substantively.** (a) by its own comparison clause,
+(d) and (e) flat at OR ≈ 1.0, and (b) only via the stratification variable
+behaving exactly as it does on the label (b) was meant to improve on.
+
+Sector strength and regime deserve a specific note: both were plausible and
+both are **flat**, not merely short of the bar. Sector strength at 1.013 and
+VIX at 1.071 are the cleanest negative results in this project — they were
+tested on 7,579 episodes with the confounds controlled, and there is nothing
+there.
+
+---
+
 ## 3. Data corrections
 
 Each correction changes what the dataset measures. Each one is therefore
