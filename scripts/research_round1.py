@@ -391,8 +391,22 @@ def main() -> int:
     print("  STOPPING RULE (§2.2)")
     print("=" * 100)
     if any_pass:
-        print("  At least one hypothesis cleared the bar. Round 1 does NOT stop here;")
-        print("  the passing hypothesis proceeds per §2.2.")
+        # Arithmetically, (b) clears. The §2.4 ruling does not count it: the
+        # clearing feature is atr_pct, which is the variable this test
+        # stratifies on, and which scores HIGHER on the hit_100 label that (b)
+        # set out to improve on. Printed here so a future reader running this
+        # script sees the ruling next to the number that prompted it, rather
+        # than discovering a "PASS" and drawing the opposite conclusion.
+        print("  Arithmetically, a hypothesis cleared the bar — see the table above.")
+        print()
+        print("  §2.4 RULING (2026-09-22): it is NOT counted, and research STOPS.")
+        print("  The only clearing feature is atr_pct: the stratification variable,")
+        print("  scoring higher on hit_100 (1.752) than on the short-horizon label")
+        print("  (b) proposed (1.616). §5.2's feature set contains the stratifier —")
+        print("  a flaw in the pre-registered rule, not a finding.")
+        print()
+        print("  Phase 2 is CLOSED. §5, §7 and §9 are not built.")
+        print("  No round 2 without a new written justification from the user.")
     else:
         print("  NO hypothesis cleared §4.2.0's effect-size bar out-of-sample.")
         print()

@@ -192,5 +192,13 @@
 ====================================================================================================
   STOPPING RULE (§2.2)
 ====================================================================================================
-  At least one hypothesis cleared the bar. Round 1 does NOT stop here;
-  the passing hypothesis proceeds per §2.2.
+  Arithmetically, a hypothesis cleared the bar — see the table above.
+
+  §2.4 RULING (2026-09-22): it is NOT counted, and research STOPS.
+  The only clearing feature is atr_pct: the stratification variable,
+  scoring higher on hit_100 (1.752) than on the short-horizon label
+  (b) proposed (1.616). §5.2's feature set contains the stratifier —
+  a flaw in the pre-registered rule, not a finding.
+
+  Phase 2 is CLOSED. §5, §7 and §9 are not built.
+  No round 2 without a new written justification from the user.

@@ -369,6 +369,77 @@ there.
 
 ---
 
+### 2.4 RULING — research stops. Spec closed. 2026-09-22
+
+**The §2.2 stopping rule is triggered. Round 1 was the only round, and no
+hypothesis cleared the bar on anything other than a confound.**
+
+(b) cleared its written bar arithmetically. It is not counted, and the reason
+is recorded here rather than left implicit: the feature that cleared it,
+`atr_pct`, is the variable the test stratifies on, and it scores **higher on
+the old `hit_100` label (1.752) than on the short-horizon label (b) proposed
+(1.616)**. A hypothesis whose stated improvement makes the effect smaller,
+carried entirely by the stratifier, is not a finding. The bar exists to
+exclude exactly this, and it failed to because §5.2's feature set contains
+the stratifier — a flaw in how the rule was written, not a result.
+
+This was the user's ruling, made after seeing the table and the control, and
+recorded as a judgement rather than disguised as an arithmetic outcome.
+
+#### What is not built
+
+Per §2.2, these are now closed and will not be built:
+
+- **§5** — models
+- **§7** — multi-threshold display
+- **§9** — shadow serving
+
+**No round 2 without a new written justification from the user.** Not from the
+agent, and not as "one more variant while we are here". The natural next
+moves — drop `atr_pct` and re-test (b), try a different horizon, add a
+catalyst source to replace the abandoned (c) — are all available, all
+defensible-sounding, and all out of scope. That is the entire point of having
+written the rule down first.
+
+#### The honest reading
+
+> **The "+8–15% momentum entry" thesis shows no demonstrated edge on daily
+> bars.**
+
+Four candidate mechanisms were tested on 7,579 out-of-sample episodes with
+buckets, volatility terciles and time folds controlled, and a lockbox that was
+never opened:
+
+| claim | result |
+|---|---|
+| path-aware labels are less volatility-dominated | refuted — identical ORs to `hit_100` |
+| a shorter horizon suits a daily-bar signal | refuted — effect is smaller, not larger |
+| relative sector strength conditions follow-through | flat, OR 1.014 |
+| market regime conditions the base rate | flat, OR 0.87–1.13 |
+
+Everything that looked like signal across Phases 1 and 2 — the v2 score,
+`rvol`, `rvol` inside ATR terciles, and now `atr_pct` on three new labels —
+reduced to the same thing: **volatile and low-priced stocks make large
+percentage moves more often, and nothing tested here says which ones or
+when.**
+
+#### What the project delivers
+
+The **screener** (§8.5): roughly 4.5 alerts per day at the median, p90 of 9,
+with 2024-11-06 the worst day at 157. It surfaces a small, reviewable set of
+unusual-volume names each session. It makes **no claim of predictive edge**,
+and this spec is the record of why it makes none.
+
+The infrastructure built along the way stands on its own and is the more
+durable output: point-in-time market cap from EDGAR, corporate-action seam
+detection, the denominator guard, source-preference ordering, worker version
+stamping, episode-level analysis, and the reference-series isolation. Each
+exists because a specific silent wrongness was found and fixed.
+
+**Status: Phase 2 CLOSED.**
+
+---
+
 ## 3. Data corrections
 
 Each correction changes what the dataset measures. Each one is therefore
