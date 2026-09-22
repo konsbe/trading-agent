@@ -459,7 +459,7 @@ detection. Neither was the cause:
 | `TradingAgentResearch <your-contact-email>` | **200** |
 | `Trading Agent Research <your-contact-email>` | **200** |
 | `TradingAgentResearch` (no email at all) | **200** |
-| `TradingAgentResearch berdelis@users.noreply.github.com` | **403** |
+| `TradingAgentResearch <a-noreply-github-address>` | **403** |
 
 **SEC denylists `users.noreply.github.com` as a contact address.** The identical
 UA with a real domain succeeds; a UA with no email at all succeeds. Record this

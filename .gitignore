@@ -28,3 +28,12 @@ __pycache__/
 *.egg-info/
 .venv/
 venv/
+
+# Go build outputs left in the package directory. macro-analysis was committed
+# (13 MB) because it was the one sibling missing from the list above —
+# fundamental-analysis and technical-analysis were already ignored. Listed by
+# name AND by pattern so the next binary does not slip through the same gap.
+services/data-analyzer/macro-analysis
+services/data-analyzer/momentum-*
+services/data-ingestion/data-*
+services/*/bin/

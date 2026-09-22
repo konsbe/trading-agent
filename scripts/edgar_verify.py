@@ -34,8 +34,18 @@ import sys
 import time
 from collections import defaultdict
 
-UA = "TradingAgentResearch <your-contact-email>"
-SLEEP = 0.35  # ~3 req/s, well under SEC's ~10/s, because the IP is shared
+#: Read from the environment, with NO default.
+#:
+#: SEC requires a descriptive User-Agent carrying a real contact address, so
+#: any default here would either be a fake address (which SEC denylists — see
+#: below) or somebody's real one committed to a public repository. Failing
+#: loudly is the only honest third option.
+UA = os.environ.get("SEC_EDGAR_USER_AGENT", "")
+
+#: ~3 req/s, well under SEC's ~10/s. Lower on purpose: the published rate is
+#: PER IP, and this network egresses through a shared corporate proxy, so our
+#: share of that allowance is not ours to assume.
+SLEEP = 0.35
 
 # Known delisted / acquired names, for check 3. Chosen because all filed with
 # SEC for years, so a CIK and a filing history certainly exist -- which makes
@@ -71,6 +81,21 @@ def main() -> int:
     ap.add_argument("--per-bucket", type=int, default=45)
     ap.add_argument("--out", default="/tmp/edgar_coverage.json")
     args = ap.parse_args()
+
+    if not UA.strip():
+        print("SEC_EDGAR_USER_AGENT is not set.\n"
+              "\n"
+              "SEC requires a descriptive User-Agent with a real contact address, e.g.\n"
+              "  SEC_EDGAR_USER_AGENT='YourProjectName you@yourdomain.example'\n"
+              "\n"
+              "Refusing to guess one is deliberate. A wrong or throwaway address returns\n"
+              "HTTP 403 with a body titled 'Request Rate Threshold Exceeded' or 'Undeclared\n"
+              "Automated Tool' — both of which point at rate limiting rather than at the\n"
+              "address, and cost an hour to diagnose. SEC denylists some contact domains:\n"
+              "a UA containing users.noreply.github.com returns 403 while the identical UA\n"
+              "with a real domain returns 200. Use a domain you control.",
+              file=sys.stderr)
+        return 2
 
     print("=" * 78)
     print("  SEC EDGAR VERIFICATION — Phase 2 §3.2 step (a)")
