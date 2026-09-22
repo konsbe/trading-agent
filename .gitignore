@@ -37,3 +37,11 @@ services/data-analyzer/macro-analysis
 services/data-analyzer/momentum-*
 services/data-ingestion/data-*
 services/*/bin/
+
+# Analysis workspace: built binaries and regenerable extracts.
+#
+# These lived in /tmp until a system tmp-cleaner deleted every binary and every
+# analysis input mid-session. Nothing was permanently lost — the durable state
+# is in Postgres, which is why schema changes go in migrations — but the
+# regeneration cost was real. Working artifacts now live in the repo, ignored.
+.work/

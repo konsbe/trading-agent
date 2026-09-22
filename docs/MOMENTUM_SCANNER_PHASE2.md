@@ -1046,6 +1046,52 @@ candidate feature.
 Note that `finnhubIndustry` is the **current** classification. That is a mild
 point-in-time issue, far less serious than the share-count problem in 3.2.
 
+#### 3.4.1 P2-4 RESULT (2026-09-22) — sector captured, at zero extra cost
+
+LIVE, `equity_fundamentals` where `metric='sector_profile'`,
+`source='finnhub_profile2'`.
+
+| | symbols | share |
+|---|---|---|
+| eligible universe | 4,975 | |
+| profile row returned | 4,575 | 92.0% |
+| **usable industry** | **4,303** | **86.5%** |
+| explicit `N/A` from Finnhub | 272 | 5.5% |
+| no profile row at all | 400 | 8.0% |
+
+Per bucket:
+
+| Bucket | symbols | usable | share | distinct industries |
+|---|---|---|---|---|
+| market | 3,056 | 2,749 | **90.0%** | 45 |
+| penny | 1,809 | 1,536 | **84.9%** | 44 |
+
+**Cost: zero additional requests.** `finnhubIndustry` comes from the same
+`/stock/profile2` response already fetched for `shareOutstanding`, which is
+what §3.4 meant by the sector data being effectively free and why Phase 1
+§3.13's cost objection lapses.
+
+Three properties of this field that constrain how it may be used:
+
+1. **It is a CURRENT classification, not point-in-time.** A company
+   reclassified since the setup carries today's label on every historical row.
+   That is a mild version of the §3.2 problem — mild because industry changes
+   are rare and, unlike share count, are not systematically related to whether
+   the stock ran. Recorded, not corrected.
+2. **Finnhub exposes ONE level**, not a sector/industry pair. The payload
+   carries the same value under both keys with a note saying so, rather than
+   inventing a hierarchy.
+3. **Missing is stored as missing.** 272 explicit `N/A` and 400 absent rows
+   are distinguishable from each other and from a real industry. §5.2 requires
+   an explicit indicator column and forbids imputation; `sector_strength_pct`
+   must therefore be null for those 672 symbols, never a universe average.
+
+An ordering trap worth recording: the capture had to be written BEFORE the
+`shareOutstanding` early-returns in the same function. That path returns early
+when the profile has no share count and when `/stock/metric` already supplied
+one — both common — so capturing the industry afterwards would have collected
+it only for the minority needing §3.9's fallback.
+
 ### 3.5 Catalyst history via Tiingo News
 
 Finnhub's free news reaches back only ~12 months, so catalyst could be evaluated
