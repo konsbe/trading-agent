@@ -2,12 +2,12 @@ package compute
 
 // MarketStructureResult encodes simple BOS-style breaks using recent swing pivots.
 type MarketStructureResult struct {
-	BullishBOS bool // close > prior swing high (second-last swing high)
-	BearishBOS bool // close < prior swing low
-	CHoCHUp    bool // after a down sequence, close takes out last significant high (heuristic)
-	CHoCHDown  bool
-	LastSwingHigh float64
-	LastSwingLow  float64
+	BullishBOS     bool // close > prior swing high (second-last swing high)
+	BearishBOS     bool // close < prior swing low
+	CHoCHUp        bool // after a down sequence, close takes out last significant high (heuristic)
+	CHoCHDown      bool
+	LastSwingHigh  float64
+	LastSwingLow   float64
 	PriorSwingHigh float64
 	PriorSwingLow  float64
 }

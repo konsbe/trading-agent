@@ -8,10 +8,10 @@ import "strings"
 // Inputs are string fields read from macro_derived payloads (empty = unknown).
 type Inputs struct {
 	GCStance, MPStance, InfStance, GGStance string
-	YieldCurve, RealRate, CreditRegime    string
-	GDPRegime                             string
-	OilRegime                             string
-	DollarRegime, JPYRegime               string
+	YieldCurve, RealRate, CreditRegime      string
+	GDPRegime                               string
+	OilRegime                               string
+	DollarRegime, JPYRegime                 string
 }
 
 // Result is persisted as mc_macro_correlation in macro_derived.

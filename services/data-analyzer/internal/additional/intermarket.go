@@ -10,12 +10,12 @@ import (
 // RollCorrResult is rolling Pearson correlation between benchmark log returns and
 // day-over-day changes in a FRED level series (forward-filled to equity dates).
 type RollCorrResult struct {
-	SeriesID           string  `json:"series_id"`
-	Correlation60d     float64 `json:"correlation_60d"`
-	ObservationsUsed   int     `json:"observations_used"`
-	Regime             string  `json:"regime"`
-	Label              string  `json:"label"`
-	InsufficientData   bool    `json:"insufficient_data"`
+	SeriesID         string  `json:"series_id"`
+	Correlation60d   float64 `json:"correlation_60d"`
+	ObservationsUsed int     `json:"observations_used"`
+	Regime           string  `json:"regime"`
+	Label            string  `json:"label"`
+	InsufficientData bool    `json:"insufficient_data"`
 }
 
 func pearson(x, y []float64) (float64, bool) {
@@ -140,12 +140,12 @@ func ComputeRollCorrEquityVsFredDelta(
 
 	rg, lb := regime(corr)
 	return RollCorrResult{
-		SeriesID:           seriesID,
+		SeriesID:         seriesID,
 		Correlation60d:   math.Round(corr*1000) / 1000,
 		ObservationsUsed: len(rets),
-		Regime:             rg,
-		Label:              lb,
-		InsufficientData:   false,
+		Regime:           rg,
+		Label:            lb,
+		InsufficientData: false,
 	}
 }
 
@@ -197,9 +197,9 @@ func ComputeBondEquity60d(spy []store.EquityOHLCVBar, dgs10 []store.MacroObs, wi
 
 // BondEquityLegacy matches the original test / snapshot field shape for DGS10.
 type BondEquityLegacy struct {
-	Correlation60d     float64
-	ObservationsUsed   int
-	Regime             string
-	Label              string
-	InsufficientData   bool
+	Correlation60d   float64
+	ObservationsUsed int
+	Regime           string
+	Label            string
+	InsufficientData bool
 }

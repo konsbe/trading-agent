@@ -4,12 +4,12 @@ import "math"
 
 // RelativeStrengthVsBenchmark: ratio and ratio-of-returns on aligned closes.
 type RelativeStrengthVsBenchmark struct {
-	Ratio              float64 // asset / benchmark at last bar
-	RatioChange1       float64 // % change in ratio vs prior aligned bar
-	AssetROC1          float64
-	BenchmarkROC1      float64
-	Outperformance1    float64 // asset ROC − bench ROC
-	AlignedBars        int
+	Ratio           float64 // asset / benchmark at last bar
+	RatioChange1    float64 // % change in ratio vs prior aligned bar
+	AssetROC1       float64
+	BenchmarkROC1   float64
+	Outperformance1 float64 // asset ROC − bench ROC
+	AlignedBars     int
 }
 
 // RelativeStrengthLast requires parallel series (same length, aligned timestamps).

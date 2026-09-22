@@ -27,8 +27,8 @@ type RSIDivergenceResult struct {
 	BullishPattern bool
 
 	PriceHigh1, PriceHigh2 float64
-	RSIHigh1, RSIHigh2    float64
-	HighIdx1, HighIdx2    int
+	RSIHigh1, RSIHigh2     float64
+	HighIdx1, HighIdx2     int
 
 	PriceLow1, PriceLow2 float64
 	RSILow1, RSILow2     float64

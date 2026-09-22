@@ -2,22 +2,24 @@
 // and derives Tier 1 FA signals that the analyst-bot can consume directly.
 //
 // Data flow:
-//   data-fundamental (data-ingestion)
-//     → equity_fundamentals (TimescaleDB, source = finnhub_*)
-//     → fundamental-analysis (this binary, data-analyzer)
-//     → equity_fundamentals (TimescaleDB, source = "fundamental_analysis")
+//
+//	data-fundamental (data-ingestion)
+//	  → equity_fundamentals (TimescaleDB, source = finnhub_*)
+//	  → fundamental-analysis (this binary, data-analyzer)
+//	  → equity_fundamentals (TimescaleDB, source = "fundamental_analysis")
 //
 // Tier 1 signals derived (period = "derived"):
-//   eps_strength            "strong" / "neutral" / "weak" classification
-//   revenue_strength        same scale as EPS strength
-//   pe_vs_5y_mean           deviation of current P/E from own 5-year mean (%)
-//   fcf_yield               FCF ÷ Market Cap × 100
-//   fcf_yield_tier          "attractive" / "fair" / "avoid"
-//   fcf_eps_divergence      flag: EPS growing fast but FCF yield flat/falling
-//   gross_margin_tier       "strong_moat" / "average" / "margin_pressure"
-//   net_margin_tier         same scale
-//   earnings_surprise_avg   rolling 4-quarter average EPS surprise (%)
-//   composite_score         weighted Tier 1 quality score [-1 … +1]
+//
+//	eps_strength            "strong" / "neutral" / "weak" classification
+//	revenue_strength        same scale as EPS strength
+//	pe_vs_5y_mean           deviation of current P/E from own 5-year mean (%)
+//	fcf_yield               FCF ÷ Market Cap × 100
+//	fcf_yield_tier          "attractive" / "fair" / "avoid"
+//	fcf_eps_divergence      flag: EPS growing fast but FCF yield flat/falling
+//	gross_margin_tier       "strong_moat" / "average" / "margin_pressure"
+//	net_margin_tier         same scale
+//	earnings_surprise_avg   rolling 4-quarter average EPS surprise (%)
+//	composite_score         weighted Tier 1 quality score [-1 … +1]
 //
 // TODO: migrate this worker to Python (analyst-bot or a dedicated service).
 // pandas + psycopg3 makes the pivoting and ratio math far simpler.
@@ -38,11 +40,11 @@ import (
 
 	"github.com/joho/godotenv"
 
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/konsbe/trading-agent/services/data-analyzer/internal/config"
 	"github.com/konsbe/trading-agent/services/data-analyzer/internal/db"
 	"github.com/konsbe/trading-agent/services/data-analyzer/internal/logx"
 	"github.com/konsbe/trading-agent/services/data-analyzer/internal/store"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func main() {
@@ -128,7 +130,8 @@ func (w *worker) analyzeAll(ctx context.Context) {
 // Do NOT use Finnhub's original camelCase names here.
 //
 // TODO: replace with Python pandas logic when migrating to analyst-bot:
-//   df = pd.DataFrame(rows).pivot(index='period', columns='metric', values='value')
+//
+//	df = pd.DataFrame(rows).pivot(index='period', columns='metric', values='value')
 func (w *worker) score(ctx context.Context, symbol string, rows []store.FundamentalRow) {
 	// ── Build lookup maps ────────────────────────────────────────────────────
 	// latest: one value per metric name (most recent across all periods).
@@ -421,11 +424,11 @@ func (w *worker) score(ctx context.Context, symbol string, rows []store.Fundamen
 				direction = "flat"
 			}
 			upsert("pe_compression", ptr(compression), map[string]any{
-				"trailing_pe":    tpe,
-				"forward_pe":     fpe,
+				"trailing_pe":     tpe,
+				"forward_pe":      fpe,
 				"compression_pct": compression,
-				"direction":      direction,
-				"note":           "negative = forward P/E < trailing = market expects EPS growth",
+				"direction":       direction,
+				"note":            "negative = forward P/E < trailing = market expects EPS growth",
 			})
 		}
 	}
@@ -622,17 +625,18 @@ func (w *worker) analyzeMarginTrend(ctx context.Context, symbol string) {
 // prefixed by "t2_" so the analyst-bot and dashboard can query them distinctly.
 //
 // Tier 2 metrics computed:
-//   t2_roe          — Return on Equity tier (rank 06)
-//   t2_roa          — Return on Assets (informational)
-//   t2_leverage     — D/E ratio tier (rank 07, composite-scored)
-//   t2_net_debt_ebitda — Net Debt / EBITDA proxy (rank 07 extended)
-//   t2_ev_ebitda    — EV/EBITDA tier (rank 08, informational — sector-dependent)
-//   t2_current_ratio — Current ratio tier (rank 10, composite-scored)
-//   t2_quick_ratio  — Quick ratio (informational supplement)
-//   t2_pb           — Price/Book tier (rank 11, informational)
-//   t2_dividend     — Dividend yield + payout sustainability (rank 12)
-//   t2_capex_intensity — CapEx as % of revenue (rank 20, informational)
-//   t2_health_score — Composite of Tier 2 balance-sheet metrics
+//
+//	t2_roe          — Return on Equity tier (rank 06)
+//	t2_roa          — Return on Assets (informational)
+//	t2_leverage     — D/E ratio tier (rank 07, composite-scored)
+//	t2_net_debt_ebitda — Net Debt / EBITDA proxy (rank 07 extended)
+//	t2_ev_ebitda    — EV/EBITDA tier (rank 08, informational — sector-dependent)
+//	t2_current_ratio — Current ratio tier (rank 10, composite-scored)
+//	t2_quick_ratio  — Quick ratio (informational supplement)
+//	t2_pb           — Price/Book tier (rank 11, informational)
+//	t2_dividend     — Dividend yield + payout sustainability (rank 12)
+//	t2_capex_intensity — CapEx as % of revenue (rank 20, informational)
+//	t2_health_score — Composite of Tier 2 balance-sheet metrics
 //
 // TODO: migrate to Python pandas — quarterly series joins and ratio math are
 // simpler with DataFrame.resample() and vectorised pct_change().
@@ -738,14 +742,14 @@ func (w *worker) scoreTier2(ctx context.Context, symbol string, rows []store.Fun
 				roic = nopatTTM / investedCap * 100
 				roicSource = "xbrl_computed"
 				roicPayload = map[string]any{
-					"roic_pct":          roic,
-					"nopat_ttm":         nopatTTM,
-					"invested_capital":  investedCap,
-					"effective_tax_rate": fmt.Sprintf("%.1f%%", taxRate*100),
-					"operating_income_q": opInc,
-					"total_assets":       totAssets,
+					"roic_pct":            roic,
+					"nopat_ttm":           nopatTTM,
+					"invested_capital":    investedCap,
+					"effective_tax_rate":  fmt.Sprintf("%.1f%%", taxRate*100),
+					"operating_income_q":  opInc,
+					"total_assets":        totAssets,
 					"current_liabilities": curLiab,
-					"note":              "NOPAT = op_income_q×4×(1−tax_rate); InvCap = total_assets−current_liabilities",
+					"note":                "NOPAT = op_income_q×4×(1−tax_rate); InvCap = total_assets−current_liabilities",
 				}
 			}
 		}
@@ -842,12 +846,12 @@ func (w *worker) scoreTier2(ctx context.Context, symbol string, rows []store.Fun
 					tier = "manageable"
 				}
 				upsert("t2_net_debt_ebitda", ptr(ratio), map[string]any{
-					"net_debt":      netDebt,
-					"ebitda_proxy":  ebitdaProxy,
-					"ratio":         ratio,
-					"tier":          tier,
-					"thresholds":    fmt.Sprintf("<%.0f× conservative, %.0f-%.0f× manageable, >%.0f× high risk", cfg.NetDebtEBITDALow, cfg.NetDebtEBITDALow, cfg.NetDebtEBITDAHigh, cfg.NetDebtEBITDAHigh),
-					"note":          "EBITDA proxy = latest quarter operating income × 4 (excludes D&A — slightly conservative)",
+					"net_debt":     netDebt,
+					"ebitda_proxy": ebitdaProxy,
+					"ratio":        ratio,
+					"tier":         tier,
+					"thresholds":   fmt.Sprintf("<%.0f× conservative, %.0f-%.0f× manageable, >%.0f× high risk", cfg.NetDebtEBITDALow, cfg.NetDebtEBITDALow, cfg.NetDebtEBITDAHigh, cfg.NetDebtEBITDAHigh),
+					"note":         "EBITDA proxy = latest quarter operating income × 4 (excludes D&A — slightly conservative)",
 				})
 			}
 		}
@@ -1040,14 +1044,15 @@ func (w *worker) scoreTier2(ctx context.Context, symbol string, rows []store.Fun
 // individually with a tier label for the analyst-bot to display.
 //
 // Metrics computed:
-//   t3_share_trend      — rank 13: share count trend (buybacks vs dilution)
-//   t3_dcf              — rank 14: simplified DCF margin of safety
-//   t3_interest_coverage — rank 15: EBIT ÷ interest expense
-//   t3_asset_turnover   — rank 16: revenue ÷ total assets (informational)
-//   t3_inventory_turnover — rank 16: COGS ÷ inventory (when available)
-//   t3_analyst_target   — rank 17: analyst target price vs current price
-//   t3_goodwill_risk    — rank 18: (goodwill+intangibles) as % of total assets
-//   t3_ps_ratio         — rank 19: price-to-sales ratio
+//
+//	t3_share_trend      — rank 13: share count trend (buybacks vs dilution)
+//	t3_dcf              — rank 14: simplified DCF margin of safety
+//	t3_interest_coverage — rank 15: EBIT ÷ interest expense
+//	t3_asset_turnover   — rank 16: revenue ÷ total assets (informational)
+//	t3_inventory_turnover — rank 16: COGS ÷ inventory (when available)
+//	t3_analyst_target   — rank 17: analyst target price vs current price
+//	t3_goodwill_risk    — rank 18: (goodwill+intangibles) as % of total assets
+//	t3_ps_ratio         — rank 19: price-to-sales ratio
 //
 // TODO: Python migration — pandas rolling join for share count series;
 // scenario-range DCF with Monte Carlo; Finviz/Seeking Alpha revision trend.
@@ -1257,11 +1262,11 @@ func (w *worker) scoreTier3(ctx context.Context, symbol string, rows []store.Fun
 				tier = "moderate"
 			}
 			upsert("t3_asset_turnover", ptr(assetTurnover), map[string]any{
-				"asset_turnover":    assetTurnover,
-				"revenue_millions":  revTTM,
-				"total_assets":      totAssets,
-				"tier":              tier,
-				"note":              "informational — compare to sector peers over time; >1.0 efficient, <0.5 asset-heavy",
+				"asset_turnover":   assetTurnover,
+				"revenue_millions": revTTM,
+				"total_assets":     totAssets,
+				"tier":             tier,
+				"note":             "informational — compare to sector peers over time; >1.0 efficient, <0.5 asset-heavy",
 			})
 		}
 	}
@@ -1303,12 +1308,12 @@ func (w *worker) scoreTier3(ctx context.Context, symbol string, rows []store.Fun
 				tier = "bearish_consensus"
 			}
 			upsert("t3_analyst_target", ptr(upside), map[string]any{
-				"upside_pct":     upside,
-				"target_price":   target,
-				"current_price":  currentPrice,
-				"tier":           tier,
-				"thresholds":     fmt.Sprintf(">%.0f%% upside = bullish consensus; <%.0f%% = bearish", cfg.AnalystUpsideBullish, cfg.AnalystDownsideBearish),
-				"note":           "single analyst target; revision trend requires paid data (Seeking Alpha / Finviz)",
+				"upside_pct":    upside,
+				"target_price":  target,
+				"current_price": currentPrice,
+				"tier":          tier,
+				"thresholds":    fmt.Sprintf(">%.0f%% upside = bullish consensus; <%.0f%% = bearish", cfg.AnalystUpsideBullish, cfg.AnalystDownsideBearish),
+				"note":          "single analyst target; revision trend requires paid data (Seeking Alpha / Finviz)",
 			})
 		}
 	}
@@ -1358,12 +1363,12 @@ func (w *worker) scoreTier3(ctx context.Context, symbol string, rows []store.Fun
 				tier = "growth_premium_required"
 			}
 			upsert("t3_ps_ratio", ptr(ps), map[string]any{
-				"ps_ratio":              ps,
-				"market_cap_millions":   mktCap,
-				"revenue_ttm_millions":  revTTM,
-				"tier":                  tier,
-				"thresholds":            fmt.Sprintf("<%.0f× value, %.0f-%.0f× fair, %.0f-%.0f× growth premium, >%.0f× speculative", cfg.PSValue, cfg.PSValue, cfg.PSFair, cfg.PSFair, cfg.PSSpeculative, cfg.PSSpeculative),
-				"note":                  "compare within sector; SaaS 5-15× is normal, industrials >3× is expensive",
+				"ps_ratio":             ps,
+				"market_cap_millions":  mktCap,
+				"revenue_ttm_millions": revTTM,
+				"tier":                 tier,
+				"thresholds":           fmt.Sprintf("<%.0f× value, %.0f-%.0f× fair, %.0f-%.0f× growth premium, >%.0f× speculative", cfg.PSValue, cfg.PSValue, cfg.PSFair, cfg.PSFair, cfg.PSSpeculative, cfg.PSSpeculative),
+				"note":                 "compare within sector; SaaS 5-15× is normal, industrials >3× is expensive",
 			})
 		}
 	}
@@ -1411,11 +1416,11 @@ func (w *worker) scoreTier3(ctx context.Context, symbol string, rows []store.Fun
 		// Net score level gives context (absolute analyst confidence).
 		netScore, _ := latest["analyst_rec_net_score"]
 		upsert("t3_analyst_rec_trend", ptr(recTrend), map[string]any{
-			"trend_delta":        recTrend,
-			"net_score_current":  netScore,
-			"tier":               tier,
-			"thresholds":         fmt.Sprintf("delta >%.0f = upgrading, <%.0f = downgrading, else neutral", cfg.AnalystRecUpgrade, cfg.AnalystRecDowngrade),
-			"note":               "Finnhub /stock/recommendation month-over-month change in (strongBuy+buy) − (strongSell+sell)",
+			"trend_delta":       recTrend,
+			"net_score_current": netScore,
+			"tier":              tier,
+			"thresholds":        fmt.Sprintf("delta >%.0f = upgrading, <%.0f = downgrading, else neutral", cfg.AnalystRecUpgrade, cfg.AnalystRecDowngrade),
+			"note":              "Finnhub /stock/recommendation month-over-month change in (strongBuy+buy) − (strongSell+sell)",
 		})
 	}
 
@@ -1524,14 +1529,14 @@ func (w *worker) scoreQualitative(ctx context.Context, symbol string, rows []sto
 			}
 
 			upsert("qual_moat_proxy", ptr(moatVal), map[string]any{
-				"tier":               moatTier,
-				"gross_margin_mean":  round2(mean),
-				"gross_margin_std":   round2(std),
-				"current_margin":     round2(currentMargin),
-				"quarters_used":      len(margins),
-				"roe_ttm":            latest["roe_ttm"],
-				"stable_threshold":   fmt.Sprintf("std < %.1fpp", cfg.QualMoatStableStdPP),
-				"note":               "Structural proxy only — does not assess brand/patent/network effects. Tune QUAL_MOAT_STABLE_STD_PP.",
+				"tier":              moatTier,
+				"gross_margin_mean": round2(mean),
+				"gross_margin_std":  round2(std),
+				"current_margin":    round2(currentMargin),
+				"quarters_used":     len(margins),
+				"roe_ttm":           latest["roe_ttm"],
+				"stable_threshold":  fmt.Sprintf("std < %.1fpp", cfg.QualMoatStableStdPP),
+				"note":              "Structural proxy only — does not assess brand/patent/network effects. Tune QUAL_MOAT_STABLE_STD_PP.",
 			})
 		}
 	}
@@ -1606,9 +1611,9 @@ func (w *worker) scoreQualitative(ctx context.Context, symbol string, rows []sto
 
 		if avgSentiment == nil || rowCount == 0 {
 			upsert(metricName, nil, map[string]any{
-				"tier":  "insufficient_data",
-				"days":  days,
-				"note":  "No news_headlines rows with sentiment scores in window. Requires FUNDAMENTAL_ENABLE_NEWS_SENTIMENT=true.",
+				"tier": "insufficient_data",
+				"days": days,
+				"note": "No news_headlines rows with sentiment scores in window. Requires FUNDAMENTAL_ENABLE_NEWS_SENTIMENT=true.",
 			})
 			continue
 		}
@@ -1677,12 +1682,13 @@ func (w *worker) scoreQualitative(ctx context.Context, symbol string, rows []sto
 // and analyses whether metrics that should move together are actually diverging.
 //
 // Outputs (period = "derived", source = "fundamental_analysis"):
-//   corr_earnings_quality   — EPS/FCF alignment, revenue/EPS coherence, margin trends
-//   corr_valuation_quality  — P/E vs growth/ROIC, FCF vs dividend, P/B vs ROE
-//   corr_leverage_liquidity — Net Debt/EBITDA vs coverage, current ratio vs FCF, D/E vs margin
-//   corr_operational        — ROIC vs revenue growth, margin trends, CapEx vs FCF
-//   corr_master_signals     — 5 high-conviction divergence patterns
-//   corr_summary            — cross-cluster aggregate score
+//
+//	corr_earnings_quality   — EPS/FCF alignment, revenue/EPS coherence, margin trends
+//	corr_valuation_quality  — P/E vs growth/ROIC, FCF vs dividend, P/B vs ROE
+//	corr_leverage_liquidity — Net Debt/EBITDA vs coverage, current ratio vs FCF, D/E vs margin
+//	corr_operational        — ROIC vs revenue growth, margin trends, CapEx vs FCF
+//	corr_master_signals     — 5 high-conviction divergence patterns
+//	corr_summary            — cross-cluster aggregate score
 //
 // TODO: migrate to Python — pandas makes pairwise delta computation trivial.
 func (w *worker) scoreCorrelations(ctx context.Context, symbol string, rows []store.FundamentalRow) {
@@ -1839,11 +1845,11 @@ func (w *worker) scoreCorrelations(ctx context.Context, symbol string, rows []st
 
 	eq1Cluster := clamp1(safeDiv(eq1Score, eq1Max))
 	upsert("corr_earnings_quality", ptr(eq1Cluster), map[string]any{
-		"tier":        corrTier(eq1Cluster),
-		"warnings":    eq1Warnings,
-		"positives":   eq1Positives,
-		"checks_run":  eq1Max,
-		"note":        "EPS/FCF alignment, revenue/EPS coherence, gross vs net margin trends",
+		"tier":       corrTier(eq1Cluster),
+		"warnings":   eq1Warnings,
+		"positives":  eq1Positives,
+		"checks_run": eq1Max,
+		"note":       "EPS/FCF alignment, revenue/EPS coherence, gross vs net margin trends",
 	})
 
 	// ── Cluster 2: Valuation vs Quality ───────────────────────────────────────

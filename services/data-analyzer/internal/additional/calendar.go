@@ -7,7 +7,7 @@ import "time"
 type SeasonalityMonth struct {
 	Month   int     `json:"month"`
 	Name    string  `json:"name"`
-	Bias    string  `json:"bias"` // strong_bull | mild_bull | neutral | mild_bear | weak_bear
+	Bias    string  `json:"bias"`  // strong_bull | mild_bull | neutral | mild_bear | weak_bear
 	Score   float64 `json:"score"` // -1 .. +1 for compositing
 	Note    string  `json:"note"`
 	AvgHist string  `json:"avg_hist,omitempty"`

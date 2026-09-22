@@ -3,8 +3,8 @@ package compute
 // PivotSet holds classic / Camarilla / Woodie levels from one prior period's OHLC.
 type PivotSet struct {
 	PP, R1, R2, R3, S1, S2, S3 float64
-	Camarilla                    map[string]float64
-	Woodie                       map[string]float64
+	Camarilla                  map[string]float64
+	Woodie                     map[string]float64
 }
 
 // PivotsFromPriorBar uses the bar at index len−2 as the reference session (H/L/C).

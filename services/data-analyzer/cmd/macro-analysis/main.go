@@ -2,33 +2,37 @@
 // and derives macro signals that the analyst-bot can consume directly.
 //
 // Data flow:
-//   data-equity (data-ingestion)
-//     → macro_fred (TimescaleDB, raw FRED series observations)
-//     → macro-analysis (this binary, data-analyzer)
-//     → macro_derived (TimescaleDB, source = "macro_analysis")
+//
+//	data-equity (data-ingestion)
+//	  → macro_fred (TimescaleDB, raw FRED series observations)
+//	  → macro-analysis (this binary, data-analyzer)
+//	  → macro_derived (TimescaleDB, source = "macro_analysis")
 //
 // Monetary Policy signals (analyzeMonetary):
-//   mp_rate, mp_yield_curve, mp_real_rate, mp_balance_sheet,
-//   mp_credit_spread, mp_breakeven_inflation, mp_treasury_yields,
-//   mp_m2_supply, mp_stance
+//
+//	mp_rate, mp_yield_curve, mp_real_rate, mp_balance_sheet,
+//	mp_credit_spread, mp_breakeven_inflation, mp_treasury_yields,
+//	mp_m2_supply, mp_stance
 //
 // Growth Cycle signals (analyzeGrowth) — all free FRED data:
-//   gc_pmi            ISM Manufacturing PMI (NAPM)
-//   gc_lei            Conference Board LEI level + 6m trend (USSLIND)
-//   gc_claims         Initial + continuing jobless claims (ICSA / CCSA)
-//   gc_housing        Housing starts + permits (HOUST / PERMIT)
-//   gc_gdp            Real GDP annualized QoQ growth (GDPC1)
-//   gc_employment     Nonfarm payrolls + unemployment + AHE + Sahm Rule
-//   gc_consumer       Retail sales YoY (RRSFS) + Michigan sentiment (UMCSENT)
-//   gc_capex          Core capex trend (NEWORDER)
-//   gc_stance         Composite weighted score (-1 contraction … +1 expansion)
+//
+//	gc_pmi            ISM Manufacturing PMI (NAPM)
+//	gc_lei            Conference Board LEI level + 6m trend (USSLIND)
+//	gc_claims         Initial + continuing jobless claims (ICSA / CCSA)
+//	gc_housing        Housing starts + permits (HOUST / PERMIT)
+//	gc_gdp            Real GDP annualized QoQ growth (GDPC1)
+//	gc_employment     Nonfarm payrolls + unemployment + AHE + Sahm Rule
+//	gc_consumer       Retail sales YoY (RRSFS) + Michigan sentiment (UMCSENT)
+//	gc_capex          Core capex trend (NEWORDER)
+//	gc_stance         Composite weighted score (-1 contraction … +1 expansion)
 //
 // Global & Geopolitical (analyzeGlobal) — free FRED data:
-//   gg_broad_dollar   Trade-weighted broad USD (DTWEXBGS)
-//   gg_usdjpy         USD/JPY spot + ~20d % change (DEXJPUS) — carry unwind
-//   gg_china_gdp      China GDP YoY % (CHNGDPNQDSMEI, OECD quarterly)
-//   gg_fiscal         FY deficit (FYFSD) + deficit % of GDP (GDP SAAR)
-//   gg_stance         Composite global stress score (-1 benign … +1 elevated)
+//
+//	gg_broad_dollar   Trade-weighted broad USD (DTWEXBGS)
+//	gg_usdjpy         USD/JPY spot + ~20d % change (DEXJPUS) — carry unwind
+//	gg_china_gdp      China GDP YoY % (CHNGDPNQDSMEI, OECD quarterly)
+//	gg_fiscal         FY deficit (FYFSD) + deficit % of GDP (GDP SAAR)
+//	gg_stance         Composite global stress score (-1 benign … +1 elevated)
 //
 // TODO [LLM]:  Score FOMC statements and minutes hawkish/dovish on -5 to +5 scale.
 // TODO [PAID]: CME FedWatch implied rate probabilities (requires CME API subscription).
@@ -38,23 +42,27 @@
 // TODO [SCRAPE]: GDPNow (Atlanta Fed real-time GDP) — no public API; needs web scraping.
 // TODO [PAID]: ADP National Employment Report — no free API.
 // Global & Geopolitical signals (analyzeGlobal) — free FRED data:
-//   gg_broad_dollar   Trade-weighted broad USD index (DTWEXBGS) — not ICE DXY but same macro role
-//   gg_usdjpy         USD/JPY spot + ~20d % change (DEXJPUS) — carry unwind detector
-//   gg_china_gdp      OECD China GDP level, YoY % (CHNGDPNQDSMEI)
-//   gg_fiscal         Federal surplus/deficit (FYFSD) + deficit % of nominal GDP (GDP, SAAR)
-//   gg_stance         Composite global-financial-conditions stress score
+//
+//	gg_broad_dollar   Trade-weighted broad USD index (DTWEXBGS) — not ICE DXY but same macro role
+//	gg_usdjpy         USD/JPY spot + ~20d % change (DEXJPUS) — carry unwind detector
+//	gg_china_gdp      OECD China GDP level, YoY % (CHNGDPNQDSMEI)
+//	gg_fiscal         Federal surplus/deficit (FYFSD) + deficit % of nominal GDP (GDP, SAAR)
+//	gg_stance         Composite global-financial-conditions stress score
 //
 // Market cycle (analyzeMarketCycles) — equity_ohlcv + macro stances:
-//   mc_market_cycle   SPY (configurable) drawdown vs peak, 200DMA %, crash heuristics,
-//                     composite phase blending gc/mp/inf/gg (see macro_analysis_reference.html Market Cycles)
+//
+//	mc_market_cycle   SPY (configurable) drawdown vs peak, 200DMA %, crash heuristics,
+//	                  composite phase blending gc/mp/inf/gg (see macro_analysis_reference.html Market Cycles)
 //
 // Macro correlation regime (analyzeMacroCorrelations) — after all macro + market cycle:
-//   mc_macro_correlation  Cross-metric regime label + score + flags for bot /analyze context
-//                         (see macro_analysis_reference.html — Macro Correlations panel)
+//
+//	mc_macro_correlation  Cross-metric regime label + score + flags for bot /analyze context
+//	                      (see macro_analysis_reference.html — Macro Correlations panel)
 //
 // Additional analysis (analyzeAdditionalReference) — additional_analysis_reference.html (v1):
-//   aa_reference_snapshot  Intermarket 60d bond–equity corr (SPY×DGS10) + static month seasonality +
-//                            presidential cycle context (JSON payload; scalar value = correlation when computed)
+//
+//	aa_reference_snapshot  Intermarket 60d bond–equity corr (SPY×DGS10) + static month seasonality +
+//	                         presidential cycle context (JSON payload; scalar value = correlation when computed)
 //
 // TODO [PAID]:    ICE DXY, real-time FX — FRED DTWEXBGS is weekly broad goods index.
 // TODO [PAID]:    China official / Caixin PMI — NBS/Caixin; EM stress (JPM EMBI+) paid.
@@ -80,10 +88,10 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
 
+	"github.com/konsbe/trading-agent/services/data-analyzer/internal/additional"
 	"github.com/konsbe/trading-agent/services/data-analyzer/internal/config"
 	"github.com/konsbe/trading-agent/services/data-analyzer/internal/db"
 	"github.com/konsbe/trading-agent/services/data-analyzer/internal/logx"
-	"github.com/konsbe/trading-agent/services/data-analyzer/internal/additional"
 	"github.com/konsbe/trading-agent/services/data-analyzer/internal/macrocorr"
 	"github.com/konsbe/trading-agent/services/data-analyzer/internal/marketcycle"
 	"github.com/konsbe/trading-agent/services/data-analyzer/internal/store"
@@ -259,13 +267,13 @@ func (w *worker) analyzeMonetary(ctx context.Context) {
 			mpRateScore = 0
 		}
 		upsert("mp_rate", ptr(ff), map[string]any{
-			"fedfunds_pct":    ff,
-			"change_yoy_bps":  changeYoYBps,
-			"regime":          mpRateRegime,
-			"thresholds":      "hiking: YoY change >+25bps | neutral: ±25bps | cutting: <-25bps",
-			"strategy":        "cutting=bullish growth/tech, buy duration | neutral=stock-picking | hiking=value>growth, banks outperform",
-			"todo_cme_watch":  "CME FedWatch rate probabilities require paid CME API — adds real-time forward rate expectations",
-			"todo_fomc_llm":   "FOMC statement hawkish/dovish scoring scheduled for LLM layer integration",
+			"fedfunds_pct":   ff,
+			"change_yoy_bps": changeYoYBps,
+			"regime":         mpRateRegime,
+			"thresholds":     "hiking: YoY change >+25bps | neutral: ±25bps | cutting: <-25bps",
+			"strategy":       "cutting=bullish growth/tech, buy duration | neutral=stock-picking | hiking=value>growth, banks outperform",
+			"todo_cme_watch": "CME FedWatch rate probabilities require paid CME API — adds real-time forward rate expectations",
+			"todo_fomc_llm":  "FOMC statement hawkish/dovish scoring scheduled for LLM layer integration",
 		})
 	}
 
@@ -339,11 +347,11 @@ func (w *worker) analyzeMonetary(ctx context.Context) {
 		}
 		be10y, _ := fredLatest("T10YIE")
 		upsert("mp_real_rate", ptr(realRate), map[string]any{
-			"real_rate_10y_pct":  realRate,
-			"breakeven_10y_pct":  be10y,
-			"regime":             rrRegime,
-			"thresholds":         fmt.Sprintf("<%.0f%% deeply negative | %.0f–%.0f%% balanced | >%.0f%% headwind", cfg.RealRateDeeplyNeg, cfg.RealRateDeeplyNeg, cfg.RealRateHeadwind, cfg.RealRateHeadwind),
-			"note":               "2020-21 deeply negative real rates caused asset bubble. 2022 rapid rise to +2% was most destabilizing event for growth stocks. Source: FRED DFII10.",
+			"real_rate_10y_pct": realRate,
+			"breakeven_10y_pct": be10y,
+			"regime":            rrRegime,
+			"thresholds":        fmt.Sprintf("<%.0f%% deeply negative | %.0f–%.0f%% balanced | >%.0f%% headwind", cfg.RealRateDeeplyNeg, cfg.RealRateDeeplyNeg, cfg.RealRateHeadwind, cfg.RealRateHeadwind),
+			"note":              "2020-21 deeply negative real rates caused asset bubble. 2022 rapid rise to +2% was most destabilizing event for growth stocks. Source: FRED DFII10.",
 		})
 	}
 
@@ -354,10 +362,10 @@ func (w *worker) analyzeMonetary(ctx context.Context) {
 	var bsRegime string
 	var bsScore float64
 
-	walcl, bsOK := fredLatest("WALCL")  // millions USD
+	walcl, bsOK := fredLatest("WALCL") // millions USD
 	if bsOK {
 		walcl4wAgo := fredNAgo("WALCL", 4) // 4 weekly observations back
-		var change4wBn float64              // in billions
+		var change4wBn float64             // in billions
 		if walcl4wAgo != nil {
 			change4wBn = (walcl - *walcl4wAgo) / 1000 // millions → billions
 		}
@@ -409,13 +417,13 @@ func (w *worker) analyzeMonetary(ctx context.Context) {
 			creditScore = 1
 		}
 		upsert("mp_credit_spread", ptr(hyBps), map[string]any{
-			"hy_spread_bps":  hyBps,
-			"ig_spread_bps":  igBps,
-			"regime":         creditRegime,
-			"thresholds":     fmt.Sprintf("<%.0fbps benign | %.0f–%.0fbps elevated | >%.0fbps crisis", cfg.HYElevatedThreshold, cfg.HYElevatedThreshold, cfg.HYCrisisThreshold, cfg.HYCrisisThreshold),
-			"note":           "Credit stress leads equity drawdowns 4-8 weeks. 2020 peak 1100bps, 2009 peak 1900bps. TEDRATE discontinued May 2023.",
-			"todo_ted":       "TEDRATE discontinued FRED May 2023. Consider SOFR-OIS spread as modern interbank stress proxy.",
-			"source":         "FRED BAMLH0A0HYM2 (HY) / BAMLC0A0CM (IG)",
+			"hy_spread_bps": hyBps,
+			"ig_spread_bps": igBps,
+			"regime":        creditRegime,
+			"thresholds":    fmt.Sprintf("<%.0fbps benign | %.0f–%.0fbps elevated | >%.0fbps crisis", cfg.HYElevatedThreshold, cfg.HYElevatedThreshold, cfg.HYCrisisThreshold, cfg.HYCrisisThreshold),
+			"note":          "Credit stress leads equity drawdowns 4-8 weeks. 2020 peak 1100bps, 2009 peak 1900bps. TEDRATE discontinued May 2023.",
+			"todo_ted":      "TEDRATE discontinued FRED May 2023. Consider SOFR-OIS spread as modern interbank stress proxy.",
+			"source":        "FRED BAMLH0A0HYM2 (HY) / BAMLC0A0CM (IG)",
 		})
 	}
 
@@ -442,12 +450,12 @@ func (w *worker) analyzeMonetary(ctx context.Context) {
 			beScore = 0.5
 		}
 		upsert("mp_breakeven_inflation", ptr(be10y), map[string]any{
-			"breakeven_10y_pct":  be10y,
-			"breakeven_5y_pct":   be5y,
-			"regime":             beRegime,
-			"thresholds":         fmt.Sprintf("<%.1f%% anchored | %.1f–%.1f%% rising | >%.1f%% unanchored", cfg.BreakevenRisingPct, cfg.BreakevenRisingPct, cfg.BreakevenUnanchoredPct, cfg.BreakevenUnanchoredPct),
-			"note":               "Stable 2.0-2.5% = Fed comfortable. Rising >2.5% = unanchoring risk. >3% = 2022 scenario, expect aggressive hikes. Source: FRED T10YIE / T5YIE.",
-			"todo_5y5y":          "5Y5Y forward inflation swap (Fed's preferred long-run anchor) requires Bloomberg terminal or paid ICE data.",
+			"breakeven_10y_pct": be10y,
+			"breakeven_5y_pct":  be5y,
+			"regime":            beRegime,
+			"thresholds":        fmt.Sprintf("<%.1f%% anchored | %.1f–%.1f%% rising | >%.1f%% unanchored", cfg.BreakevenRisingPct, cfg.BreakevenRisingPct, cfg.BreakevenUnanchoredPct, cfg.BreakevenUnanchoredPct),
+			"note":              "Stable 2.0-2.5% = Fed comfortable. Rising >2.5% = unanchoring risk. >3% = 2022 scenario, expect aggressive hikes. Source: FRED T10YIE / T5YIE.",
+			"todo_5y5y":         "5Y5Y forward inflation swap (Fed's preferred long-run anchor) requires Bloomberg terminal or paid ICE data.",
 		})
 	}
 
@@ -462,12 +470,12 @@ func (w *worker) analyzeMonetary(ctx context.Context) {
 	dgs30, _ := fredLatest("DGS30")
 	if dgs10OK {
 		upsert("mp_treasury_yields", ptr(dgs10), map[string]any{
-			"2y_pct":  dgs2,
-			"10y_pct": dgs10,
-			"30y_pct": dgs30,
-			"note":    "Every +100bps in 10Y reduces equity fair value ~10-15% via discount rate. Earnings Yield = 1/PE*100 vs 10Y = Equity Risk Premium. ERP <1% = equities expensive vs bonds.",
+			"2y_pct":   dgs2,
+			"10y_pct":  dgs10,
+			"30y_pct":  dgs30,
+			"note":     "Every +100bps in 10Y reduces equity fair value ~10-15% via discount rate. Earnings Yield = 1/PE*100 vs 10Y = Equity Risk Premium. ERP <1% = equities expensive vs bonds.",
 			"todo_erp": "Full Equity Risk Premium calculation requires S&P composite P/E from fundamental-analysis derived table (future cross-service query).",
-			"source":  "FRED DGS2 / DGS10 / DGS30",
+			"source":   "FRED DGS2 / DGS10 / DGS30",
 		})
 	}
 
@@ -522,13 +530,13 @@ func (w *worker) analyzeMonetary(ctx context.Context) {
 	}
 
 	signals := []signalEntry{
-		{"rate_regime",      mpRateScore,  2.0, ffOK},
-		{"yield_curve",      ycScore,      2.0, yc2sOK},
-		{"real_rate",        rrScore,      1.5, rrOK},
-		{"balance_sheet",    bsScore,      1.0, bsOK},
-		{"credit_spread",    creditScore,  2.0, hyOK},
-		{"breakeven_infl",   beScore,      1.0, be10yOK},
-		{"m2_supply",        m2Score,      0.5, m2OK},
+		{"rate_regime", mpRateScore, 2.0, ffOK},
+		{"yield_curve", ycScore, 2.0, yc2sOK},
+		{"real_rate", rrScore, 1.5, rrOK},
+		{"balance_sheet", bsScore, 1.0, bsOK},
+		{"credit_spread", creditScore, 2.0, hyOK},
+		{"breakeven_infl", beScore, 1.0, be10yOK},
+		{"m2_supply", m2Score, 0.5, m2OK},
 	}
 
 	var weightedSum, totalWeight float64
@@ -565,14 +573,14 @@ func (w *worker) analyzeMonetary(ctx context.Context) {
 	}
 
 	upsert("mp_stance", ptr(stanceScore), map[string]any{
-		"stance":        stance,
-		"score":         fmt.Sprintf("%.2f", stanceScore),
-		"signals_used":  usedSignals,
-		"thresholds":    fmt.Sprintf("accommodative >%.1f | neutral %.1f–%.1f | restrictive <%.1f", cfg.MPAccommodativeScore, cfg.MPRestrictiveScore, cfg.MPAccommodativeScore, cfg.MPRestrictiveScore),
-		"weights":       "rate×2 + yield_curve×2 + real_rate×1.5 + balance_sheet×1 + credit×2 + breakeven×1 + m2×0.5",
-		"note":          "Composite of free FRED data only. Adding CME FedWatch + FOMC LLM scoring would substantially improve signal.",
-		"todo_growth":   "Growth panel (GDP/PMI/jobless claims) would enable full macro regime detection",
-		"todo_global":   "ECB/BoE/BoJ rates + global PMI required for cross-border regime overlay",
+		"stance":       stance,
+		"score":        fmt.Sprintf("%.2f", stanceScore),
+		"signals_used": usedSignals,
+		"thresholds":   fmt.Sprintf("accommodative >%.1f | neutral %.1f–%.1f | restrictive <%.1f", cfg.MPAccommodativeScore, cfg.MPRestrictiveScore, cfg.MPAccommodativeScore, cfg.MPRestrictiveScore),
+		"weights":      "rate×2 + yield_curve×2 + real_rate×1.5 + balance_sheet×1 + credit×2 + breakeven×1 + m2×0.5",
+		"note":         "Composite of free FRED data only. Adding CME FedWatch + FOMC LLM scoring would substantially improve signal.",
+		"todo_growth":  "Growth panel (GDP/PMI/jobless claims) would enable full macro regime detection",
+		"todo_global":  "ECB/BoE/BoJ rates + global PMI required for cross-border regime overlay",
 	})
 
 	w.log.Info("monetary policy analysis complete",
@@ -591,15 +599,18 @@ func (w *worker) analyzeMonetary(ctx context.Context) {
 // is the primary output consumed by the analyst-bot daily-report embed.
 //
 // Tier 1 (Leading indicators — move before the economy):
-//   PMI (NAPM), LEI (USSLIND), jobless claims (ICSA/CCSA), housing (HOUST/PERMIT)
+//
+//	PMI (NAPM), LEI (USSLIND), jobless claims (ICSA/CCSA), housing (HOUST/PERMIT)
 //
 // Tier 2 (Coincident indicators — move with the economy):
-//   Real GDP (GDPC1), payrolls (PAYEMS), unemployment (UNRATE),
-//   avg hourly earnings (CES0500000003), Sahm Rule (SAHMREALTIME),
-//   retail sales (RSAFS/RRSFS)
+//
+//	Real GDP (GDPC1), payrolls (PAYEMS), unemployment (UNRATE),
+//	avg hourly earnings (CES0500000003), Sahm Rule (SAHMREALTIME),
+//	retail sales (RSAFS/RRSFS)
 //
 // Tier 3 (Lagging / Sentiment):
-//   Michigan Sentiment (UMCSENT), Durable Goods (DGORDER), Core Capex (NEWORDER)
+//
+//	Michigan Sentiment (UMCSENT), Durable Goods (DGORDER), Core Capex (NEWORDER)
 func (w *worker) analyzeGrowth(ctx context.Context) {
 	ts := time.Now().UTC()
 	gc := w.growthCfg
@@ -795,10 +806,10 @@ func (w *worker) analyzeGrowth(ctx context.Context) {
 			claimsScore = -1.0
 		}
 		payload := map[string]any{
-			"regime":       claimsRegime,
-			"score":        claimsScore,
-			"icsa_4w_ma":   math.Round(ma4),
-			"icsa_latest":  icsa[0].Value,
+			"regime":      claimsRegime,
+			"score":       claimsScore,
+			"icsa_4w_ma":  math.Round(ma4),
+			"icsa_latest": icsa[0].Value,
 		}
 		if contClaims != nil {
 			payload["ccsa_latest"] = *contClaims
@@ -830,9 +841,9 @@ func (w *worker) analyzeGrowth(ctx context.Context) {
 			housingScore = -0.8
 		}
 		payload := map[string]any{
-			"regime":       housingRegime,
-			"score":        housingScore,
-			"houst_k_ann":  math.Round(hv),
+			"regime":      housingRegime,
+			"score":       housingScore,
+			"houst_k_ann": math.Round(hv),
 		}
 		if permitVal != nil {
 			payload["permit_k_ann"] = math.Round(*permitVal)
@@ -871,11 +882,11 @@ func (w *worker) analyzeGrowth(ctx context.Context) {
 		}
 		addScore(gdpScore, 0.14)
 		upsert("gc_gdp", ptr(gdpAnnPct), map[string]any{
-			"regime":     gdpRegime,
-			"score":      gdpScore,
-			"ann_pct":    math.Round(gdpAnnPct*100) / 100,
-			"gdpc1_bn":   math.Round(gdp),
-			"series":     "GDPC1",
+			"regime":   gdpRegime,
+			"score":    gdpScore,
+			"ann_pct":  math.Round(gdpAnnPct*100) / 100,
+			"gdpc1_bn": math.Round(gdp),
+			"series":   "GDPC1",
 		})
 	} else {
 		upsert("gc_gdp", nil, map[string]any{"regime": gdpRegime})
@@ -975,9 +986,9 @@ func (w *worker) analyzeGrowth(ctx context.Context) {
 			consumerScore = -0.8
 		}
 		payload := map[string]any{
-			"regime":          consumerRegime,
-			"score":           consumerScore,
-			"rrsfs_yoy_pct":   math.Round(yoyPct*100) / 100,
+			"regime":           consumerRegime,
+			"score":            consumerScore,
+			"rrsfs_yoy_pct":    math.Round(yoyPct*100) / 100,
 			"rrsfs_current_mn": math.Round(current),
 		}
 		if nv, ok := fredLatest("RSAFS"); ok {
@@ -1074,8 +1085,8 @@ func (w *worker) analyzeGrowth(ctx context.Context) {
 	if usedSignals == 0 {
 		gcStance = "insufficient_data"
 		upsert("gc_stance", nil, map[string]any{
-			"stance":  gcStance,
-			"signals": 0,
+			"stance":        gcStance,
+			"signals":       0,
 			"todo_pmi_paid": "S&P Global / ISM Services PMI would improve leading-indicator coverage",
 		})
 	} else {
@@ -1092,17 +1103,17 @@ func (w *worker) analyzeGrowth(ctx context.Context) {
 		}
 		gcStanceScore = ptr(stanceScore)
 		upsert("gc_stance", gcStanceScore, map[string]any{
-			"stance":         gcStance,
-			"score":          math.Round(stanceScore*1000) / 1000,
-			"signals_used":   usedSignals,
-			"pmi_regime":     pmiRegime,
-			"lei_regime":     leiRegime,
-			"claims_regime":  claimsRegime,
-			"housing_regime": housingRegime,
-			"gdp_regime":     gdpRegime,
-			"empl_regime":    emplRegime,
+			"stance":          gcStance,
+			"score":           math.Round(stanceScore*1000) / 1000,
+			"signals_used":    usedSignals,
+			"pmi_regime":      pmiRegime,
+			"lei_regime":      leiRegime,
+			"claims_regime":   claimsRegime,
+			"housing_regime":  housingRegime,
+			"gdp_regime":      gdpRegime,
+			"empl_regime":     emplRegime,
 			"consumer_regime": consumerRegime,
-			"capex_regime":   capexRegime,
+			"capex_regime":    capexRegime,
 		})
 	}
 
@@ -1122,22 +1133,27 @@ func (w *worker) analyzeGrowth(ctx context.Context) {
 // output consumed by the analyst-bot daily-report embed.
 //
 // Tier 1 (Core inflation measures):
-//   CPI (CPIAUCSL), Core CPI (CPILFESL), Shelter CPI (CUSR0000SAH1),
-//   PCE (PCEPI), Core PCE (PCEPILFE — Fed's actual 2% target)
+//
+//	CPI (CPIAUCSL), Core CPI (CPILFESL), Shelter CPI (CUSR0000SAH1),
+//	PCE (PCEPI), Core PCE (PCEPILFE — Fed's actual 2% target)
 //
 // PPI pipeline:
-//   PPI Final Demand (PPIFID), PPI All Commodities (PPIACO),
-//   PPI-CPI spread as corporate margin pressure signal
+//
+//	PPI Final Demand (PPIFID), PPI All Commodities (PPIACO),
+//	PPI-CPI spread as corporate margin pressure signal
 //
 // Energy:
-//   WTI crude (DCOILWTICO), Brent crude (DCOILBRENTEU)
+//
+//	WTI crude (DCOILWTICO), Brent crude (DCOILBRENTEU)
 //
 // Wages (services inflation driver):
-//   AHE (CES0500000003 — already fetched for Growth Cycle),
-//   ECI (ECIALLCIV — quarterly, Fed's preferred wage measure)
+//
+//	AHE (CES0500000003 — already fetched for Growth Cycle),
+//	ECI (ECIALLCIV — quarterly, Fed's preferred wage measure)
 //
 // Commodities / global demand:
-//   Copper (PCOPPUSDM — monthly)
+//
+//	Copper (PCOPPUSDM — monthly)
 //
 // TODO [PAID]:   Iron ore — no free FRED equivalent; LME data is paid.
 // TODO [SCRAPE]: EIA weekly oil inventory — EIA.gov has no FRED equivalent.
@@ -1246,10 +1262,10 @@ func (w *worker) analyzeInflation(ctx context.Context) {
 		}
 		addScore(cpiScore, 0.20)
 		upsert("inf_cpi", ptr(cpiYoy), map[string]any{
-			"regime":   cpiRegime,
-			"score":    cpiScore,
-			"yoy_pct":  math.Round(cpiYoy*100) / 100,
-			"series":   "CPIAUCSL",
+			"regime":  cpiRegime,
+			"score":   cpiScore,
+			"yoy_pct": math.Round(cpiYoy*100) / 100,
+			"series":  "CPIAUCSL",
 		})
 	} else {
 		upsert("inf_cpi", nil, map[string]any{"regime": cpiRegime})
@@ -1303,11 +1319,11 @@ func (w *worker) analyzeInflation(ctx context.Context) {
 			shelterRegime = "normalizing"
 		}
 		upsert("inf_shelter", ptr(shelterYoy), map[string]any{
-			"regime":      shelterRegime,
-			"yoy_pct":     math.Round(shelterYoy*100) / 100,
-			"lag_note":    "shelter CPI lags market rents by ~18 months",
-			"cpi_weight":  "~35% of headline CPI",
-			"series":      "CUSR0000SAH1",
+			"regime":     shelterRegime,
+			"yoy_pct":    math.Round(shelterYoy*100) / 100,
+			"lag_note":   "shelter CPI lags market rents by ~18 months",
+			"cpi_weight": "~35% of headline CPI",
+			"series":     "CUSR0000SAH1",
 		})
 	} else {
 		upsert("inf_shelter", nil, map[string]any{"regime": shelterRegime})
@@ -1342,11 +1358,11 @@ func (w *worker) analyzeInflation(ctx context.Context) {
 		}
 		addScore(corePCEScore, 0.20) // highest weight — Fed's actual target
 		payload := map[string]any{
-			"regime":          corePCERegime,
-			"score":           corePCEScore,
-			"core_pce_yoy":   math.Round(corePCEYoy*100) / 100,
-			"fed_target":      2.0,
-			"series":          "PCEPILFE",
+			"regime":       corePCERegime,
+			"score":        corePCEScore,
+			"core_pce_yoy": math.Round(corePCEYoy*100) / 100,
+			"fed_target":   2.0,
+			"series":       "PCEPILFE",
 		}
 		if pcePctFull != nil {
 			payload["headline_pce_yoy"] = *pcePctFull
@@ -1693,11 +1709,11 @@ func (w *worker) analyzeGlobal(ctx context.Context) {
 		}
 		addScore(dollarScore, 0.28)
 		upsert("gg_broad_dollar", ptr(tw), map[string]any{
-			"regime":        dollarRegime,
-			"score":         dollarScore,
-			"index":         math.Round(tw*1000) / 1000,
-			"series":        "DTWEXBGS",
-			"not_ice_dxy":   true,
+			"regime":         dollarRegime,
+			"score":          dollarScore,
+			"index":          math.Round(tw*1000) / 1000,
+			"series":         "DTWEXBGS",
+			"not_ice_dxy":    true,
 			"interpretation": "broad USD goods TWI — proxy for USD strength vs ICE DXY",
 		})
 	} else {
@@ -1729,12 +1745,12 @@ func (w *worker) analyzeGlobal(ctx context.Context) {
 		}
 		addScore(jpyScore, 0.28)
 		payload := map[string]any{
-			"regime":           jpyRegime,
-			"score":            jpyScore,
-			"pct_chg_20d":      *jpyChg,
-			"lookback_obs":     g.USDJPYLookbackObs,
-			"series":           "DEXJPUS",
-			"latest_spot":      math.Round(cur*10000) / 10000,
+			"regime":       jpyRegime,
+			"score":        jpyScore,
+			"pct_chg_20d":  *jpyChg,
+			"lookback_obs": g.USDJPYLookbackObs,
+			"series":       "DEXJPUS",
+			"latest_spot":  math.Round(cur*10000) / 10000,
 		}
 		upsert("gg_usdjpy", ptr(cur), payload)
 	} else {
@@ -1799,14 +1815,14 @@ func (w *worker) analyzeGlobal(ctx context.Context) {
 			}
 			addScore(fiscalScore, 0.20)
 			upsert("gg_fiscal", deficitPct, map[string]any{
-				"regime":              fiscalRegime,
-				"score":               fiscalScore,
-				"deficit_pct_gdp":     *deficitPct,
-				"fyfsd_millions":      math.Round(fyfsd),
-				"gdp_billions_saar":   math.Round(gdp*10) / 10,
-				"series_deficit":      "FYFSD",
-				"series_gdp":          "GDP",
-				"note":                "FYFSD is fiscal-year; GDP is latest quarterly SAAR — ratio is indicative",
+				"regime":            fiscalRegime,
+				"score":             fiscalScore,
+				"deficit_pct_gdp":   *deficitPct,
+				"fyfsd_millions":    math.Round(fyfsd),
+				"gdp_billions_saar": math.Round(gdp*10) / 10,
+				"series_deficit":    "FYFSD",
+				"series_gdp":        "GDP",
+				"note":              "FYFSD is fiscal-year; GDP is latest quarterly SAAR — ratio is indicative",
 			})
 		} else {
 			upsert("gg_fiscal", ptr(fyfsd), map[string]any{
@@ -1848,14 +1864,14 @@ func (w *worker) analyzeGlobal(ctx context.Context) {
 		}
 		ggScorePtr = ptr(ggScore)
 		upsert("gg_stance", ggScorePtr, map[string]any{
-			"stance":           ggStance,
-			"score":            math.Round(ggScore*1000) / 1000,
-			"signals_used":     usedSignals,
-			"dollar_regime":    dollarRegime,
-			"usdjpy_regime":    jpyRegime,
-			"china_regime":     chinaRegime,
-			"fiscal_regime":    fiscalRegime,
-			"interpretation":   "+1 = max USD/carry/fiscal stress; -1 = benign global liquidity",
+			"stance":         ggStance,
+			"score":          math.Round(ggScore*1000) / 1000,
+			"signals_used":   usedSignals,
+			"dollar_regime":  dollarRegime,
+			"usdjpy_regime":  jpyRegime,
+			"china_regime":   chinaRegime,
+			"fiscal_regime":  fiscalRegime,
+			"interpretation": "+1 = max USD/carry/fiscal stress; -1 = benign global liquidity",
 		})
 	}
 
@@ -1905,27 +1921,27 @@ func (w *worker) analyzeMarketCycles(ctx context.Context) {
 	comp := marketcycle.BuildComposite(pr, gc, mp, inf, gg)
 
 	payload := map[string]any{
-		"symbol":              pr.Symbol,
-		"interval":            cfg.Interval,
-		"bars_used":           len(bars),
-		"min_bars_expected":   cfg.MinBars,
-		"close":               marketcycle.Round2(pr.Close),
-		"peak_high":           marketcycle.Round2(pr.PeakHigh),
-		"peak_ts":             pr.PeakTS.UTC().Format(time.RFC3339),
-		"drawdown_pct":        marketcycle.Round2(pr.DrawdownPct * 100),
-		"days_off_peak":       pr.DaysOffPeak,
-		"sma200":              marketcycle.Round2(pr.SMA200),
-		"has_sma200":          pr.HasSMA200,
-		"pct_vs_sma200":       marketcycle.Round2(pr.PctVsSMA200),
-		"price_phase":         pr.Phase,
-		"crash_warning":       pr.CrashWarning,
-		"composite_phase":     comp.Phase,
-		"composite_label":     comp.Label,
+		"symbol":            pr.Symbol,
+		"interval":          cfg.Interval,
+		"bars_used":         len(bars),
+		"min_bars_expected": cfg.MinBars,
+		"close":             marketcycle.Round2(pr.Close),
+		"peak_high":         marketcycle.Round2(pr.PeakHigh),
+		"peak_ts":           pr.PeakTS.UTC().Format(time.RFC3339),
+		"drawdown_pct":      marketcycle.Round2(pr.DrawdownPct * 100),
+		"days_off_peak":     pr.DaysOffPeak,
+		"sma200":            marketcycle.Round2(pr.SMA200),
+		"has_sma200":        pr.HasSMA200,
+		"pct_vs_sma200":     marketcycle.Round2(pr.PctVsSMA200),
+		"price_phase":       pr.Phase,
+		"crash_warning":     pr.CrashWarning,
+		"composite_phase":   comp.Phase,
+		"composite_label":   comp.Label,
 		"inputs": map[string]any{
-			"gc_stance": gc,
-			"mp_stance": mp,
+			"gc_stance":  gc,
+			"mp_stance":  mp,
 			"inf_stance": inf,
-			"gg_stance": gg,
+			"gg_stance":  gg,
 		},
 		"reference": "macro_analysis_reference.html — Market Cycles panel",
 	}
@@ -1987,17 +2003,17 @@ func (w *worker) analyzeMacroCorrelations(ctx context.Context) {
 		"label":  r.Label,
 		"flags":  r.Flags,
 		"inputs": map[string]any{
-			"gc_stance":    in.GCStance,
-			"mp_stance":    in.MPStance,
-			"inf_stance":   in.InfStance,
-			"gg_stance":    in.GGStance,
-			"yield_curve":  in.YieldCurve,
-			"real_rate":    in.RealRate,
-			"credit":       in.CreditRegime,
-			"gdp":          in.GDPRegime,
-			"oil":          in.OilRegime,
-			"dollar":       in.DollarRegime,
-			"usdjpy":       in.JPYRegime,
+			"gc_stance":   in.GCStance,
+			"mp_stance":   in.MPStance,
+			"inf_stance":  in.InfStance,
+			"gg_stance":   in.GGStance,
+			"yield_curve": in.YieldCurve,
+			"real_rate":   in.RealRate,
+			"credit":      in.CreditRegime,
+			"gdp":         in.GDPRegime,
+			"oil":         in.OilRegime,
+			"dollar":      in.DollarRegime,
+			"usdjpy":      in.JPYRegime,
 		},
 		"reference": "macro_analysis_reference.html — Macro Correlations panel",
 	}

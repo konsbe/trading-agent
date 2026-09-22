@@ -4,13 +4,13 @@ import "math"
 
 // FibRetracementRule documents how the swing leg is chosen for retracement levels.
 //
-// 1. Take the last swing-high index and last swing-low index in the window (same pivot rules as S/R).
-// 2. If the swing high occurs after the swing low (iH > iL), treat the completed impulse as UP
-//    from low → high; retracements are measured down from the high toward the low.
-// 3. If the swing low occurs after the swing high (iL > iH), treat the impulse as DOWN from
-//    high → low; retracements are measured up from the low toward the high.
-// 4. Ratios: 0, 0.236, 0.382, 0.5, 0.618, 0.786, 1.0 map linearly along the leg.
-// 5. Extensions (optional): 1.272 and 1.618 of the leg length beyond the impulse extreme.
+//  1. Take the last swing-high index and last swing-low index in the window (same pivot rules as S/R).
+//  2. If the swing high occurs after the swing low (iH > iL), treat the completed impulse as UP
+//     from low → high; retracements are measured down from the high toward the low.
+//  3. If the swing low occurs after the swing high (iL > iH), treat the impulse as DOWN from
+//     high → low; retracements are measured up from the low toward the high.
+//  4. Ratios: 0, 0.236, 0.382, 0.5, 0.618, 0.786, 1.0 map linearly along the leg.
+//  5. Extensions (optional): 1.272 and 1.618 of the leg length beyond the impulse extreme.
 type FibRetracementResult struct {
 	Direction     string             // "up_impulse" or "down_impulse"
 	ImpulseLow    float64            // price at start of impulse leg

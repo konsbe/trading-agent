@@ -3,10 +3,11 @@
 // and writes results to the technical_indicators table.
 //
 // Data flow:
-//   data-crypto / data-equity (data-ingestion)
-//     → equity_ohlcv / crypto_ohlcv (TimescaleDB)
-//     → technical-analysis (this binary, data-analyzer)
-//     → technical_indicators (TimescaleDB)
+//
+//	data-crypto / data-equity (data-ingestion)
+//	  → equity_ohlcv / crypto_ohlcv (TimescaleDB)
+//	  → technical-analysis (this binary, data-analyzer)
+//	  → technical_indicators (TimescaleDB)
 //
 // TODO: migrate compute/ to Python (pandas-ta / ta-lib) and retire this binary.
 // See internal/compute/doc.go for the migration checklist.
@@ -26,12 +27,12 @@ import (
 
 	"github.com/joho/godotenv"
 
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/konsbe/trading-agent/services/data-analyzer/internal/compute"
 	"github.com/konsbe/trading-agent/services/data-analyzer/internal/config"
 	"github.com/konsbe/trading-agent/services/data-analyzer/internal/db"
 	"github.com/konsbe/trading-agent/services/data-analyzer/internal/logx"
 	"github.com/konsbe/trading-agent/services/data-analyzer/internal/store"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func main() {
@@ -841,22 +842,22 @@ func (w *worker) computeAndStore(ctx context.Context, bars []compute.Bar, symbol
 			}
 		}
 		upsert(fmt.Sprintf("hs_pattern_sw%d", w.cfg.HSSwingStrength), ptr(score), map[string]any{
-			"hs_found":                hs.HSFound,
-			"hs_left_shoulder":        hs.HSLeftShoulder,
-			"hs_head":                 hs.HSHead,
-			"hs_right_shoulder":       hs.HSRightShoulder,
-			"hs_neckline":             hs.HSNeckline,
-			"hs_symmetry_pct":         hs.HSShouldersSymmetryPct,
-			"hs_neckline_break":       hs.HSNecklineBreak,
-			"inv_hs_found":            hs.InvHSFound,
-			"inv_hs_left_shoulder":    hs.InvHSLeftShoulder,
-			"inv_hs_head":             hs.InvHSHead,
-			"inv_hs_right_shoulder":   hs.InvHSRightShoulder,
-			"inv_hs_neckline":         hs.InvHSNeckline,
-			"inv_hs_symmetry_pct":     hs.InvHSShouldersSymmetryPct,
-			"inv_hs_neckline_break":   hs.InvHSNecklineBreak,
-			"swing_strength":          w.cfg.HSSwingStrength,
-			"shoulder_tolerance_pct":  w.cfg.HSTolerancePct,
+			"hs_found":               hs.HSFound,
+			"hs_left_shoulder":       hs.HSLeftShoulder,
+			"hs_head":                hs.HSHead,
+			"hs_right_shoulder":      hs.HSRightShoulder,
+			"hs_neckline":            hs.HSNeckline,
+			"hs_symmetry_pct":        hs.HSShouldersSymmetryPct,
+			"hs_neckline_break":      hs.HSNecklineBreak,
+			"inv_hs_found":           hs.InvHSFound,
+			"inv_hs_left_shoulder":   hs.InvHSLeftShoulder,
+			"inv_hs_head":            hs.InvHSHead,
+			"inv_hs_right_shoulder":  hs.InvHSRightShoulder,
+			"inv_hs_neckline":        hs.InvHSNeckline,
+			"inv_hs_symmetry_pct":    hs.InvHSShouldersSymmetryPct,
+			"inv_hs_neckline_break":  hs.InvHSNecklineBreak,
+			"swing_strength":         w.cfg.HSSwingStrength,
+			"shoulder_tolerance_pct": w.cfg.HSTolerancePct,
 		})
 	}
 
@@ -1101,12 +1102,12 @@ func (w *worker) computeVIXRegime(ctx context.Context, ts time.Time, symbol, exc
 	}
 	ptr := func(v float64) *float64 { return &v }
 	upsert("vix_regime", ptr(vix), map[string]any{
-		"vix":                     vix,
-		"regime":                  regime,
-		"fear_threshold":          w.cfg.VIXFearThreshold,
-		"elevated_threshold":      w.cfg.VIXElevatedThreshold,
-		"complacency_threshold":   w.cfg.VIXComplacencyThreshold,
-		"series_id":               "VIXCLS",
+		"vix":                   vix,
+		"regime":                regime,
+		"fear_threshold":        w.cfg.VIXFearThreshold,
+		"elevated_threshold":    w.cfg.VIXElevatedThreshold,
+		"complacency_threshold": w.cfg.VIXComplacencyThreshold,
+		"series_id":             "VIXCLS",
 	})
 }
 

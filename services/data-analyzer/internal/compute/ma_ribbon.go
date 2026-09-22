@@ -4,15 +4,15 @@ import "math"
 
 // RibbonResult summarises ordered SMAs and compression.
 type RibbonResult struct {
-	Periods       []int
-	SMAs          []float64
-	BullStack     bool // strictly increasing SMAs with shorter period > longer (fast above slow)?
-	BearStack     bool // strictly decreasing
-	Compression   float64 // (max-min)/mean of SMAs when mean!=0
-	GoldenCross   bool    // SMA50 crosses above SMA200 vs prior bar
-	DeathCross    bool    // SMA50 crosses below SMA200 vs prior bar
-	CrossFast     int
-	CrossSlow     int
+	Periods     []int
+	SMAs        []float64
+	BullStack   bool    // strictly increasing SMAs with shorter period > longer (fast above slow)?
+	BearStack   bool    // strictly decreasing
+	Compression float64 // (max-min)/mean of SMAs when mean!=0
+	GoldenCross bool    // SMA50 crosses above SMA200 vs prior bar
+	DeathCross  bool    // SMA50 crosses below SMA200 vs prior bar
+	CrossFast   int
+	CrossSlow   int
 }
 
 // MARibbonEval evaluates strictly increasing `periods` (e.g. 10,20,50,200).

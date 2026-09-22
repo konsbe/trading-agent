@@ -306,14 +306,16 @@ type FlagResult struct {
 // DetectFlag checks for bull/bear flag patterns.
 //
 // A flag requires:
+//
 //  1. A strong impulse move ("pole") over poleLen bars ≥ polePct %.
+//
 //  2. Followed by a consolidation over flagLen bars where total retracement
 //     of the pole does not exceed maxRetracementPct %.
 //
-//   - polePct:            minimum % move for the pole (e.g. 5.0).
-//   - maxRetracementPct:  max allowed retracement of the pole within the flag (e.g. 50.0).
-//   - poleLen:            number of bars for the pole phase (e.g. 5).
-//   - flagLen:            number of bars for the consolidation phase (e.g. 10).
+//     - polePct:            minimum % move for the pole (e.g. 5.0).
+//     - maxRetracementPct:  max allowed retracement of the pole within the flag (e.g. 50.0).
+//     - poleLen:            number of bars for the pole phase (e.g. 5).
+//     - flagLen:            number of bars for the consolidation phase (e.g. 10).
 func DetectFlag(bars []Bar, polePct, maxRetracementPct float64, poleLen, flagLen int) FlagResult {
 	n := len(bars)
 	if n < poleLen+flagLen {

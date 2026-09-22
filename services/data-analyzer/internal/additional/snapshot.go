@@ -86,7 +86,7 @@ func BuildSnapshot(ctx context.Context, pool *pgxpool.Pool, cfg Config) (map[str
 	bars, err := store.QueryEquityOHLCVAsc(ctx, pool, cfg.Symbol, cfg.Interval, cfg.MaxBars)
 	if err != nil || len(bars) < cfg.CorrWindow+2 {
 		out["intermarket"] = map[string]any{
-			"note": "Not enough benchmark OHLCV for rolling windows — check equity_ohlcv and MARKET_CYCLE_*.",
+			"note":            "Not enough benchmark OHLCV for rolling windows — check equity_ohlcv and MARKET_CYCLE_*.",
 			"bond_equity_60d": map[string]any{"insufficient_data": true, "note": "No bar window."},
 			"oil_equity_60d":  map[string]any{"insufficient_data": true, "note": "No bar window."},
 			"vix_equity_60d":  map[string]any{"insufficient_data": true, "note": "No bar window."},
@@ -109,7 +109,7 @@ func BuildSnapshot(ctx context.Context, pool *pgxpool.Pool, cfg Config) (map[str
 	} else {
 		im["bond_equity_60d"] = map[string]any{
 			"insufficient_data": true,
-			"note":                "DGS10 (macro_fred) missing or sparse — run data-equity FRED ingestion.",
+			"note":              "DGS10 (macro_fred) missing or sparse — run data-equity FRED ingestion.",
 		}
 	}
 
