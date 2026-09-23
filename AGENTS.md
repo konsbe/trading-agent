@@ -36,6 +36,7 @@ Every **MFE** (`web-app/ui/spog`, `web-app/ui/mfe-*`) and every **service** (`se
 ## Defaults
 
 - Theme and components: Stitch via `web-app/shared-components` (`@trading-agent/shared-components`)
+- Design spec: `docs/design-system/` (DESIGN.light.md, DESIGN.dark.md, tokens.json); light/dark applied only by the ThemeProviders
 - Host remote: `spog@http://localhost:3000/remoteEntry.js`
 - Public npm (`registry.npmjs.org`)
 - UI: TypeScript + React 19 + webpack Module Federation

@@ -10,9 +10,10 @@ You are the trading-agent UI developer. Follow the structure and standards below
 
 Visual UI comes from **Stitch AI**, published as `@trading-agent/shared-components` (`web-app/shared-components`).
 
-- Tokens: `@trading-agent/shared-components/theme.css` (`data-theme="light" | "dark"` on `<html>`)
+- Spec: `docs/design-system/` — `DESIGN.light.md`, `DESIGN.dark.md`, `tokens.json`, and `README.md` (token → usage table, rules). Read it before styling.
+- Tokens: Stitch colours/fonts from `shared-components/src/theme/tokens.json` exposed as `var(--color-<token>)`; mode-independent spacing/radius/sizes in `@trading-agent/shared-components/theme.css`
 - Components: import from `@trading-agent/shared-components` (Button, Input, Table, Dialog, layout, …)
-- Theme: wrap the app with `ThemeProvider` from `@trading-agent/shared-components` (or the local `data-theme` provider until the kit exists)
+- Theme: light/dark is applied only by the ThemeProviders (shell: `web-app/spog/src/providers/ThemeProvider`, MFEs: `ThemeProvider` from `@trading-agent/shared-components`). Never add `[data-theme]` CSS, hex colours or `prefers-color-scheme` checks anywhere else.
 
 Work in `web-app/ui/spog` (host) or `web-app/ui/mfe-<name>` (remotes). When a Stitch or Figma design is provided, implement tokens/components into `web-app/shared-components` first, then consume them from the MFE. Use Figma MCP when a Figma file/node is given.
 
@@ -260,7 +261,7 @@ This section provides detailed explanations of each file and directory in the MF
 - **`PageExample2/`** - main Page component will render different components and/ or features
 
 ##### Context Providers (`src/providers/`)
-- **`ThemeProvider/`** - UI theme and styling context. Import `ThemeProvider` from `@trading-agent/shared-components` (Stitch). Until that package exists, use the local `data-theme` ThemeProvider from the mfe-creator playbook.
+- **`ThemeProvider/`** - UI theme and styling context. Import `ThemeProvider` from `@trading-agent/shared-components` (Stitch tokens); it is the only place an MFE applies light/dark.
 - **`AuthContext/`** - User authentication state management
 - **`AppContext/`** - Global application state
 
@@ -315,13 +316,17 @@ it should be inside the /src directory
 - Use Stitch theme tokens from `@trading-agent/shared-components/theme.css` (CSS variables). Prefer class names from the kit over inline styles.
   css
   ```
-  background-color: var(--color-surface);
-  color: var(--color-text);
+  background-color: var(--color-surface-container);
+  color: var(--color-on-surface);
   ```
-  - text: `var(--color-text)` / `var(--color-text-secondary)`
-  - app background: `var(--color-app-background)`
-  - surface / widget: `var(--color-surface)`
-  - spacing: `var(--space-xs)`, `var(--space-sm)`, `var(--space-md)`, `var(--space-lg)`
+  - text: `var(--color-on-surface)` / `var(--color-on-surface-variant)` (aliases `--color-text` / `--color-text-secondary`)
+  - page backdrop: `var(--color-surface)` (alias `--color-app-background`) — note Stitch `surface` is the viewport, not a card
+  - header / sidebar / rows: `var(--color-surface-container-low)`; cards: `var(--color-surface-container)`; hover & dialogs: `var(--color-surface-container-high)`; menus & popovers: `var(--color-surface-container-highest)`
+  - borders: `var(--color-outline)` (interactive) / `var(--color-outline-variant)` (dividers)
+  - actions: `var(--color-primary)` + `var(--color-on-primary)`; active pills/filters: `var(--color-primary-container)`
+  - fonts: `var(--font-family)`, `var(--font-family-headline)`, `var(--font-family-label)` (JetBrains Mono for tickers/prices)
+  - spacing: `var(--space-xs)`, `var(--space-sm)`, `var(--space-md)`, `var(--space-lg)`; radius `var(--radius-md)` (4px)
+  - green/red only for price deltas; the "Screener — not a forecast" pill uses `tertiary-container` and is on every screen
 - For tables, use the Stitch table/DataGrid from `@trading-agent/shared-components`. If it is not exported yet, use TanStack Table styled with Stitch tokens.
 - For complex UI (dialogs, menus, inputs, layout), use `@trading-agent/shared-components` Stitch components. Do not invent a parallel widget library.
 

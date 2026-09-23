@@ -1,0 +1,35 @@
+---
+description: Stitch "Momentum Scanner" design tokens, theming and colour rules for trading-agent UI
+globs: web-app/**/*.{ts,tsx,css}
+alwaysApply: false
+---
+
+# Momentum Scanner design system
+
+Spec: `docs/design-system/` (`DESIGN.light.md`, `DESIGN.dark.md`, `tokens.json`, `README.md` = token → usage table).
+
+## Theming
+
+- Light/dark is applied **only** by the two ThemeProviders:
+  - shell `web-app/spog/src/providers/ThemeProvider/ThemeProvider.tsx` (`applyTheme(document.documentElement, …)`)
+  - MFEs `web-app/shared-components/src/ui/providers/ThemeProvider/ThemeProvider.tsx`
+- Colours/fonts come from `shared-components/src/theme/tokens.json` via `tokens.ts`. Never hard-code hex colours, add `[data-theme]` blocks, or use `prefers-color-scheme` elsewhere.
+- Token change: update `docs/design-system/tokens.json`, copy to `shared-components/src/theme/tokens.json` (a test enforces equality).
+
+## Using tokens
+
+```css
+/* ❌ */ .card { background: #1c2026; color: #fff; border-radius: 6px; }
+/* ✅ */ .card { background: var(--color-surface-container); color: var(--color-on-surface); border-radius: var(--radius-lg); }
+```
+
+- Stitch colours: `var(--color-<token>)` (`surface-container-high`, `on-surface-variant`, `primary-container`, …).
+- Elevation: page `surface` → header/sidebar/rows `surface-container-low` → cards `surface-container` → hover/dialogs `surface-container-high` → menus/popovers `surface-container-highest`.
+- Hover = state layer: `color-mix(in srgb, var(--color-primary), var(--color-on-primary) 8%)`.
+- Fonts: `--font-family` (body), `--font-family-headline`, `--font-family-label` (JetBrains Mono for tickers/prices).
+- Spacing/radius/sizes: `--space-*`, `--radius-*` (4px base), `--font-size-*` from `theme.css`.
+
+## Hard rules
+
+- Green/red **only** for price movement deltas — never in chrome. Telemetry uses `secondary`, alerts use `error`.
+- Disclaimer pill "Screener — not a forecast": `tertiary-container` / `on-tertiary-container`, persistent on every screen.

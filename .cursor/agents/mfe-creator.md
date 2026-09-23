@@ -10,7 +10,8 @@ You are the trading-agent MFE creator. Follow this playbook. Do not invent a dif
 
 Visual UI comes from **Stitch AI**, owned in `web-app/shared-components` and imported as `@trading-agent/shared-components`:
 
-- Theme tokens (light/dark CSS variables) → `@trading-agent/shared-components/theme.css`
+- Design spec → `docs/design-system/` (Stitch `DESIGN.light.md`, `DESIGN.dark.md`, `tokens.json`, `README.md`)
+- Theme tokens → Stitch `tokens.json` applied by `ThemeProvider` from `@trading-agent/shared-components`; mode-independent spacing/radius in `@trading-agent/shared-components/theme.css`
 - Shared components (Button, Input, Table, Dialog, layout, …) → `@trading-agent/shared-components`
 
 Before building a visual component:
@@ -19,7 +20,7 @@ Before building a visual component:
 2. If a Stitch or Figma design exists, implement it into `@trading-agent/shared-components` first (use Figma MCP when a Figma URL/node is provided)
 3. Consume the kit from the MFE — do not bypass it with one-off styles
 
-If `@trading-agent/shared-components` is not generated yet, still wire `ThemeProvider` with `document.documentElement.dataset.theme` and CSS variables so Stitch tokens can drop in later.
+The MFE's `ThemeProvider` is the only place it applies light/dark — never add `[data-theme]` CSS, hex colours or `prefers-color-scheme` checks elsewhere.
 
 ## Repo layout
 
@@ -1464,76 +1465,31 @@ import { ThemeProvider } from "@trading-agent/shared-components";
 
 ---
 
-## Variant B ThemeProvider (until `@trading-agent/shared-components` exists)
+## Variant B ThemeProvider (standalone repo, no `@trading-agent/shared-components`)
 
-Use this when `web-app/shared-components` has not been generated from Stitch yet. Create a local provider that only sets `data-theme` and loads CSS variables. Replace these placeholder tokens with Stitch exports, then switch the import to `import { ThemeProvider } from "@trading-agent/shared-components"`.
-
-#### src/providers/ThemeProvider/theme.css
-
-```css
-:root,
-:root[data-theme="light"] {
-  --color-text: #111111;
-  --color-text-secondary: #5c5c5c;
-  --color-app-background: #f5f5f5;
-  --color-surface: #ffffff;
-  --space-xs: 4px;
-  --space-sm: 8px;
-  --space-md: 16px;
-  --space-lg: 24px;
-}
-
-:root[data-theme="dark"] {
-  --color-text: #f5f5f5;
-  --color-text-secondary: #b3b3b3;
-  --color-app-background: #121212;
-  --color-surface: #1e1e1e;
-}
-```
+Copy the Stitch tokens instead of inventing values: `docs/design-system/tokens.json` → `src/theme/tokens.json`, and `web-app/shared-components/src/theme/tokens.ts` → `src/theme/tokens.ts` (plus `theme.css` for spacing/radius). The local provider is then the MFE's only light/dark switch:
 
 #### src/providers/ThemeProvider/ThemeProvider.tsx
 
 ```typescript
-import React, { useEffect, useState } from 'react';
-import './theme.css'; // move to `@trading-agent/shared-components/theme.css` when web-app/shared-components exists
-
-type ThemeMode = 'light' | 'dark';
+import React, { CSSProperties, useMemo } from 'react';
+import { getSystemTheme, getThemeVariables, ThemeMode } from '@/theme/tokens';
+import '@/theme/theme.css';
 
 interface ThemeProviderProps {
   children: React.ReactNode;
-  userData?: { theme?: string };
+  userData?: { theme?: ThemeMode };
 }
 
-const getSystemTheme = (): ThemeMode =>
-  window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-
 export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children, userData }) => {
-  const [theme, setTheme] = useState<ThemeMode>(() => {
-    if (userData?.theme === 'dark' || userData?.theme === 'light') return userData.theme;
-    return getSystemTheme();
-  });
+  const theme = userData?.theme ?? getSystemTheme();
+  const style = useMemo(() => ({ ...getThemeVariables(theme), colorScheme: theme }) as CSSProperties, [theme]);
 
-  useEffect(() => {
-    if (userData?.theme === 'dark' || userData?.theme === 'light') {
-      setTheme(userData.theme as ThemeMode);
-    }
-  }, [userData?.theme]);
-
-  useEffect(() => {
-    const mq = window.matchMedia('(prefers-color-scheme: dark)');
-    const handler = () => {
-      if (!userData?.theme) setTheme(getSystemTheme());
-    };
-    mq.addEventListener('change', handler);
-    return () => mq.removeEventListener('change', handler);
-  }, [userData?.theme]);
-
-  useEffect(() => {
-    document.documentElement.dataset.theme = theme;
-    document.documentElement.style.colorScheme = theme;
-  }, [theme]);
-
-  return <>{children}</>;
+  return (
+    <div data-theme={theme} style={{ ...style, display: 'contents' }}>
+      {children}
+    </div>
+  );
 };
 
 export default ThemeProvider;

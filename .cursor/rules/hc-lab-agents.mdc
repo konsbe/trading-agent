@@ -10,6 +10,7 @@ Layout (do not invent another):
 - Host MFE: `web-app/ui/spog`
 - Remote MFEs: `web-app/ui/mfe-<name>`
 - Shared Stitch kit: `web-app/shared-components` (`@trading-agent/shared-components`)
+- Design system spec (Stitch tokens, light/dark, colour rules): `docs/design-system/`
 - Microservices: `services/svc-<name>`
 - Keycloak: `auth/`
 
