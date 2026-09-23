@@ -1,0 +1,62 @@
+.user-menu {
+    position: relative;
+}
+
+.user-menu__trigger {
+    gap: var(--space-sm);
+    padding: 0 var(--space-sm);
+}
+
+.user-menu__avatar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background-color: var(--color-primary-container);
+    color: var(--color-on-primary-container);
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-bold);
+}
+
+.user-menu__name {
+    max-width: 180px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.user-menu__dropdown {
+    position: absolute;
+    top: calc(100% + var(--space-xs));
+    right: 0;
+    z-index: 100;
+    min-width: 260px;
+    padding: var(--space-xs);
+    background-color: var(--color-surface-container-highest);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-lg);
+}
+
+.user-menu__section {
+    padding: var(--space-sm);
+    border-bottom: 1px solid var(--color-border);
+    margin-bottom: var(--space-xs);
+}
+
+.user-menu__label {
+    margin-bottom: var(--space-xs);
+    font-size: var(--font-size-xs);
+    color: var(--color-text-secondary);
+}
+
+.user-menu__roles {
+    font-size: var(--font-size-sm);
+    color: var(--color-text);
+    word-break: break-word;
+}
+
+.user-menu__item {
+    justify-content: flex-start;
+}

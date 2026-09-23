@@ -1,0 +1,14 @@
+.page-header {
+    gap: var(--space-sm);
+}
+
+.page-header__icon {
+    flex-shrink: 0;
+    width: 20px;
+    height: 20px;
+    color: var(--color-text-secondary);
+}
+
+.page-header__title {
+    color: var(--color-text-secondary);
+}

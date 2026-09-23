@@ -1,0 +1,10 @@
+/node_modules
+/dist
+/coverage
+package-lock.json
+.env
+**/playwright-report
+**/test-results
+**/storageState.json
+**/junit-report
+/.jest-cache

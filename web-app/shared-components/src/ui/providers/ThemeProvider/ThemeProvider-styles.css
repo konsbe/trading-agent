@@ -1,0 +1,5 @@
+.ta-theme-root {
+    display: contents;
+    color: var(--color-text);
+    font-family: var(--font-family);
+}

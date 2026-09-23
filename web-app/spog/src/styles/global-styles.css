@@ -1,0 +1,82 @@
+:root {
+    --app-header-height: 56px;
+    --app-sidebar-width: 240px;
+}
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+    height: 100%;
+    margin: 0;
+}
+
+body {
+    font-family: var(--font-family);
+    font-size: var(--font-size-md);
+    line-height: var(--line-height);
+    background-color: var(--color-app-background);
+    color: var(--color-text);
+    -webkit-font-smoothing: antialiased;
+}
+
+/* Apply className="app-scroll" on any overflow:auto/scroll container. */
+.app-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+}
+
+.app-scroll:hover {
+    scrollbar-color: var(--color-outline-variant) transparent;
+}
+
+.app-scroll::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+    background: transparent;
+}
+
+.app-scroll::-webkit-scrollbar-thumb {
+    background: transparent;
+    border-radius: 3px;
+}
+
+.app-scroll:hover::-webkit-scrollbar-thumb {
+    background: var(--color-outline-variant);
+}
+
+.horizontal-divider {
+    width: 100%;
+    height: 1px;
+    background-color: var(--color-border);
+}
+
+.pointer {
+    cursor: pointer;
+}
+
+/* SplitScreen pane that fills its parent and scrolls on overflow. */
+.split-pane-with-scroll {
+    position: relative;
+    height: 100%;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+/* SplitScreen pane with a fixed height. */
+.split-pane-no-scroll {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    max-height: 100%;
+    overflow: hidden;
+}
+
+.split-pane-no-scroll > div {
+    width: 100%;
+}

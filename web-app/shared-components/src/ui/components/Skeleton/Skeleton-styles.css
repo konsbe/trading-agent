@@ -1,0 +1,27 @@
+.ta-skeleton {
+    display: block;
+    border-radius: var(--radius-sm);
+    background: linear-gradient(
+        90deg,
+        var(--color-surface-container-high) 25%,
+        var(--color-surface-container-highest) 50%,
+        var(--color-surface-container-high) 75%
+    );
+    background-size: 200% 100%;
+    animation: ta-skeleton-shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes ta-skeleton-shimmer {
+    from {
+        background-position: 200% 0;
+    }
+    to {
+        background-position: -200% 0;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ta-skeleton {
+        animation: none;
+    }
+}

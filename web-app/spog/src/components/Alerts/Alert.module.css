@@ -1,0 +1,26 @@
+.alert {
+  margin: 0;
+  padding: var(--space-md);
+  font-size: var(--font-size-md);
+  line-height: 20px;
+  border-radius: var(--radius-lg);
+  border: 1px solid transparent;
+}
+
+.info {
+  background-color: var(--color-primary-container);
+  border-color: var(--color-primary);
+  color: var(--color-on-primary-container);
+}
+
+.warning {
+  background-color: var(--color-tertiary-container);
+  border-color: var(--color-tertiary);
+  color: var(--color-on-tertiary-container);
+}
+
+.error {
+  background-color: var(--color-error-container);
+  border-color: var(--color-error);
+  color: var(--color-on-error-container);
+}

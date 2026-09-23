@@ -1,0 +1,24 @@
+{
+  "shell_spog": {
+    "mainJsUrl": "http://localhost:3000/bundle.js",
+    "label": "main",
+    "version": "0.1.0",
+    "endpoint": "/remoteEntry.js",
+    "module": "",
+    "description": "Trading Agent SPOG shell application",
+    "roles": [],
+    "enabled": true,
+    "isConfigMfe": false,
+    "config": {
+      "bannerString": "Trading Agent",
+      "productRelease": "0.1",
+      "productBuild": "0.1.0",
+      "spogDomain": "http://localhost:3000",
+      "keycloakUrl": "http://localhost:8080",
+      "keycloakRealm": "trading-agent",
+      "keycloakClientId": "spog"
+    }
+  },
+  "mfes": {},
+  "iframes": {}
+}

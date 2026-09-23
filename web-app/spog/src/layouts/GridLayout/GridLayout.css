@@ -1,0 +1,632 @@
+/* GridLayout Container */
+.grid-layout-container {
+    width: 100%;
+    height: calc(100% - 60px);
+    /* 100vh minus header height */
+    display: flex;
+    flex-direction: column;
+}
+
+/* Row Styling */
+.grid-layout-row {
+    display: grid;
+    grid-template-columns: repeat(24, 1fr);
+    height: 100%;
+    flex: 1;
+}
+
+/* Row with splitter - use flexbox instead of grid */
+.grid-layout-row-with-splitter {
+    display: flex !important;
+    grid-template-columns: unset !important;
+    overflow: hidden !important;
+}
+
+/* Columns inside splitter row should take full width */
+.grid-layout-row-with-splitter .grid-layout-column {
+    width: 100% !important;
+    flex: 1 1 100% !important;
+    grid-column: unset !important;
+}
+
+/* Column Styling */
+.grid-layout-column {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    height: 100%;
+}
+
+/* Nested Grid Container */
+.grid-layout-nested-container {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+    gap: inherit;
+}
+
+/* Responsive Grid Columns - Extra Small (xs) - Mobile */
+.grid-col-xs-1 {
+    grid-column: span 1;
+}
+
+.grid-col-xs-2 {
+    grid-column: span 2;
+}
+
+.grid-col-xs-3 {
+    grid-column: span 3;
+}
+
+.grid-col-xs-4 {
+    grid-column: span 4;
+}
+
+.grid-col-xs-5 {
+    grid-column: span 5;
+}
+
+.grid-col-xs-6 {
+    grid-column: span 6;
+}
+
+.grid-col-xs-7 {
+    grid-column: span 7;
+}
+
+.grid-col-xs-8 {
+    grid-column: span 8;
+}
+
+.grid-col-xs-9 {
+    grid-column: span 9;
+}
+
+.grid-col-xs-10 {
+    grid-column: span 10;
+}
+
+.grid-col-xs-11 {
+    grid-column: span 11;
+}
+
+.grid-col-xs-12 {
+    grid-column: span 12;
+}
+
+.grid-col-xs-13 {
+    grid-column: span 13;
+}
+
+.grid-col-xs-14 {
+    grid-column: span 14;
+}
+
+.grid-col-xs-15 {
+    grid-column: span 15;
+}
+
+.grid-col-xs-16 {
+    grid-column: span 16;
+}
+
+.grid-col-xs-17 {
+    grid-column: span 17;
+}
+
+.grid-col-xs-18 {
+    grid-column: span 18;
+}
+
+.grid-col-xs-19 {
+    grid-column: span 19;
+}
+
+.grid-col-xs-20 {
+    grid-column: span 20;
+}
+
+.grid-col-xs-21 {
+    grid-column: span 21;
+}
+
+.grid-col-xs-22 {
+    grid-column: span 22;
+}
+
+.grid-col-xs-23 {
+    grid-column: span 23;
+}
+
+.grid-col-xs-24 {
+    grid-column: span 24;
+}
+
+/* Responsive Grid Columns - Small (sm) - Tablets (≥600px) */
+@media (min-width: 600px) {
+    .grid-col-sm-1 {
+        grid-column: span 1;
+    }
+
+    .grid-col-sm-2 {
+        grid-column: span 2;
+    }
+
+    .grid-col-sm-3 {
+        grid-column: span 3;
+    }
+
+    .grid-col-sm-4 {
+        grid-column: span 4;
+    }
+
+    .grid-col-sm-5 {
+        grid-column: span 5;
+    }
+
+    .grid-col-sm-6 {
+        grid-column: span 6;
+    }
+
+    .grid-col-sm-7 {
+        grid-column: span 7;
+    }
+
+    .grid-col-sm-8 {
+        grid-column: span 8;
+    }
+
+    .grid-col-sm-9 {
+        grid-column: span 9;
+    }
+
+    .grid-col-sm-10 {
+        grid-column: span 10;
+    }
+
+    .grid-col-sm-11 {
+        grid-column: span 11;
+    }
+
+    .grid-col-sm-12 {
+        grid-column: span 12;
+    }
+
+    .grid-col-sm-13 {
+        grid-column: span 13;
+    }
+
+    .grid-col-sm-14 {
+        grid-column: span 14;
+    }
+
+    .grid-col-sm-15 {
+        grid-column: span 15;
+    }
+
+    .grid-col-sm-16 {
+        grid-column: span 16;
+    }
+
+    .grid-col-sm-17 {
+        grid-column: span 17;
+    }
+
+    .grid-col-sm-18 {
+        grid-column: span 18;
+    }
+
+    .grid-col-sm-19 {
+        grid-column: span 19;
+    }
+
+    .grid-col-sm-20 {
+        grid-column: span 20;
+    }
+
+    .grid-col-sm-21 {
+        grid-column: span 21;
+    }
+
+    .grid-col-sm-22 {
+        grid-column: span 22;
+    }
+
+    .grid-col-sm-23 {
+        grid-column: span 23;
+    }
+
+    .grid-col-sm-24 {
+        grid-column: span 24;
+    }
+}
+
+/* Responsive Grid Columns - Medium (md) - Small Laptops (≥960px) */
+@media (min-width: 960px) {
+    .grid-col-md-1 {
+        grid-column: span 1;
+    }
+    .grid-col-md-2 {
+        grid-column: span 2;
+    }
+
+    .grid-col-md-3 {
+        grid-column: span 3;
+    }
+
+    .grid-col-md-4 {
+        grid-column: span 4;
+    }
+
+    .grid-col-md-5 {
+        grid-column: span 5;
+    }
+
+    .grid-col-md-6 {
+        grid-column: span 6;
+    }
+
+    .grid-col-md-7 {
+        grid-column: span 7;
+    }
+
+    .grid-col-md-8 {
+        grid-column: span 8;
+    }
+
+    .grid-col-md-9 {
+        grid-column: span 9;
+    }
+
+    .grid-col-md-10 {
+        grid-column: span 10;
+    }
+
+    .grid-col-md-11 {
+        grid-column: span 11;
+    }
+
+    .grid-col-md-12 {
+        grid-column: span 12;
+    }
+
+    .grid-col-md-13 {
+        grid-column: span 13;
+    }
+
+    .grid-col-md-14 {
+        grid-column: span 14;
+    }
+
+    .grid-col-md-15 {
+        grid-column: span 15;
+    }
+
+    .grid-col-md-16 {
+        grid-column: span 16;
+    }
+
+    .grid-col-md-17 {
+        grid-column: span 17;
+    }
+
+    .grid-col-md-18 {
+        grid-column: span 18;
+    }
+
+    .grid-col-md-19 {
+        grid-column: span 19;
+    }
+
+    .grid-col-md-20 {
+        grid-column: span 20;
+    }
+
+    .grid-col-md-21 {
+        grid-column: span 21;
+    }
+
+    .grid-col-md-22 {
+        grid-column: span 22;
+    }
+
+    .grid-col-md-23 {
+        grid-column: span 23;
+    }
+
+    .grid-col-md-24 {
+        grid-column: span 24;
+    }
+}
+
+/* Responsive Grid Columns - Large (lg) - Desktops (≥1280px) */
+@media (min-width: 1280px) {
+    .grid-col-lg-1 {
+        grid-column: span 1;
+    }
+
+    .grid-col-lg-2 {
+        grid-column: span 2;
+    }
+
+    .grid-col-lg-3 {
+        grid-column: span 3;
+    }
+
+    .grid-col-lg-4 {
+        grid-column: span 4;
+    }
+
+    .grid-col-lg-5 {
+        grid-column: span 5;
+    }
+
+    .grid-col-lg-6 {
+        grid-column: span 6;
+    }
+
+    .grid-col-lg-7 {
+        grid-column: span 7;
+    }
+
+    .grid-col-lg-8 {
+        grid-column: span 8;
+    }
+
+    .grid-col-lg-9 {
+        grid-column: span 9;
+    }
+
+    .grid-col-lg-10 {
+        grid-column: span 10;
+    }
+
+    .grid-col-lg-11 {
+        grid-column: span 11;
+    }
+
+    .grid-col-lg-12 {
+        grid-column: span 12;
+    }
+
+    .grid-col-lg-13 {
+        grid-column: span 13;
+    }
+
+    .grid-col-lg-14 {
+        grid-column: span 14;
+    }
+
+    .grid-col-lg-15 {
+        grid-column: span 15;
+    }
+
+    .grid-col-lg-16 {
+        grid-column: span 16;
+    }
+
+    .grid-col-lg-17 {
+        grid-column: span 17;
+    }
+
+    .grid-col-lg-18 {
+        grid-column: span 18;
+    }
+
+    .grid-col-lg-19 {
+        grid-column: span 19;
+    }
+
+    .grid-col-lg-20 {
+        grid-column: span 20;
+    }
+
+    .grid-col-lg-21 {
+        grid-column: span 21;
+    }
+
+    .grid-col-lg-22 {
+        grid-column: span 22;
+    }
+
+    .grid-col-lg-23 {
+        grid-column: span 23;
+    }
+
+    .grid-col-lg-24 {
+        grid-column: span 24;
+    }
+}
+
+/* Responsive Grid Columns - Extra Large (xl) - Large Desktops (≥1920px) */
+@media (min-width: 1920px) {
+    .grid-col-xl-1 {
+        grid-column: span 1;
+    }
+
+    .grid-col-xl-2 {
+        grid-column: span 2;
+    }
+
+    .grid-col-xl-3 {
+        grid-column: span 3;
+    }
+
+    .grid-col-xl-4 {
+        grid-column: span 4;
+    }
+
+    .grid-col-xl-5 {
+        grid-column: span 5;
+    }
+
+    .grid-col-xl-6 {
+        grid-column: span 6;
+    }
+
+    .grid-col-xl-7 {
+        grid-column: span 7;
+    }
+
+    .grid-col-xl-8 {
+        grid-column: span 8;
+    }
+
+    .grid-col-xl-9 {
+        grid-column: span 9;
+    }
+
+    .grid-col-xl-10 {
+        grid-column: span 10;
+    }
+
+    .grid-col-xl-11 {
+        grid-column: span 11;
+    }
+
+    .grid-col-xl-12 {
+        grid-column: span 12;
+    }
+
+    .grid-col-xl-13 {
+        grid-column: span 13;
+    }
+
+    .grid-col-xl-14 {
+        grid-column: span 14;
+    }
+
+    .grid-col-xl-15 {
+        grid-column: span 15;
+    }
+
+    .grid-col-xl-16 {
+        grid-column: span 16;
+    }
+
+    .grid-col-xl-17 {
+        grid-column: span 17;
+    }
+
+    .grid-col-xl-18 {
+        grid-column: span 18;
+    }
+
+    .grid-col-xl-19 {
+        grid-column: span 19;
+    }
+
+    .grid-col-xl-20 {
+        grid-column: span 20;
+    }
+
+    .grid-col-xl-21 {
+        grid-column: span 21;
+    }
+
+    .grid-col-xl-22 {
+        grid-column: span 22;
+    }
+
+    .grid-col-xl-23 {
+        grid-column: span 23;
+    }
+
+    .grid-col-xl-24 {
+        grid-column: span 24;
+    }
+}
+
+.grid-layout-component {
+    background-color: var(--color-surface-container-low);
+    border-radius: var(--radius-lg);
+    overflow-y: auto;
+    overflow-x: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.grid-layout-component-no-scroll {
+    background-color: var(--color-surface-container-low);
+    border-radius: var(--radius-lg);
+    display: flex;
+    flex-direction: column;
+    overflow-y: hidden;
+}
+/* Scrollbar Styling - Applied to component container */
+.grid-layout-component::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
+}
+
+.grid-layout-component::-webkit-scrollbar-track {
+    background: transparent;
+    border-radius: 10px;
+}
+
+.grid-layout-component::-webkit-scrollbar-thumb {
+    background: var(--color-outline-variant);
+    border-radius: 10px;
+}
+
+.grid-layout-component::-webkit-scrollbar-thumb:hover {
+    background: var(--color-outline);
+}
+
+/* Scrollable Component - Override overflow */
+.grid-layout-component-scrollable {
+    overflow: visible;
+}
+
+.grid-layout-component-scrollable .grid-layout-component-content {
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+/* Component Header */
+.grid-layout-component-header {
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid var(--color-border);
+    background-color: var(--color-surface-container);
+    flex-shrink: 0;
+}
+
+.grid-layout-component-title {
+    margin: 0;
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: var(--color-text);
+}
+
+.grid-layout-component-subtitle {
+    margin: 0.25rem 0 0;
+    font-size: 0.875rem;
+    color: var(--color-text-secondary);
+}
+
+/* Component Content */
+.grid-layout-component-content {
+    padding: 10px;
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    flex-direction: column;
+    overflow: visible;
+}
+
+/* Component Content No Padding */
+.grid-layout-component-content-no-padding {
+    padding: 0;
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    flex-direction: column;
+    overflow: visible;
+}
+
+/* Utility Classes */
+.padding-left-right-7 {
+    padding-left: 7px;
+    padding-right: 7px;
+}

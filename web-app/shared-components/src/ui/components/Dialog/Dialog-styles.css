@@ -1,0 +1,52 @@
+.ta-dialog-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-md);
+    background-color: var(--color-overlay);
+}
+
+.ta-dialog {
+    display: flex;
+    flex-direction: column;
+    max-width: 100%;
+    max-height: calc(100vh - 2 * var(--space-md));
+    background-color: var(--color-surface-container-high);
+    color: var(--color-text);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-lg);
+    font-family: var(--font-family);
+    font-size: var(--font-size-md);
+    outline: none;
+}
+
+.ta-dialog__header {
+    padding: var(--space-md) var(--space-lg);
+    border-bottom: 1px solid var(--color-border);
+}
+
+.ta-dialog__title {
+    margin: 0;
+    font-family: var(--font-family-headline);
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-bold);
+}
+
+.ta-dialog__body {
+    flex: 1;
+    overflow: auto;
+    padding: var(--space-lg);
+    line-height: var(--line-height);
+}
+
+.ta-dialog__footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--space-sm);
+    padding: var(--space-md) var(--space-lg);
+    border-top: 1px solid var(--color-border);
+}

@@ -1,0 +1,20 @@
+# Source files (only ship compiled dist/)
+src/
+*.test.ts
+*.test.tsx
+__tests__/
+
+# Config files
+tsconfig.json
+jest.config.js
+
+# Development files
+node_modules/
+coverage/
+.vscode/
+.idea/
+
+# Logs
+*.log
+npm-debug.log*
+

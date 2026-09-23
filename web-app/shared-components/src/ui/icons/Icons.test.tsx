@@ -1,0 +1,33 @@
+import React from 'react';
+import { render } from '@testing-library/react';
+import '@testing-library/jest-dom';
+import { ArrowLeftIcon, ChevronDownIcon, CloseIcon, LogoutIcon, MenuIcon, MonitorIcon, MoonIcon, SunIcon } from './Icons';
+
+describe('Icons', () => {
+    it.each([
+        ['MenuIcon', MenuIcon],
+        ['ArrowLeftIcon', ArrowLeftIcon],
+        ['CloseIcon', CloseIcon],
+        ['ChevronDownIcon', ChevronDownIcon],
+        ['LogoutIcon', LogoutIcon],
+        ['SunIcon', SunIcon],
+        ['MoonIcon', MoonIcon],
+        ['MonitorIcon', MonitorIcon],
+    ])('%s renders a decorative 20px svg by default', (displayName, Icon) => {
+        const { container } = render(<Icon />);
+
+        const svg = container.querySelector('svg');
+        expect(svg).toHaveAttribute('width', '20');
+        expect(svg).toHaveAttribute('aria-hidden', 'true');
+        expect(Icon.displayName).toBe(displayName);
+    });
+
+    it('accepts a size and exposes itself when labelled', () => {
+        const { container } = render(<MenuIcon size={32} aria-label="Menu" className="icon" />);
+
+        const svg = container.querySelector('svg');
+        expect(svg).toHaveAttribute('width', '32');
+        expect(svg).not.toHaveAttribute('aria-hidden');
+        expect(svg).toHaveClass('icon');
+    });
+});
