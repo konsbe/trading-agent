@@ -19,6 +19,7 @@ import (
 	"strings"
 	"syscall"
 	"time"
+	_ "time/tzdata" // America/New_York for the daily-bars schedule, whatever the image ships
 
 	"github.com/joho/godotenv"
 
@@ -128,7 +129,12 @@ func main() {
 
 	tSymbols := time.NewTicker(cfg.PollSymbols)
 	defer tSymbols.Stop()
-	tDailyBars := time.NewTicker(cfg.DailyBarsInterval)
+	nextDaily, err := w.dailyBarsSchedule(ctx)
+	if err != nil {
+		log.Error("daily bars schedule", "err", err)
+		os.Exit(1)
+	}
+	tDailyBars := time.NewTimer(time.Until(nextDaily(time.Now(), true)))
 	defer tDailyBars.Stop()
 
 	// The backfill runs back-to-back batches while work remains, then idles. A
@@ -149,7 +155,7 @@ func main() {
 
 	log.Info("data-universe running",
 		"symbols_every", cfg.PollSymbols.String(),
-		"daily_bars_every", cfg.DailyBarsInterval.String(),
+		"daily_bars_at", cfg.DailyBarsAt,
 		"backfill_enabled", cfg.EnableBackfill,
 		"backfill_years", cfg.BackfillYears,
 		// Named after the setting, not after one provider: the field read
@@ -181,6 +187,7 @@ func main() {
 			if cfg.EnableDailyBars {
 				w.runDailyBars(ctx)
 			}
+			tDailyBars.Reset(time.Until(nextDaily(time.Now(), false)))
 		case <-backfillTimer.C:
 			processed := w.runBackfillRound(ctx)
 			// Immediately continue while there is work; idle once drained so a

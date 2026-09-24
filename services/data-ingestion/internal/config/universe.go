@@ -197,10 +197,21 @@ type Universe struct {
 
 	// ── §8.1.4 daily incremental refresh ───────────────────────────────────
 
-	// DailyBarsInterval is how often the incremental refresh runs. Daily after
-	// the US close; the worker does not implement a market calendar, so this is
-	// a plain interval and a run on a holiday simply returns no new bars.
+	// DailyBarsAt is the New York time of day (HH:MM) the refresh runs on
+	// weekdays. Tiingo's EOD bars are usually final by ~18:00 ET; 18:30 lets a
+	// ~45 min pass finish well inside momentum-daily's wait window. The value
+	// "interval" falls back to DailyBarsInterval (the old plain ticker).
+	DailyBarsAt string
+
+	// DailyBarsInterval is the legacy schedule, used only when DailyBarsAt is
+	// "interval": a plain interval with no market calendar.
 	DailyBarsInterval time.Duration
+
+	// DailyBarsCatchUpShare: at startup, run the refresh immediately when fewer
+	// than this share of backfilled symbols have a bar for the latest due
+	// session. Restarting a current worker costs nothing; restarting a stale one
+	// catches it up instead of waiting for the next scheduled pass.
+	DailyBarsCatchUpShare float64
 
 	// DailyBarsLookbackDays is the window requested per symbol. Wider than one
 	// day on purpose: it repairs gaps from a missed run or a late provider
@@ -283,7 +294,9 @@ func LoadUniverse() (Universe, error) {
 		BackoffBase:       durationEnv2("UNIVERSE_BAR_BACKOFF_BASE", "UNIVERSE_YAHOO_BACKOFF_BASE", 2*time.Second),
 		BackoffMax:        durationEnv2("UNIVERSE_BAR_BACKOFF_MAX", "UNIVERSE_YAHOO_BACKOFF_MAX", 60*time.Second),
 
+		DailyBarsAt:           env("UNIVERSE_DAILY_BARS_AT", "18:30"),
 		DailyBarsInterval:     durationEnv("UNIVERSE_DAILY_BARS_INTERVAL", 24*time.Hour),
+		DailyBarsCatchUpShare: floatEnv("UNIVERSE_DAILY_BARS_CATCHUP_SHARE", 0.95),
 		DailyBarsLookbackDays: intEnv("UNIVERSE_DAILY_BARS_LOOKBACK_DAYS", 7),
 	}, nil
 }

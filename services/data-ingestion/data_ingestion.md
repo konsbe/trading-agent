@@ -669,7 +669,9 @@ unexplained empty penny bucket later.
 | `UNIVERSE_YAHOO_TIMEOUT` | `30s` | Per-request timeout |
 | `UNIVERSE_YAHOO_MAX_RETRIES` | `3` | Retries after the first attempt, transient statuses only |
 | `UNIVERSE_YAHOO_BACKOFF_BASE` / `_MAX` | `2s` / `60s` | Exponential backoff bounds; `Retry-After` overrides when longer |
-| `UNIVERSE_DAILY_BARS_INTERVAL` | `24h` | Incremental refresh cadence |
+| `UNIVERSE_DAILY_BARS_AT` | `18:30` | New York time the weekday refresh runs. `interval` = legacy plain ticker |
+| `UNIVERSE_DAILY_BARS_CATCHUP_SHARE` | `0.95` | At startup, refresh immediately if fewer than this share of backfilled symbols have the latest due session |
+| `UNIVERSE_DAILY_BARS_INTERVAL` | `24h` | Legacy cadence, only used with `UNIVERSE_DAILY_BARS_AT=interval`. It used to be the only schedule: the first pass came 24h after startup, so a worker restarted more often than daily never refreshed (2026-09-22/23 were missed that way) |
 | `UNIVERSE_DAILY_BARS_LOOKBACK_DAYS` | `7` | Window per symbol — wider than a day to repair missed runs and late corrections |
 
 ---
