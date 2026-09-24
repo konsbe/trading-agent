@@ -1,7 +1,9 @@
 /// <reference types="@testing-library/jest-dom" />
 import React from 'react';
 import { describe, it, expect, beforeEach, jest } from '@jest/globals';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { readFileSync } from 'fs';
+import { join } from 'path';
 import '@testing-library/jest-dom';
 import ErrorBoundary from './ErrorBoundary';
 
@@ -77,7 +79,7 @@ describe('ErrorBoundary', () => {
         expect(screen.getByText(/Please try refreshing the page or contact support/i)).toBeInTheDocument();
     });
 
-    it('should not show error details in production', () => {
+    it('shows the error message but not the stack in production', () => {
         const originalEnv = process.env.NODE_ENV;
         process.env.NODE_ENV = 'production';
 
@@ -87,8 +89,9 @@ describe('ErrorBoundary', () => {
             </ErrorBoundary>
         );
 
-        const details = screen.queryByText('Test error message');
-        expect(details).not.toBeInTheDocument();
+        expect(screen.getByTestId('error-boundary-message')).toHaveTextContent('Error: Test error message');
+        expect(screen.queryByTestId('error-boundary-details')).not.toBeInTheDocument();
+        expect(screen.queryByTestId('error-boundary-stack')).not.toBeInTheDocument();
 
         process.env.NODE_ENV = originalEnv;
     });
@@ -103,7 +106,7 @@ describe('ErrorBoundary', () => {
             </ErrorBoundary>
         );
 
-        expect(screen.getByText(/Test error message/i)).toBeInTheDocument();
+        expect(screen.getByTestId('error-boundary-message')).toHaveTextContent('Error: Test error message');
 
         process.env.NODE_ENV = originalEnv;
     });
@@ -197,7 +200,7 @@ describe('ErrorBoundary', () => {
             </ErrorBoundary>
         );
 
-        const details = screen.getByText(/Test error message/i).closest('details');
+        const details = screen.getByTestId('error-boundary-stack').closest('details');
         expect(details).toBeInTheDocument();
         expect(details).toHaveClass('ta-error-boundary__details');
 
@@ -216,5 +219,105 @@ describe('ErrorBoundary', () => {
 
         expect(screen.getByTestId('fragment-child-1')).toBeInTheDocument();
         expect(screen.getByTestId('fragment-child-2')).toBeInTheDocument();
+    });
+
+    describe('error details layout', () => {
+        const originalEnv = process.env.NODE_ENV;
+        beforeEach(() => {
+            process.env.NODE_ENV = 'development';
+        });
+        afterEach(() => {
+            process.env.NODE_ENV = originalEnv;
+        });
+
+        const LongStack = () => {
+            const error = new RangeError('Long stack');
+            error.stack = `RangeError: Long stack\n${'    at frame (webpack://spog-ui/./src/very/long/path/'.padEnd(600, 'x')})\n`.repeat(200);
+            throw error;
+        };
+
+        /** The rules of one selector in the component stylesheet (jsdom has no layout, so CSS is asserted as text). */
+        const css = readFileSync(join(__dirname, 'ErrorBoundary-styles.css'), 'utf8');
+        const rule = (selector: string): string => {
+            const match = css.match(new RegExp(`(^|\\n)${selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\{([^}]*)\\}`));
+            if (!match) throw new Error(`no CSS rule for ${selector}`);
+            return match[2];
+        };
+
+        it('shows error name and message above the details, outside them', () => {
+            render(
+                <ErrorBoundary>
+                    <LongStack />
+                </ErrorBoundary>
+            );
+
+            const message = screen.getByTestId('error-boundary-message');
+            const details = screen.getByTestId('error-boundary-details');
+            expect(message).toHaveTextContent('RangeError: Long stack');
+            expect(details).not.toContainElement(message);
+            expect(message.compareDocumentPosition(details)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+            expect(screen.getByRole('heading', { level: 2 }).compareDocumentPosition(message)).toBe(
+                Node.DOCUMENT_POSITION_FOLLOWING
+            );
+        });
+
+        it('keeps details closed by default and opens them from the summary', () => {
+            render(
+                <ErrorBoundary>
+                    <LongStack />
+                </ErrorBoundary>
+            );
+
+            const details = screen.getByTestId('error-boundary-details') as HTMLDetailsElement;
+            expect(details.open).toBe(false);
+            fireEvent.click(screen.getByText('Error details'));
+            expect(details.open).toBe(true);
+        });
+
+        it('renders a very long stack only inside the scrolling details block', () => {
+            render(
+                <ErrorBoundary>
+                    <LongStack />
+                </ErrorBoundary>
+            );
+
+            const alert = screen.getByRole('alert');
+            const details = screen.getByTestId('error-boundary-details');
+            const stack = screen.getByTestId('error-boundary-stack');
+            expect(details).toHaveClass('ta-error-boundary__details');
+            expect(details).toContainElement(stack);
+            expect(stack.tagName).toBe('PRE');
+            expect(stack.textContent).toContain('Component stack:');
+            expect(stack.textContent!.length).toBeGreaterThan(100000);
+            // The only children of the panel: heading, help, message, details — the stack is nowhere else.
+            expect([...alert.children].map(c => c.className)).toEqual([
+                'ta-error-boundary__title',
+                'ta-error-boundary__help',
+                'ta-error-boundary__message',
+                'ta-error-boundary__details',
+            ]);
+            expect(alert.querySelectorAll('pre')).toHaveLength(1);
+        });
+
+        it('bounds the panel and lets only the details shrink and scroll', () => {
+            const panel = rule('.ta-error-boundary');
+            expect(panel).toMatch(/min-height:\s*0/);
+            expect(panel).toMatch(/max-height:\s*100%/);
+            expect(panel).toMatch(/overflow:\s*hidden/);
+            expect(panel).toMatch(/flex-direction:\s*column/);
+
+            expect(rule('.ta-error-boundary > *')).toMatch(/flex-shrink:\s*0/);
+
+            const details = rule('.ta-error-boundary > .ta-error-boundary__details');
+            expect(details).toMatch(/flex:\s*0 1 auto/);
+            expect(details).toMatch(/min-height:\s*0/);
+            expect(details).toMatch(/overflow:\s*auto/);
+
+            expect(rule('.ta-error-boundary__summary')).toMatch(/position:\s*sticky/);
+            const stack = rule('.ta-error-boundary__stack');
+            expect(stack).toMatch(/white-space:\s*pre-wrap/);
+            expect(stack).toMatch(/overflow-wrap:\s*anywhere/);
+            expect(css).not.toMatch(/#[0-9a-f]{3,8}\b|data-theme|prefers-color-scheme/i);
+        });
     });
 });
