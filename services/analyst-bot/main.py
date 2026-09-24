@@ -39,12 +39,29 @@ logging.basicConfig(
 log = logging.getLogger(__name__)
 
 
+def _preflight_shared_caveats() -> None:
+    """Fail at boot, with the reason, if the shared caveats file is unavailable.
+
+    notifier.discord.momentum reads shared/content/momentum_caveats.json at
+    import (it is shared with momentum-api). Importing it here surfaces a
+    missing mount before any connection is opened, instead of as a traceback
+    halfway through startup.
+    """
+    try:
+        from notifier.discord import momentum  # noqa: F401
+    except RuntimeError as exc:
+        log.error("analyst-bot cannot start: %s", exc)
+        sys.exit(1)
+
+
 async def start() -> None:
     cfg = _config.load()
 
     if not cfg.discord_bot_token:
         log.error("DISCORD_BOT_TOKEN is not set — bot cannot start")
         sys.exit(1)
+
+    _preflight_shared_caveats()
 
     log.info("initialising DB pool")
     db_pool = await pool.init(cfg.database_url)

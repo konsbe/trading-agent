@@ -82,6 +82,7 @@ nothing else. Diagnosability is worth more than the saved table.
 | [momentum_labels](#momentum_labels) | `momentum_labels` | `007_momentum.sql` | `momentum-scanner` (backfill mode) |
 | [catalyst_events](#catalyst_events) | `catalyst_events` | `007_momentum.sql` | `data-universe` (company news) |
 | [momentum_tracked](#momentum_tracked) | `momentum_tracked` | `007_momentum.sql` | `momentum-scanner`, `analyst-bot` |
+| [watchlist_items](#watchlist_items) | `watchlist_items` | `024_watchlist.sql` | `momentum-api` (watchlist endpoints) |
 | [api_rate_budget](#api_rate_budget) | `api_rate_budget` | `008_api_rate_budget.sql` | every worker calling a shared-quota API |
 | [fundamental_fetch_state](#fundamental_fetch_state) | `fundamental_fetch_state` | `009_fundamental_fetch_state.sql` | `data-fundamental` |
 
@@ -752,6 +753,25 @@ Keyword lists live in configuration, so they can be tuned without a rebuild.
 | `ingested_at` | datetime | yes | |
 
 ---
+
+## watchlist_items
+
+**File:** `watchlist_items.schema.json`
+**Migration:** `024_watchlist.sql`
+
+Symbols a user chose to follow, written by momentum-api's watchlist endpoints
+(`PUT`/`DELETE /api/v1/watchlist/{symbol}`) and read by data-ingestion's
+`intraday-bars` job. The only table momentum-api writes.
+
+| Column | Type | Nullable | Notes |
+|---|---|---|---|
+| `id` | bigint | no | Surrogate key |
+| `owner_sub` | text | **yes** | Identity-provider subject of the signed-in user. **NULL = the shared unauthenticated list** (no auth exists yet, so every row is NULL today). Never a placeholder string |
+| `symbol` | text | no | Upper-case; CHECK enforced |
+| `added_at` | timestamptz | no | Default `now()` |
+
+Unique on `(COALESCE(owner_sub, ''), symbol)` — a plain UNIQUE would let NULL
+owners duplicate a symbol.
 
 ## momentum_tracked
 

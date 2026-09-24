@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "watchlist_items",
+  "description": "User watchlist rows (migration 024). owner_sub NULL = unauthenticated list.",
+  "type": "object",
+  "required": [
+    "id",
+    "symbol",
+    "added_at"
+  ],
+  "properties": {
+    "id": {
+      "type": "integer"
+    },
+    "owner_sub": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "symbol": {
+      "type": "string",
+      "pattern": "^[A-Z0-9.\\-]+$"
+    },
+    "added_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

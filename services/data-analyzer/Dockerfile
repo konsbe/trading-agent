@@ -14,7 +14,8 @@ COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -o /out/technical-analysis ./cmd/technical-analysis \
   && CGO_ENABLED=0 GOOS=linux go build -o /out/fundamental-analysis ./cmd/fundamental-analysis \
   && CGO_ENABLED=0 GOOS=linux go build -o /out/macro-analysis ./cmd/macro-analysis \
-  && CGO_ENABLED=0 GOOS=linux go build -o /out/market-operations ./cmd/market-operations
+  && CGO_ENABLED=0 GOOS=linux go build -o /out/market-operations ./cmd/market-operations \
+  && CGO_ENABLED=0 GOOS=linux go build -o /out/momentum-api ./cmd/momentum-api
 
 FROM gcr.io/distroless/base-debian12:nonroot
 WORKDIR /app
@@ -23,4 +24,6 @@ COPY --from=build /out/technical-analysis /app/technical-analysis
 COPY --from=build /out/fundamental-analysis /app/fundamental-analysis
 COPY --from=build /out/macro-analysis /app/macro-analysis
 COPY --from=build /out/market-operations /app/market-operations
+COPY --from=build /out/momentum-api /app/momentum-api
+EXPOSE 8090
 USER nonroot:nonroot

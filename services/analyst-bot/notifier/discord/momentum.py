@@ -36,12 +36,77 @@ headroom that cannot be reached, so the denominator stays explicit.
 
 from __future__ import annotations
 
+import json
+import os
+from pathlib import Path
 from typing import Any, Mapping, Sequence
 
 # §4.1 v2. Kept here as the single source of truth for rendering so a footer and
 # a breakdown can never disagree about the ceiling.
 SCORE_ALLOCATED = 90
 SCORE_PRACTICAL_CEILING = 75  # catalyst_tier is null until §3.11 ships in Step 8
+
+class SharedCaveatsError(RuntimeError):
+    """The shared caveats file is missing or malformed. Raised at import."""
+
+
+_CAVEATS_FIX = (
+    "This file holds EVIDENCE_CAVEAT and RESEARCH_SCORE_CAVEAT. It is shared "
+    "with momentum-api (services/data-analyzer/cmd/momentum-api) so the bot "
+    "and the web app make exactly the same claims, which is why there is no "
+    "built-in fallback text. Fix: in Docker, mount the repo's shared/content "
+    "directory read-only and point MOMENTUM_CAVEATS_PATH at the file (see "
+    "infra/docker-compose.yml, service analyst-bot: "
+    "'../shared/content:/shared/content:ro' and "
+    "MOMENTUM_CAVEATS_PATH=/shared/content/momentum_caveats.json). Running "
+    "from a repo checkout, leave MOMENTUM_CAVEATS_PATH unset."
+)
+
+
+def _load_shared_caveats() -> Mapping[str, str]:
+    """Read both caveats from the one file every surface shares.
+
+    The text lives in shared/content/momentum_caveats.json, not here, because
+    momentum-api serves the same claims to the web app and "one shared
+    constant" has to hold across languages, not just within this bot. There is
+    deliberately no fallback copy: a missing file must fail at import, since a
+    silent default would be a second source of the claim.
+    """
+    configured = os.environ.get("MOMENTUM_CAVEATS_PATH")
+    if configured:
+        path, source = Path(configured), "MOMENTUM_CAVEATS_PATH"
+    else:
+        # services/analyst-bot/notifier/discord/momentum.py -> repo root. Inside a
+        # Docker image the file sits at /app/notifier/discord/, which has no repo
+        # root above it, so the default only exists in a checkout.
+        parents = Path(__file__).resolve().parents
+        if len(parents) <= 4:
+            raise SharedCaveatsError(
+                "MOMENTUM_CAVEATS_PATH is not set and this is not a repo checkout, "
+                f"so there is no default path to the shared caveats file. {_CAVEATS_FIX}"
+            )
+        path = parents[4] / "shared" / "content" / "momentum_caveats.json"
+        source = "the default repo-relative path"
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError as exc:
+        raise SharedCaveatsError(
+            f"Shared momentum caveats file not found at {path} (from {source}). {_CAVEATS_FIX}"
+        ) from exc
+    except (OSError, ValueError) as exc:
+        raise SharedCaveatsError(
+            f"Shared momentum caveats file at {path} could not be read as JSON: {exc}. {_CAVEATS_FIX}"
+        ) from exc
+    keys = ("evidence_caveat", "research_score_caveat")
+    missing = [k for k in keys if not isinstance(data, dict) or not data.get(k)]
+    if missing:
+        raise SharedCaveatsError(
+            f"Shared momentum caveats file at {path} is missing {', '.join(missing)}. {_CAVEATS_FIX}"
+        )
+    return {k: data[k] for k in keys}
+
+
+_CAVEATS = _load_shared_caveats()
 
 #: The single claim this product makes, on every surface that shows a candidate.
 #:
@@ -51,20 +116,12 @@ SCORE_PRACTICAL_CEILING = 75  # catalyst_tier is null until §3.11 ships in Step
 #: rows, and on a lookahead-free set rvol's stratified odds ratio is 0.991
 #: (p = 0.947). Leaving the old wording up would be the most damaging kind of
 #: stale comment — a validity claim that outlived its evidence.
-EVIDENCE_CAVEAT = (
-    "⚠️ SCREENER, not a forecast. These candidates meet the published gates on "
-    "daily bars, regular session. No component of the ranking has shown "
-    "predictive value out-of-sample. Nothing here is a forecast or trading advice."
-)
+EVIDENCE_CAVEAT = _CAVEATS["evidence_caveat"]
 
 #: Shown wherever the research score is rendered, which is /score and nowhere
 #: else. Separate from EVIDENCE_CAVEAT so the screener's claim stays short on
 #: the surfaces that do not show a score at all.
-RESEARCH_SCORE_CAVEAT = (
-    "🔬 Research score — NOT VALIDATED. Retained as a Phase 2 baseline. It does "
-    "not separate outcomes within a bucket out-of-sample (MH OR 0.991, p=0.947). "
-    "Do not read it as a ranking."
-)
+RESEARCH_SCORE_CAVEAT = _CAVEATS["research_score_caveat"]
 
 #: Labels any ordering as an ordering. A sorted list implies a ranking unless
 #: it says otherwise, and this one is descriptive only.

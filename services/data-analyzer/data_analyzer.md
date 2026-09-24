@@ -571,6 +571,23 @@ Separate binary from **`macro-analysis`**. Writes **`mo_reference_snapshot`** to
 
 ---
 
+## `momentum-tracker` — §5 exit tracking
+
+Daily: evaluates exits on every active `momentum_tracked` row, then opens rows
+for the session's candidates. `-open-mode=gates` (default, since 2026-09-24)
+opens on every §3.2 gate pass — the same criterion the bot's screener alerts
+use, so tracked = alerted. `-open-mode=score` restores the retired 65/72 score
+thresholds (Phase 1 §10.1.9's replay figures used it). `-replay` is in-memory and
+writes nothing. Run after `momentum-scanner`:
+`go run ./cmd/momentum-tracker` (or `-dry-run`).
+
+## `momentum-api` server (read-only scanner API)
+
+Long-running HTTP server (not a one-shot job) that serves the momentum scanner's
+stored output to the web app. No auth — loopback / trusted network only. See
+[`cmd/momentum-api/README.md`](cmd/momentum-api/README.md) and
+`docs/MOMENTUM_SCANNER_API.md`.
+
 ## Known Limitations & Future Work
 
 | Area | Current state | Future plan |

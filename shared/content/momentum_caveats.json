@@ -1,0 +1,11 @@
+{
+  "evidence_caveat": "⚠️ SCREENER, not a forecast. These candidates meet the published gates on daily bars, regular session. No component of the ranking has shown predictive value out-of-sample. Nothing here is a forecast or trading advice.",
+  "research_score_caveat": "🔬 Research score — NOT VALIDATED. Retained as a Phase 2 baseline. It does not separate outcomes within a bucket out-of-sample (MH OR 0.991, p=0.947). Do not read it as a ranking.",
+  "exit_reason_notes": {
+    "breakout_failed": "Closed back below the 20-day resistance level it broke out over at alert time. Measured to fire on the first session in most cases (651 of 1,545 replayed exits, at a median peak of 0.00%): an overly sensitive rule, not a confirmed breakout failure.",
+    "lost_vwap": "Closed below its rolling 20-day VWAP.",
+    "momentum_stalled": "Relative volume (20-day) stayed below 1.5 for 3 consecutive sessions.",
+    "stop_atr": "Closed more than 2 × ATR(14) below the reference price. In the Phase 1 replay this condition was true 116 times but fired first only 31 — faster rules usually pre-empt it, and its priority ordering is unvalidated.",
+    "timeout": "Held for 20 sessions without another exit firing. This exit never fired in 1,545 replayed exits (the longest position ran 17 sessions), so a timeout here is itself unusual and worth a closer look."
+  }
+}

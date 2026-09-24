@@ -5,7 +5,7 @@ ANALYZER := $(ROOT)/services/data-analyzer
 BOT     := $(ROOT)/services/analyst-bot
 
 .PHONY: help tidy build-ingestion build-analyzer db-up db-down up down deploy ensure-env ensure-corp-ca \
-	docker-build-timescaledb restart clean psql up-bot log-bot \
+	docker-build-timescaledb restart clean psql up-bot log-bot up-api log-api \
 	db-crypto-ohlcv db-crypto-global db-equity-ohlcv db-macro-fred db-onchain db-sentiment db-news db-tables \
 	db-technical db-technical-symbol db-fundamental db-fundamental-symbol \
 	log-docker-compose log-services log-analyzer \
@@ -17,6 +17,7 @@ help:
 	@echo "  make up-ingestion  Ingestion workers only (DB must be running)"
 	@echo "  make up-analyzer   Analyzer workers only (DB + ingestion must be running)"
 	@echo "  make up-bot        Discord analyst-bot only (DB + Redis must be running)"
+	@echo "  make up-api        momentum-api on 127.0.0.1:8090 (DB must be running; no auth)"
 	@echo "  make down          Stop everything (volumes kept)"
 	@echo "  make restart       down + up --build; database data preserved"
 	@echo "  make clean         Nuclear: remove containers, volumes (DB wiped), and local images"
@@ -93,6 +94,12 @@ up-bot: ensure-env ensure-corp-ca
 
 log-bot:
 	docker compose -f $(ROOT)/infra/docker-compose.yml --profile bot logs -f analyst-bot
+
+up-api: ensure-env
+	docker compose -f $(ROOT)/infra/docker-compose.yml --profile api up -d --build --force-recreate momentum-api
+
+log-api:
+	docker compose -f $(ROOT)/infra/docker-compose.yml --profile api logs -f momentum-api
 
 down:
 	$(MAKE) -C $(INFRA) down

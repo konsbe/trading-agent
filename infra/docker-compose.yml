@@ -246,6 +246,36 @@ services:
     profiles: [analyzer]
     restart: on-failure
 
+  # ── momentum-api ───────────────────────────────────────────────────────────
+  # Read-only HTTP API over the momentum scanner's stored output for the web app
+  # (docs/MOMENTUM_SCANNER_API.md). Start with: make up-api
+  #
+  # NO AUTHENTICATION. Published on 127.0.0.1 only — never change the host side
+  # of `ports` to 0.0.0.0 or expose it beyond this machine until real auth
+  # exists (see services/data-analyzer/cmd/momentum-api/README.md).
+  momentum-api:
+    build:
+      context: ../services/data-analyzer
+      dockerfile: Dockerfile
+    command: ["/app/momentum-api"]
+    env_file:
+      - path: ../.env
+        required: false
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@timescaledb:5432/trading?sslmode=disable
+      # Listens on all interfaces INSIDE the container; the host port is loopback-only.
+      MOMENTUM_API_ADDR: 0.0.0.0:8090
+      MOMENTUM_CAVEATS_PATH: /shared/content/momentum_caveats.json
+    volumes:
+      - ../shared/content:/shared/content:ro
+    ports:
+      - "127.0.0.1:8090:8090"
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+    profiles: [api]
+    restart: on-failure
+
   # ── analyst-bot ────────────────────────────────────────────────────────────
   # Discord bot + scheduler. Reads from TimescaleDB and Redis — no API calls.
   # Start with: make up-bot  (or docker compose --profile bot up -d analyst-bot)
@@ -260,6 +290,10 @@ services:
     environment:
       DATABASE_URL: postgres://postgres:postgres@timescaledb:5432/trading?sslmode=disable
       REDIS_URL: redis://redis:6379/0
+      # EVIDENCE_CAVEAT / RESEARCH_SCORE_CAVEAT, shared with momentum-api.
+      MOMENTUM_CAVEATS_PATH: /shared/content/momentum_caveats.json
+    volumes:
+      - ../shared/content:/shared/content:ro
     depends_on:
       timescaledb:
         condition: service_healthy

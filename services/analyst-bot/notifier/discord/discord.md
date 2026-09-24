@@ -4,6 +4,15 @@ This document explains how to create a Discord bot application, obtain every req
 
 ---
 
+> **Runtime dependency — the bot will not start without it.** The bot reads
+> `shared/content/momentum_caveats.json` (the momentum scanner's caveat text,
+> shared with momentum-api). From a repo checkout it is found automatically. In
+> Docker it must be mounted: `../shared/content:/shared/content:ro` plus
+> `MOMENTUM_CAVEATS_PATH=/shared/content/momentum_caveats.json`, already wired in
+> `infra/docker-compose.yml`. Without it the bot exits at boot with
+> `analyst-bot cannot start: ...`, naming what is missing and the fix. See
+> "Cross-service runtime dependencies" in `services/data-ingestion/data_ingestion.md`.
+
 ## Step 1 — Create a Discord Application & Bot
 
 ### 1.1 Open the Developer Portal

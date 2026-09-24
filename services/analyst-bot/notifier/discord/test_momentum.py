@@ -281,5 +281,51 @@ class TestMomentumOutput(unittest.TestCase):
         assert "0.19% of high" in out
 
 
+class SharedCaveatSourceTest(unittest.TestCase):
+    """The caveats are read from shared/content, the same file momentum-api serves.
+
+    This is what enforces "one shared constant" across the bot and the API: both
+    sides assert against the file, so neither can hold its own copy.
+    """
+
+    SHARED = (
+        __import__("pathlib").Path(__file__).resolve().parents[4]
+        / "shared" / "content" / "momentum_caveats.json"
+    )
+
+    def test_constants_match_the_shared_file_byte_for_byte(self):
+        import json
+        data = json.loads(self.SHARED.read_text(encoding="utf-8"))
+        self.assertEqual(m.EVIDENCE_CAVEAT, data["evidence_caveat"])
+        self.assertEqual(m.RESEARCH_SCORE_CAVEAT, data["research_score_caveat"])
+
+    def test_missing_file_fails_loudly_and_says_how_to_fix_it(self):
+        import os
+        from unittest import mock
+        with mock.patch.dict(os.environ, {"MOMENTUM_CAVEATS_PATH": "/nonexistent/caveats.json"}):
+            with self.assertRaises(m.SharedCaveatsError) as ctx:
+                m._load_shared_caveats()
+        msg = str(ctx.exception)
+        for needle in ("/nonexistent/caveats.json", "MOMENTUM_CAVEATS_PATH", "momentum-api",
+                       "shared/content", "docker-compose.yml"):
+            self.assertIn(needle, msg)
+
+    def test_malformed_or_incomplete_file_fails_with_a_named_reason(self):
+        import os
+        import tempfile
+        from unittest import mock
+        for content, needle in (("not json", "could not be read as JSON"),
+                                ('{"evidence_caveat": "x"}', "missing research_score_caveat")):
+            with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as f:
+                f.write(content)
+            try:
+                with mock.patch.dict(os.environ, {"MOMENTUM_CAVEATS_PATH": f.name}):
+                    with self.assertRaises(m.SharedCaveatsError) as ctx:
+                        m._load_shared_caveats()
+                self.assertIn(needle, str(ctx.exception))
+            finally:
+                os.unlink(f.name)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
