@@ -65,7 +65,9 @@ services:
     volumes:
       - ${CORP_CA_PEM_PATH:-/dev/null}:/etc/ssl/extra/corp-ca.pem:ro
     profiles: [ingestion]
-    restart: on-failure
+    # unless-stopped: feeds the daily market report on an ongoing basis, and
+    # on-failure containers are not brought back when Docker itself restarts.
+    restart: unless-stopped
 
   data-onchain:
     build:
@@ -125,7 +127,9 @@ services:
     environment:
       DATABASE_URL: *live-db-url
     profiles: [ingestion]
-    restart: on-failure
+    # unless-stopped: feeds the daily market report on an ongoing basis, and
+    # on-failure containers are not brought back when Docker itself restarts.
+    restart: unless-stopped
 
   # Calendars (Finnhub), GPR CSV, GDELT doc tone, RSS macro feeds → macro_* tables + tagged news_headlines.
   data-macro-intel:
@@ -142,7 +146,9 @@ services:
     volumes:
       - ${CORP_CA_PEM_PATH:-/dev/null}:/etc/ssl/extra/corp-ca.pem:ro
     profiles: [ingestion]
-    restart: on-failure
+    # unless-stopped: feeds the daily market report on an ongoing basis, and
+    # on-failure containers are not brought back when Docker itself restarts.
+    restart: unless-stopped
 
   # Eligible US common-stock universe for the momentum scanner (§3.1 / §8.1).
   # Weekly symbol-list refresh + weekly sector/shares/market-cap refresh.
@@ -219,7 +225,9 @@ services:
       # data-equity (ingestion profile) populates macro_fred. FRED data is fetched
       # weekly/monthly so a 60-second startup delay is sufficient.
     profiles: [analyzer]
-    restart: on-failure
+    # unless-stopped: feeds the daily market report on an ongoing basis, and
+    # on-failure containers are not brought back when Docker itself restarts.
+    restart: unless-stopped
 
   market-operations:
     build:
