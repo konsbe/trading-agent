@@ -74,8 +74,13 @@ describe('AppRouter', () => {
         });
     });
 
+    const REMOTE_ROUTES: Record<string, { key: string; component: string; title: string }> = {
+        '/candidates': { key: 'mfe_scanner', component: './Scanner', title: "Today's Candidates" },
+        '/watchlist': { key: 'mfe_watchlist', component: './Watchlist', title: 'Watchlist' },
+    };
+
     it.each(
-        APP_ROUTES.filter(({ path }) => path !== '/candidates').map(({ path, label }) => [path, label])
+        APP_ROUTES.filter(({ path }) => !(path in REMOTE_ROUTES)).map(({ path, label }) => [path, label])
     )(
         'renders the %s placeholder inside the layout and access control',
         (path, label) => {
@@ -88,9 +93,15 @@ describe('AppRouter', () => {
         }
     );
 
-    it.each(['/candidates', '/candidates/NEXR'])(
-        'renders the mfe_scanner remote for %s inside the layout and access control',
-        (path) => {
+    it.each([
+        ['/candidates', '/candidates'],
+        ['/candidates/NEXR', '/candidates'],
+        ['/watchlist', '/watchlist'],
+        ['/watchlist/VGZ', '/watchlist'],
+    ])(
+        'renders the remote for %s inside the layout and access control',
+        (path, base) => {
+            const expected = REMOTE_ROUTES[base];
             renderAt(path);
 
             const accessControl = screen.getByTestId('user-access-control');
@@ -98,10 +109,10 @@ describe('AppRouter', () => {
             expect(screen.getByTestId('layout')).toContainElement(accessControl);
             expect(accessControl).toContainElement(mfePage);
             expect(accessControl).toHaveAttribute('data-roles', '');
-            expect(mfePage).toHaveAttribute('data-mfe-key', 'mfe_scanner');
-            expect(mfePage).toHaveAttribute('data-mfe-component', './Scanner');
-            expect(mfePage).toHaveAttribute('data-navigation-path', '/candidates');
-            expect(mfePage).toHaveTextContent("Today's Candidates");
+            expect(mfePage).toHaveAttribute('data-mfe-key', expected.key);
+            expect(mfePage).toHaveAttribute('data-mfe-component', expected.component);
+            expect(mfePage).toHaveAttribute('data-navigation-path', base);
+            expect(mfePage).toHaveTextContent(expected.title);
         }
     );
 

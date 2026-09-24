@@ -52,7 +52,19 @@ export const routes: RouteObject[] = [
             },
             {
                 path: "watchlist/*",
-                element: <PrivateRouter component={<>Watchlist</>} />,
+                element: (
+                    <PrivateRouter
+                        component={
+                            <SingleMfePage
+                                mfe_key="mfe_watchlist"
+                                mfe_component="./Watchlist"
+                                mfe_header_title="Watchlist"
+                                mfe_navigation_path="/watchlist"
+                                mfe_enable_navigation={false}
+                            />
+                        }
+                    />
+                ),
             },
             {
                 path: "tracked-positions/*",

@@ -30,6 +30,16 @@
       "description": "Today's momentum scanner candidates and score breakdown",
       "roles": [],
       "enabled": true
+    },
+    "mfe_watchlist": {
+      "label": "Watchlist",
+      "version": "1.0.0",
+      "endpoint": "http://localhost:3002/remoteEntry.js",
+      "module": "./Watchlist",
+      "scope": "mfe_watchlist",
+      "description": "Shared watchlist with current price data and symbol search",
+      "roles": [],
+      "enabled": true
     }
   },
   "iframes": {}

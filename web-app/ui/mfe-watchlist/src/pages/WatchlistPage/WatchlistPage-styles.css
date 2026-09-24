@@ -1,0 +1,7 @@
+/* Card chrome (surface, radius, header toggle) comes from the shared CollapsibleCard. */
+
+.watchlist-list__meta {
+    margin: 0;
+    color: var(--color-on-surface-variant);
+    font-size: var(--font-size-xs);
+}

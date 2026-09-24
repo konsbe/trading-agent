@@ -1,0 +1,136 @@
+.watchlist-add {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+    max-width: 40rem;
+}
+
+.watchlist-add__label {
+    color: var(--color-on-surface);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+}
+
+.watchlist-add__field {
+    position: relative;
+}
+
+.watchlist-add__input {
+    box-sizing: border-box;
+    width: 100%;
+    padding: var(--space-sm) var(--space-md);
+    border: 1px solid var(--color-outline);
+    border-radius: var(--radius-md);
+    background: var(--color-surface-container-low);
+    color: var(--color-on-surface);
+    font-family: var(--font-family);
+    font-size: var(--font-size-md);
+    transition: border-color var(--transition-fast);
+}
+
+.watchlist-add__input::placeholder {
+    color: var(--color-on-surface-variant);
+}
+
+.watchlist-add__input:hover {
+    border-color: var(--color-on-surface-variant);
+}
+
+.watchlist-add__input:focus {
+    border-color: var(--color-primary);
+    outline: none;
+}
+
+.watchlist-add__input:focus-visible {
+    outline: 2px solid var(--color-focus-ring);
+    outline-offset: 2px;
+}
+
+/* Menus & popovers sit on the highest container. */
+.watchlist-add__popup {
+    position: absolute;
+    top: calc(100% + var(--space-xs));
+    left: 0;
+    right: 0;
+    z-index: 10;
+    max-height: 18rem;
+    overflow-y: auto;
+    border: 1px solid var(--color-outline-variant);
+    border-radius: var(--radius-md);
+    background: var(--color-surface-container-highest);
+    color: var(--color-on-surface);
+    box-shadow: var(--shadow-lg);
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-outline) transparent;
+}
+
+.watchlist-add__status {
+    margin: 0;
+    padding: var(--space-sm) var(--space-md);
+    color: var(--color-on-surface-variant);
+    font-size: var(--font-size-sm);
+}
+
+.watchlist-add__listbox {
+    margin: 0;
+    padding: var(--space-xs) 0;
+    list-style: none;
+}
+
+.watchlist-add__listbox[hidden] {
+    display: none;
+}
+
+.watchlist-add__option {
+    display: grid;
+    grid-template-columns: minmax(4.5rem, auto) minmax(0, 1fr) auto auto;
+    align-items: baseline;
+    gap: var(--space-sm);
+    padding: var(--space-xs) var(--space-md);
+    font-size: var(--font-size-sm);
+    cursor: pointer;
+}
+
+.watchlist-add__option.is-active {
+    background: color-mix(in srgb, var(--color-surface-container-highest), var(--color-on-surface) 8%);
+    box-shadow: inset 2px 0 0 var(--color-primary);
+}
+
+.watchlist-add__option.is-added {
+    cursor: default;
+    color: var(--color-on-surface-variant);
+}
+
+.watchlist-add__ticker {
+    font-family: var(--font-family-label);
+    font-weight: var(--font-weight-bold);
+}
+
+.watchlist-add__company {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.watchlist-add__exchange,
+.watchlist-add__option-note,
+.watchlist-add__help {
+    color: var(--color-on-surface-variant);
+    font-size: var(--font-size-xs);
+}
+
+.watchlist-add__option-note {
+    font-style: italic;
+    white-space: nowrap;
+}
+
+.watchlist-add__help {
+    margin: 0;
+}
+
+.watchlist-add__notice {
+    margin: 0;
+    color: var(--color-on-surface-variant);
+    font-size: var(--font-size-sm);
+}

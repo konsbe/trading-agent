@@ -1,0 +1,52 @@
+{
+    "name": "mfe-watchlist",
+    "version": "1.0.0",
+    "description": "Watchlist remote MFE (shared watchlist + symbol search)",
+    "private": true,
+    "scripts": {
+        "start": "NODE_OPTIONS='--require ts-node/register' webpack serve --mode development",
+        "start-app": "NODE_OPTIONS='--require ts-node/register' webpack serve --mode production",
+        "start-dev": "NODE_OPTIONS='--require ts-node/register' webpack serve --mode development",
+        "build": "NODE_OPTIONS='--require ts-node/register' webpack --mode production",
+        "typecheck": "tsc --noEmit -p tsconfig.json",
+        "test": "jest",
+        "test:watch": "jest --watch",
+        "test:coverage": "jest --coverage --maxWorkers=50% --passWithNoTests",
+        "test:coverage:ci": "NODE_OPTIONS='--max-old-space-size=1024' jest --coverage --maxWorkers=1 --forceExit --passWithNoTests"
+    },
+    "dependencies": {
+        "@trading-agent/shared-components": "file:../../shared-components",
+        "react": "19.2.7",
+        "react-dom": "19.2.7",
+        "react-router-dom": "^7.16.0"
+    },
+    "devDependencies": {
+        "@babel/core": "^7.29.7",
+        "@babel/preset-env": "^7.29.7",
+        "@babel/preset-react": "^7.29.7",
+        "@babel/preset-typescript": "^7.29.7",
+        "@testing-library/dom": "^10.4.1",
+        "@testing-library/jest-dom": "^6.9.1",
+        "@testing-library/react": "^16.3.2",
+        "@testing-library/user-event": "^14.6.1",
+        "@types/jest": "^30.0.0",
+        "@types/node": "^25.9.1",
+        "@types/react": "^19.2.16",
+        "@types/react-dom": "^19.2.3",
+        "babel-jest": "^30.4.1",
+        "babel-loader": "^10.1.1",
+        "css-loader": "^7.1.4",
+        "html-webpack-plugin": "^5.6.7",
+        "identity-obj-proxy": "^3.0.0",
+        "jest": "^30.4.2",
+        "jest-environment-jsdom": "^30.4.1",
+        "style-loader": "^4.0.0",
+        "ts-jest": "^29.4.11",
+        "ts-node": "^10.9.2",
+        "typescript": "^6.0.3",
+        "url-loader": "^4.1.1",
+        "webpack": "^5.107.2",
+        "webpack-cli": "^7.0.3",
+        "webpack-dev-server": "^5.2.4"
+    }
+}
