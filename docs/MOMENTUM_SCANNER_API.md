@@ -798,3 +798,275 @@ the literal percentages.
   `last_scan_date` to `expected_session`), and `tracker_behind` (bool). Build it
   with the MFE, not before; the UI must not derive staleness from row dates.
 
+
+
+# Momentum Scanner — API Service Spec, Addendum: Backtest Lab
+
+**Extends:** `docs/MOMENTUM_SCANNER_API.md` / `services/data-analyzer/cmd/momentum-api`.
+**Status:** steps 1–3 built 2026-09-24 (`shared/content/backtest_lab_report.json`,
+`GET /api/v1/backtest-lab/report`, tests). Step 4 waits for `mfe-backtest-lab`,
+which does not exist yet and has no UI brief.
+**Serves:** `web-app/ui/mfe-backtest-lab`'s "Backtest Lab" screen.
+
+Read `docs/MOMENTUM_SCANNER_PHASE1.md` §10.1 and
+`docs/MOMENTUM_SCANNER_PHASE2.md` §2.1–§2.4 before implementing. This
+addendum turns those sections' findings into a served, structured report —
+it does not reinterpret them, recompute them, or add new analysis.
+
+---
+
+## 0. What this endpoint is, and is not
+
+**Is:** a read-only presentation layer over **findings that are already
+finished, written down, and closed.** Phase 2 §2.4 states plainly:
+"Status: Phase 2 CLOSED." Nothing in this endpoint runs a query against
+live data, computes a statistic, or can produce a number that hasn't
+already been published in the spec.
+
+**Is not:** a live dashboard, a re-analysis tool, or a path to a "round 2."
+Phase 2 §2.2's stopping rule is explicit: **"No round 2 without a new
+written justification from the user."** This endpoint must not create a
+temptation to quietly restart research by making it easy to re-run
+anything — because it doesn't run anything. It serves a frozen report.
+
+**Why static content, not a live query.** Every number this screen shows
+was computed once, on a specific dataset, under a specific pre-registered
+protocol, and reported. Re-deriving them from `momentum_features` /
+`momentum_labels` on each request would risk two things: (1) a table
+drifting from the spec's published numbers if the underlying data ever
+changes (e.g. more sessions accrue, labels mature further), which would
+silently contradict a report that is supposed to be historical and fixed;
+(2) implying the analysis is "live" and re-checkable, which is precisely
+the framing Phase 2's closure rejects. The report is a **dated artifact**,
+like a published paper, not a live view.
+
+---
+
+## 1. Where it lives
+
+**New endpoint on the existing `momentum-api` service**, not a new binary.
+Same reasoning as the watchlist and tracked-positions additions: this is
+one more read-only route on a service that already exists, already has
+the loopback/auth posture, and already has the pattern for serving
+content from a shared JSON file (`shared/content/momentum_caveats.json`).
+
+**Content source: `shared/content/backtest_lab_report.json`**, checked
+into the repo, read at startup — same mechanism as the caveats file. A
+missing file stops the service, same as a missing caveat.
+
+---
+
+## 2. Endpoint
+
+```
+GET /api/v1/backtest-lab/report
+```
+
+No parameters. Always returns the one, current frozen report.
+
+### 2.1 Response shape
+
+```json
+{
+  "report": {
+    "version": "phase2-final",
+    "status": "closed",
+    "closed_date": "2026-09-22",
+    "headline": "The \"+8-15% momentum entry\" thesis shows no demonstrated edge on daily bars.",
+    "screener_note": "The screener (gate-pass alerts, no score) is what ships. This report explains why it makes no predictive claim."
+  },
+  "entry_gate": {
+    "title": "Phase 2 entry-gate measurement",
+    "rule_committed_before_result": true,
+    "test": "rvol CMH, stratified by bucket x ATR tercile, episode level, gate v2 with us-gaap fallback, lockbox excluded",
+    "result": {
+      "chi_square": 0.00,
+      "p_value": 0.947,
+      "mh_odds_ratio": 0.991,
+      "required": "positive direction AND p < 0.05",
+      "verdict": "FAILS on both"
+    },
+    "route_taken": "feature_research_only",
+    "note": "The pooled, unstratified number was still large (+6.80pp, p<0.001) and still meaningless -- within bucket x ATR cells rvol pointed the wrong way in both high-volatility strata."
+  },
+  "v2_score_finding": {
+    "title": "Why the hand-weighted score (v2) is not a validated ranker",
+    "pooled_result": { "p_value": 0.017, "verdict": "meets the letter of the original criterion" },
+    "stratified_result": {
+      "penny_bucket_p": 0.891,
+      "market_bucket_p": 0.645,
+      "verdict": "separates in NEITHER bucket"
+    },
+    "composition_share_pct": 97,
+    "explanation": "v2's apparent separation was 97% explained by which bucket its top/bottom thirds happened to contain, not by ranking ability within either bucket."
+  },
+  "rvol_stratification_funnel": {
+    "title": "How rvol's apparent effect shrank under stratification",
+    "steps": [
+      { "label": "Crude, unstratified", "excess_odds": 0.529, "odds_ratio": 1.529 },
+      { "label": "Stratified by bucket", "excess_odds": 0.215, "odds_ratio": 1.215, "composition_share_pct": 59 },
+      { "label": "Stratified by bucket x ATR tercile", "excess_odds": 0.192, "odds_ratio": 1.192, "composition_share_pct": 64 },
+      { "label": "On the corrected (gate v2) candidate set", "odds_ratio": 0.991, "verdict": "indistinguishable from no effect" }
+    ]
+  },
+  "research_round_1": {
+    "title": "Research round 1 -- the only round (stopping rule applied)",
+    "hypotheses": [
+      {
+        "id": "a",
+        "label": "Path-aware labels (first-passage) are less volatility-dominated than touch-anytime",
+        "best_effect": { "odds_ratio": 1.195, "ci": [0.986, 1.449] },
+        "verdict": "FAIL",
+        "reason": "Refuted by its own control -- every feature that cleared the bar on the new label cleared it just as well on the old one."
+      },
+      {
+        "id": "b",
+        "label": "A shorter horizon (+20% in 10 sessions) suits a daily-bar signal",
+        "best_effect": { "odds_ratio": 1.616, "ci": [1.389, 1.880] },
+        "verdict": "FAIL",
+        "verdict_note": "Cleared its written bar arithmetically -- NOT counted. The passing feature (atr_pct) was the stratification variable itself, and it scored WORSE on this label than on the original one.",
+        "reason": "A flaw in how the rule was written, discovered by the user, not a real finding."
+      },
+      {
+        "id": "d",
+        "label": "Relative sector strength conditions which movers follow through",
+        "best_effect": { "odds_ratio": 1.014, "ci": [0.830, 1.239] },
+        "verdict": "FAIL",
+        "reason": "Flat. One of the cleanest negative results in the project."
+      },
+      {
+        "id": "e",
+        "label": "Market regime (SPY/IWM/VIX) conditions the base rate",
+        "best_effect": { "odds_ratio": 1.081, "ci": [0.911, 1.283] },
+        "verdict": "FAIL",
+        "reason": "Flat across all three regime inputs tested."
+      }
+    ],
+    "abandoned": [
+      {
+        "id": "c",
+        "label": "Catalyst via Tiingo News",
+        "reason": "Tiingo News is a ~3-month archive against Finnhub's ~12 -- would have reduced coverage, not extended it. Abandoned before the round ran; no substitute hypothesis added."
+      }
+    ]
+  },
+  "sample_size": {
+    "episodes": 7579,
+    "excludes": "the lockbox region and the in-sample pilot window",
+    "lockbox_opened": false
+  },
+  "closing_statement": "Everything that looked like signal across Phases 1 and 2 -- the v2 score, rvol, rvol inside ATR terciles, and atr_pct on three new labels -- reduced to the same thing: volatile and low-priced stocks make large percentage moves more often, and nothing tested here says which ones or when."
+}
+```
+
+### 2.2 Field notes
+
+- **`report.status`** is always `"closed"` in the current build. It exists
+  as a field (rather than being implied) so that *if* a round 2 is ever
+  authorized per Phase 2 §2.2's rule, the report has a place to say so
+  explicitly rather than the UI inferring "closed" from silence.
+- **`entry_gate.rule_committed_before_result: true`** is not decorative —
+  it's the single fact that makes the whole report trustworthy rather than
+  a post-hoc story. Keep it as an explicit field so the UI can foreground
+  it, per §3's design note.
+- **`research_round_1.hypotheses[].verdict_note`** exists only on hypothesis
+  (b), because it's the one case where a bare PASS/FAIL would misrepresent
+  what happened. Don't generalize this field to every hypothesis — most of
+  them have a plain FAIL with no asterisk, and adding a note to all of them
+  would flatten the one that actually needs one.
+- **Transcription corrections (step 1, 2026-09-24).** Every number in §2.1's
+  example matched its source; three pieces of it did not, and the file
+  differs from the example accordingly:
+  - hypothesis (b)'s `reason` said the flaw was "discovered by the user". The
+    source says nobody noticed it when the rule was written (Phase 2 §2.3);
+    what was the user's is the *ruling* not to count it (§2.4). The reason now
+    says that.
+  - `sample_size` (7,579 episodes) is research round 1's sample only. It now
+    carries `applies_to: "research_round_1"`, and the other sections name
+    their own published samples: `entry_gate.sample` (9,407 candidates, 6,936
+    episodes, base rate 9.90% — Phase 2 §2.1), `v2_score_finding.sample` and
+    `rvol_stratification_funnel.sample` (Phase 1 B+C, 6,924 episodes).
+  - the funnel's last step (0.991) is gate v2 **with the us-gaap fallback** —
+    the Phase 2 entry-gate measurement. Without the fallback it was 0.985
+    (Phase 1 §10.1.5b). Its label now says which.
+- **No `momentum_score_100` or any live score appears anywhere in this
+  response.** This report is about whether a scoring approach works in
+  general, not about any specific symbol's current number. Keep those
+  concepts fully separate — a reader should never be able to click from
+  this report into "so what's NVDA's score right now."
+
+---
+
+## 3. Content authoring and integrity
+
+**The JSON file is hand-authored once, from the finalized spec text**, not
+generated by a script. Prose fields (`headline`, `explanation`, `reason`,
+`closing_statement`) are close paraphrases of the actual spec language —
+not new writing. Numeric fields are transcribed exactly from the spec's
+tables.
+
+**A drift test is required, not optional.** Because this content is
+hand-transcribed, add a test that spot-checks a handful of load-bearing
+numbers in `backtest_lab_report.json` against the same numbers hard-coded
+as constants in the test itself, sourced by re-reading the relevant spec
+sections at the time the test is written:
+
+- `entry_gate.result.p_value == 0.947`
+- `entry_gate.result.mh_odds_ratio == 0.991`
+- `v2_score_finding.composition_share_pct == 97`
+- `rvol_stratification_funnel.steps[3].odds_ratio == 0.991`
+
+This is the same discipline as the `EVIDENCE_CAVEAT` byte-exact test —
+not because the JSON is expected to change, but because a silent
+transcription slip in a number this load-bearing is exactly the kind of
+error this project has repeatedly found by testing rather than trusting.
+
+---
+
+## 4. Non-functional requirements
+
+- **Auth, CORS, loopback binding:** identical posture to the rest of
+  `momentum-api` (§3 of the main spec). No new considerations.
+- **Caching:** cache indefinitely (or a long TTL, e.g. 24h) — this content
+  changes only when someone deliberately authors a new report version,
+  never on a schedule. Don't apply the 5-minute TTL used for `/today`;
+  that cadence belongs to daily-changing data, and applying it here would
+  misrepresent how often this actually changes.
+- **No write path.**
+
+---
+
+## 5. Error responses
+
+| Condition | Response |
+|---|---|
+| Content file missing at startup | Service fails to start (same as a missing caveats file) |
+| Request succeeds | Always `200` — there is no "no report available" state once the service is up, since the content is static and checked in |
+
+---
+
+## 6. Testing
+
+- The drift test from §3.
+- A test asserting the response contains no field named or shaped like a
+  live score, symbol-specific data, or anything suggesting the report can
+  be re-run (guards against someone "helpfully" wiring this up to live
+  queries later without reading this doc).
+- A schema test that every `hypotheses[]` entry has a `verdict`, and that
+  `verdict_note` is present only where the spec text actually requires an
+  asterisked reading (currently: only hypothesis `b`).
+
+---
+
+## 7. Build order
+
+| Step | Deliverable |
+|---|---|
+| 1 | Author `shared/content/backtest_lab_report.json` from Phase 1 §10.1 and Phase 2 §2.1-§2.4, verbatim on numbers |
+| 2 | `GET /api/v1/backtest-lab/report` handler, reading the file at startup |
+| 3 | Tests per §6 |
+| 4 | Point `mfe-backtest-lab`'s fetch layer at it |
+
+No live-data verification step is needed here (unlike every other
+addendum) — there is no live data involved. Step 1's own care in
+transcription is the only thing that can go wrong.

@@ -53,6 +53,7 @@ func main() {
 	}
 	addr := env("MOMENTUM_API_ADDR", "127.0.0.1:8090")
 	caveatsPath := env("MOMENTUM_CAVEATS_PATH", "../../shared/content/momentum_caveats.json")
+	reportPath := env("MOMENTUM_BACKTEST_REPORT_PATH", "../../shared/content/backtest_lab_report.json")
 	scanGrace := duration(log, "MOMENTUM_API_SCAN_GRACE", 6*time.Hour)
 	cacheTTL := duration(log, "MOMENTUM_API_CACHE_TTL", maxCacheTTL)
 	if cacheTTL > maxCacheTTL {
@@ -64,6 +65,12 @@ func main() {
 	caveats, err := momentumapi.LoadCaveats(caveatsPath)
 	if err != nil {
 		log.Error("momentum-api: caveats", "err", err)
+		os.Exit(1)
+	}
+	report, err := momentumapi.LoadBacktestReport(reportPath)
+	if err != nil {
+		log.Error("momentum-api: backtest lab report", "err", err,
+			"fix", "set MOMENTUM_BACKTEST_REPORT_PATH to shared/content/backtest_lab_report.json (in Docker, mount ../shared/content)")
 		os.Exit(1)
 	}
 
@@ -84,6 +91,7 @@ func main() {
 	srv := momentumapi.NewServer(momentumapi.Config{
 		Store:             momentumapi.DBStore{Q: pool, PingFn: pool.Ping},
 		Caveats:           caveats,
+		BacktestReport:    report,
 		Log:               log,
 		SessionReadyAfter: scanGrace,
 		CacheTTL:          cacheTTL,

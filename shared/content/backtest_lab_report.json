@@ -1,0 +1,99 @@
+{
+  "report": {
+    "version": "phase2-final",
+    "status": "closed",
+    "closed_date": "2026-09-22",
+    "headline": "The \"+8–15% momentum entry\" thesis shows no demonstrated edge on daily bars.",
+    "screener_note": "The screener (gate-pass alerts, no score) is what ships. This report explains why it makes no predictive claim."
+  },
+  "entry_gate": {
+    "title": "Phase 2 entry-gate measurement",
+    "rule_committed_before_result": true,
+    "test": "rvol CMH, stratified by bucket x ATR tercile, episode level, gate v2 with us-gaap fallback, lockbox excluded",
+    "sample": {
+      "candidates": 9407,
+      "episodes": 6936,
+      "base_rate_pct": 9.90,
+      "excludes": "the lockbox region and population A (in-sample pilot)"
+    },
+    "result": {
+      "chi_square": 0.00,
+      "p_value": 0.947,
+      "mh_odds_ratio": 0.991,
+      "required": "positive direction AND p < 0.05",
+      "verdict": "FAILS on both"
+    },
+    "route_taken": "feature_research_only",
+    "note": "The pooled, unstratified number was still large (+6.80pp, p < 0.001) and still meaningless — within bucket x ATR cells rvol pointed the wrong way in both high-volatility strata."
+  },
+  "v2_score_finding": {
+    "title": "Why the hand-weighted score (v2) is not a validated ranker",
+    "sample": "Phase 1 out-of-sample population B+C, 6,924 episodes, lockbox excluded",
+    "pooled_result": { "p_value": 0.017, "verdict": "meets the letter of the original criterion" },
+    "stratified_result": {
+      "penny_bucket_p": 0.891,
+      "market_bucket_p": 0.645,
+      "verdict": "separates in NEITHER bucket"
+    },
+    "composition_share_pct": 97,
+    "explanation": "v2's apparent separation was 97% explained by which bucket its top/bottom thirds happened to contain, not by ranking ability within either bucket."
+  },
+  "rvol_stratification_funnel": {
+    "title": "How rvol's apparent effect shrank under stratification",
+    "sample": "The first three steps: Phase 1 out-of-sample population B+C, 6,924 episodes, gate v1. The last step: the Phase 2 entry-gate measurement above (gate v2 with the us-gaap fallback, 6,936 episodes).",
+    "steps": [
+      { "label": "Crude, unstratified", "excess_odds": 0.529, "odds_ratio": 1.529 },
+      { "label": "Stratified by bucket", "excess_odds": 0.215, "odds_ratio": 1.215, "composition_share_pct": 59 },
+      { "label": "Stratified by bucket x ATR tercile", "excess_odds": 0.192, "odds_ratio": 1.192, "composition_share_pct": 64 },
+      { "label": "Bucket x ATR tercile, on the corrected candidate set (gate v2 with us-gaap fallback)", "odds_ratio": 0.991, "verdict": "indistinguishable from no effect" }
+    ]
+  },
+  "research_round_1": {
+    "title": "Research round 1 — the only round (stopping rule applied)",
+    "hypotheses": [
+      {
+        "id": "a",
+        "label": "Path-aware labels (first-passage) are less volatility-dominated than touch-anytime",
+        "best_effect": { "odds_ratio": 1.195, "ci": [0.986, 1.449] },
+        "verdict": "FAIL",
+        "reason": "Refuted by its own control — every feature that cleared the bar on the new label cleared it just as well on the old one."
+      },
+      {
+        "id": "b",
+        "label": "A shorter horizon (+20% in 10 sessions) suits a daily-bar signal",
+        "best_effect": { "odds_ratio": 1.616, "ci": [1.389, 1.880] },
+        "verdict": "FAIL",
+        "verdict_note": "Cleared its written bar arithmetically — NOT counted. The passing feature (atr_pct) was the stratification variable itself, and it scored WORSE on this label than on the original one.",
+        "reason": "A flaw in how the rule was written (its feature set contains the stratifier), not a real finding. Not counting it was the user's ruling, made after seeing the table and the control."
+      },
+      {
+        "id": "d",
+        "label": "Relative sector strength conditions which movers follow through",
+        "best_effect": { "odds_ratio": 1.014, "ci": [0.830, 1.239] },
+        "verdict": "FAIL",
+        "reason": "Flat. One of the cleanest negative results in the project."
+      },
+      {
+        "id": "e",
+        "label": "Market regime (SPY/IWM/VIX) conditions the base rate",
+        "best_effect": { "odds_ratio": 1.081, "ci": [0.911, 1.283] },
+        "verdict": "FAIL",
+        "reason": "Flat across all three regime inputs tested."
+      }
+    ],
+    "abandoned": [
+      {
+        "id": "c",
+        "label": "Catalyst via Tiingo News",
+        "reason": "Tiingo News is a ~3-month archive against Finnhub's ~12 — would have reduced coverage, not extended it. Abandoned before the round ran; no substitute hypothesis added."
+      }
+    ]
+  },
+  "sample_size": {
+    "applies_to": "research_round_1",
+    "episodes": 7579,
+    "excludes": "the lockbox region and the in-sample pilot window",
+    "lockbox_opened": false
+  },
+  "closing_statement": "Everything that looked like signal across Phases 1 and 2 — the v2 score, rvol, rvol inside ATR terciles, and atr_pct on three new labels — reduced to the same thing: volatile and low-priced stocks make large percentage moves more often, and nothing tested here says which ones or when."
+}

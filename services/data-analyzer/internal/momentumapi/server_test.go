@@ -194,6 +194,7 @@ func newTestServer(t *testing.T, st Store, now time.Time) *Server {
 	return NewServer(Config{
 		Store:             st,
 		Caveats:           loadSharedCaveats(t),
+		BacktestReport:    loadSharedReport(t),
 		Log:               slog.New(slog.NewTextHandler(io.Discard, nil)),
 		SessionReadyAfter: 6 * time.Hour,
 		CacheTTL:          5 * time.Minute,

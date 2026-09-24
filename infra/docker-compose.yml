@@ -276,6 +276,7 @@ services:
       # Listens on all interfaces INSIDE the container; the host port is loopback-only.
       MOMENTUM_API_ADDR: 0.0.0.0:8090
       MOMENTUM_CAVEATS_PATH: /shared/content/momentum_caveats.json
+      MOMENTUM_BACKTEST_REPORT_PATH: /shared/content/backtest_lab_report.json
     volumes:
       - ../shared/content:/shared/content:ro
     ports:
