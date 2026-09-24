@@ -9,6 +9,10 @@
     color: var(--color-on-surface-variant);
 }
 
+.scanner-detail__no-data-text {
+    margin: 0 0 var(--space-xs);
+}
+
 .scanner-detail__footer-nav {
     display: flex;
     justify-content: center;

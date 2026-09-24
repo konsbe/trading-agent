@@ -20,10 +20,16 @@ import './FactsMatrix-styles.css';
 
 const shares = (value: number | null) => (value === null ? EMPTY_VALUE : `${formatCompact(value, 1)} shares`);
 
+/** A never-checked catalyst (null tier, no headline) is "—", with why as the sub line. */
+const catalystCell = (facts: FactsMatrixProps['facts']): Pick<FactCell, 'value' | 'sub'> =>
+    facts.catalyst_tier === null && !facts.catalyst_headline
+        ? { value: EMPTY_VALUE, sub: catalystText(facts) }
+        : { value: catalystText(facts) };
+
 export const buildFacts = (facts: FactsMatrixProps['facts']): FactCell[] => {
     const direction = priceDirection(facts);
     return [
-        { key: 'close', label: 'Last close', value: formatPrice(facts.close), sub: facts.prior_close !== null ? `Prior close ${formatPrice(facts.prior_close)}` : undefined },
+        { key: 'close', label: 'Last close', value: formatPrice(facts.close), sub: `Prior close ${formatPrice(facts.prior_close)}` },
         {
             key: 'change',
             label: 'Day change',
@@ -44,11 +50,11 @@ export const buildFacts = (facts: FactsMatrixProps['facts']): FactCell[] => {
             key: 'vwap',
             label: 'VWAP distance',
             value: vwapDistanceText(facts),
-            sub: facts.vwap_20 !== null ? `20-day VWAP ${formatPrice(facts.vwap_20)}` : undefined,
+            sub: `20-day VWAP ${formatPrice(facts.vwap_20)}`,
         },
         { key: 'atr', label: 'ATR %', value: formatPercent(facts.atr_pct, 1) },
         { key: 'market_cap', label: 'Market cap', value: marketCapText(facts) },
-        { key: 'catalyst', label: 'Identified catalyst', value: catalystText(facts), wide: true, plain: true },
+        { key: 'catalyst', label: 'Identified catalyst', ...catalystCell(facts), wide: true, plain: true },
     ];
 };
 

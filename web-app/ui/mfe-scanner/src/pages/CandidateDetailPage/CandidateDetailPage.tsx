@@ -3,6 +3,8 @@ import { Skeleton } from '@trading-agent/shared-components';
 import ApiErrorState from '@/components/ApiErrorState';
 import PageLayout from '@/components/PageLayout';
 import StatusNotice from '@/components/StatusNotice';
+import { formatTradingDay } from '@/common/format/format';
+import CandidacyNotice from '@/features/CandidateDetail/components/CandidacyNotice';
 import { DetailMeta, DetailTitle } from '@/features/CandidateDetail/components/DetailHeader';
 import EvidenceNote from '@/features/CandidateDetail/components/EvidenceNote';
 import FactsMatrix from '@/features/CandidateDetail/components/FactsMatrix';
@@ -25,6 +27,8 @@ const DetailSkeleton = ({ symbol }: { symbol: string }) => (
 /**
  * Per-symbol view, in the Stitch "Stock Detail & Score Breakdown" order:
  * gates, evidence note, facts matrix, price chart, score breakdown, watchlist.
+ * Serves any symbol with a stored row, from its own newest row (`as_of`), so
+ * dates come from the payload, never "today"; a non-candidate gets a note.
  */
 const CandidateDetailPage = () => {
     const { symbol: routeSymbol = '' } = useParams<{ symbol: string }>();
@@ -44,9 +48,10 @@ const CandidateDetailPage = () => {
             {isLoading && !data && <DetailSkeleton symbol={symbol} />}
 
             {error?.code === 'no_data_for_symbol' && (
-                <StatusNotice title={`No data for ${symbol} in the latest scan.`} data-testid="no-data-state">
+                <StatusNotice title={`No scanner data for ${symbol}`} data-testid="no-data-state">
+                    <p className="scanner-detail__no-data-text">The scanner has never stored a row for this symbol.</p>
                     <Link className="scanner-link" to="..">
-                        Back to today&apos;s candidates
+                        Back to candidates
                     </Link>
                 </StatusNotice>
             )}
@@ -55,6 +60,7 @@ const CandidateDetailPage = () => {
 
             {data && (
                 <>
+                    <CandidacyNotice data={data} />
                     <GatesPanel gates={data.gates} passed={data.gates_passed} asOf={data.as_of} />
                     <EvidenceNote note={data.evidence_note} />
                     <FactsMatrix facts={data.facts} />
@@ -63,7 +69,7 @@ const CandidateDetailPage = () => {
                         <ScoreBreakdown score={data.score} facts={data.facts} />
                     ) : (
                         <p className="scanner-card scanner-detail__no-score" data-testid="no-score">
-                            No score — {symbol} did not pass the gates on {data.as_of}.
+                            No score — {symbol} did not pass the gates on {formatTradingDay(data.as_of, 'none')}.
                         </p>
                     )}
                     <WatchlistButton symbol={data.symbol} />

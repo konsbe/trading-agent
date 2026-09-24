@@ -1,5 +1,5 @@
 import { parsePriceBars, parseScannerSymbol, parseScannerToday, parseWatchlist } from './parsers';
-import { makePriceBars, makeSymbolResponse, makeTodayResponse, makeWatchlist } from '@/test-utils/fixtures';
+import { makeCatlResponse, makePriceBars, makeSymbolResponse, makeTodayResponse, makeWatchlist } from '@/test-utils/fixtures';
 
 const clone = <T,>(value: T): any => JSON.parse(JSON.stringify(value));
 
@@ -95,6 +95,9 @@ describe('parseScannerSymbol', () => {
         ['missing weight', (b: any) => delete b.score.weights.rvol],
         ['non-boolean penalty applied', (b: any) => { b.score.penalty_rules[0].applied = 1; }],
         ['penalty rules not an array', (b: any) => { b.score.penalty_rules = {}; }],
+        ['missing is_stale', (b: any) => delete b.is_stale],
+        ['non-boolean is_candidate_today', (b: any) => { b.is_candidate_today = 'false'; }],
+        ['null latest_scan_date', (b: any) => { b.latest_scan_date = null; }],
     ])('rejects %s', (_label, mutate) => {
         const body = clone(makeSymbolResponse());
         mutate(body);
@@ -104,6 +107,18 @@ describe('parseScannerSymbol', () => {
     it('accepts a gate-failed symbol with null bucket and null score', () => {
         const body = makeSymbolResponse({ bucket: null, gates_passed: false, gate_failures: ['price_floor'], score: null });
         expect(parseScannerSymbol(clone(body))).toEqual(body);
+    });
+
+    it('accepts the live CATL shape: stale/candidacy fields, null bucket, 18 null facts, null gate values, no score', () => {
+        const body = makeCatlResponse();
+        const parsed = parseScannerSymbol(clone(body));
+        expect(parsed).toEqual(body);
+        expect(parsed).toMatchObject({ is_stale: false, latest_scan_date: '2026-09-23', is_candidate_today: false, bucket: null });
+    });
+
+    it('keeps an older as_of with is_stale for a symbol the latest scan skipped', () => {
+        const body = makeSymbolResponse({ as_of: '2026-09-21', latest_scan_date: '2026-09-23', is_stale: true, is_candidate_today: false });
+        expect(parseScannerSymbol(clone(body))).toMatchObject({ as_of: '2026-09-21', latest_scan_date: '2026-09-23', is_stale: true });
     });
 
     it('rejects a malformed score', () => {

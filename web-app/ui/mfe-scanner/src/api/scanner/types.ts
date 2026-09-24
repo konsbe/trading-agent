@@ -153,9 +153,16 @@ export interface ScannerSymbolResponse {
     symbol: string;
     exchange: string | null;
     company_name: string | null;
-    /** Null for gate-failed symbols. */
+    /** Null for gate-failed symbols and for prices no bucket covers. */
     bucket: Bucket | null;
+    /** Date (`YYYY-MM-DD`) of this symbol's own newest row; may be older than `latest_scan_date`. */
     as_of: string;
+    /** Same rule as `scan.is_stale`, applied to `as_of`. */
+    is_stale: boolean;
+    /** Date (`YYYY-MM-DD`) of the newest scan. */
+    latest_scan_date: string;
+    /** Passed the gates in the latest scan; passing on an older date does not count. */
+    is_candidate_today: boolean;
     gates_passed: boolean;
     gate_failures: string[];
     gates: GatesSummary;

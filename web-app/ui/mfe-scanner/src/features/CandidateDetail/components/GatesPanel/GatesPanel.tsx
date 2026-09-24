@@ -13,9 +13,8 @@ import './GatesPanel-styles.css';
  */
 const GatesPanel = ({ gates, passed, asOf }: GatesPanelProps) => {
     const failedCount = gates.total - gates.passed_count;
-    const title = passed
-        ? `Passed the gates (${formatTradingDay(asOf, 'none')} close)`
-        : `Failed ${failedCount} of ${gates.total} gates`;
+    const session = `${formatTradingDay(asOf, 'none')} close`;
+    const title = passed ? `Passed the gates (${session})` : `Failed ${failedCount} of ${gates.total} gates (${session})`;
 
     return (
         <CollapsibleCard

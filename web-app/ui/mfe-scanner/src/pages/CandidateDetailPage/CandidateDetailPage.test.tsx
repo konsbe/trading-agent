@@ -6,7 +6,7 @@ import usePriceBars from '@/hooks/scanner/usePriceBars';
 import useScannerSymbol from '@/hooks/scanner/useScannerSymbol';
 import useWatchlist from '@/hooks/watchlist/useWatchlist';
 import { HostModeProvider } from '@/providers/HostModeContext';
-import { makePriceBars, makeSymbolResponse } from '@/test-utils/fixtures';
+import { makeCatlResponse, makePriceBars, makeSymbolResponse } from '@/test-utils/fixtures';
 import CandidateDetailPage from './CandidateDetailPage';
 
 jest.mock('@/hooks/scanner/useScannerSymbol', () => ({ __esModule: true, default: jest.fn() }));
@@ -104,7 +104,7 @@ describe('CandidateDetailPage', () => {
             expect(screen.getByTestId('fact-change-value')).toHaveTextContent('+$0.48 (+21.2%)');
             expect(screen.getByTestId('fact-change-value')).toHaveClass('is-price-up');
             expect(screen.getByTestId('fact-high_52w')).toHaveTextContent('−12.5% from peak');
-            expect(screen.getByTestId('fact-catalyst-value')).toHaveTextContent('Not checked');
+            expect(screen.getByTestId('fact-catalyst')).toHaveTextContent('Not checked');
         });
 
         it('shows the chart for the symbol, the score breakdown and the watchlist button', () => {
@@ -189,7 +189,7 @@ describe('CandidateDetailPage', () => {
             mockHook({ data });
             renderAt();
 
-            expect(within(screen.getByTestId('gates-panel')).getByRole('button', { name: 'Failed 1 of 6 gates' })).toHaveAttribute('aria-expanded', 'true');
+            expect(within(screen.getByTestId('gates-panel')).getByRole('button', { name: 'Failed 1 of 6 gates (Sep 21, 2026 close)' })).toHaveAttribute('aria-expanded', 'true');
         });
 
         it('remembers a collapsed widget on the next symbol within the session', async () => {
@@ -213,13 +213,124 @@ describe('CandidateDetailPage', () => {
         mockHook({ data });
         renderAt();
 
-        expect(screen.getByTestId('gates-status')).toHaveTextContent('Failed 1 of 6 gates');
+        expect(screen.getByTestId('gates-status')).toHaveTextContent('Failed 1 of 6 gates (Sep 21, 2026 close)');
         expect(screen.getByTestId('gate-rvol_20')).toHaveTextContent('RVOL below minimum');
-        expect(screen.getByTestId('no-score')).toHaveTextContent('No score — VGZ did not pass the gates on 2026-09-21.');
+        expect(screen.getByTestId('no-score')).toHaveTextContent('No score — VGZ did not pass the gates on Sep 21, 2026.');
         expect(screen.queryByTestId('score-breakdown')).not.toBeInTheDocument();
         expect(screen.getByTestId('facts-matrix')).toBeInTheDocument();
         expect(screen.getByTestId('price-chart')).toBeInTheDocument();
-        expect(screen.getByTestId('symbol-meta')).not.toHaveTextContent('Market');
+        expect(screen.getByTestId('bucket')).toHaveTextContent(/^Bucket —$/);
+    });
+
+    describe('a non-candidate with thin data (live CATL shape, null bucket)', () => {
+        /** Visible text outside <code> (failure codes such as `rvol_20_null` are shown verbatim on purpose). */
+        const visibleText = () => {
+            const page = screen.getByTestId('scanner-page').cloneNode(true) as HTMLElement;
+            page.querySelectorAll('code').forEach(code => code.remove());
+            return page.textContent ?? '';
+        };
+
+        beforeEach(() => {
+            usePriceBarsMock.mockReturnValue({ data: makePriceBars({ bars: [] }), error: null, isLoading: false, reload: jest.fn() });
+            mockHook({ data: makeCatlResponse() });
+            renderAt('/candidates/CATL');
+        });
+
+        it('leaks no 0, NaN, undefined, null, "No" or empty value anywhere on the page', () => {
+            expect(visibleText()).not.toMatch(/NaN|undefined|null|Infinity|\bNo\b(?! score| price history)|0\.00×|\$0(?![.\d])|(^|\s)0%|\bpts\b/);
+            screen.getAllByTestId(/^fact-[a-z_0-9]+-value$/).forEach(cell => {
+                expect(cell.textContent).not.toBe('');
+                expect(cell.textContent).not.toMatch(/^(0|0%|\$0|0\.00×|No)$/);
+            });
+        });
+
+        it('renders each null fact as "—"', () => {
+            ['avg_volume', 'rvol', 'float', 'rsi', 'high_52w', 'breakout', 'vwap', 'atr', 'market_cap', 'catalyst'].forEach(key =>
+                expect(screen.getByTestId(`fact-${key}-value`)).toHaveTextContent(/^—$/)
+            );
+            expect(screen.getByTestId('fact-vwap')).toHaveTextContent('20-day VWAP —');
+            expect(screen.getByTestId('fact-close-value')).toHaveTextContent('$9.85');
+            expect(screen.getByTestId('fact-volume-value')).toHaveTextContent('7.8K shares');
+        });
+
+        it('shows "—" for null gate values and keeps the thresholds', () => {
+            expect(screen.getByTestId('gate-history')).toHaveTextContent('History — ≥ 252 bars');
+            expect(screen.getByTestId('gate-rvol_20')).toHaveTextContent('RVOL — ≥ 3.0×');
+            expect(screen.getByTestId('gate-market_cap')).toHaveTextContent('Market cap — within $300M–$10B');
+            expect(screen.getByTestId('gate-rvol_20')).toHaveTextContent('RVOL not available');
+            expect(screen.getByTestId('gates-status')).toHaveTextContent('Failed 5 of 6 gates (Sep 23, 2026 close)');
+        });
+
+        it('renders the null bucket as "—" and shows the no-score state instead of zero-point rows', () => {
+            expect(screen.getByTestId('bucket')).toHaveTextContent(/^Bucket —$/);
+            expect(screen.getByTestId('no-score')).toHaveTextContent('No score — CATL did not pass the gates on Sep 23, 2026.');
+            expect(screen.queryByTestId('score-breakdown')).not.toBeInTheDocument();
+            expect(screen.queryByTestId('sub-scores')).not.toBeInTheDocument();
+            expect(screen.queryByTestId('penalties')).not.toBeInTheDocument();
+        });
+
+        it("labels it as not in today's candidates because it failed today's gates, neutrally", () => {
+            const notice = screen.getByTestId('candidacy-notice');
+            expect(notice).toHaveTextContent("Not in today's candidates — Didn't pass today's gates");
+            expect(notice).toHaveAttribute('role', 'note');
+            expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+        });
+
+        it('shows the chart empty state when there are no bars', () => {
+            expect(screen.getByTestId('price-chart-empty')).toHaveTextContent('No price history for CATL in this range.');
+        });
+    });
+
+    it('renders a null exchange and company as "—"', () => {
+        mockHook({ data: makeCatlResponse({ exchange: null, company_name: null }) });
+        renderAt('/candidates/CATL');
+
+        expect(screen.getByTestId('exchange-badge')).toHaveTextContent(/^—$/);
+        expect(screen.getByTestId('company-name')).toHaveTextContent(/^—$/);
+    });
+
+    describe('a stale symbol (newest row older than the latest scan, like BRR)', () => {
+        const stale = () =>
+            makeSymbolResponse({
+                symbol: 'BRR',
+                as_of: '2026-09-21',
+                latest_scan_date: '2026-09-23',
+                is_stale: true,
+                is_candidate_today: false,
+                gates_passed: false,
+                score: null,
+            });
+
+        it('names both dates and dates every heading with as_of, never claiming today', () => {
+            const data = stale();
+            data.gates = { ...data.gates, passed_count: 4 };
+            mockHook({ data });
+            renderAt('/candidates/BRR');
+
+            expect(screen.getByTestId('candidacy-notice')).toHaveTextContent(
+                "Not in today's candidates — Latest data is from Sep 21, 2026: no newer daily bar has arrived for this symbol, so the Sep 23, 2026 scan has nothing newer to show."
+            );
+            expect(screen.getByTestId('as-of')).toHaveTextContent('as of Sep 21, 2026');
+            expect(screen.getByTestId('gates-status')).toHaveTextContent('Failed 2 of 6 gates (Sep 21, 2026 close)');
+            expect(screen.getByTestId('no-score')).toHaveTextContent('Sep 21, 2026');
+            const outsideNotice = screen.getByTestId('scanner-page').textContent!.replace(screen.getByTestId('candidacy-notice').textContent!, '');
+            expect(outsideNotice).not.toMatch(/today/i);
+            expect(outsideNotice).not.toMatch(/Sep 23, 2026 close|as of Sep 23/);
+        });
+
+        it('does not call an older pass a candidate today', () => {
+            mockHook({ data: { ...stale(), gates_passed: true, score: makeSymbolResponse().score } });
+            renderAt('/candidates/BRR');
+
+            expect(screen.getByTestId('gates-status')).toHaveTextContent('Passed the gates (Sep 21, 2026 close)');
+            expect(screen.getByTestId('candidacy-notice')).toHaveTextContent('Latest data is from Sep 21, 2026');
+        });
+    });
+
+    it('shows no candidacy notice for a candidate today', () => {
+        mockHook({ data: makeSymbolResponse() });
+        renderAt();
+        expect(screen.queryByTestId('candidacy-notice')).not.toBeInTheDocument();
     });
 
     it('shows "no data" for a 404 with a way back and no retry', async () => {
@@ -227,11 +338,11 @@ describe('CandidateDetailPage', () => {
         renderAt('/candidates/zzzz');
 
         const notice = screen.getByTestId('no-data-state');
-        expect(notice).toHaveTextContent('No data for ZZZZ in the latest scan.');
+        expect(notice).toHaveTextContent('No scanner data for ZZZZ');
         expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
         expect(screen.queryByTestId('price-chart')).not.toBeInTheDocument();
 
-        await userEvent.click(within(notice).getByRole('link', { name: "Back to today's candidates" }));
+        await userEvent.click(within(notice).getByRole('link', { name: 'Back to candidates' }));
         expect(screen.getByTestId('location')).toHaveTextContent(/^\/candidates$/);
     });
 

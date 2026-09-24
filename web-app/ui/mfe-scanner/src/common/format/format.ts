@@ -90,11 +90,11 @@ export const marketCapIsEstimate = (fields: MarketCapFields): boolean =>
 export const marketCapText = (fields: MarketCapFields): string =>
     withEst(formatUsdShort(marketCapValue(fields)), marketCapIsEstimate(fields));
 
-/** 0.48 → "+$0.48", -0.48 → "-$0.48". */
-export const formatSignedUsd = (value: number | null | undefined): string => {
+/** 0.48 → "+$0.48", -0.48 → "-$0.48"; pass 4 digits for sub-dollar names (-0.0048 → "-$0.0048"). */
+export const formatSignedUsd = (value: number | null | undefined, fractionDigits = 2): string => {
     if (!isNum(value)) return EMPTY_VALUE;
     const sign = value > 0 ? '+' : value < 0 ? '-' : '';
-    return `${sign}$${formatNumber(Math.abs(value), 2)}`;
+    return `${sign}$${formatNumber(Math.abs(value), fractionDigits)}`;
 };
 
 export const formatPercent = (value: number | null | undefined, fractionDigits = 1): string =>

@@ -76,6 +76,9 @@ export const makeSymbolResponse = (overrides: Partial<ScannerSymbolResponse> = {
     company_name: 'VISTA GOLD CORP',
     bucket: 'market',
     as_of: '2026-09-21',
+    is_stale: false,
+    latest_scan_date: '2026-09-21',
+    is_candidate_today: true,
     gates_passed: true,
     gate_failures: [],
     gates: {
@@ -111,6 +114,84 @@ export const makeSymbolResponse = (overrides: Partial<ScannerSymbolResponse> = {
         null_inputs: ['catalyst_tier'],
         caveat: '🔬 Research score — NOT VALIDATED. Retained as a Phase 2 baseline.',
     },
+    ...overrides,
+});
+
+/** Every nullable fact null (what a thin row can look like). */
+export const makeNullFacts = (overrides: Partial<SymbolFacts> = {}): SymbolFacts => ({
+    close: null,
+    prior_close: null,
+    change_pct: null,
+    change_abs: null,
+    gap_pct: null,
+    volume: null,
+    avg_volume_20: null,
+    dollar_volume: null,
+    rvol_20: null,
+    vol_accel: null,
+    atr_pct: null,
+    rsi_14: null,
+    high_52w: null,
+    pct_of_52w_high: null,
+    resistance_20: null,
+    breakout_state: null,
+    was_consolidating: null,
+    vwap_20: null,
+    above_vwap: null,
+    vwap_dist_pct: null,
+    float_shares_est: null,
+    float_is_proxy: null,
+    market_cap: null,
+    market_cap_est: null,
+    market_cap_is_proxy: null,
+    catalyst_tier: null,
+    catalyst_headline: null,
+    computed_at: null,
+    ...overrides,
+});
+
+/**
+ * Live CATL (2026-09-23 scan): in today's scan, failed 5 gates, no score, 18
+ * null facts, null gate values. `bucket` is null here to cover ADBT-like rows too.
+ */
+export const makeCatlResponse = (overrides: Partial<ScannerSymbolResponse> = {}): ScannerSymbolResponse => ({
+    symbol: 'CATL',
+    exchange: 'NASDAQ',
+    company_name: 'CATALYST ACQUISITION-CL A',
+    bucket: null,
+    as_of: '2026-09-23',
+    is_stale: false,
+    latest_scan_date: '2026-09-23',
+    is_candidate_today: false,
+    gates_passed: false,
+    gate_failures: ['change_pct_below_min', 'dollar_volume_below_min', 'insufficient_history', 'market_cap_unavailable', 'rvol_20_null'],
+    gates: {
+        passed_count: 1,
+        total: 6,
+        checks: [
+            { key: 'price', label: 'Price within bucket range', passed: true, failures: [], value: 9.85, min: 2, max: null, value_is_proxy: false },
+            { key: 'history', label: 'Enough price history', passed: false, failures: ['insufficient_history'], value: null, min: 252, max: null, value_is_proxy: false },
+            { key: 'change_pct', label: 'Day change within range', passed: false, failures: ['change_pct_below_min'], value: 0.20345879959307034, min: 8, max: 25, value_is_proxy: false },
+            { key: 'rvol_20', label: 'Relative volume (20-day)', passed: false, failures: ['rvol_20_null'], value: null, min: 3, max: null, value_is_proxy: false },
+            { key: 'dollar_volume', label: 'Dollar volume (liquidity)', passed: false, failures: ['dollar_volume_below_min'], value: 76682.25, min: 5000000, max: null, value_is_proxy: false },
+            { key: 'market_cap', label: 'Market cap within bucket range', passed: false, failures: ['market_cap_unavailable'], value: null, min: 300000000, max: 10000000000, value_is_proxy: false },
+        ],
+        unmapped_failures: [],
+    },
+    facts: makeNullFacts({
+        close: 9.85,
+        prior_close: 9.83,
+        change_pct: 0.20345879959307034,
+        change_abs: 0.019999999999999574,
+        gap_pct: 0.02848423194303784,
+        volume: 7785,
+        dollar_volume: 76682.25,
+        float_is_proxy: false,
+        market_cap_is_proxy: false,
+        computed_at: '2026-09-24T11:35:56Z',
+    }),
+    evidence_note: '⚠️ SCREENER, not a forecast.',
+    score: null,
     ...overrides,
 });
 

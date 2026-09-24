@@ -45,12 +45,13 @@ const GATE_FORMATS: Record<string, GateFormat> = {
 
 /**
  * Value against its threshold in plain language: "RVOL 6.45× ≥ 3.0×",
- * "Day change +21.2% within 8–25%", "History ≥ 252 bars" (no stored value).
+ * "Day change +21.2% within 8–25%", "History — ≥ 252 bars" (no stored value).
+ * A null threshold is unbounded and is left out.
  */
 export const gateLine = (check: GateCheck): string => {
     const format = GATE_FORMATS[check.key] ?? { name: check.label, value: formatPlain, bound: formatPlain };
     const parts = [format.name];
-    if (isNum(check.value)) parts.push(format.value(check.value) + (check.value_is_proxy ? ' (est.)' : ''));
+    parts.push(isNum(check.value) ? format.value(check.value) + (check.value_is_proxy ? ' (est.)' : '') : EMPTY_VALUE);
     if (isNum(check.min) && isNum(check.max)) {
         parts.push(`within ${format.range ? format.range(check.min, check.max) : `${format.bound(check.min)}–${format.bound(check.max)}`}`);
     } else if (isNum(check.min)) {
@@ -82,7 +83,9 @@ export const priceDirection = (facts: SymbolFacts): PriceDirection | null => {
 };
 
 export const dayChangeText = (facts: SymbolFacts): string => {
-    const abs = isNum(facts.change_abs) ? formatSignedUsd(facts.change_abs) : null;
+    // Same precision as the close (formatPrice): a sub-dollar move would otherwise round to "$0.00".
+    const digits = isNum(facts.close) && Math.abs(facts.close) < 1 ? 4 : 2;
+    const abs = isNum(facts.change_abs) ? formatSignedUsd(facts.change_abs, digits) : null;
     const pct = isNum(facts.change_pct) ? formatSignedPercent(facts.change_pct) : null;
     if (abs && pct) return `${abs} (${pct})`;
     return abs ?? pct ?? EMPTY_VALUE;

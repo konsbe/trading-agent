@@ -1,7 +1,7 @@
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import { render, screen } from '@testing-library/react';
-import { makeFacts } from '@/test-utils/fixtures';
+import { makeFacts, makeNullFacts } from '@/test-utils/fixtures';
 import FactsMatrix from './FactsMatrix';
 
 const value = (key: string) => screen.getByTestId(`fact-${key}-value`);
@@ -26,7 +26,8 @@ describe('FactsMatrix', () => {
         expect(value('vwap')).toHaveTextContent('15.9% above');
         expect(value('atr')).toHaveTextContent('5.2%');
         expect(value('market_cap')).toHaveTextContent(/^\$390M$/);
-        expect(value('catalyst')).toHaveTextContent('Not checked — catalyst data not yet ingested');
+        expect(value('catalyst')).toHaveTextContent(/^—$/);
+        expect(screen.getByTestId('fact-catalyst')).toHaveTextContent('Not checked — catalyst data not yet ingested');
         expect(screen.queryByText(/spread/i)).not.toBeInTheDocument();
     });
 
@@ -48,6 +49,26 @@ describe('FactsMatrix', () => {
         expect(css).toMatch(/\.is-price-up\s*\{\s*color:\s*var\(--color-price-up\)/);
         expect(css).toMatch(/\.is-price-down\s*\{\s*color:\s*var\(--color-price-down\)/);
         expect(css).not.toMatch(/#[0-9a-f]{3,6}\b/i);
+    });
+
+    it('renders every fact as "—" when all facts are null: no 0, NaN, "No", empty value or tone', () => {
+        render(<FactsMatrix facts={makeNullFacts()} />);
+
+        const cells = screen.getAllByTestId(/^fact-[a-z_0-9]+-value$/);
+        expect(cells).toHaveLength(15);
+        cells.forEach(cell => expect(cell).toHaveTextContent(/^—$/));
+        expect(screen.getByTestId('fact-close')).toHaveTextContent('Prior close —');
+        expect(screen.getByTestId('fact-vwap')).toHaveTextContent('20-day VWAP —');
+        expect(screen.getByTestId('fact-catalyst')).toHaveTextContent('Not checked — catalyst data not yet ingested');
+        expect(document.querySelectorAll('.is-price-up, .is-price-down')).toHaveLength(0);
+        expect(screen.getByTestId('facts-matrix').textContent).not.toMatch(/NaN|undefined|null|Infinity|\bNo\b|\(est\.\)|0\.00×|\$0(?![.\d])|(^|\s)0%/);
+        expect(screen.queryByText(/computed/)).not.toBeInTheDocument();
+    });
+
+    it('does not mark a null float or market cap as an estimate even when the proxy flag is set', () => {
+        render(<FactsMatrix facts={makeNullFacts({ float_is_proxy: true, market_cap_is_proxy: true })} />);
+        expect(value('float')).toHaveTextContent(/^—$/);
+        expect(value('market_cap')).toHaveTextContent(/^—$/);
     });
 
     it('renders nulls as "—", a new high, and "None found" for a checked-but-empty catalyst', () => {

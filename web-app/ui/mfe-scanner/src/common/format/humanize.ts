@@ -22,6 +22,8 @@ const WORDS: Record<string, string> = {
     accel: 'acceleration',
     vol: 'volume',
     '52w': '52-week',
+    // `rvol_20_null`, `close_null`, `market_cap_null`: the input had no value.
+    null: 'not available',
 };
 
 export const humanizeCode = (code: string): string => {

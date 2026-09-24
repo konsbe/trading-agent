@@ -22,7 +22,7 @@ const custom = (overrides: Partial<GateCheck>): GateCheck => ({
 describe('gateLine', () => {
     it.each([
         ['price', 'Price $2.74 ≥ $2.00'],
-        ['history', 'History ≥ 252 bars'],
+        ['history', 'History — ≥ 252 bars'],
         ['change_pct', 'Day change +21.2% within 8–25%'],
         ['rvol_20', 'RVOL 6.45× ≥ 3.0×'],
         ['dollar_volume', 'Dollar volume $21.7M ≥ $5.0M'],
@@ -57,6 +57,8 @@ describe('facts text', () => {
         expect(dayChangeText(makeFacts({ change_abs: -0.3, change_pct: -4.5 }))).toBe('-$0.30 (-4.5%)');
         expect(dayChangeText(makeFacts({ change_abs: null }))).toBe('+21.2%');
         expect(dayChangeText(makeFacts({ change_abs: null, change_pct: null }))).toBe('—');
+        // Live ADBT: close $0.12, change -$0.0048 — never "-$0.00".
+        expect(dayChangeText(makeFacts({ close: 0.12, change_abs: -0.004799999999999999, change_pct: -3.8461538461538436 }))).toBe('-$0.0048 (-3.8%)');
         expect(priceDirection(makeFacts())).toBe('up');
         expect(priceDirection(makeFacts({ change_pct: -1 }))).toBe('down');
         expect(priceDirection(makeFacts({ change_pct: 0, change_abs: 0 }))).toBe('flat');
