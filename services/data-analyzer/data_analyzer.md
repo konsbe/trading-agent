@@ -603,6 +603,13 @@ NYSE session (same holiday calendar as momentum-api) it:
    `MOMENTUM_DAILY_MAX_ATTEMPTS` (3) times;
 3. gives up on the session after `MOMENTUM_DAILY_GIVE_UP_AFTER` (14h) and logs it.
 
+"Completed" is kept in memory, so after a restart it re-runs the latest due
+session if its bars are in. That is safe by design: the scanner upserts the same
+rows, the tracker skips bars it already evaluated, and the bot posts a session
+once (verified on the first Compose start: tracker 0 opened / 0 advanced / 0
+closed). In Compose it runs next to `data-universe`, both `restart:
+unless-stopped`, against the live `ta-phase1` database.
+
 It does **not** ingest bars — data-ingestion's `data-universe` worker must be
 running — and it does **not** backfill missed sessions: a session skipped while
 it was down stays unscanned unless the scanner and tracker are run by hand.

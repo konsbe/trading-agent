@@ -1,6 +1,17 @@
+# Every service reads and writes the LIVE database: the `ta-phase1` container
+# (published on host port 55442), reached through the Docker host gateway. The
+# `timescaledb` service below is the old Compose database, stopped since April
+# 2026 and holding stale data; it is kept only behind the `legacy-db` profile.
+# Pointing a service back at it is how analyst-bot crash-looped for five months.
+# Override with COMPOSE_DATABASE_URL (e.g. for a throwaway test database).
+x-live-db-url: &live-db-url ${COMPOSE_DATABASE_URL:-postgres://postgres:pg@host.docker.internal:55442/trading?sslmode=disable}
+x-live-db-hosts: &live-db-hosts
+  - "host.docker.internal:host-gateway"
+
 services:
   timescaledb:
     image: timescale/timescaledb:latest-pg16
+    profiles: [legacy-db]
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
@@ -34,11 +45,9 @@ services:
     env_file:
       - path: ../.env
         required: false
+    extra_hosts: *live-db-hosts
     environment:
-      DATABASE_URL: postgres://postgres:postgres@timescaledb:5432/trading?sslmode=disable
-    depends_on:
-      timescaledb:
-        condition: service_healthy
+      DATABASE_URL: *live-db-url
     profiles: [ingestion]
     restart: on-failure
 
@@ -50,13 +59,11 @@ services:
     env_file:
       - path: ../.env
         required: false
+    extra_hosts: *live-db-hosts
     environment:
-      DATABASE_URL: postgres://postgres:postgres@timescaledb:5432/trading?sslmode=disable
+      DATABASE_URL: *live-db-url
     volumes:
       - ${CORP_CA_PEM_PATH:-/dev/null}:/etc/ssl/extra/corp-ca.pem:ro
-    depends_on:
-      timescaledb:
-        condition: service_healthy
     profiles: [ingestion]
     restart: on-failure
 
@@ -68,11 +75,9 @@ services:
     env_file:
       - path: ../.env
         required: false
+    extra_hosts: *live-db-hosts
     environment:
-      DATABASE_URL: postgres://postgres:postgres@timescaledb:5432/trading?sslmode=disable
-    depends_on:
-      timescaledb:
-        condition: service_healthy
+      DATABASE_URL: *live-db-url
     profiles: [ingestion]
     restart: on-failure
 
@@ -84,13 +89,11 @@ services:
     env_file:
       - path: ../.env
         required: false
+    extra_hosts: *live-db-hosts
     environment:
-      DATABASE_URL: postgres://postgres:postgres@timescaledb:5432/trading?sslmode=disable
+      DATABASE_URL: *live-db-url
     volumes:
       - ${CORP_CA_PEM_PATH:-/dev/null}:/etc/ssl/extra/corp-ca.pem:ro
-    depends_on:
-      timescaledb:
-        condition: service_healthy
     profiles: [ingestion]
     restart: on-failure
 
@@ -102,13 +105,11 @@ services:
     env_file:
       - path: ../.env
         required: false
+    extra_hosts: *live-db-hosts
     environment:
-      DATABASE_URL: postgres://postgres:postgres@timescaledb:5432/trading?sslmode=disable
+      DATABASE_URL: *live-db-url
     volumes:
       - ${CORP_CA_PEM_PATH:-/dev/null}:/etc/ssl/extra/corp-ca.pem:ro
-    depends_on:
-      timescaledb:
-        condition: service_healthy
     profiles: [ingestion]
     restart: on-failure
 
@@ -120,11 +121,9 @@ services:
     env_file:
       - path: ../.env
         required: false
+    extra_hosts: *live-db-hosts
     environment:
-      DATABASE_URL: postgres://postgres:postgres@timescaledb:5432/trading?sslmode=disable
-    depends_on:
-      timescaledb:
-        condition: service_healthy
+      DATABASE_URL: *live-db-url
     profiles: [ingestion]
     restart: on-failure
 
@@ -137,13 +136,11 @@ services:
     env_file:
       - path: ../.env
         required: false
+    extra_hosts: *live-db-hosts
     environment:
-      DATABASE_URL: postgres://postgres:postgres@timescaledb:5432/trading?sslmode=disable
+      DATABASE_URL: *live-db-url
     volumes:
       - ${CORP_CA_PEM_PATH:-/dev/null}:/etc/ssl/extra/corp-ca.pem:ro
-    depends_on:
-      timescaledb:
-        condition: service_healthy
     profiles: [ingestion]
     restart: on-failure
 
@@ -159,15 +156,15 @@ services:
     env_file:
       - path: ../.env
         required: false
+    extra_hosts: *live-db-hosts
     environment:
-      DATABASE_URL: postgres://postgres:postgres@timescaledb:5432/trading?sslmode=disable
+      DATABASE_URL: *live-db-url
     volumes:
       - ${CORP_CA_PEM_PATH:-/dev/null}:/etc/ssl/extra/corp-ca.pem:ro
-    depends_on:
-      timescaledb:
-        condition: service_healthy
     profiles: [ingestion]
-    restart: on-failure
+    # unless-stopped, not on-failure: the daily bars feed momentum-daily, and
+    # on-failure containers are not brought back when Docker itself restarts.
+    restart: unless-stopped
 
   # ── data-analyzer ──────────────────────────────────────────────────────────
   # Reads bars / fundamentals from TimescaleDB and writes computed indicators
@@ -183,11 +180,9 @@ services:
     env_file:
       - path: ../.env
         required: false
+    extra_hosts: *live-db-hosts
     environment:
-      DATABASE_URL: postgres://postgres:postgres@timescaledb:5432/trading?sslmode=disable
-    depends_on:
-      timescaledb:
-        condition: service_healthy
+      DATABASE_URL: *live-db-url
       # Cross-profile depends_on (data-technical is in 'ingestion') is not supported
       # when running --profile analyzer alone. Startup delay handles timing instead:
       # ANALYZER_STARTUP_DELAY_SECS (default 180) gives ingestion time to populate OHLCV.
@@ -202,11 +197,9 @@ services:
     env_file:
       - path: ../.env
         required: false
+    extra_hosts: *live-db-hosts
     environment:
-      DATABASE_URL: postgres://postgres:postgres@timescaledb:5432/trading?sslmode=disable
-    depends_on:
-      timescaledb:
-        condition: service_healthy
+      DATABASE_URL: *live-db-url
       # Cross-profile depends_on (data-fundamental is in 'ingestion') is not supported
       # when running --profile analyzer alone. FUNDAMENTAL_STARTUP_DELAY_SECS handles timing.
     profiles: [analyzer]
@@ -220,11 +213,9 @@ services:
     env_file:
       - path: ../.env
         required: false
+    extra_hosts: *live-db-hosts
     environment:
-      DATABASE_URL: postgres://postgres:postgres@timescaledb:5432/trading?sslmode=disable
-    depends_on:
-      timescaledb:
-        condition: service_healthy
+      DATABASE_URL: *live-db-url
       # data-equity (ingestion profile) populates macro_fred. FRED data is fetched
       # weekly/monthly so a 60-second startup delay is sufficient.
     profiles: [analyzer]
@@ -238,11 +229,9 @@ services:
     env_file:
       - path: ../.env
         required: false
+    extra_hosts: *live-db-hosts
     environment:
-      DATABASE_URL: postgres://postgres:postgres@timescaledb:5432/trading?sslmode=disable
-    depends_on:
-      timescaledb:
-        condition: service_healthy
+      DATABASE_URL: *live-db-url
     profiles: [analyzer]
     restart: on-failure
 
@@ -259,12 +248,10 @@ services:
     env_file:
       - path: ../.env
         required: false
+    extra_hosts: *live-db-hosts
     environment:
-      DATABASE_URL: postgres://postgres:postgres@timescaledb:5432/trading?sslmode=disable
+      DATABASE_URL: *live-db-url
       MOMENTUM_DAILY_BIN_DIR: /app
-    depends_on:
-      timescaledb:
-        condition: service_healthy
     profiles: [analyzer]
     restart: unless-stopped
 
@@ -283,8 +270,9 @@ services:
     env_file:
       - path: ../.env
         required: false
+    extra_hosts: *live-db-hosts
     environment:
-      DATABASE_URL: postgres://postgres:postgres@timescaledb:5432/trading?sslmode=disable
+      DATABASE_URL: *live-db-url
       # Listens on all interfaces INSIDE the container; the host port is loopback-only.
       MOMENTUM_API_ADDR: 0.0.0.0:8090
       MOMENTUM_CAVEATS_PATH: /shared/content/momentum_caveats.json
@@ -292,9 +280,6 @@ services:
       - ../shared/content:/shared/content:ro
     ports:
       - "127.0.0.1:8090:8090"
-    depends_on:
-      timescaledb:
-        condition: service_healthy
     profiles: [api]
     restart: on-failure
 
@@ -309,16 +294,15 @@ services:
     env_file:
       - path: ../.env
         required: false
+    extra_hosts: *live-db-hosts
     environment:
-      DATABASE_URL: postgres://postgres:postgres@timescaledb:5432/trading?sslmode=disable
+      DATABASE_URL: *live-db-url
       REDIS_URL: redis://redis:6379/0
       # EVIDENCE_CAVEAT / RESEARCH_SCORE_CAVEAT, shared with momentum-api.
       MOMENTUM_CAVEATS_PATH: /shared/content/momentum_caveats.json
     volumes:
       - ../shared/content:/shared/content:ro
     depends_on:
-      timescaledb:
-        condition: service_healthy
       redis:
         condition: service_started
     profiles: [bot]

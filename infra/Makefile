@@ -5,9 +5,11 @@ COMPOSE := docker compose -f $(ROOT)/infra/docker-compose.yml --env-file $(ROOT)
 
 .PHONY: db-up db-down up down up-ingestion up-analyzer build-timescaledb restart clean
 
-# Databases + Redis only (data volume persists across down/up without -v)
+# Live database + Redis only. The live DB is the standalone ta-phase1 container
+# (restart=unless-stopped); Compose's timescaledb is legacy (profile legacy-db).
 db-up:
-	cd $(ROOT) && $(COMPOSE) up -d timescaledb redis
+	docker start ta-phase1
+	cd $(ROOT) && $(COMPOSE) up -d redis
 
 db-down:
 	cd $(ROOT) && $(COMPOSE) --profile ingestion --profile analyzer down

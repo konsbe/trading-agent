@@ -21,7 +21,7 @@ help:
 	@echo "  make down          Stop everything (volumes kept)"
 	@echo "  make restart       down + up --build; database data preserved"
 	@echo "  make clean         Nuclear: remove containers, volumes (DB wiped), and local images"
-	@echo "  make db-up         TimescaleDB + Redis only"
+	@echo "  make db-up         Live DB (ta-phase1, :55442) + Redis only"
 	@echo ""
 	@echo "━━━ Local dev (no Docker) ━━━"
 	@echo "  make db-up && cp .env.example .env"
@@ -137,11 +137,13 @@ log-technical-analysis:
 log-fundamental-analysis:
 	$(COMPOSE) logs -f fundamental-analysis
 
+# The live database is the standalone ta-phase1 container, not Compose's
+# legacy timescaledb service (see infra/docker-compose.yml).
 psql:
-	docker exec -it infra-timescaledb-1 psql -U postgres -d trading
+	docker exec -it ta-phase1 psql -U postgres -d trading
 
 # --- DB table inspection targets ---
-DB := docker exec infra-timescaledb-1 psql -U postgres -d trading -x -c
+DB := docker exec ta-phase1 psql -U postgres -d trading -x -c
 
 # row counts for all tables at once
 db-tables:
