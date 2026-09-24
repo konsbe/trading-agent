@@ -14,6 +14,7 @@ import os
 import sys
 import types
 import unittest
+from datetime import date, datetime, timezone
 
 
 def _install_stubs() -> None:
@@ -43,14 +44,19 @@ def _install_stubs() -> None:
 
     mq = types.ModuleType("db.queries.momentum")
 
-    async def _alertable(pool, *, min_score_market, min_score_penny):
+    async def _alertable(pool, *, min_score_market, min_score_penny, scan_date=None):
+        pool.setdefault("asked_scan_dates", []).append(scan_date)
         return pool.get("rows", [])
 
     async def _fresh(pool):
         return {"last_scan_date": "2026-09-17", "scored_today": 3}
 
+    async def _latest(pool):
+        return pool.get("latest")
+
     mq.alertable_candidates = _alertable
     mq.scan_freshness = _fresh
+    mq.latest_scan_date = _latest
     sys.modules["db.queries.momentum"] = mq
 
     # notifier.discord's real __init__ imports discord.py, which is not installed
@@ -135,11 +141,18 @@ def run(coro):
     return asyncio.get_event_loop_policy().new_event_loop().run_until_complete(coro)
 
 
+#: Tuesday 2026-09-22, 19:00 New York (23:00 UTC) — an evening run after the close.
+EVENING = datetime(2026, 9, 22, 23, 0, tzinfo=timezone.utc)
+SESSION = date(2026, 9, 22)
+
+
 class TestMomentumScanJob(unittest.TestCase):
-    def _job(self, rows, cfg=None, notifier=None):
+    def _job(self, rows, cfg=None, notifier=None, now=EVENING, latest=SESSION):
         notifier = notifier or FakeNotifier()
-        job = MomentumScanJob(cfg or FakeCfg(), {"rows": rows}, [notifier])
+        self.pool = {"rows": rows, "latest": latest}
+        job = MomentumScanJob(cfg or FakeCfg(), self.pool, [notifier])
         job._embed_cls = staticmethod(lambda: FakeEmbed)  # type: ignore[assignment]
+        job._now = lambda: now  # type: ignore[assignment]
         return job, notifier
 
     def test_routes_each_bucket_to_its_own_channel(self):
@@ -171,8 +184,9 @@ class TestMomentumScanJob(unittest.TestCase):
         self.assertEqual(notifier.sent, [])
 
     def test_missing_notifier_is_survivable(self):
-        job = MomentumScanJob(FakeCfg(), {"rows": [row()]}, [])
+        job = MomentumScanJob(FakeCfg(), {"rows": [row()], "latest": SESSION}, [])
         job._embed_cls = staticmethod(lambda: FakeEmbed)  # type: ignore[assignment]
+        job._now = lambda: EVENING  # type: ignore[assignment]
         run(job.run())  # must not raise
 
     def test_cooldown_fails_open_when_redis_is_unavailable(self):
@@ -259,6 +273,54 @@ class TestMomentumScanJob(unittest.TestCase):
             "cooldown-suppressed symbols consumed cap slots; 10 fresh candidates "
             "were available and fewer were posted",
         )
+
+    # ── freshness gate ───────────────────────────────────────────────────────
+
+    def test_stale_scan_is_not_alerted(self):
+        """The old job alerted on the latest stored scan whatever its date, so a
+        scanner that had not run for days re-posted an old scan as today's."""
+        job, notifier = self._job([row()], latest=date(2026, 9, 17))
+        with self.assertLogs("scheduler.jobs.momentum_scan", level="INFO") as logs:
+            run(job.run())
+        self.assertEqual(notifier.sent, [])
+        self.assertNotIn("asked_scan_dates", self.pool, "no candidates may be queried for a stale scan")
+        self.assertTrue(any("not alerting" in m for m in logs.output), logs.output)
+
+    def test_no_scan_at_all_is_not_alerted(self):
+        job, notifier = self._job([row()], latest=None)
+        run(job.run())
+        self.assertEqual(notifier.sent, [])
+
+    def test_weekend_is_skipped(self):
+        saturday = datetime(2026, 9, 26, 23, 0, tzinfo=timezone.utc)
+        job, notifier = self._job([row()], now=saturday, latest=date(2026, 9, 26))
+        run(job.run())
+        self.assertEqual(notifier.sent, [])
+
+    def test_the_session_is_new_york_local(self):
+        """00:30 UTC Wednesday is still Tuesday evening in New York."""
+        job, notifier = self._job([row()], now=datetime(2026, 9, 23, 0, 30, tzinfo=timezone.utc))
+        run(job.run())
+        self.assertEqual(len(notifier.sent), 1)
+
+    def test_query_is_pinned_to_the_fresh_session(self):
+        job, _ = self._job([row()])
+        run(job.run())
+        self.assertEqual(self.pool["asked_scan_dates"], [SESSION])
+
+    def test_evening_retries_alert_a_session_once(self):
+        job, notifier = self._job([row("AAA"), row("BBB")])
+        run(job.run())
+        run(job.run())
+        run(job.run())
+        self.assertEqual(len(notifier.sent), 2, "later runs re-posted an already alerted session")
+        self.assertEqual(len(self.pool["asked_scan_dates"]), 1)
+
+    def test_zero_candidate_session_counts_as_handled(self):
+        job, notifier = self._job([])
+        run(job.run())
+        run(job.run())
+        self.assertEqual(len(self.pool["asked_scan_dates"]), 1)
 
     def test_posted_embed_carries_the_evidence_caveat(self):
         job, notifier = self._job([row()])

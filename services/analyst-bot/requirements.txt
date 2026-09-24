@@ -9,6 +9,9 @@ redis[asyncio]>=5.0.0
 
 # Scheduling
 APScheduler>=3.10.0
+# IANA time zones for zoneinfo (the slim image has no system tz database);
+# the momentum job needs America/New_York to know which session just closed.
+tzdata>=2024.1
 
 # Config
 pydantic-settings>=2.2.0

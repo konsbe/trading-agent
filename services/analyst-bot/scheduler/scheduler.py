@@ -128,7 +128,14 @@ def build_scheduler(
 
                 momentum_job.run,
 
-                trigger=CronTrigger(hour="22", minute="15", timezone="UTC"),
+                # Every 30 minutes through the New York evening, weekdays. The
+                # job alerts only once the scan for the session that just
+                # closed exists (momentum-daily runs when that session's bars
+                # land, which is not at a fixed time) and only once per session.
+                trigger=CronTrigger(
+                    day_of_week="mon-fri", hour="18-23", minute="15,45",
+                    timezone="America/New_York",
+                ),
 
                 id="momentum_scan",
 
@@ -138,7 +145,7 @@ def build_scheduler(
 
             )
 
-            log.info("momentum scan scheduled (22:15 UTC, after the US close)")
+            log.info("momentum scan scheduled (every 30 min, 18:15-23:45 New York, weekdays; once per fresh session)")
 
         except Exception:
 

@@ -19,6 +19,7 @@ Two things here are deliberate rather than incidental:
 
 from __future__ import annotations
 
+from datetime import date
 from typing import Any, Mapping, Sequence
 
 # Columns shared by every read. Kept as one string so the scheduled alert and the
@@ -95,8 +96,19 @@ async def top_candidates(
         return await conn.fetch(sql, *args)
 
 
+async def latest_scan_date(pool) -> "date | None":
+    """The trading day of the most recent persisted scan.
+
+    Read from momentum_features, not momentum_scores: scores exist only for
+    gate-passers, so a day with zero candidates has no score rows and would
+    make the latest scan look older than it is (same reasoning as momentum-api).
+    """
+    async with pool.acquire() as conn:
+        return await conn.fetchval("SELECT max(ts)::date FROM momentum_features")
+
+
 async def alertable_candidates(
-    pool, *, min_score_market: int, min_score_penny: int
+    pool, *, min_score_market: int, min_score_penny: int, scan_date: "date | None" = None
 ) -> Sequence[Mapping[str, Any]]:
     """Candidates to alert on, in SCREENER mode: every gate pass, per bucket.
 
@@ -115,20 +127,28 @@ async def alertable_candidates(
     mode. They are kept in the signature rather than removed so
     BOT_MOMENTUM_ALERT_MODE=score can be selected without a code change, and so
     the caller's configuration stays honest about what mode it is in.
+
+    `scan_date` pins the scan being alerted on. The scheduled job always passes
+    the session it verified as fresh, so an old scan can never be re-alerted
+    just because it is the latest one with score rows.
     """
+    if scan_date is not None:
+        where, args = "s.ts::date = $1", [scan_date]
+    else:
+        where, args = "s.ts::date = (SELECT max(ts)::date FROM momentum_scores)", []
     sql = f"""
         SELECT {_SCORE_COLUMNS}
         FROM momentum_scores s
         JOIN momentum_features f ON f.symbol = s.symbol AND f.ts = s.ts
-        WHERE s.ts::date = (SELECT max(ts)::date FROM momentum_scores)
+        WHERE {where}
         ORDER BY f.rvol_20 DESC NULLS LAST, s.symbol
     """
     async with pool.acquire() as conn:
-        return await conn.fetch(sql)
+        return await conn.fetch(sql, *args)
 
 
 async def alertable_candidates_by_score(
-    pool, *, min_score_market: int, min_score_penny: int
+    pool, *, min_score_market: int, min_score_penny: int, scan_date: "date | None" = None
 ) -> Sequence[Mapping[str, Any]]:
     """The pre-screener behaviour: candidates clearing their OWN bucket's threshold.
 
@@ -145,7 +165,7 @@ async def alertable_candidates_by_score(
         SELECT {_SCORE_COLUMNS}
         FROM momentum_scores s
         JOIN momentum_features f ON f.symbol = s.symbol AND f.ts = s.ts
-        WHERE s.ts::date = (SELECT max(ts)::date FROM momentum_scores)
+        WHERE s.ts::date = COALESCE($3::date, (SELECT max(ts)::date FROM momentum_scores))
           AND (
                 (s.bucket = 'market' AND s.momentum_score_100 >= $1)
              OR (s.bucket = 'penny'  AND s.momentum_score_100 >= $2)
@@ -153,7 +173,7 @@ async def alertable_candidates_by_score(
         ORDER BY s.momentum_score_100 DESC, s.symbol
     """
     async with pool.acquire() as conn:
-        return await conn.fetch(sql, min_score_market, min_score_penny)
+        return await conn.fetch(sql, min_score_market, min_score_penny, scan_date)
 
 
 async def score_for_symbol(pool, symbol: str) -> Mapping[str, Any] | None:

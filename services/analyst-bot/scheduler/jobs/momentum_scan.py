@@ -29,7 +29,9 @@ Three behaviours here are requirements rather than choices:
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, Mapping, Sequence
+from datetime import date, datetime, timezone
+from typing import TYPE_CHECKING, Any, Callable, Mapping, Sequence
+from zoneinfo import ZoneInfo
 
 from db import cache
 from db.queries import momentum as mq
@@ -43,6 +45,26 @@ log = logging.getLogger(__name__)
 #: Cooldown key namespace. Includes the bucket so a symbol crossing the $2
 #: boundary is not muted by the key it held in its previous bucket.
 _COOLDOWN_KEY = "momentum:alert:{bucket}:{symbol}"
+
+#: Marks a session as alerted, so the evening retries post it exactly once.
+_SESSION_KEY = "momentum:session_alerted:{session}"
+_SESSION_TTL_SECS = 7 * 24 * 3600
+
+_NEW_YORK = ZoneInfo("America/New_York")
+
+
+def session_just_closed(now: datetime) -> date | None:
+    """The New York trading date an evening run should alert on, or None on a weekend.
+
+    Holidays are NOT modelled here — the holiday calendar lives once, in
+    data-analyzer. On a holiday there is simply no fresh scan for the date, so
+    the freshness gate skips it; the log says "holiday, or the chain has not
+    finished" rather than pretending to know which.
+    """
+    local = now.astimezone(_NEW_YORK)
+    if local.weekday() >= 5:
+        return None
+    return local.date()
 
 
 class MomentumScanJob:
@@ -63,6 +85,11 @@ class MomentumScanJob:
         self._discord = next(
             (n for n in notifiers if hasattr(n, "send_action")), None
         )
+        #: Injectable clock, for tests.
+        self._now: Callable[[], datetime] = lambda: datetime.now(timezone.utc)
+        #: Fallback when Redis is unavailable, so retries in this process still
+        #: post a session once.
+        self._alerted_sessions: set[str] = set()
 
     def _redis(self) -> Any | None:
         """The shared Redis handle, or None when the cache is not initialised.
@@ -166,8 +193,63 @@ class MomentumScanJob:
 
     # ── run ──────────────────────────────────────────────────────────────────
 
+    async def _session_alerted(self, session: date) -> bool:
+        key = _SESSION_KEY.format(session=session.isoformat())
+        if key in self._alerted_sessions:
+            return True
+        r = self._redis()
+        if r is None:
+            return False
+        try:
+            return bool(await r.exists(key))
+        except Exception:
+            log.warning("momentum scan: session marker lookup failed; proceeding")
+            return False
+
+    async def _mark_session_alerted(self, session: date) -> None:
+        key = _SESSION_KEY.format(session=session.isoformat())
+        self._alerted_sessions.add(key)
+        r = self._redis()
+        if r is None:
+            return
+        try:
+            await r.set(key, "1", ex=_SESSION_TTL_SECS)
+        except Exception:
+            log.warning("momentum scan: could not persist session marker %s", key)
+
+    async def _fresh_session(self) -> date | None:
+        """The session to alert on, or None (logged) when there is nothing fresh.
+
+        Alerts fire only for the session that just closed. The previous job
+        alerted on the latest stored scan whatever its date, so a scanner that
+        had not run for days re-posted an old scan as if it were today's.
+        """
+        session = session_just_closed(self._now())
+        if session is None:
+            log.info("momentum scan: weekend — no session to alert on")
+            return None
+        try:
+            latest = await mq.latest_scan_date(self._pool)
+        except Exception:
+            log.exception("momentum scan: could not read the latest scan date")
+            return None
+        if latest != session:
+            log.info(
+                "momentum scan: latest scan is %s, not today's session %s "
+                "(market holiday, or momentum-daily has not finished yet) — not alerting",
+                latest, session,
+            )
+            return None
+        if await self._session_alerted(session):
+            log.debug("momentum scan: session %s already alerted", session)
+            return None
+        return session
+
     async def run(self) -> None:
         log.debug("running momentum scan")
+        session = await self._fresh_session()
+        if session is None:
+            return
         try:
             mode = str(getattr(self._cfg, "bot_momentum_alert_mode", "screener")).lower()
             select = (
@@ -186,6 +268,7 @@ class MomentumScanJob:
                 self._pool,
                 min_score_market=int(getattr(self._cfg, "bot_momentum_min_score_market", 65)),
                 min_score_penny=int(getattr(self._cfg, "bot_momentum_min_score_penny", 72)),
+                scan_date=session,
             )
         except Exception:
             log.exception("momentum candidate query failed")
@@ -205,9 +288,11 @@ class MomentumScanJob:
                 )
             except Exception:
                 log.info("momentum scan: no candidates, and freshness check failed")
+            await self._mark_session_alerted(session)
             return
 
         if self._discord is None:
+            # Not marked as alerted: a later run with a notifier should still post.
             log.warning("no Discord notifier available; %d momentum candidates not posted", len(rows))
             return
 
@@ -268,8 +353,10 @@ class MomentumScanJob:
                 except Exception:
                     log.exception("failed posting overflow summary for bucket=%s", bucket)
 
+        await self._mark_session_alerted(session)
         log.info(
-            "momentum scan: %d candidates, %d posted, %d on cooldown, %d unroutable, %d over cap",
+            "momentum scan: session %s — %d candidates, %d posted, %d on cooldown, %d unroutable, %d over cap",
+            session,
             len(rows),
             posted,
             skipped_cooldown,
