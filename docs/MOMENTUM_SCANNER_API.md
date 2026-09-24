@@ -692,7 +692,10 @@ active rows (pinned by tests).
 
 **Daily order for real data:** bar ingestion → `momentum-scanner` →
 `momentum-tracker` (evaluates exits on the new session, then opens that
-session's gate passes). Until a session after the alert date has been ingested
+session's gate passes). The scanner and tracker were never scheduled before
+2026-09-24; `momentum-daily` (data-analyzer) now runs them in that order once
+the session's bars have landed, and the analyst-bot alerts only for a scan of
+the session that just closed (it used to re-alert whatever scan was latest). Until a session after the alert date has been ingested
 and tracked, active rows show `sessions_elapsed: 0` and `unrealized_pct: 0`.
 
 ### 6.1 UI brief for step 4 — `mfe-tracked` (deferred; build after real rows accumulate)

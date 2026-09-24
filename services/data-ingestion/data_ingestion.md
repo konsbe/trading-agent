@@ -1163,7 +1163,8 @@ does not own.
 |---|---|---|---|
 | `shared/content/momentum_caveats.json` (`EVIDENCE_CAVEAT`, `RESEARCH_SCORE_CAVEAT`) | edited by hand; one source for both services | **analyst-bot** (`notifier/discord/momentum.py`) and **momentum-api** (`services/data-analyzer/cmd/momentum-api`) | Both refuse to start and log exactly which path was tried and how to fix it. There is deliberately no fallback text — a fallback would be a second source of the claim |
 | `watchlist_items` (migration 024) | momentum-api (`PUT/DELETE /api/v1/watchlist/{symbol}`) | **intraday-bars** reads it to pick symbols | Not a failure: the job just fetches candidates only |
-| `momentum_features`, `momentum_scores` | `momentum-scanner` (data-analyzer) | analyst-bot (`/scanner`, `/score`, alerts), momentum-api | Not a startup failure: both serve the last stored scan; momentum-api reports it via `scan.is_stale` |
+| `momentum_features`, `momentum_scores` | `momentum-scanner` (data-analyzer) | analyst-bot (`/scanner`, `/score`, alerts), momentum-api | Not a startup failure: both serve the last stored scan; momentum-api reports it via `scan.is_stale`. Evening alerts are skipped (logged) until a scan for the session that just closed exists |
+| `equity_ohlcv` daily `tiingo` bars for the session | `data-universe` (this service) | **momentum-daily** (data-analyzer) waits for ≥95% coverage before running scanner → tracker | The chain waits, then gives up on that session after 14h and logs it; no scan, no tracker update, no bot alert that day |
 
 **The caveats file is the one that can break a running service.** It was
 introduced for momentum-api, but analyst-bot reads it too. Rebuilding or

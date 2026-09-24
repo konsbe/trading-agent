@@ -246,6 +246,28 @@ services:
     profiles: [analyzer]
     restart: on-failure
 
+  # ── momentum-daily ─────────────────────────────────────────────────────────
+  # The momentum chain, once per NYSE session: waits until that session's daily
+  # bars have landed (data-universe, ingestion profile), then runs
+  # momentum-scanner and momentum-tracker in that order. Missed sessions are not
+  # backfilled. The analyst-bot alerts only once this session's scan exists.
+  momentum-daily:
+    build:
+      context: ../services/data-analyzer
+      dockerfile: Dockerfile
+    command: ["/app/momentum-daily"]
+    env_file:
+      - path: ../.env
+        required: false
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@timescaledb:5432/trading?sslmode=disable
+      MOMENTUM_DAILY_BIN_DIR: /app
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+    profiles: [analyzer]
+    restart: unless-stopped
+
   # ── momentum-api ───────────────────────────────────────────────────────────
   # Read-only HTTP API over the momentum scanner's stored output for the web app
   # (docs/MOMENTUM_SCANNER_API.md). Start with: make up-api

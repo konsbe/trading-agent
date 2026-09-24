@@ -579,7 +579,30 @@ opens on every §3.2 gate pass — the same criterion the bot's screener alerts
 use, so tracked = alerted. `-open-mode=score` restores the retired 65/72 score
 thresholds (Phase 1 §10.1.9's replay figures used it). `-replay` is in-memory and
 writes nothing. Run after `momentum-scanner`:
-`go run ./cmd/momentum-tracker` (or `-dry-run`).
+`go run ./cmd/momentum-tracker` (or `-dry-run`). Re-running it for a session it
+has already evaluated is a no-op (each row only evaluates bars after its
+`last_evaluated_ts`), so a retried chain cannot double-count a session.
+
+## `momentum-daily` — the scheduled chain
+
+Long-running daemon (Compose service `momentum-daily`, `analyzer` profile;
+locally `make run-momentum-daily`, or `ARGS=-once` for a single pass). For each
+NYSE session (same holiday calendar as momentum-api) it:
+
+1. waits `MOMENTUM_DAILY_GRACE` (2h) after the close, then polls every
+   `MOMENTUM_DAILY_POLL` (15m) until the session's `1Day` bars from
+   `MOMENTUM_DAILY_BAR_SOURCE` (`tiingo`) cover `MOMENTUM_DAILY_MIN_COVERAGE`
+   (95%) of scannable universe symbols;
+2. runs `momentum-scanner`, then `momentum-tracker` (binaries from
+   `MOMENTUM_DAILY_BIN_DIR`, default: next to its own executable), up to
+   `MOMENTUM_DAILY_MAX_ATTEMPTS` (3) times;
+3. gives up on the session after `MOMENTUM_DAILY_GIVE_UP_AFTER` (14h) and logs it.
+
+It does **not** ingest bars — data-ingestion's `data-universe` worker must be
+running — and it does **not** backfill missed sessions: a session skipped while
+it was down stays unscanned unless the scanner and tracker are run by hand.
+The analyst-bot alerts only once the scan for the session that just closed
+exists, so the bot's alert time follows this chain, not a fixed clock.
 
 ## `momentum-api` server (read-only scanner API)
 

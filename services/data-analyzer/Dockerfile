@@ -15,7 +15,10 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o /out/technical-analysis ./cmd/technical
   && CGO_ENABLED=0 GOOS=linux go build -o /out/fundamental-analysis ./cmd/fundamental-analysis \
   && CGO_ENABLED=0 GOOS=linux go build -o /out/macro-analysis ./cmd/macro-analysis \
   && CGO_ENABLED=0 GOOS=linux go build -o /out/market-operations ./cmd/market-operations \
-  && CGO_ENABLED=0 GOOS=linux go build -o /out/momentum-api ./cmd/momentum-api
+  && CGO_ENABLED=0 GOOS=linux go build -o /out/momentum-api ./cmd/momentum-api \
+  && CGO_ENABLED=0 GOOS=linux go build -o /out/momentum-scanner ./cmd/momentum-scanner \
+  && CGO_ENABLED=0 GOOS=linux go build -o /out/momentum-tracker ./cmd/momentum-tracker \
+  && CGO_ENABLED=0 GOOS=linux go build -o /out/momentum-daily ./cmd/momentum-daily
 
 FROM gcr.io/distroless/base-debian12:nonroot
 WORKDIR /app
@@ -25,5 +28,8 @@ COPY --from=build /out/fundamental-analysis /app/fundamental-analysis
 COPY --from=build /out/macro-analysis /app/macro-analysis
 COPY --from=build /out/market-operations /app/market-operations
 COPY --from=build /out/momentum-api /app/momentum-api
+COPY --from=build /out/momentum-scanner /app/momentum-scanner
+COPY --from=build /out/momentum-tracker /app/momentum-tracker
+COPY --from=build /out/momentum-daily /app/momentum-daily
 EXPOSE 8090
 USER nonroot:nonroot
