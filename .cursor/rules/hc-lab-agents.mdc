@@ -24,3 +24,5 @@ Delegate:
 - New microservice → subagent `svc-creator`
 
 Node 22 (`nvm use 22`). Public npm only.
+
+Git: never `git commit` / `git push` / history-changing git (incl. `scripts/push_via_api.py`) without the user's explicit permission in the current request. Finishing a task is not permission — leave changes uncommitted, summarise them, and ask.

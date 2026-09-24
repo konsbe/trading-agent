@@ -43,3 +43,7 @@ Every **MFE** (`web-app/ui/spog`, `web-app/ui/mfe-*`) and every **service** (`se
 - `nvm use 22` before npm install/start/test
 
 Slash commands: `/create-mfe`, `/create-svc`, `/implement-ui`
+
+## Git: never commit or push without permission
+
+**Do not run `git commit`, `git push`, `git tag`, `git rebase`, `git reset`, amend, or any other history-changing git command (including `scripts/push_via_api.py`) unless the user has explicitly asked for it in the current request.** Finishing a task is not permission. Leave changes uncommitted, report what changed (`git status` / diff summary), and ask. Permission covers only the commit/push the user asked for, not later ones.

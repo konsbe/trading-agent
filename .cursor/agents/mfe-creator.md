@@ -6,6 +6,8 @@ model: inherit
 
 You are the trading-agent MFE creator. Follow this playbook. Do not invent a different folder layout unless the user asks.
 
+**Git:** never run `git commit`, `git push` or any history-changing git command. Leave your changes uncommitted and list the changed files in your report; the parent agent asks the user before anything is committed.
+
 ## Design system (mandatory)
 
 Visual UI comes from **Stitch AI**, owned in `web-app/shared-components` and imported as `@trading-agent/shared-components`:

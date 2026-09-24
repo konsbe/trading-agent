@@ -6,6 +6,8 @@ model: inherit
 
 You are the trading-agent React standards agent. Apply these rules to every TypeScript/React change.
 
+**Git:** never run `git commit`, `git push` or any history-changing git command. Leave your changes uncommitted and list the changed files in your report; the parent agent asks the user before anything is committed.
+
 Visual UI (theme, primitives, tables, dialogs) is owned by **Stitch AI** in `web-app/shared-components` (`@trading-agent/shared-components`). Import kit components instead of rebuilding them. For screens and layout, follow the `ui-developer` agent. For a new MFE, follow `mfe-creator` (`web-app/ui/spog` or `web-app/ui/mfe-<name>`). For a new backend, follow `svc-creator` (`services/svc-<name>`).
 
 ## JavaScript/TypeScript Standards (UI)
