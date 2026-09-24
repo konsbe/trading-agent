@@ -22,13 +22,17 @@ const custom = (overrides: Partial<GateCheck>): GateCheck => ({
 describe('gateLine', () => {
     it.each([
         ['price', 'Price $2.74 ≥ $2.00'],
-        ['history', 'History — ≥ 252 bars'],
+        ['history', 'History ≥ 252 bars'],
         ['change_pct', 'Day change +21.2% within 8–25%'],
         ['rvol_20', 'RVOL 6.45× ≥ 3.0×'],
         ['dollar_volume', 'Dollar volume $21.7M ≥ $5.0M'],
         ['market_cap', 'Market cap $390M within $300M–$10B'],
     ])('%s → %s', (key, line) => {
         expect(gateLine(check(key))).toBe(line);
+    });
+
+    it('signs a negative gate value with "−" (live ADBT day change)', () => {
+        expect(gateLine({ ...check('change_pct'), value: -3.8461538461538436, min: null, max: null })).toBe('Day change −3.8%');
     });
 
     it('marks a proxy value as estimated', () => {
@@ -39,7 +43,8 @@ describe('gateLine', () => {
         expect(gateLine({ ...check('price'), min: null, max: 20 })).toBe('Price $2.74 ≤ $20.00');
         expect(gateLine({ ...check('price'), min: null })).toBe('Price $2.74');
         expect(gateLine(custom({ value: 1.5, min: 1 }))).toBe('Custom gate 1.5 ≥ 1');
-        expect(gateLine({ ...check('history'), value: 300 })).toBe('History 300 bars ≥ 252 bars');
+        // Bound-only: even if a value ever arrived, History shows just its bound.
+        expect(gateLine({ ...check('history'), value: 300 })).toBe('History ≥ 252 bars');
         expect(gateLine({ ...check('market_cap'), value: 4939254000000 })).toBe('Market cap $4.9T within $300M–$10B');
     });
 });
@@ -54,11 +59,11 @@ describe('facts text', () => {
 
     it('formats the day change and its direction (zero is flat)', () => {
         expect(dayChangeText(makeFacts())).toBe('+$0.48 (+21.2%)');
-        expect(dayChangeText(makeFacts({ change_abs: -0.3, change_pct: -4.5 }))).toBe('-$0.30 (-4.5%)');
+        expect(dayChangeText(makeFacts({ change_abs: -0.3, change_pct: -4.5 }))).toBe('−$0.30 (−4.5%)');
         expect(dayChangeText(makeFacts({ change_abs: null }))).toBe('+21.2%');
         expect(dayChangeText(makeFacts({ change_abs: null, change_pct: null }))).toBe('—');
         // Live ADBT: close $0.12, change -$0.0048 — never "-$0.00".
-        expect(dayChangeText(makeFacts({ close: 0.12, change_abs: -0.004799999999999999, change_pct: -3.8461538461538436 }))).toBe('-$0.0048 (-3.8%)');
+        expect(dayChangeText(makeFacts({ close: 0.12, change_abs: -0.004799999999999999, change_pct: -3.8461538461538436 }))).toBe('−$0.0048 (−3.8%)');
         expect(priceDirection(makeFacts())).toBe('up');
         expect(priceDirection(makeFacts({ change_pct: -1 }))).toBe('down');
         expect(priceDirection(makeFacts({ change_pct: 0, change_abs: 0 }))).toBe('flat');

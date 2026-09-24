@@ -2,6 +2,7 @@ import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { HostModeProvider } from '@/providers/HostModeContext';
+import { findAsciiMinus } from '@/test-utils/asciiMinus';
 import { makeUncoveredItem, makeWatchlistItem } from '@/test-utils/fixtures';
 import WatchlistTable from './WatchlistTable';
 import { WatchlistTableProps } from './types';
@@ -69,7 +70,7 @@ describe('WatchlistTable', () => {
             rows: [makeWatchlistItem({ symbol: 'DOWN', change_pct: -3.4 }), makeWatchlistItem({ symbol: 'FLAT', change_pct: 0 })],
         });
 
-        expect(row('DOWN').getByTestId('change-value')).toHaveTextContent('-3.4%');
+        expect(row('DOWN').getByTestId('change-value')).toHaveTextContent('−3.4%');
         expect(row('DOWN').getByTestId('change-value')).toHaveClass('is-price-down');
         expect(row('FLAT').getByTestId('change-value')).toHaveTextContent('0.0%');
         expect(row('FLAT').getByTestId('change-value')).not.toHaveClass('is-price-up');
@@ -138,6 +139,18 @@ describe('WatchlistTable', () => {
 
         expect(screen.getByRole('button', { name: 'Remove A from watchlist' })).toBeDisabled();
         expect(screen.getByRole('button', { name: 'Remove B from watchlist' })).toBeEnabled();
+    });
+
+    it('renders negative changes with "−" and no ASCII hyphen-minus anywhere in the table (live NVDA −1.5%)', () => {
+        renderTable({
+            rows: [
+                makeWatchlistItem({ symbol: 'NVDA', close: 225.51, change_pct: -1.4680823174728075, rvol_20: 0.6718976256402801 }),
+                makeWatchlistItem({ symbol: 'TINY', close: 0.12, change_pct: -0.04 }),
+            ],
+        });
+
+        expect(row('NVDA').getByTestId('change-value')).toHaveTextContent(/^−1\.5%$/);
+        expect(findAsciiMinus(screen.getByTestId('watchlist-table'))).toEqual([]);
     });
 
     it('has no score, breakout or signal framing', () => {

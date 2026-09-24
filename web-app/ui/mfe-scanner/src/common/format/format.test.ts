@@ -11,6 +11,7 @@ import {
     formatDateTime,
     formatInteger,
     formatMultiple,
+    formatNumber,
     formatPoints,
     formatPrice,
     formatRatioAsPercent,
@@ -41,7 +42,7 @@ describe('format', () => {
         expect(formatPrice(12.345)).toBe('$12.35');
         expect(formatPrice(0.0123)).toBe('$0.0123');
         expect(formatSignedPercent(15.5)).toBe('+15.5%');
-        expect(formatSignedPercent(-2)).toBe('-2.0%');
+        expect(formatSignedPercent(-2)).toBe('−2.0%');
         expect(formatSignedPercent(0)).toBe('0.0%');
         expect(formatRatioAsPercent(0.0019)).toBe('0.19%');
         expect(formatRatioAsPercent(0.93)).toBe('93.00%');
@@ -51,7 +52,7 @@ describe('format', () => {
         expect(formatCompactUsd(12_300)).toBe('$12.3K');
         expect(formatCompactUsd(999)).toBe('$999');
         expect(formatInteger(36.4)).toBe('36');
-        expect(formatPoints(-8)).toBe('-8');
+        expect(formatPoints(-8)).toBe('−8');
         expect(formatPoints(2.5)).toBe('2.5');
         expect(formatBreakoutState('breakout_from_consolidation')).toBe('breakout from consolidation');
         expect(formatDateTime('not-a-date')).toBe('not-a-date');
@@ -71,7 +72,7 @@ describe('format', () => {
         expect(formatUsdShort(999)).toBe('$999');
         expect(formatUsdShort(null)).toBe('—');
         expect(formatSignedUsd(0.48)).toBe('+$0.48');
-        expect(formatSignedUsd(-2.5)).toBe('-$2.50');
+        expect(formatSignedUsd(-2.5)).toBe('−$2.50');
         expect(formatSignedUsd(0)).toBe('$0.00');
         expect(formatPercent(5.21)).toBe('5.2%');
         expect(formatPlain(8)).toBe('8');
@@ -85,6 +86,41 @@ describe('format', () => {
         expect(formatCatalystTier('none')).toBe('None');
         expect(formatCatalystTier('A')).toBe('Tier A');
         expect(formatCatalystTier('B')).toBe('Tier B');
+    });
+
+    describe('negative numbers use "−" (U+2212), never an ASCII hyphen', () => {
+        it.each<[string, () => string, string]>([
+            ['formatNumber', () => formatNumber(-1234.5), '−1,234.50'],
+            ['formatPrice', () => formatPrice(-2.5), '−$2.50'],
+            ['formatPrice (sub-dollar)', () => formatPrice(-0.1234), '−$0.1234'],
+            ['formatSignedPercent', () => formatSignedPercent(-0.7), '−0.7%'],
+            ['formatRatioAsPercent', () => formatRatioAsPercent(-0.5), '−50.00%'],
+            ['formatMultiple', () => formatMultiple(-1.5), '−1.50×'],
+            ['formatCompactUsd', () => formatCompactUsd(-2_500_000_000), '−$2.50B'],
+            ['formatCompactUsd (small)', () => formatCompactUsd(-999), '−$999'],
+            ['formatCompact', () => formatCompact(-5_000_000), '−5.0M'],
+            ['formatUsdShort', () => formatUsdShort(-390473360), '−$390M'],
+            ['formatUsdShort (small)', () => formatUsdShort(-999), '−$999'],
+            ['formatSignedUsd', () => formatSignedUsd(-0.48), '−$0.48'],
+            ['formatSignedUsd (4 digits)', () => formatSignedUsd(-0.0048, 4), '−$0.0048'],
+            ['formatPercent', () => formatPercent(-5.21), '−5.2%'],
+            ['formatPlain', () => formatPlain(-2.5), '−2.5'],
+            ['formatInteger', () => formatInteger(-36.4), '−36'],
+            ['formatScore', () => formatScore(-3), '−3'],
+            ['formatPoints (integer)', () => formatPoints(-8), '−8'],
+            ['formatPoints (decimal)', () => formatPoints(-2.5), '−2.5'],
+        ])('%s', (_name, run, expected) => {
+            expect(run()).toBe(expected);
+            expect(run()).not.toMatch(/-\d/);
+        });
+
+        it('keeps "+" on positives where it was shown and zero unsigned', () => {
+            expect(formatSignedPercent(0.7)).toBe('+0.7%');
+            expect(formatSignedUsd(0.48)).toBe('+$0.48');
+            expect(formatSignedPercent(0)).toBe('0.0%');
+            expect(formatSignedUsd(0)).toBe('$0.00');
+            expect(formatPrice(2.5)).toBe('$2.50');
+        });
     });
 
     describe('market cap', () => {

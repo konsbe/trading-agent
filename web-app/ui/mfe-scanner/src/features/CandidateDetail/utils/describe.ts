@@ -12,26 +12,28 @@ import {
     formatUsdShort,
 } from '@/common/format/format';
 import { humanizeCode } from '@/common/format/humanize';
+import { MINUS } from '@/common/format/sign';
 
 const isNum = (value: number | null | undefined): value is number => typeof value === 'number' && Number.isFinite(value);
 
 export const capitalize = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 
 /** U+2212, used where a value is shown as a deduction ("−10 pts", "−12.5% from peak"). */
-export const MINUS = '−';
+export { MINUS };
 
 // ---- Gates ----------------------------------------------------------------
 
 interface GateFormat {
     name: string;
-    value: (n: number) => string;
+    /** Absent for bound-only gates. */
+    value?: (n: number) => string;
     bound: (n: number) => string;
     range?: (min: number, max: number) => string;
 }
 
 const GATE_FORMATS: Record<string, GateFormat> = {
     price: { name: 'Price', value: formatPrice, bound: formatPrice },
-    history: { name: 'History', value: n => `${formatPlain(n)} bars`, bound: n => `${formatPlain(n)} bars` },
+    history: { name: 'History', bound: n => `${formatPlain(n)} bars` },
     change_pct: {
         name: 'Day change',
         value: formatSignedPercent,
@@ -44,14 +46,26 @@ const GATE_FORMATS: Record<string, GateFormat> = {
 };
 
 /**
+ * Gates that never carry a per-symbol value, only a bound. The scanner doesn't
+ * store the bar count, so `history` always arrives with `value: null` and the
+ * 252 minimum: bound-only by definition, not missing data, so it gets no "—".
+ * "—" stays reserved for gates that do have a per-symbol value which is
+ * missing this time (e.g. a null RVOL → "RVOL — ≥ 3.0×").
+ */
+export const BOUND_ONLY_GATES: ReadonlySet<string> = new Set(['history']);
+
+/**
  * Value against its threshold in plain language: "RVOL 6.45× ≥ 3.0×",
- * "Day change +21.2% within 8–25%", "History — ≥ 252 bars" (no stored value).
- * A null threshold is unbounded and is left out.
+ * "Day change +21.2% within 8–25%", "RVOL — ≥ 3.0×" (value missing),
+ * "History ≥ 252 bars" (bound-only). A null threshold is unbounded and is left out.
  */
 export const gateLine = (check: GateCheck): string => {
     const format = GATE_FORMATS[check.key] ?? { name: check.label, value: formatPlain, bound: formatPlain };
     const parts = [format.name];
-    parts.push(isNum(check.value) ? format.value(check.value) + (check.value_is_proxy ? ' (est.)' : '') : EMPTY_VALUE);
+    if (!BOUND_ONLY_GATES.has(check.key)) {
+        const value = format.value ?? formatPlain;
+        parts.push(isNum(check.value) ? value(check.value) + (check.value_is_proxy ? ' (est.)' : '') : EMPTY_VALUE);
+    }
     if (isNum(check.min) && isNum(check.max)) {
         parts.push(`within ${format.range ? format.range(check.min, check.max) : `${format.bound(check.min)}–${format.bound(check.max)}`}`);
     } else if (isNum(check.min)) {

@@ -22,7 +22,7 @@ describe('GatesPanel', () => {
         const lines = within(screen.getByTestId('gate-checks')).getAllByRole('listitem').map(li => li.textContent);
         expect(lines).toEqual([
             '✓Met: Price $2.74 ≥ $2.00',
-            '✓Met: History — ≥ 252 bars',
+            '✓Met: History ≥ 252 bars',
             '✓Met: Day change +21.2% within 8–25%',
             '✓Met: RVOL 6.45× ≥ 3.0×',
             '✓Met: Dollar volume $21.7M ≥ $5.0M',

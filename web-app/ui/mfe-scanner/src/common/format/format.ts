@@ -1,24 +1,27 @@
 /** Display formatters. Every one renders `null` as EMPTY_VALUE, never as 0. */
 
 import { CatalystTier } from '@/api';
+import { formatSignedNumber, signOf } from './sign';
 
 export const EMPTY_VALUE = '—';
 
 const isNum = (value: number | null | undefined): value is number =>
     typeof value === 'number' && Number.isFinite(value);
 
+/** Fixed decimals; a negative gets "−" (U+2212) like every signed number here (see ./sign). */
 export const formatNumber = (value: number | null | undefined, fractionDigits = 2): string =>
-    isNum(value)
-        ? value.toLocaleString('en-US', { minimumFractionDigits: fractionDigits, maximumFractionDigits: fractionDigits })
-        : EMPTY_VALUE;
+    isNum(value) ? formatSignedNumber(value, { minimumFractionDigits: fractionDigits, maximumFractionDigits: fractionDigits }) : EMPTY_VALUE;
+
+/** Sign before the currency symbol: -2.5 → "−$2.50". */
+const usd = (value: number, body: (abs: number) => string) => `${signOf(value)}$${body(Math.abs(value))}`;
 
 /** Sub-dollar prices keep four decimals so penny names stay readable. */
 export const formatPrice = (value: number | null | undefined): string =>
-    isNum(value) ? `$${formatNumber(value, Math.abs(value) < 1 ? 4 : 2)}` : EMPTY_VALUE;
+    isNum(value) ? usd(value, abs => formatNumber(abs, abs < 1 ? 4 : 2)) : EMPTY_VALUE;
 
-/** `change_pct` is already a percentage (15.5 → "+15.5%"). */
+/** `change_pct` is already a percentage (15.5 → "+15.5%", -0.7 → "−0.7%"). */
 export const formatSignedPercent = (value: number | null | undefined): string =>
-    isNum(value) ? `${value > 0 ? '+' : ''}${formatNumber(value, 1)}%` : EMPTY_VALUE;
+    isNum(value) ? `${formatSignedNumber(value, { minimumFractionDigits: 1, maximumFractionDigits: 1, plus: true })}%` : EMPTY_VALUE;
 
 /** `pct_of_52w_high` is a raw ratio (0.0019 → "0.19%", 0.93 → "93.00%"). */
 export const formatRatioAsPercent = (value: number | null | undefined): string =>
@@ -29,11 +32,12 @@ export const formatMultiple = (value: number | null | undefined): string =>
 
 export const formatCompactUsd = (value: number | null | undefined): string => {
     if (!isNum(value)) return EMPTY_VALUE;
-    const abs = Math.abs(value);
-    if (abs >= 1e9) return `$${formatNumber(value / 1e9, 2)}B`;
-    if (abs >= 1e6) return `$${formatNumber(value / 1e6, 2)}M`;
-    if (abs >= 1e3) return `$${formatNumber(value / 1e3, 1)}K`;
-    return `$${formatNumber(value, 0)}`;
+    return usd(value, abs => {
+        if (abs >= 1e9) return `${formatNumber(abs / 1e9, 2)}B`;
+        if (abs >= 1e6) return `${formatNumber(abs / 1e6, 2)}M`;
+        if (abs >= 1e3) return `${formatNumber(abs / 1e3, 1)}K`;
+        return formatNumber(abs, 0);
+    });
 };
 
 const COMPACT_UNITS: [number, string][] = [
@@ -61,11 +65,13 @@ export const formatCompact = (value: number | null | undefined, fractionDigits =
  */
 export const formatUsdShort = (value: number | null | undefined): string => {
     if (!isNum(value)) return EMPTY_VALUE;
-    const [scaled, unit] = compactParts(value);
-    if (!unit) return `$${formatNumber(value, 0)}`;
-    let text = formatNumber(scaled, Math.abs(scaled) < 100 ? 1 : 0);
-    if (Math.abs(scaled) >= 10) text = text.replace(/\.0$/, '');
-    return `$${text}${unit}`;
+    return usd(value, abs => {
+        const [scaled, unit] = compactParts(abs);
+        if (!unit) return formatNumber(abs, 0);
+        let text = formatNumber(scaled, scaled < 100 ? 1 : 0);
+        if (scaled >= 10) text = text.replace(/\.0$/, '');
+        return `${text}${unit}`;
+    });
 };
 
 /** Appends the estimate marker; never to EMPTY_VALUE. */
@@ -90,29 +96,26 @@ export const marketCapIsEstimate = (fields: MarketCapFields): boolean =>
 export const marketCapText = (fields: MarketCapFields): string =>
     withEst(formatUsdShort(marketCapValue(fields)), marketCapIsEstimate(fields));
 
-/** 0.48 → "+$0.48", -0.48 → "-$0.48"; pass 4 digits for sub-dollar names (-0.0048 → "-$0.0048"). */
-export const formatSignedUsd = (value: number | null | undefined, fractionDigits = 2): string => {
-    if (!isNum(value)) return EMPTY_VALUE;
-    const sign = value > 0 ? '+' : value < 0 ? '-' : '';
-    return `${sign}$${formatNumber(Math.abs(value), fractionDigits)}`;
-};
+/** 0.48 → "+$0.48", -0.48 → "−$0.48"; pass 4 digits for sub-dollar names (-0.0048 → "−$0.0048"). */
+export const formatSignedUsd = (value: number | null | undefined, fractionDigits = 2): string =>
+    isNum(value) ? `${signOf(value, true)}$${formatNumber(Math.abs(value), fractionDigits)}` : EMPTY_VALUE;
 
 export const formatPercent = (value: number | null | undefined, fractionDigits = 1): string =>
     isNum(value) ? `${formatNumber(value, fractionDigits)}%` : EMPTY_VALUE;
 
 /** Threshold numbers without padding zeros: 8 → "8", 2.5 → "2.5". */
 export const formatPlain = (value: number | null | undefined): string =>
-    isNum(value) ? value.toLocaleString('en-US', { maximumFractionDigits: 2 }) : EMPTY_VALUE;
+    isNum(value) ? formatSignedNumber(value, { maximumFractionDigits: 2 }) : EMPTY_VALUE;
 
 export const formatInteger = (value: number | null | undefined): string =>
-    isNum(value) ? value.toLocaleString('en-US', { maximumFractionDigits: 0 }) : EMPTY_VALUE;
+    isNum(value) ? formatSignedNumber(value, { maximumFractionDigits: 0 }) : EMPTY_VALUE;
 
 export const formatScore = (value: number | null | undefined): string =>
-    isNum(value) ? String(Math.round(value)) : EMPTY_VALUE;
+    isNum(value) ? formatSignedNumber(Math.round(value), { maximumFractionDigits: 0 }) : EMPTY_VALUE;
 
-/** Points keep one decimal only when they have one (8 → "8", 2.5 → "2.5"). */
+/** Points keep one decimal only when they have one (8 → "8", 2.5 → "2.5", -8 → "−8"). */
 export const formatPoints = (value: number | null | undefined): string =>
-    isNum(value) ? (Number.isInteger(value) ? String(value) : formatNumber(value, 1)) : EMPTY_VALUE;
+    isNum(value) ? (Number.isInteger(value) ? formatSignedNumber(value, { maximumFractionDigits: 0 }) : formatNumber(value, 1)) : EMPTY_VALUE;
 
 /** Plain-text label for the raw `breakout_state` string. */
 export const formatBreakoutState = (value: string | null | undefined): string =>

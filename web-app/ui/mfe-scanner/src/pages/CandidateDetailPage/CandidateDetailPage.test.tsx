@@ -6,7 +6,8 @@ import usePriceBars from '@/hooks/scanner/usePriceBars';
 import useScannerSymbol from '@/hooks/scanner/useScannerSymbol';
 import useWatchlist from '@/hooks/watchlist/useWatchlist';
 import { HostModeProvider } from '@/providers/HostModeContext';
-import { makeCatlResponse, makePriceBars, makeSymbolResponse } from '@/test-utils/fixtures';
+import { findAsciiMinus } from '@/test-utils/asciiMinus';
+import { makeCatlResponse, makeFacts, makePriceBars, makeSymbolResponse } from '@/test-utils/fixtures';
 import CandidateDetailPage from './CandidateDetailPage';
 
 jest.mock('@/hooks/scanner/useScannerSymbol', () => ({ __esModule: true, default: jest.fn() }));
@@ -100,6 +101,8 @@ describe('CandidateDetailPage', () => {
             expect(screen.getByTestId('gates-badge')).toHaveTextContent('6/6 met');
             expect(screen.getByTestId('gate-rvol_20')).toHaveTextContent('RVOL 6.45× ≥ 3.0×');
             expect(screen.getByTestId('gate-dollar_volume')).toHaveTextContent('Dollar volume $21.7M ≥ $5.0M');
+            expect(screen.getByTestId('gate-history')).toHaveTextContent('Met: History ≥ 252 bars');
+            expect(screen.getByTestId('gate-history')).not.toHaveTextContent('—');
             expect(screen.getByTestId('evidence-note').textContent).toBe(data.evidence_note);
             expect(screen.getByTestId('fact-change-value')).toHaveTextContent('+$0.48 (+21.2%)');
             expect(screen.getByTestId('fact-change-value')).toHaveClass('is-price-up');
@@ -254,7 +257,9 @@ describe('CandidateDetailPage', () => {
         });
 
         it('shows "—" for null gate values and keeps the thresholds', () => {
-            expect(screen.getByTestId('gate-history')).toHaveTextContent('History — ≥ 252 bars');
+            // History is bound-only (no per-symbol value exists), so no "—"; RVOL and market cap have a missing value.
+            expect(screen.getByTestId('gate-history')).toHaveTextContent('Not met: History ≥ 252 bars');
+            expect(screen.getByTestId('gate-history')).not.toHaveTextContent('—');
             expect(screen.getByTestId('gate-rvol_20')).toHaveTextContent('RVOL — ≥ 3.0×');
             expect(screen.getByTestId('gate-market_cap')).toHaveTextContent('Market cap — within $300M–$10B');
             expect(screen.getByTestId('gate-rvol_20')).toHaveTextContent('RVOL not available');
@@ -325,6 +330,22 @@ describe('CandidateDetailPage', () => {
             expect(screen.getByTestId('gates-status')).toHaveTextContent('Passed the gates (Sep 21, 2026 close)');
             expect(screen.getByTestId('candidacy-notice')).toHaveTextContent('Latest data is from Sep 21, 2026');
         });
+    });
+
+    it('renders every negative number with "−", never an ASCII hyphen (gap, day change $ and %, gate, VWAP, peak)', () => {
+        const data = makeSymbolResponse({
+            facts: makeFacts({ change_abs: -0.3, change_pct: -4.5, gap_pct: -0.7, vwap_dist_pct: -3.2, above_vwap: false, pct_of_52w_high: 0.852 }),
+        });
+        data.gates = { ...data.gates, checks: data.gates.checks.map(c => (c.key === 'change_pct' ? { ...c, value: -4.5 } : c)) };
+        mockHook({ data });
+        renderAt();
+
+        expect(screen.getByTestId('fact-gap-value')).toHaveTextContent(/^−0\.7%$/);
+        expect(screen.getByTestId('fact-change-value')).toHaveTextContent(/^−\$0\.30 \(−4\.5%\)$/);
+        expect(screen.getByTestId('fact-high_52w')).toHaveTextContent('−14.8% from peak');
+        expect(screen.getByTestId('gate-change_pct')).toHaveTextContent('Day change −4.5% within 8–25%');
+        expect(screen.getByTestId('penalty-already_extended_change_gt_20')).toHaveTextContent('−10 pts');
+        expect(findAsciiMinus(screen.getByTestId('scanner-page'))).toEqual([]);
     });
 
     it('shows no candidacy notice for a candidate today', () => {

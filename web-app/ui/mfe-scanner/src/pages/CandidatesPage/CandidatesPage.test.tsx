@@ -7,6 +7,7 @@ import { ApiError } from '@/api';
 import { formatDateTime } from '@/common/format/format';
 import useScannerToday from '@/hooks/scanner/useScannerToday';
 import { HostModeProvider } from '@/providers/HostModeContext';
+import { findAsciiMinus } from '@/test-utils/asciiMinus';
 import { makeCandidate, makeTodayResponse } from '@/test-utils/fixtures';
 import CandidatesPage from './CandidatesPage';
 
@@ -198,12 +199,25 @@ describe('CandidatesPage', () => {
             expect(change('UP')).toHaveClass('is-price-up');
             expect(change('UP')).toHaveTextContent('+15.5%');
             expect(change('DOWN')).toHaveClass('is-price-down');
-            expect(change('DOWN')).toHaveTextContent('-3.2%');
+            expect(change('DOWN')).toHaveTextContent('−3.2%');
             ['FLAT', 'NONE'].forEach(symbol => {
                 expect(change(symbol)).not.toHaveClass('is-price-up');
                 expect(change(symbol)).not.toHaveClass('is-price-down');
             });
             expect(change('NONE')).toHaveTextContent('—');
+        });
+
+        it('renders no ASCII hyphen-minus anywhere in the table, with negative changes', () => {
+            const data = makeTodayResponse();
+            data.buckets.market.candidates = [
+                makeCandidate({ symbol: 'DOWN', change_pct: -3.2 }),
+                makeCandidate({ symbol: 'TINY', change_pct: -0.04, close: 0.4081 }),
+            ];
+            mockHook({ data });
+            renderPage();
+
+            expect(within(cell('DOWN', 'change_pct')).getByTestId('change-value')).toHaveTextContent(/^−3\.2%$/);
+            expect(findAsciiMinus(screen.getByTestId('scanner-bucket-market-table'))).toEqual([]);
         });
 
         it('keeps every other list cell neutral (price colours appear only in Change %)', () => {

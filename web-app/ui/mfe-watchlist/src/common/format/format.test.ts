@@ -26,12 +26,22 @@ describe('format', () => {
     it('formats percentages with a sign', () => {
         expect(formatSignedPercent(15.5)).toBe('+15.5%');
         expect(formatSignedPercent(0.32)).toBe('+0.3%');
-        expect(formatSignedPercent(-3)).toBe('-3.0%');
+        expect(formatSignedPercent(-3)).toBe('−3.0%');
         expect(formatSignedPercent(0)).toBe('0.0%');
     });
 
     it('formats multiples', () => {
         expect(formatMultiple(4.2)).toBe('4.20×');
+    });
+
+    it('renders every negative with "−" (U+2212), never an ASCII hyphen', () => {
+        expect(formatNumber(-1234.5)).toBe('−1,234.50');
+        expect(formatPrice(-2.5)).toBe('−$2.50');
+        expect(formatPrice(-0.1234)).toBe('−$0.1234');
+        // Live NVDA change: -1.4680823174728075 → "−1.5%".
+        expect(formatSignedPercent(-1.4680823174728075)).toBe('−1.5%');
+        expect(formatMultiple(-1.5)).toBe('−1.50×');
+        [formatNumber, formatPrice, formatSignedPercent, formatMultiple].forEach(fn => expect(fn(-3.21)).not.toMatch(/-\d/));
     });
 
     it('formats trading days as calendar dates', () => {
