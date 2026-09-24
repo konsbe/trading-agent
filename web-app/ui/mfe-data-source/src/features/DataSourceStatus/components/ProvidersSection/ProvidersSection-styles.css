@@ -1,0 +1,5 @@
+.data-source-providers {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
+    gap: var(--space-md);
+}

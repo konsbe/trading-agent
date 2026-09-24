@@ -1,0 +1,50 @@
+/* Reusable Data Source classes shared across features. */
+
+.data-source-muted {
+    margin: 0;
+    color: var(--color-on-surface-variant);
+}
+
+.data-source-mono {
+    font-family: var(--font-family-label);
+    font-variant-numeric: tabular-nums;
+}
+
+.data-source-sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+}
+
+/* A widget-surface panel that is always expanded (same look as CollapsibleCard). */
+.data-source-card {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+    min-width: 0;
+    padding: var(--space-md);
+    border-radius: var(--radius-lg);
+    background: var(--color-surface-container);
+    color: var(--color-on-surface);
+}
+
+/* Inline "Unavailable" line for a section the server could not read. */
+.data-source-unavailable {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xxs);
+    padding: var(--space-sm) var(--space-md);
+    border: 1px dashed var(--color-outline);
+    border-radius: var(--radius-md);
+}
+
+.data-source-unavailable p {
+    margin: 0;
+}
+
+.data-source-unavailable__title {
+    font-weight: var(--font-weight-bold);
+}

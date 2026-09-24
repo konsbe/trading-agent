@@ -1,0 +1,106 @@
+/* Plain text only: no colour anywhere in the chain (the page's only colour is the overall indicator). */
+.data-source-chain__last-clean {
+    align-self: flex-start;
+    margin: 0;
+    padding: var(--space-xs) var(--space-md);
+    border-left: 3px solid var(--color-outline);
+    border-radius: var(--radius-md);
+    background: var(--color-surface-container-low);
+    font-weight: var(--font-weight-medium);
+}
+
+.data-source-chain__scroll {
+    overflow-x: auto;
+    border: 1px solid var(--color-outline-variant);
+    border-radius: var(--radius-md);
+}
+
+.data-source-chain__table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.data-source-chain__table th {
+    padding: var(--space-sm) var(--space-md);
+    border-bottom: 1px solid var(--color-outline-variant);
+    background: var(--color-surface-container-low);
+    color: var(--color-on-surface-variant);
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-medium);
+    letter-spacing: 0.04em;
+    text-align: left;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.data-source-chain__table td {
+    padding: var(--space-sm) var(--space-md);
+    border-bottom: 1px solid var(--color-outline-variant);
+    vertical-align: top;
+}
+
+.data-source-chain__table tbody tr:last-child td,
+.data-source-chain__row.has-detail td {
+    border-bottom: 0;
+}
+
+.data-source-chain__status-cell {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xxs);
+}
+
+.data-source-chain__status {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-xs);
+    color: var(--color-on-surface);
+}
+
+/* Most concerning: nothing ran at all. Weight + glyph, same colour as the text. */
+.data-source-chain__status--not_run {
+    font-weight: var(--font-weight-bold);
+}
+
+.data-source-chain__status--failed {
+    font-weight: var(--font-weight-bold);
+}
+
+/* Least concerning: before tracking existed. */
+.data-source-chain__status--not_recorded {
+    color: var(--color-on-surface-variant);
+}
+
+.data-source-chain__glyph {
+    flex-shrink: 0;
+}
+
+.data-source-chain__note {
+    font-size: var(--font-size-sm);
+}
+
+.data-source-chain__detail-row td {
+    padding-top: 0;
+}
+
+.data-source-chain__detail {
+    margin: 0;
+    padding: var(--space-xs) var(--space-md);
+    border-left: 2px solid var(--color-outline);
+    border-radius: var(--radius-sm);
+    background: var(--color-surface-container-low);
+    color: var(--color-on-surface);
+    font-size: var(--font-size-sm);
+}
+
+.data-source-chain__detail-row.is-completed_after_retry .data-source-chain__detail {
+    color: var(--color-on-surface-variant);
+}
+
+.data-source-chain__detail-label {
+    font-weight: var(--font-weight-medium);
+}
+
+.data-source-chain__footnote {
+    font-size: var(--font-size-xs);
+}

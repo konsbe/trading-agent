@@ -50,6 +50,16 @@
       "description": "Frozen Phase 2 backtest report: why the screener makes no predictive claim",
       "roles": [],
       "enabled": true
+    },
+    "mfe_data_source": {
+      "label": "Data Source",
+      "version": "1.0.0",
+      "endpoint": "http://localhost:3004/remoteEntry.js",
+      "module": "./DataSource",
+      "scope": "mfe_data_source",
+      "description": "Provider budgets and daily-chain health, checked on demand",
+      "roles": [],
+      "enabled": true
     }
   },
   "iframes": {}

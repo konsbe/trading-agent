@@ -1,0 +1,111 @@
+{
+  "checked_at": "2026-09-24T19:40:32Z",
+  "providers": {
+    "finnhub": {
+      "role": "universe, quotes, fundamentals",
+      "daily_used": 9993,
+      "daily_window_start": "2026-09-24",
+      "daily_reset_tz": "UTC",
+      "daily_limit": null,
+      "daily_used_pct": null,
+      "rate_per_sec": 1,
+      "theoretical_daily_capacity": 86400,
+      "degraded_count_24h": null
+    },
+    "tiingo": {
+      "role": "primary bar provider",
+      "daily_used": 5080,
+      "daily_window_start": "2026-09-24",
+      "daily_reset_tz": "EST",
+      "daily_limit": 90000,
+      "daily_used_pct": 5.6,
+      "rate_per_sec": 2,
+      "theoretical_daily_capacity": 172800,
+      "degraded_count_24h": null
+    }
+  },
+  "daily_chain": {
+    "last_clean_session": "2026-09-23",
+    "sessions": [
+      {
+        "session": "2026-09-23",
+        "bars_coverage_now_pct": 99.5,
+        "attempts": 1,
+        "scanner_completed": true,
+        "tracker_completed": true,
+        "gave_up_reason": null,
+        "last_error": null,
+        "status": "clean"
+      },
+      {
+        "session": "2026-09-22",
+        "bars_coverage_now_pct": 99.5,
+        "attempts": 0,
+        "scanner_completed": false,
+        "tracker_completed": false,
+        "gave_up_reason": null,
+        "last_error": null,
+        "status": "not_recorded",
+        "note": "before the chain recorded its runs (momentum_chain_runs)"
+      },
+      {
+        "session": "2026-09-21",
+        "bars_coverage_now_pct": 99.6,
+        "attempts": 0,
+        "scanner_completed": false,
+        "tracker_completed": false,
+        "gave_up_reason": null,
+        "last_error": null,
+        "status": "not_recorded",
+        "note": "before the chain recorded its runs (momentum_chain_runs)"
+      },
+      {
+        "session": "2026-09-18",
+        "bars_coverage_now_pct": 99.6,
+        "attempts": 0,
+        "scanner_completed": false,
+        "tracker_completed": false,
+        "gave_up_reason": null,
+        "last_error": null,
+        "status": "not_recorded",
+        "note": "before the chain recorded its runs (momentum_chain_runs)"
+      },
+      {
+        "session": "2026-09-17",
+        "bars_coverage_now_pct": 99.5,
+        "attempts": 0,
+        "scanner_completed": false,
+        "tracker_completed": false,
+        "gave_up_reason": null,
+        "last_error": null,
+        "status": "not_recorded",
+        "note": "before the chain recorded its runs (momentum_chain_runs)"
+      },
+      {
+        "session": "2026-09-16",
+        "bars_coverage_now_pct": 99.4,
+        "attempts": 0,
+        "scanner_completed": false,
+        "tracker_completed": false,
+        "gave_up_reason": null,
+        "last_error": null,
+        "status": "not_recorded",
+        "note": "before the chain recorded its runs (momentum_chain_runs)"
+      },
+      {
+        "session": "2026-09-15",
+        "bars_coverage_now_pct": 99.4,
+        "attempts": 0,
+        "scanner_completed": false,
+        "tracker_completed": false,
+        "gave_up_reason": null,
+        "last_error": null,
+        "status": "not_recorded",
+        "note": "before the chain recorded its runs (momentum_chain_runs)"
+      }
+    ],
+    "sessions_shown": 7
+  },
+  "overall": "healthy",
+  "overall_reasons": []
+}

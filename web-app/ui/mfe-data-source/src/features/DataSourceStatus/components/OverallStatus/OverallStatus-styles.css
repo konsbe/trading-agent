@@ -1,0 +1,63 @@
+.data-source-overall__line {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-sm) var(--space-md);
+}
+
+/*
+ * Deliberate exception to the app's "no status colour" rule: system-health
+ * status tokens (never the price aliases), drawn as a pill + dot + icon — a
+ * shape no price element uses.
+ */
+.data-source-overall__indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-xs);
+    padding: var(--space-xs) var(--space-md) var(--space-xs) var(--space-sm);
+    border: 1px solid transparent;
+    border-radius: var(--radius-full);
+    font-family: var(--font-family-headline);
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-bold);
+}
+
+.data-source-overall__indicator.is-healthy {
+    border-color: var(--color-status-ok);
+    background: var(--color-status-ok-container);
+    color: var(--color-on-status-ok-container);
+}
+
+.data-source-overall__indicator.is-attention {
+    border-color: var(--color-status-warning);
+    background: var(--color-status-warning-container);
+    color: var(--color-on-status-warning-container);
+}
+
+.data-source-overall__dot {
+    width: 0.625rem;
+    height: 0.625rem;
+    border-radius: var(--radius-full);
+}
+
+.data-source-overall__indicator.is-healthy .data-source-overall__dot {
+    background: var(--color-status-ok);
+}
+
+.data-source-overall__indicator.is-attention .data-source-overall__dot {
+    background: var(--color-status-warning);
+}
+
+.data-source-overall__text {
+    margin: 0;
+    color: var(--color-on-surface);
+}
+
+.data-source-overall__reasons {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xxs);
+    margin: 0;
+    padding-left: var(--space-lg);
+    color: var(--color-on-surface);
+}

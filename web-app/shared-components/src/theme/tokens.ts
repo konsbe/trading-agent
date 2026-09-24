@@ -45,6 +45,15 @@ const buildThemeVariables = (mode: ThemeMode): ThemeVariables => {
         // alias its green (secondary) and red (error). Never use them in chrome.
         '--color-price-up': color('secondary'),
         '--color-price-down': color('error'),
+        // System-health status (the Data Source page's overall indicator) ONLY —
+        // infrastructure state, never a stock signal. Distinct names from the
+        // price aliases so neither can stand in for the other.
+        '--color-status-ok': color('secondary'),
+        '--color-status-ok-container': color('secondary-container'),
+        '--color-on-status-ok-container': color('on-secondary-container'),
+        '--color-status-warning': color('tertiary'),
+        '--color-status-warning-container': color('tertiary-container'),
+        '--color-on-status-warning-container': color('on-tertiary-container'),
         '--font-family': fontFamily.body.value,
         '--font-family-headline': fontFamily.headline.value,
         '--font-family-label': fontFamily.label.value,

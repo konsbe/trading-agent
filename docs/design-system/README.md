@@ -63,6 +63,12 @@ Other theme variables: `--color-focus-ring`, `--color-overlay`, `--shadow-sm`, `
 change, a chart's up/down candles and volume bars. Stitch reserves green/red for
 this and defines no dedicated tokens, so these are aliases (decision 2026-09-24).
 
+**System-status colours** — `--color-status-ok` (= `secondary`) and
+`--color-status-warning` (= `tertiary`), each with `-container` /
+`on-…-container`. Use them **only** for infrastructure health (the Data Source
+page's overall indicator: a pill with a dot and an icon), never for a stock or a
+verdict, and never in place of the price aliases.
+
 Hover/pressed states are state layers over the base colour, not new tokens:
 
 ```css

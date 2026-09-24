@@ -36,6 +36,12 @@ describe('design tokens', () => {
         expect(dark['--color-price-up']).toBe(dark['--color-secondary']);
         expect(dark['--color-price-down']).toBe(dark['--color-error']);
         expect(getThemeVariables('light')['--color-price-up']).toBe('#0d9488');
+        expect(dark['--color-status-ok']).toBe(dark['--color-secondary']);
+        expect(dark['--color-status-ok-container']).toBe(dark['--color-secondary-container']);
+        expect(dark['--color-on-status-ok-container']).toBe(dark['--color-on-secondary-container']);
+        expect(dark['--color-status-warning']).toBe(dark['--color-tertiary']);
+        expect(dark['--color-status-warning-container']).toBe(dark['--color-tertiary-container']);
+        expect(dark['--color-on-status-warning-container']).toBe(dark['--color-on-tertiary-container']);
         expect(dark['--font-family']).toBe('Inter, sans-serif');
         expect(dark['--font-family-label']).toBe('JetBrains Mono, monospace');
         expect(getThemeVariables('light')['--color-primary']).toBe('#0284c7');

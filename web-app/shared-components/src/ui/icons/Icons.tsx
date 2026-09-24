@@ -67,6 +67,20 @@ export const LockIcon = createIcon('LockIcon', (
     </>
 ));
 
+export const CheckCircleIcon = createIcon('CheckCircleIcon', (
+    <>
+        <circle cx="12" cy="12" r="9" />
+        <path d="m8.5 12 2.5 2.5 4.5-5" />
+    </>
+));
+
+export const AlertTriangleIcon = createIcon('AlertTriangleIcon', (
+    <>
+        <path d="M10.3 3.9 2.4 17.5A2 2 0 0 0 4.1 20.5h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" />
+        <path d="M12 9v4M12 17h.01" />
+    </>
+));
+
 export const MonitorIcon = createIcon('MonitorIcon', (
     <>
         <rect x="2" y="3" width="20" height="14" rx="2" />

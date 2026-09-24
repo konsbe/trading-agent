@@ -78,6 +78,7 @@ describe('AppRouter', () => {
         '/candidates': { key: 'mfe_scanner', component: './Scanner', title: "Today's Candidates" },
         '/watchlist': { key: 'mfe_watchlist', component: './Watchlist', title: 'Watchlist' },
         '/backtest-lab': { key: 'mfe_backtest_lab', component: './BacktestLab', title: 'Backtest Lab' },
+        '/data-source': { key: 'mfe_data_source', component: './DataSource', title: 'Data Source' },
     };
 
     it.each(
@@ -101,6 +102,8 @@ describe('AppRouter', () => {
         ['/watchlist/VGZ', '/watchlist'],
         ['/backtest-lab', '/backtest-lab'],
         ['/backtest-lab/anything', '/backtest-lab'],
+        ['/data-source', '/data-source'],
+        ['/data-source/tiingo', '/data-source'],
     ])(
         'renders the remote for %s inside the layout and access control',
         (path, base) => {

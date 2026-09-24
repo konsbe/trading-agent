@@ -84,7 +84,19 @@ export const routes: RouteObject[] = [
             },
             {
                 path: "data-source/*",
-                element: <PrivateRouter component={<>Data Source</>} />,
+                element: (
+                    <PrivateRouter
+                        component={
+                            <SingleMfePage
+                                mfe_key="mfe_data_source"
+                                mfe_component="./DataSource"
+                                mfe_header_title="Data Source"
+                                mfe_navigation_path="/data-source"
+                                mfe_enable_navigation={false}
+                            />
+                        }
+                    />
+                ),
             },
             {
                 path: "settings/*",

@@ -1,0 +1,92 @@
+.data-source-provider {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+    min-width: 0;
+    padding: var(--space-sm) var(--space-md) var(--space-md);
+    border: 1px solid var(--color-outline-variant);
+    border-radius: var(--radius-md);
+    background: var(--color-surface-container-low);
+}
+
+.data-source-provider p {
+    margin: 0;
+}
+
+.data-source-provider__header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--space-xs) var(--space-sm);
+}
+
+.data-source-provider__name {
+    margin: 0;
+    font-family: var(--font-family-headline);
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-bold);
+}
+
+.data-source-provider__role,
+.data-source-provider__small {
+    font-size: var(--font-size-sm);
+}
+
+.data-source-provider__usage {
+    color: var(--color-on-surface);
+}
+
+.data-source-provider__usage .data-source-mono {
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-bold);
+}
+
+.data-source-provider__bar {
+    height: 0.5rem;
+    overflow: hidden;
+    border-radius: var(--radius-full);
+    background: var(--color-surface-container-highest);
+}
+
+.data-source-provider__fill {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--color-primary);
+}
+
+/* Only when overall_reasons names this provider's budget (Data Source status exception). */
+.data-source-provider__bar.is-over-budget .data-source-provider__fill {
+    background: var(--color-status-warning);
+}
+
+.data-source-provider__facts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-xs) var(--space-lg);
+    margin: 0;
+    color: var(--color-on-surface-variant);
+    font-size: var(--font-size-sm);
+}
+
+.data-source-provider__facts div {
+    display: flex;
+    gap: var(--space-xs);
+}
+
+.data-source-provider__facts dt {
+    font-weight: var(--font-weight-medium);
+}
+
+.data-source-provider__facts dt::after {
+    content: ':';
+}
+
+.data-source-provider__facts dd {
+    margin: 0;
+}
+
+.data-source-provider__missing {
+    color: var(--color-on-surface);
+    font-weight: var(--font-weight-medium);
+}
