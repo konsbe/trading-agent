@@ -70,6 +70,40 @@ describe('ThemeProvider', () => {
         expect(screen.getByTestId('ta-theme-root')).toHaveAttribute('data-theme', 'light');
     });
 
+    describe('hosted, before userData arrives', () => {
+        afterEach(() => document.documentElement.removeAttribute('data-theme'));
+
+        it.each([
+            ['light', true],
+            ['dark', false],
+        ])('follows the %s theme the shell applied to <html>, not the OS preference', (host, prefersDark) => {
+            mockMatchMedia(prefersDark);
+            document.documentElement.setAttribute('data-theme', host);
+
+            render(<ThemeProvider userData={null}><div>test</div></ThemeProvider>);
+
+            expect(screen.getByTestId('ta-theme-root')).toHaveAttribute('data-theme', host);
+        });
+
+        it('switches to userData.theme once it arrives', () => {
+            document.documentElement.setAttribute('data-theme', 'light');
+            const { rerender } = render(<ThemeProvider userData={null}><div>test</div></ThemeProvider>);
+
+            rerender(<ThemeProvider userData={{ theme: 'dark' }}><div>test</div></ThemeProvider>);
+
+            expect(screen.getByTestId('ta-theme-root')).toHaveAttribute('data-theme', 'dark');
+        });
+
+        it('ignores an unknown <html data-theme> and uses the OS preference', () => {
+            mockMatchMedia(true);
+            document.documentElement.setAttribute('data-theme', 'sepia');
+
+            render(<ThemeProvider><div>test</div></ThemeProvider>);
+
+            expect(screen.getByTestId('ta-theme-root')).toHaveAttribute('data-theme', 'dark');
+        });
+    });
+
     it('getSystemTheme defaults to light when matchMedia is unavailable', () => {
         Object.defineProperty(window, 'matchMedia', { writable: true, value: undefined });
 

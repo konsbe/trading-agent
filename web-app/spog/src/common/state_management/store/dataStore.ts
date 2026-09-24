@@ -18,7 +18,7 @@ declare global {
 // Create store instance ONCE globally
 let globalStore: any = null;
 
-const createStoreInstance = () => {
+export const createStoreInstance = () => {
   return configureStore({
     reducer: {
       filterData: filterDataSlice.reducer,

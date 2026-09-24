@@ -1,6 +1,7 @@
 import { render, screen, fireEvent, renderHook } from '@testing-library/react';
 import { ThemeProvider, useThemeProvider, THEME_STORAGE_KEY } from './ThemeProvider';
 import { getGlobalStore } from '../../common/state_management/utils/globalStoreUtils';
+import { installFreshStore } from '../../utils/tests/freshStore';
 
 const mockMatchMedia = (dark: boolean) => {
     Object.defineProperty(window, 'matchMedia', {
@@ -35,12 +36,53 @@ const renderWithProvider = () =>
         </ThemeProvider>
     );
 
+/** A page load with `saved` in localStorage (or nothing). */
+const loadWith = (saved: string | null) => {
+    localStorage.clear();
+    if (saved !== null) localStorage.setItem(THEME_STORAGE_KEY, saved);
+    return installFreshStore();
+};
+
 describe('ThemeProvider', () => {
     beforeEach(() => {
-        localStorage.clear();
         document.documentElement.removeAttribute('data-theme');
         document.documentElement.removeAttribute('style');
         mockMatchMedia(false);
+        loadWith(null);
+    });
+
+    describe('on page load, the shell and the store (which MFEs follow) agree', () => {
+        it.each([
+            ['light', 'light'],
+            ['dark', 'dark'],
+            [null, 'dark'],
+        ])('saved %s → %s everywhere, before anyone touches the switcher', (saved, expected) => {
+            const store = loadWith(saved);
+            expect(store.getState().user.theme).toBe(expected);
+
+            renderWithProvider();
+
+            expect(screen.getByTestId('theme')).toHaveTextContent(expected);
+            expect(document.documentElement).toHaveAttribute('data-theme', expected);
+            expect(store.getState().user.theme).toBe(expected);
+        });
+
+        it('does not rewrite storage on load', () => {
+            loadWith(null);
+            renderWithProvider();
+            expect(localStorage.getItem(THEME_STORAGE_KEY)).toBeNull();
+        });
+
+        it('persists and propagates a switch after a light load', () => {
+            const store = loadWith('light');
+            renderWithProvider();
+
+            fireEvent.click(screen.getByText('toggle'));
+
+            expect(screen.getByTestId('theme')).toHaveTextContent('dark');
+            expect(localStorage.getItem(THEME_STORAGE_KEY)).toBe('dark');
+            expect(store.getState().user.theme).toBe('dark');
+        });
     });
 
     it('renders children', () => {
@@ -72,17 +114,18 @@ describe('ThemeProvider', () => {
     });
 
     it('initializes from a valid stored theme and ignores invalid values', () => {
-        localStorage.setItem(THEME_STORAGE_KEY, 'light');
+        loadWith('light');
         const { unmount } = renderWithProvider();
         expect(screen.getByTestId('theme')).toHaveTextContent('light');
         unmount();
 
-        localStorage.setItem(THEME_STORAGE_KEY, 'not-a-theme');
+        loadWith('not-a-theme');
         renderWithProvider();
         expect(screen.getByTestId('theme')).toHaveTextContent('dark');
     });
 
     it('toggles between dark and light, persisting and syncing the store', () => {
+        const store = getGlobalStore();
         renderWithProvider();
 
         fireEvent.click(screen.getByText('toggle'));
@@ -90,10 +133,12 @@ describe('ThemeProvider', () => {
         expect(screen.getByTestId('is-dark')).toHaveTextContent('false');
         expect(document.documentElement).toHaveAttribute('data-theme', 'light');
         expect(localStorage.getItem(THEME_STORAGE_KEY)).toBe('light');
+        expect(store.getState().user.theme).toBe('light');
 
         fireEvent.click(screen.getByText('toggle'));
         expect(screen.getByTestId('theme')).toHaveTextContent('dark');
         expect(localStorage.getItem(THEME_STORAGE_KEY)).toBe('dark');
+        expect(store.getState().user.theme).toBe('dark');
     });
 
     it('switches to an explicit mode', () => {
@@ -132,7 +177,9 @@ describe('ThemeProvider', () => {
     it('keeps working when localStorage is unavailable', () => {
         const setItem = jest.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('denied'); });
         const getItem = jest.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new Error('denied'); });
+        installFreshStore();
         renderWithProvider();
+        expect(screen.getByTestId('theme')).toHaveTextContent('dark');
 
         fireEvent.click(screen.getByText('toggle'));
 

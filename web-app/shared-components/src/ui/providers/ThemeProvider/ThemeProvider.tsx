@@ -11,11 +11,22 @@ interface ThemeProviderProps {
 }
 
 /**
+ * The theme the shell already applied to `<html>` (spog does so before any
+ * remote mounts). Null when standalone, where nothing themes `<html>`.
+ */
+const getHostTheme = (): ThemeMode | null => {
+    const applied = globalThis.document?.documentElement.getAttribute("data-theme");
+    return applied === "light" || applied === "dark" ? applied : null;
+};
+
+/**
  * MFE theme boundary: applies the Stitch light/dark tokens to its subtree.
- * Uses `userData.theme` (the shell's choice) when provided, otherwise the OS preference.
+ * Uses `userData.theme` (the shell's choice) when provided. Until it arrives
+ * over the message bus, follows the theme the host applied to `<html>` so a
+ * hosted remote never paints in the other mode first; standalone, the OS preference.
  */
 const ThemeProvider = ({ children, userData }: ThemeProviderProps) => {
-    const theme = userData?.theme ?? getSystemTheme();
+    const theme = userData?.theme ?? getHostTheme() ?? getSystemTheme();
     const style = useMemo(
         () => ({ ...getThemeVariables(theme), colorScheme: theme }) as CSSProperties,
         [theme]

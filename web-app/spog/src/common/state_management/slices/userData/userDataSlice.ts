@@ -1,9 +1,10 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import type { ThemeMode } from '@trading-agent/shared-components';
+import { DEFAULT_THEME, getInitialTheme } from '../../../../providers/ThemeProvider/themeStorage';
 
 export type { ThemeMode };
 
-export const defaultTheme: ThemeMode = "dark";
+export const defaultTheme: ThemeMode = DEFAULT_THEME;
 export interface UserData {
     userName?: string;
     userRoles?: string[];
@@ -19,17 +20,20 @@ export interface UserState {
     isAuthenticated: boolean;
 }
 
-const initialState: UserState = {
-    theme: defaultTheme,
+// Lazy, so the store starts with the saved theme: MFEs follow `state.theme`
+// from their first message, before anyone touches the switcher.
+const initialState = (): UserState => ({
+    theme: getInitialTheme(),
     currentUser: null,
     isAuthenticated: false,
-};
+});
 
 export const userDataSlice = createSlice({
     name: 'user',
     initialState,
     reducers: {
         initUserDataStore: (state, action: PayloadAction<UserData>) => {
+            const theme = action.payload.theme || state.currentUser?.theme || state.theme;
             // Return new state object to avoid Immer issues
             return {
                 currentUser: {
@@ -37,16 +41,16 @@ export const userDataSlice = createSlice({
                     userRoles: action.payload.userRoles || state.currentUser?.userRoles || [],
                     authenticated: action.payload.authenticated || state.currentUser?.authenticated || false,
                     token: action.payload.token || state.currentUser?.token || '',
-                    theme: action.payload.theme || state.currentUser?.theme || defaultTheme,
+                    theme,
                 },
-                theme: action.payload.theme || state.currentUser?.theme || defaultTheme,
+                theme,
                 isAuthenticated: action.payload.authenticated || state.currentUser?.authenticated || false,
             };
         },
         updateUserDataTheme: (state, action: PayloadAction<{currentUser: UserData}>) => {
             // state.theme must follow the switch even before anyone signs in:
             // MFEs read it from the published slice when currentUser is null.
-            const newTheme = action.payload.currentUser?.theme || state.currentUser?.theme || defaultTheme;
+            const newTheme = action.payload.currentUser?.theme || state.currentUser?.theme || state.theme;
             state.theme = newTheme;
             if (state.currentUser) {
                 state.currentUser.theme = newTheme;
@@ -57,14 +61,12 @@ export const userDataSlice = createSlice({
                 state.currentUser.token = action.payload.currentUser?.token;
             }
         },
-        clearUserDataStore: () => {
-            // Return the initial state
-            return {
-                currentUser: null,
-                isAuthenticated: false,
-                theme: defaultTheme,  
-            };
-        },
+        // Signing out clears the user, not the display theme the shell is showing.
+        clearUserDataStore: (state) => ({
+            currentUser: null,
+            isAuthenticated: false,
+            theme: state.theme,
+        }),
     },
 });
 

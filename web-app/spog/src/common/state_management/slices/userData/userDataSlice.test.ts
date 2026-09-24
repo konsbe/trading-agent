@@ -7,9 +7,13 @@ import reducer, {
     updateUserDataTheme,
     UserState,
     UserData,
+    defaultTheme,
 } from './userDataSlice';
+import { THEME_STORAGE_KEY } from '../../../../providers/ThemeProvider/themeStorage';
 
 describe('userDataSlice', () => {
+    beforeEach(() => localStorage.clear());
+
     const initialState: UserState = {
         theme: "dark",
         currentUser: null,
@@ -18,6 +22,28 @@ describe('userDataSlice', () => {
 
     it('should return the initial state', () => {
         expect(reducer(undefined, { type: '' })).toEqual(initialState);
+    });
+
+    describe('initial theme (restored on page load)', () => {
+        it.each([
+            ['light', 'light'],
+            ['dark', 'dark'],
+            ['not-a-theme', 'dark'],
+        ])('starts from a saved %s as %s', (saved, expected) => {
+            localStorage.setItem(THEME_STORAGE_KEY, saved);
+            expect(reducer(undefined, { type: '' }).theme).toBe(expected);
+        });
+
+        it('starts from the default when nothing is saved', () => {
+            expect(reducer(undefined, { type: '' }).theme).toBe(defaultTheme);
+            expect(defaultTheme).toBe('dark');
+        });
+
+        it('starts from the default when storage is unavailable', () => {
+            const getItem = jest.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new Error('denied'); });
+            expect(reducer(undefined, { type: '' }).theme).toBe('dark');
+            getItem.mockRestore();
+        });
     });
 
     it('should handle initUserDataStore', () => {
@@ -84,7 +110,7 @@ describe('userDataSlice', () => {
         expect(nextState.isAuthenticated).toBe(true); // state.currentUser.authenticated fallback
     });
 
-    it('should fall back to defaultTheme when neither payload nor state have a theme', () => {
+    it("should fall back to the store's current theme when neither payload nor user have one", () => {
         const state: UserState = {
             theme: "light",
             currentUser: {
@@ -97,8 +123,8 @@ describe('userDataSlice', () => {
             authenticated: false,
             theme: undefined as any,
         }));
-        expect(nextState.theme).toBe('dark');
-        expect(nextState.currentUser?.theme).toBe('dark');
+        expect(nextState.theme).toBe('light');
+        expect(nextState.currentUser?.theme).toBe('light');
     });
 
     it('should handle updateUserDataStoreToken', () => {
@@ -157,7 +183,8 @@ describe('userDataSlice', () => {
             theme: "light",
         };
         const nextState = reducer(state, clearUserDataStore());
-        expect(nextState).toEqual(initialState);
+        // Signing out clears the user but keeps the theme the shell is showing.
+        expect(nextState).toEqual({ ...initialState, theme: 'light' });
     });
 
     it('should handle updateUserDataTheme when currentUser exists', () => {
@@ -198,7 +225,7 @@ describe('userDataSlice', () => {
         expect(nextState.theme).toBe('dark');
     });
 
-    it('should fall back to defaultTheme when both payload and currentUser themes are falsy', () => {
+    it("should keep the store's current theme when both payload and currentUser themes are falsy", () => {
         const state: UserState = {
             theme: "light",
             currentUser: {
@@ -213,8 +240,8 @@ describe('userDataSlice', () => {
         const nextState = reducer(state, updateUserDataTheme({
             currentUser: { userName: 'Jane', userRoles: [], token: 'tok', authenticated: true, theme: undefined as any },
         }));
-        expect(nextState.currentUser?.theme).toBe('dark');
-        expect(nextState.theme).toBe('dark');
+        expect(nextState.currentUser?.theme).toBe('light');
+        expect(nextState.theme).toBe('light');
     });
 
     // MFEs read the theme from the published slice when nobody is signed in, so

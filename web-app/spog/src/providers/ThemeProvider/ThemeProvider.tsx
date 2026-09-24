@@ -1,8 +1,10 @@
 import { createContext, ReactNode, useCallback, useContext, useLayoutEffect, useState } from "react";
 import { applyTheme, getSystemTheme } from '@trading-agent/shared-components';
-import { defaultTheme, ThemeMode } from '../../common/state_management/slices/userData/userDataSlice';
+import { ThemeMode, updateUserDataTheme } from '../../common/state_management/slices/userData/userDataSlice';
 import { getGlobalStore } from '../../common/state_management/utils/globalStoreUtils';
-import { updateUserDataTheme } from '../../common/state_management/slices/userData/userDataSlice';
+import { saveTheme } from './themeStorage';
+
+export { THEME_STORAGE_KEY } from './themeStorage';
 
 interface ThemeContextType {
     theme: ThemeMode;
@@ -15,34 +17,19 @@ interface ThemeContextType {
 
 const ThemeProviderContext = createContext<ThemeContextType | undefined>(undefined);
 
-export const THEME_STORAGE_KEY = 'app-theme';
-
-const isThemeMode = (value: unknown): value is ThemeMode => value === 'light' || value === 'dark';
-
-const getStoredTheme = (): ThemeMode | null => {
-    try {
-        const stored = localStorage.getItem(THEME_STORAGE_KEY);
-        return isThemeMode(stored) ? stored : null;
-    } catch {
-        return null;
-    }
-};
-
 const persistTheme = (theme: ThemeMode) => {
-    try {
-        localStorage.setItem(THEME_STORAGE_KEY, theme);
-    } catch {
-        // Storage can be unavailable (private mode); the in-memory theme still applies.
-    }
+    saveTheme(theme);
     getGlobalStore().dispatch(updateUserDataTheme({ currentUser: { theme, authenticated: false } }));
 };
 
 /**
  * The shell's single light/dark switch: holds the theme and applies the Stitch
- * tokens (CSS variables, `data-theme`, `color-scheme`) to `<html>`.
+ * tokens (CSS variables, `data-theme`, `color-scheme`) to `<html>`. It starts
+ * from the store (which restored the saved theme), so the shell and the MFEs
+ * agree from the first render.
  */
 const ThemeProvider = ({ children }: { children: ReactNode }) => {
-    const [theme, setTheme] = useState<ThemeMode>(() => getStoredTheme() ?? defaultTheme);
+    const [theme, setTheme] = useState<ThemeMode>(() => getGlobalStore().getState().user.theme);
     const [isSystemMode, setIsSystemMode] = useState(false);
 
     useLayoutEffect(() => {
