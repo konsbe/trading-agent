@@ -33,6 +33,7 @@ import (
 	"os"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -184,7 +185,7 @@ func evaluateExits(
 		f := momentum.ComputeAt(series, last, fcfg)
 		ts := series[last].TS
 
-		if row.LastEvaluatedTS != nil && !ts.After(*row.LastEvaluatedTS) {
+		if alreadyEvaluated(row, ts) {
 			// Already evaluated against this bar. Re-evaluating would double-count
 			// the session and halve every time-based condition's effective horizon.
 			continue
@@ -649,4 +650,19 @@ func (r openRule) String() string {
 		return fmt.Sprintf("score thresholds (market >=%d, penny >=%d)", r.minMarket, r.minPenny)
 	}
 	return "every gate pass (screener mode)"
+}
+
+// alreadyEvaluated reports whether the tracker has nothing new to evaluate for
+// this row at bar ts. The alert bar itself is never an evaluation session: a
+// row opened this run has no last_evaluated_ts yet, and without this floor a
+// second run the same day would evaluate it against its own alert bar and
+// count a spurious session 1 — the same double-count the evaluate-before-open
+// ordering in main exists to prevent, now reachable because momentum-daily
+// may re-run the tracker after a restart.
+func alreadyEvaluated(row store.TrackedRow, ts time.Time) bool {
+	floor := row.AlertedTS
+	if row.LastEvaluatedTS != nil && row.LastEvaluatedTS.After(floor) {
+		floor = *row.LastEvaluatedTS
+	}
+	return !ts.After(floor)
 }

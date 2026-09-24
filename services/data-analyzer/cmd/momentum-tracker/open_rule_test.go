@@ -2,8 +2,10 @@ package main
 
 import (
 	"testing"
+	"time"
 
 	"github.com/konsbe/trading-agent/services/data-analyzer/internal/momentum"
+	"github.com/konsbe/trading-agent/services/data-analyzer/internal/store"
 )
 
 func TestParseOpenMode(t *testing.T) {
@@ -37,5 +39,25 @@ func TestOpenRule(t *testing.T) {
 		if got := c.rule.opens(c.bucket, c.total); got != c.want {
 			t.Errorf("%s opens(%s, %d) = %v, want %v", c.rule, c.bucket, c.total, got, c.want)
 		}
+	}
+}
+
+func TestAlreadyEvaluated(t *testing.T) {
+	alert := time.Date(2026, 9, 21, 0, 0, 0, 0, time.UTC)
+	next := alert.AddDate(0, 0, 1)
+	later := alert.AddDate(0, 0, 2)
+	fresh := store.TrackedRow{AlertedTS: alert}
+	if !alreadyEvaluated(fresh, alert) {
+		t.Error("a row opened on bar T must not be evaluated against bar T (spurious session 1 on re-run)")
+	}
+	if alreadyEvaluated(fresh, next) {
+		t.Error("the first session after the alert must be evaluated")
+	}
+	advanced := store.TrackedRow{AlertedTS: alert, LastEvaluatedTS: &next}
+	if !alreadyEvaluated(advanced, next) {
+		t.Error("re-running on an already evaluated bar must be a no-op")
+	}
+	if alreadyEvaluated(advanced, later) {
+		t.Error("a newer bar must be evaluated")
 	}
 }
