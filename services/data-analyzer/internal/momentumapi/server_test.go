@@ -43,6 +43,15 @@ type fakeStore struct {
 	symbols       []store.SymbolMatch
 	searched      []string
 
+	budgets     []store.ProviderBudget
+	budgetErr   error
+	chainRuns   map[string]store.ChainRun
+	firstRun    *time.Time
+	chainErr    error
+	lastClean   *time.Time
+	coverage    map[string]float64
+	statusCalls int
+
 	tracked       []store.TrackedPositionRow
 	trackedCounts store.TrackedCounts
 	trackedAsked  []string
@@ -122,6 +131,31 @@ func (f *fakeStore) AddToWatchlist(_ context.Context, owner *string, sym string)
 	f.watchlist = append([]store.WatchlistItem{{Symbol: sym, AddedAt: scanDay}}, f.watchlist...)
 	return true, f.queryErr
 }
+func (f *fakeStore) ProviderBudgets(context.Context, []string) ([]store.ProviderBudget, error) {
+	f.statusCalls++
+	return f.budgets, f.budgetErr
+}
+func (f *fakeStore) ChainRunsBetween(_ context.Context, from, to time.Time) (map[string]store.ChainRun, time.Time, bool, error) {
+	if f.chainErr != nil {
+		return nil, time.Time{}, false, f.chainErr
+	}
+	out := map[string]store.ChainRun{}
+	for k, r := range f.chainRuns {
+		if !r.Session.Before(from) && !r.Session.After(to) {
+			out[k] = r
+		}
+	}
+	if f.firstRun == nil {
+		return out, time.Time{}, false, nil
+	}
+	return out, *f.firstRun, true, nil
+}
+func (f *fakeStore) LastCleanSession(context.Context) (*time.Time, error) {
+	return f.lastClean, f.chainErr
+}
+func (f *fakeStore) SessionCoverage(context.Context, []time.Time, string) (map[string]float64, error) {
+	return f.coverage, f.chainErr
+}
 func (f *fakeStore) SearchSymbols(_ context.Context, q string, limit int) ([]store.SymbolMatch, error) {
 	f.searched = append(f.searched, q)
 	return f.symbols, f.queryErr
@@ -198,6 +232,7 @@ func newTestServer(t *testing.T, st Store, now time.Time) *Server {
 		Log:               slog.New(slog.NewTextHandler(io.Discard, nil)),
 		SessionReadyAfter: 6 * time.Hour,
 		CacheTTL:          5 * time.Minute,
+		StatusCacheTTL:    30 * time.Second,
 		CORSOrigins:       []string{"http://localhost:3000"},
 		Now:               func() time.Time { return now },
 	})

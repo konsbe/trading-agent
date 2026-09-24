@@ -1070,3 +1070,221 @@ error this project has repeatedly found by testing rather than trusting.
 No live-data verification step is needed here (unlike every other
 addendum) — there is no live data involved. Step 1's own care in
 transcription is the only thing that can go wrong.
+
+# Momentum Scanner — API Service Spec, Addendum: Data Source
+
+**Extends:** `docs/MOMENTUM_SCANNER_API.md` / `services/data-analyzer/cmd/momentum-api`.
+**Status:** steps 1–3 built 2026-09-24 (`GET /api/v1/data-sources/status`,
+tests). Step 4 waits for `mfe-data-source`, which does not exist yet and has
+no UI brief. Step 1's findings and the decisions taken on them are in §2.3;
+where they differ from §2.1's example, §2.3 is what is served.
+**Serves:** `web-app/ui/mfe-data-source`'s "Data Source" screen.
+
+---
+
+## 0. What this endpoint is, and is not — the one deliberate exception
+
+Every other addendum in this project (candidates, watchlist, tracked
+positions, backtest lab) exists partly to **avoid** implying real-time
+status on data that isn't real-time. This one is the opposite case, and
+that has to be stated explicitly so it isn't read as an inconsistency.
+
+**This page's entire purpose is showing current operational health** —
+whether the daily chain ran, whether providers are within budget, whether
+anything needs attention. Here, live framing is the *honest* choice. A
+"Data Source" page that hid its own staleness would defeat its purpose.
+
+**Still not a dashboard that polls or pushes.** No WebSocket, no
+auto-refresh timer, no shell message-bus wiring. This is a
+manual-refresh page: a button, a "last checked" timestamp, and a query
+that runs when asked. Same reasoning already applied to the watchlist
+sidebar badge — build push-based infrastructure only when there's a real
+second consumer for it, not speculatively. A person checking on the
+system by hand, occasionally, is the actual use case; nothing here needs
+to update itself while unwatched.
+
+**Still read-only.** This reports on the chain and providers; it doesn't
+restart, retry, or reconfigure anything. A "retry this session" action is
+a plausible future write endpoint, explicitly out of scope here.
+
+---
+
+## 1. Where it lives
+
+**New endpoint on the existing `momentum-api` service.** Same reasoning
+as every other addendum — one more read-only route, not a new binary.
+
+---
+
+## 2. Endpoint
+
+```
+GET /api/v1/data-sources/status
+```
+
+No parameters.
+
+### 2.1 Response shape
+
+```json
+{
+  "checked_at": "2026-09-25T08:03:11Z",
+  "providers": {
+    "tiingo": {
+      "role": "primary bar provider",
+      "daily_used": 4975,
+      "daily_limit": 90000,
+      "daily_used_pct": 5.5,
+      "degraded_count_24h": 0
+    },
+    "finnhub": {
+      "role": "universe, quotes, fundamentals",
+      "daily_used": 5228,
+      "daily_limit": 86400,
+      "daily_used_pct": 6.0,
+      "degraded_count_24h": 0
+    }
+  },
+  "daily_chain": {
+    "last_clean_session": "2026-09-24",
+    "sessions": [
+      {
+        "session": "2026-09-24",
+        "bars_coverage_pct": 99.8,
+        "attempts": 1,
+        "scanner_completed": true,
+        "tracker_completed": true,
+        "gave_up_reason": null,
+        "status": "clean"
+      },
+      {
+        "session": "2026-09-23",
+        "bars_coverage_pct": 100.0,
+        "attempts": 1,
+        "scanner_completed": true,
+        "tracker_completed": true,
+        "gave_up_reason": null,
+        "status": "clean"
+      }
+    ],
+    "sessions_shown": 7
+  },
+  "overall": "healthy"
+}
+```
+
+### 2.2 Field sourcing — **verify every one against the live schema; this addendum has more open questions than most**
+
+Unlike the candidates/watchlist/tracked endpoints, no prior step in this
+project queried `api_rate_budget` or `momentum_chain_runs` for *display*
+purposes — they were built and used internally by the limiter and the
+daily runner. Treat every field below as unconfirmed until checked.
+
+| Field | Likely source | Verify |
+|---|---|---|
+| `providers.*.daily_used`, `daily_limit` | `api_rate_budget` (migration 008/010/011: `tokens`, `refill_per_sec`, `burst`, `daily_limit`, `daily_used`, `daily_window_start`) | Confirm column names exactly; confirm whether `daily_used` resets in a way this endpoint should account for (the daily-window logic from the rate-limiter work) |
+| `providers.*.degraded_count_24h` | the shared limiter's `degraded` counter (from the limiter PR — confirmed to exist as a metric, not confirmed as a queryable column) | If it's only an in-process counter, not persisted, this field may need a new small persisted counter, or may need to be dropped from v1. Don't invent a fallback — report it as unavailable (`null`) if it can't be sourced honestly |
+| `daily_chain.sessions[]` | `momentum_chain_runs` (migration 025) | Confirm exact column names for the scanner/tracker completion markers and `gave_up_at`/`attempts` (referenced in prior reports as existing, but never read back out for a report — verify the read path, not just that writes work) |
+| `daily_chain.sessions[].status` | derived | `"clean"` if attempts=1, both markers set, no gave-up reason; otherwise `"failed"` with `gave_up_reason` populated; a currently-in-progress session (bars still landing) is `"pending"`, distinct from both |
+| `overall` | derived | `"healthy"` if the most recent session is clean and both providers are under some reasonable threshold (e.g. <90% of daily budget); `"attention"` otherwise. Threshold is a config value, not hardcoded — expose via env var |
+
+### 2.3 Step 1 findings (live schema, 2026-09-24) and decisions
+
+- **`api_rate_budget` columns** are as listed. Only `tiingo` and `finnhub` are
+  reported, from an explicit list — the table also holds the retired
+  `twelve_data` row and 15 `test_*` rows the limiter's integration tests left
+  in the live database on 2026-09-16 (not removed).
+- **`daily_used` can be yesterday's.** The limiter rolls the window only on its
+  next request, so the endpoint applies the limiter's own rule
+  (`daily_window_start = (now() AT TIME ZONE daily_reset_tz)::date`) and serves
+  0 when the stored window is not today's. `daily_window_start` and
+  `daily_reset_tz` are served too (Tiingo resets on `EST`, Finnhub on `UTC`).
+- **Finnhub has no daily limit** (`daily_limit` NULL; it is limited to
+  1 request/s). `daily_limit` and `daily_used_pct` are `null` for it. Every
+  provider also carries `rate_per_sec` and `theoretical_daily_capacity`
+  (rate × 86,400) — labelled capacity, **never a quota and never a
+  denominator**. The `overall` budget check therefore applies only to
+  providers with a real daily limit (Tiingo today).
+- **`degraded_count_24h` is always `null`**: the limiter counts degradations in
+  each ingestion process's memory and never persists them. Logged as future
+  work (a persisted counter) in `services/data-analyzer/data_analyzer.md`.
+- **Sessions come from the NYSE calendar**, not from `momentum_chain_runs`
+  rows: the last 7 sessions whose close has passed, each joined to its row.
+  A session the daemon never attempted is therefore **visible**, not absent.
+- **Statuses:** `clean` (1 attempt, both markers, no error) ·
+  `completed_after_retry` (both markers, more than one attempt) · `pending`
+  (inside its window: close + `MOMENTUM_DAILY_GIVE_UP_AFTER`, the same
+  variable momentum-daily reads) · `failed` (`gave_up_at` set; or attempted
+  and never finished after the window, with a `note`) · `not_run` (no row,
+  window over) · `not_recorded` (before the first `momentum_chain_runs` row —
+  derived from the table, not hard-coded). `gave_up_reason` is `last_error`
+  only when `gave_up_at` is set; `last_error` is served on its own.
+- **`bars_coverage_pct` is renamed `bars_coverage_now_pct`.** It is not
+  stored; it is computed at request time with momentum-daily's definition and
+  can differ from the coverage that gated that session's run if bars were
+  corrected or backfilled since. The name says which fact it is.
+- **`overall`** comes with `overall_reasons`. It is decided by the newest
+  session that is **not** pending (a session inside its window is normal), by
+  each provider with a daily limit against `MOMENTUM_API_BUDGET_ATTENTION_PCT`
+  (default 90), and it is `attention` whenever a section is unavailable.
+- **Cache:** `MOMENTUM_API_STATUS_CACHE_TTL`, default 30 s, capped at 60 s;
+  `checked_at` is the time of the query, so a cached answer shows its real
+  age.
+
+**`sessions_shown`** caps the session list (default 7, roughly a trading
+week) rather than returning the full `momentum_chain_runs` history —
+this page answers "is it working now," not "show me all history." If a
+longer view is ever wanted, that's a `?days=N` parameter added later, not
+built speculatively now.
+
+---
+
+## 3. Non-functional requirements
+
+- **Cache: short, and this is the one deliberate exception to the
+  otherwise-consistent caching posture.** 30–60 seconds is reasonable —
+  long enough that clicking refresh twice in a row doesn't double-hit
+  Postgres, short enough that "last checked" never feels meaningfully
+  stale relative to when the button was pressed. Do **not** apply the
+  5-minute or 24-hour TTLs used elsewhere; both would undermine this
+  page's actual purpose.
+- **Auth, CORS, loopback binding:** identical posture to the rest of
+  `momentum-api`.
+- **No write path in v1.**
+
+---
+
+## 4. Error responses
+
+| Condition | Response |
+|---|---|
+| DB unreachable | `503`, `{"error": "database_unavailable"}` — and this is a genuinely meaningful error *for this specific page*, unlike elsewhere: if the status page itself can't reach the database, that IS the operational problem it exists to report. The UI should render this prominently, not as a generic error state |
+| `api_rate_budget` or `momentum_chain_runs` query fails independently | Partial response: the section that failed reports `"unavailable"` rather than failing the whole request. A provider-status hiccup shouldn't hide the daily-chain section, and vice versa |
+
+---
+
+## 5. Testing
+
+- Fixture with a clean session, a failed session (with `gave_up_reason`
+  populated), and a pending/in-progress session — confirm `status`
+  derives correctly for each.
+- Confirm a provider at >90% budget flips `overall` to `"attention"` even
+  when the chain itself is clean — both conditions matter independently.
+- Confirm partial-failure behavior: if `momentum_chain_runs` is
+  unreachable but `api_rate_budget` isn't, the provider section still
+  returns real data.
+
+---
+
+## 6. Build order
+
+| Step | Deliverable |
+|---|---|
+| 1 | Verify every field in §2.2 against the live schema — this step matters more here than in any prior addendum, since none of these columns have been read back out for display before. Report back before building if `degraded_count_24h` turns out to be unsourceable. |
+| 2 | `GET /api/v1/data-sources/status` handler |
+| 3 | Tests per §5 |
+| 4 | Point `mfe-data-source`'s fetch layer at it |
+
+Report back after step 1 — this addendum has the most open schema
+questions of any built so far, and it's worth confirming the shape before
+writing UI against fields that might not exist as assumed.

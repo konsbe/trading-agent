@@ -28,6 +28,10 @@ type Store interface {
 	AddToWatchlist(ctx context.Context, owner *string, symbol string) (bool, error)
 	RemoveFromWatchlist(ctx context.Context, owner *string, symbol string) (bool, error)
 	SearchSymbols(ctx context.Context, query string, limit int) ([]store.SymbolMatch, error)
+	ProviderBudgets(ctx context.Context, keys []string) ([]store.ProviderBudget, error)
+	ChainRunsBetween(ctx context.Context, from, to time.Time) (map[string]store.ChainRun, time.Time, bool, error)
+	LastCleanSession(ctx context.Context) (*time.Time, error)
+	SessionCoverage(ctx context.Context, sessions []time.Time, source string) (map[string]float64, error)
 	TrackedPositions(ctx context.Context, status store.TrackedStatusFilter, latestScan *time.Time) ([]store.TrackedPositionRow, error)
 	TrackedCounts(ctx context.Context) (store.TrackedCounts, error)
 	Ping(ctx context.Context) error
@@ -69,6 +73,18 @@ func (s DBStore) ListWatchlist(ctx context.Context, owner *string) ([]store.Watc
 func (s DBStore) SearchSymbols(ctx context.Context, query string, limit int) ([]store.SymbolMatch, error) {
 	return store.SearchSymbols(ctx, s.Q, query, limit)
 }
+func (s DBStore) ProviderBudgets(ctx context.Context, keys []string) ([]store.ProviderBudget, error) {
+	return store.ProviderBudgets(ctx, s.Q, keys)
+}
+func (s DBStore) ChainRunsBetween(ctx context.Context, from, to time.Time) (map[string]store.ChainRun, time.Time, bool, error) {
+	return store.ChainRunsBetween(ctx, s.Q, from, to)
+}
+func (s DBStore) LastCleanSession(ctx context.Context) (*time.Time, error) {
+	return store.LastCleanSession(ctx, s.Q)
+}
+func (s DBStore) SessionCoverage(ctx context.Context, sessions []time.Time, source string) (map[string]float64, error) {
+	return store.SessionCoverage(ctx, s.Q, sessions, source)
+}
 func (s DBStore) AddToWatchlist(ctx context.Context, owner *string, sym string) (bool, error) {
 	return store.AddToWatchlist(ctx, s.Q, owner, sym)
 }
@@ -100,13 +116,24 @@ type Config struct {
 	CacheTTL          time.Duration
 	CORSOrigins       []string
 
+	// Data Source status page. StatusCacheTTL is deliberately short (30–60s):
+	// long enough to absorb a double-clicked refresh, short enough that
+	// "last checked" stays honest. ChainGiveUpAfter mirrors momentum-daily's
+	// MOMENTUM_DAILY_GIVE_UP_AFTER so "pending" ends when the daemon gives up.
+	StatusCacheTTL     time.Duration
+	ChainGiveUpAfter   time.Duration
+	BudgetAttentionPct float64
+	SessionsShown      int
+	BarSource          string
+
 	// Now is injectable for tests; defaults to time.Now.
 	Now func() time.Time
 }
 
 type Server struct {
-	cfg   Config
-	cache *responseCache
+	cfg         Config
+	cache       *responseCache
+	statusCache *responseCache
 }
 
 func NewServer(cfg Config) *Server {
@@ -116,7 +143,20 @@ func NewServer(cfg Config) *Server {
 	if cfg.Log == nil {
 		cfg.Log = slog.Default()
 	}
-	return &Server{cfg: cfg, cache: newResponseCache(cfg.CacheTTL, cfg.Now)}
+	if cfg.SessionsShown <= 0 {
+		cfg.SessionsShown = 7
+	}
+	if cfg.ChainGiveUpAfter <= 0 {
+		cfg.ChainGiveUpAfter = 14 * time.Hour
+	}
+	if cfg.BudgetAttentionPct <= 0 {
+		cfg.BudgetAttentionPct = 90
+	}
+	if cfg.BarSource == "" {
+		cfg.BarSource = "tiingo"
+	}
+	return &Server{cfg: cfg, cache: newResponseCache(cfg.CacheTTL, cfg.Now),
+		statusCache: newResponseCache(cfg.StatusCacheTTL, cfg.Now)}
 }
 
 // Handler returns the HTTP routes wrapped in CORS handling.
@@ -132,6 +172,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("DELETE /api/v1/watchlist/{symbol}", s.handleWatchlistRemove)
 	mux.HandleFunc("GET /api/v1/symbols", s.handleSymbolSearch)
 	mux.HandleFunc("GET /api/v1/backtest-lab/report", s.handleBacktestReport)
+	mux.HandleFunc("GET /api/v1/data-sources/status", s.handleDataSourcesStatus)
 	return s.cors(mux)
 }
 

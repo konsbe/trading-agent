@@ -22,6 +22,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -37,6 +38,10 @@ import (
 // maxCacheTTL is the ceiling from the spec: longer would let a stale cache hide
 // a corrected re-run.
 const maxCacheTTL = 5 * time.Minute
+
+// maxStatusCacheTTL caps the Data Source status cache: its "last checked" must
+// stay honest relative to when refresh was pressed (addendum §3).
+const maxStatusCacheTTL = 60 * time.Second
 
 func main() {
 	// Service-local .env first, then the repo root's (the documented home of
@@ -61,6 +66,19 @@ func main() {
 		cacheTTL = maxCacheTTL
 	}
 	origins := csv(env("MOMENTUM_API_CORS_ORIGINS", "http://localhost:3000"))
+	statusTTL := duration(log, "MOMENTUM_API_STATUS_CACHE_TTL", 30*time.Second)
+	if statusTTL > maxStatusCacheTTL {
+		log.Warn("momentum-api: status cache TTL capped", "requested", statusTTL, "cap", maxStatusCacheTTL)
+		statusTTL = maxStatusCacheTTL
+	}
+	// Same variable momentum-daily reads, so "pending" ends exactly when it gives up.
+	giveUpAfter := duration(log, "MOMENTUM_DAILY_GIVE_UP_AFTER", 14*time.Hour)
+	attentionPct := 90.0
+	if v, err := strconv.ParseFloat(env("MOMENTUM_API_BUDGET_ATTENTION_PCT", "90"), 64); err == nil && v > 0 && v <= 100 {
+		attentionPct = v
+	} else {
+		log.Warn("momentum-api: invalid MOMENTUM_API_BUDGET_ATTENTION_PCT; using 90")
+	}
 
 	caveats, err := momentumapi.LoadCaveats(caveatsPath)
 	if err != nil {
@@ -96,6 +114,12 @@ func main() {
 		SessionReadyAfter: scanGrace,
 		CacheTTL:          cacheTTL,
 		CORSOrigins:       origins,
+
+		StatusCacheTTL:     statusTTL,
+		ChainGiveUpAfter:   giveUpAfter,
+		BudgetAttentionPct: attentionPct,
+		SessionsShown:      7,
+		BarSource:          env("MOMENTUM_DAILY_BAR_SOURCE", "tiingo"),
 	})
 	httpServer := &http.Server{
 		Addr:              addr,
