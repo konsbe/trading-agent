@@ -3,6 +3,8 @@
 package store
 
 import (
+	"github.com/konsbe/trading-agent/services/data-analyzer/internal/testdb"
+
 	"context"
 	"fmt"
 	"testing"
@@ -22,15 +24,10 @@ import (
 // latest scan date.
 var fixtureDay = time.Date(2099, 1, 2, 0, 0, 0, 0, time.UTC)
 
+// fixtureTx is testdb.Tx: read-write, always rolled back.
 func fixtureTx(t *testing.T) pgx.Tx {
 	t.Helper()
-	ctx := context.Background()
-	tx, err := testPool(t).Begin(ctx)
-	if err != nil {
-		t.Fatalf("begin: %v", err)
-	}
-	t.Cleanup(func() { _ = tx.Rollback(context.Background()) })
-	return tx
+	return testdb.Tx(t)
 }
 
 type fixtureRow struct {

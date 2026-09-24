@@ -3,9 +3,10 @@
 package ratelimit
 
 import (
+	"github.com/konsbe/trading-agent/services/data-ingestion/internal/testdb"
+
 	"context"
 	"errors"
-	"os"
 	"sync"
 	"testing"
 	"time"
@@ -22,16 +23,10 @@ import (
 
 func testPool(t *testing.T) *pgxpool.Pool {
 	t.Helper()
-	dsn := os.Getenv("TEST_DATABASE_URL")
-	if dsn == "" {
-		t.Skip("TEST_DATABASE_URL not set")
-	}
-	p, err := pgxpool.New(context.Background(), dsn)
-	if err != nil {
-		t.Fatalf("connect: %v", err)
-	}
-	t.Cleanup(p.Close)
-	return p
+	// Skips without TEST_DATABASE_URL and refuses a non-scratch database: these
+	// tests create and delete api_rate_budget rows, and once ran against the
+	// live database and left 15 test_* rows behind.
+	return testdb.Pool(t)
 }
 
 // generousFallback is a fallback that would never itself throttle, so any

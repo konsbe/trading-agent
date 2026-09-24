@@ -3,26 +3,19 @@
 package store
 
 import (
+	"github.com/konsbe/trading-agent/services/data-analyzer/internal/testdb"
+
 	"context"
-	"os"
 	"testing"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+// testPool is read-only by default; fixtures go through fixtureTx (see testdb).
 func testPool(t *testing.T) *pgxpool.Pool {
 	t.Helper()
-	dsn := os.Getenv("TEST_DATABASE_URL")
-	if dsn == "" {
-		t.Skip("TEST_DATABASE_URL not set")
-	}
-	pool, err := pgxpool.New(context.Background(), dsn)
-	if err != nil {
-		t.Fatalf("connect: %v", err)
-	}
-	t.Cleanup(pool.Close)
-	return pool
+	return testdb.Pool(t)
 }
 
 // Guards the source preference in QueryEquityBars.
@@ -37,15 +30,9 @@ func testPool(t *testing.T) *pgxpool.Pool {
 // feature across any ex-dividend date.
 func TestQueryEquityBars_PrefersTiingoOverYahooWhenBothExist(t *testing.T) {
 	ctx := context.Background()
-	pool := testPool(t)
+	tx := fixtureTx(t)
 
 	const sym = "DEDUPTEST"
-	if _, err := pool.Exec(ctx, `DELETE FROM equity_ohlcv WHERE symbol = $1`, sym); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() {
-		pool.Exec(context.Background(), `DELETE FROM equity_ohlcv WHERE symbol = $1`, sym)
-	})
 
 	ts := time.Date(2026, 3, 2, 0, 0, 0, 0, time.UTC)
 
@@ -59,14 +46,14 @@ func TestQueryEquityBars_PrefersTiingoOverYahooWhenBothExist(t *testing.T) {
 		{"yahoo_finance", 100.0}, // unadjusted
 		{"tiingo", 97.5},         // dividend-adjusted
 	} {
-		if _, err := pool.Exec(ctx, `
+		if _, err := tx.Exec(ctx, `
 INSERT INTO equity_ohlcv (ts, symbol, interval, open, high, low, close, volume, source)
 VALUES ($1, $2, '1Day', $3, $3, $3, $3, 1000000, $4)`, ts, sym, row.close, row.source); err != nil {
 			t.Fatalf("insert %s: %v", row.source, err)
 		}
 	}
 
-	bars, err := QueryEquityBars(ctx, pool, sym, "1Day", 10)
+	bars, err := QueryEquityBars(ctx, tx, sym, "1Day", 10)
 	if err != nil {
 		t.Fatalf("query: %v", err)
 	}
@@ -82,24 +69,18 @@ VALUES ($1, $2, '1Day', $3, $3, $3, $3, 1000000, $4)`, ts, sym, row.close, row.s
 // still the best available and must be returned rather than dropped.
 func TestQueryEquityBars_StillReturnsYahooWhenItIsTheOnlySource(t *testing.T) {
 	ctx := context.Background()
-	pool := testPool(t)
+	tx := fixtureTx(t)
 
 	const sym = "YAHOOONLY"
-	if _, err := pool.Exec(ctx, `DELETE FROM equity_ohlcv WHERE symbol = $1`, sym); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() {
-		pool.Exec(context.Background(), `DELETE FROM equity_ohlcv WHERE symbol = $1`, sym)
-	})
 
 	ts := time.Date(2026, 3, 2, 0, 0, 0, 0, time.UTC)
-	if _, err := pool.Exec(ctx, `
+	if _, err := tx.Exec(ctx, `
 INSERT INTO equity_ohlcv (ts, symbol, interval, open, high, low, close, volume, source)
 VALUES ($1, $2, '1Day', 42, 42, 42, 42, 1000000, 'yahoo_finance')`, ts, sym); err != nil {
 		t.Fatal(err)
 	}
 
-	bars, err := QueryEquityBars(ctx, pool, sym, "1Day", 10)
+	bars, err := QueryEquityBars(ctx, tx, sym, "1Day", 10)
 	if err != nil {
 		t.Fatalf("query: %v", err)
 	}
@@ -113,15 +94,9 @@ VALUES ($1, $2, '1Day', 42, 42, 42, 42, 1000000, 'yahoo_finance')`, ts, sym); er
 // Tiingo would silently truncate history to only the dates Tiingo covers.
 func TestQueryEquityBars_PreferencePerTimestampDoesNotDropYahooOnlyDates(t *testing.T) {
 	ctx := context.Background()
-	pool := testPool(t)
+	tx := fixtureTx(t)
 
 	const sym = "MIXEDHIST"
-	if _, err := pool.Exec(ctx, `DELETE FROM equity_ohlcv WHERE symbol = $1`, sym); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() {
-		pool.Exec(context.Background(), `DELETE FROM equity_ohlcv WHERE symbol = $1`, sym)
-	})
 
 	day := func(d int) time.Time { return time.Date(2026, 3, d, 0, 0, 0, 0, time.UTC) }
 
@@ -136,14 +111,14 @@ func TestQueryEquityBars_PreferencePerTimestampDoesNotDropYahooOnlyDates(t *test
 		{day(4), 30, "tiingo"},        // Tiingo only
 	}
 	for _, r := range rows {
-		if _, err := pool.Exec(ctx, `
+		if _, err := tx.Exec(ctx, `
 INSERT INTO equity_ohlcv (ts, symbol, interval, open, high, low, close, volume, source)
 VALUES ($1, $2, '1Day', $3, $3, $3, $3, 1000000, $4)`, r.ts, sym, r.close, r.source); err != nil {
 			t.Fatal(err)
 		}
 	}
 
-	bars, err := QueryEquityBars(ctx, pool, sym, "1Day", 10)
+	bars, err := QueryEquityBars(ctx, tx, sym, "1Day", 10)
 	if err != nil {
 		t.Fatalf("query: %v", err)
 	}

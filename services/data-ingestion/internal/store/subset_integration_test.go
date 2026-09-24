@@ -51,7 +51,9 @@ func TestSelectPilotSubset_SizeCapIsAssertedBeforeAnyWrite(t *testing.T) {
 	}
 	// The message must explain the consequence, not just the arithmetic — this is
 	// read weeks later by someone who does not know why 450 matters.
-	if !contains(err.Error(), "500 unique symbols per month") {
+	// Since the Tiingo Power upgrade the cap no longer guards billing; the
+	// message must say what it still protects against.
+	if !contains(err.Error(), "order-of-magnitude selection bug") {
 		t.Errorf("error should explain why the cap exists, got: %v", err)
 	}
 

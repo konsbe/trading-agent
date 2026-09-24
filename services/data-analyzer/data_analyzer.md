@@ -632,6 +632,18 @@ it was down stays unscanned unless the scanner and tracker are run by hand.
 The analyst-bot alerts only once the scan for the session that just closed
 exists, so the bot's alert time follows this chain, not a fixed clock.
 
+## Integration tests: live database, rolled-back fixtures — enforced
+
+`make test-integration` runs against the populated database on purpose
+(`TEST_DATABASE_URL` defaults to `DATABASE_URL`); the rule that makes that safe
+is that fixtures live in a transaction that is always rolled back. Since
+2026-09-24 it is enforced rather than conventional: every test reaches Postgres
+through `internal/testdb`, whose `Pool` opens sessions with
+`default_transaction_read_only = on` and whose `Tx` is the only read-write path
+and always rolls back. A write outside `Tx` now fails with a read-only error.
+(The `equity_ohlcv` tests used to insert and delete committed rows on the pool
+against live data; they now use `Tx`.)
+
 ## `momentum-api` server (read-only scanner API)
 
 Long-running HTTP server (not a one-shot job) that serves the momentum scanner's

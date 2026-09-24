@@ -35,7 +35,7 @@ import (
 // ex-dividend date.
 //
 // See services/data-ingestion/data_ingestion.md for the full caveat.
-func QueryEquityBars(ctx context.Context, pool *pgxpool.Pool, symbol, interval string, limit int) ([]compute.Bar, error) {
+func QueryEquityBars(ctx context.Context, pool Querier, symbol, interval string, limit int) ([]compute.Bar, error) {
 	rows, err := pool.Query(ctx, `
 		SELECT ts, open, high, low, close, volume FROM (
 			SELECT DISTINCT ON (ts) ts, open, high, low, close, volume

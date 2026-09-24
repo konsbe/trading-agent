@@ -1223,8 +1223,16 @@ fails when it is broken:
 ## Integration tests truncate tables and must never see a real database
 
 The destructive fixtures in `internal/store` call `clearUniverse`, which is a
-wholesale `DELETE FROM universe_symbols`. `requireScratchDB` refuses to run
-unless the connected database's **name** contains `test`.
+wholesale `DELETE FROM universe_symbols`. The guard refuses to run unless the
+connected database's **name** contains `test`.
+
+**Every integration test in this module gets its pool from `internal/testdb`**
+(`testdb.Pool`), which applies that guard — not only the tests that call
+`clearUniverse`. Until 2026-09-24 the guard lived inside `clearUniverse` alone:
+most store tests and all of `internal/ratelimit`'s used their own pool helpers
+without it, and the rate-limiter tests ran against the live database and left
+15 `test_*` rows in `api_rate_budget` (removed). A new integration test must use
+`testdb.Pool`; a private `pgxpool.New(TEST_DATABASE_URL)` bypasses the guard.
 
 This was added after `TEST_DATABASE_URL` was pointed at a populated database
 during Phase 1 bring-up. The damage was silent in both directions: the real

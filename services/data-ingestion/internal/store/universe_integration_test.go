@@ -3,8 +3,9 @@
 package store
 
 import (
+	"github.com/konsbe/trading-agent/services/data-ingestion/internal/testdb"
+
 	"context"
-	"os"
 	"strings"
 	"testing"
 
@@ -18,20 +19,12 @@ import (
 //
 //	go test -tags=integration ./internal/store/ -run Universe -v
 //
-// Requires TEST_DATABASE_URL. Skipped otherwise so the default `go test ./...`
-// stays hermetic.
+// testPool is testdb.Pool: skipped without TEST_DATABASE_URL, and refused
+// unless the database is a scratch one — for every test in this package, not
+// only the ones that call clearUniverse.
 func testPool(t *testing.T) *pgxpool.Pool {
 	t.Helper()
-	dsn := os.Getenv("TEST_DATABASE_URL")
-	if dsn == "" {
-		t.Skip("TEST_DATABASE_URL not set")
-	}
-	pool, err := pgxpool.New(context.Background(), dsn)
-	if err != nil {
-		t.Fatalf("connect: %v", err)
-	}
-	t.Cleanup(pool.Close)
-	return pool
+	return testdb.Pool(t)
 }
 
 // requireScratchDB refuses to run destructive fixtures unless the connected
@@ -55,15 +48,7 @@ func testPool(t *testing.T) *pgxpool.Pool {
 // forgotten, at which point it protects nothing.
 func requireScratchDB(t *testing.T, pool *pgxpool.Pool) {
 	t.Helper()
-	var dbName string
-	if err := pool.QueryRow(context.Background(), `SELECT current_database()`).Scan(&dbName); err != nil {
-		t.Fatalf("scratch-db guard: %v", err)
-	}
-	if !strings.Contains(strings.ToLower(dbName), "test") {
-		t.Fatalf("refusing to run destructive fixtures against database %q: these tests truncate "+
-			"universe_symbols and equity_ohlcv wholesale. Point TEST_DATABASE_URL at a database "+
-			"whose name contains \"test\" (e.g. trading_test).", dbName)
-	}
+	testdb.RequireScratch(t, pool)
 }
 
 // clearUniverse empties universe_symbols for a fixture and registers cleanup so

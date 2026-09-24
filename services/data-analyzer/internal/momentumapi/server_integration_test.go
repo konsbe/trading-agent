@@ -3,16 +3,15 @@
 package momentumapi
 
 import (
+	"github.com/konsbe/trading-agent/services/data-analyzer/internal/testdb"
+
 	"context"
 	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
-	"os"
 	"testing"
 	"time"
-
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // End to end: real SQL on a fixture scan, through the HTTP handlers, asserting
@@ -20,21 +19,9 @@ import (
 // always rolled back, so the live scan is never touched.
 
 func TestIntegration_TodayAndDetailOverRealQueries(t *testing.T) {
-	dsn := os.Getenv("TEST_DATABASE_URL")
-	if dsn == "" {
-		t.Skip("TEST_DATABASE_URL not set")
-	}
 	ctx := context.Background()
-	pool, err := pgxpool.New(ctx, dsn)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(pool.Close)
-	tx, err := pool.Begin(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = tx.Rollback(context.Background()) })
+	pool := testdb.Pool(t) // read-only: only the rolled-back tx can write
+	tx := testdb.Tx(t)
 
 	day := time.Date(2099, 1, 2, 0, 0, 0, 0, time.UTC)
 	for i := 1; i <= 11; i++ {
