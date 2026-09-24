@@ -792,6 +792,9 @@ a restart nor a kill mid-run depends on a process remembering what finished.
 | `last_error` | text | **yes** | Why the last attempt or give-up happened |
 | `updated_at` | timestamptz | no | Default `now()` |
 
+A give-up is final; to retry a session by hand, see the recovery SQL in
+[`services/data-analyzer/data_analyzer.md`](../../services/data-analyzer/data_analyzer.md#momentum-daily--the-scheduled-chain) (`momentum-daily` section).
+
 ## momentum_tracked
 
 **File:** `momentum_tracked.schema.json`

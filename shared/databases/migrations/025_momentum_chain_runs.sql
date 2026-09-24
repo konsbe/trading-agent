@@ -23,6 +23,9 @@
 --   momentum-daily    a session is done iff tracker_completed_at IS NOT NULL.
 --   analyst-bot       alerts only for a session with scanner_completed_at, so a
 --                     partial scan can never be alerted on.
+--
+-- A give-up is final. To retry a session by hand, use the recovery SQL in
+-- services/data-analyzer/data_analyzer.md (momentum-daily section).
 
 CREATE TABLE IF NOT EXISTS momentum_chain_runs (
     session               DATE         PRIMARY KEY,
