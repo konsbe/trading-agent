@@ -186,13 +186,17 @@ Field-by-field, with the schema question flagged where one exists:
 | `breakout_state` | `momentum_features.breakout_state` | pass through as-is: `"none"` / `"approaching"` / `"breakout"` / `"breakout_from_consolidation"`. **Plain string, not a display label** — labeling ("Breakout: none") is a frontend concern, per the mfe-scanner design's "plain text, not a badge" requirement. |
 | `pct_of_52w_high` | `momentum_features.pct_of_52w_high` | raw ratio (e.g. `0.0019`), frontend formats as a percentage — do not pre-format server-side |
 | `catalyst_tier` | `momentum_features.catalyst_tier` | `"A"` / `"B"` / `"none"` / `null`. **`null` is the expected/common case** (§3.11's finding: catalyst is unresolved and often absent) — the frontend must render nothing rather than a placeholder when this is `null`, not treat it as missing data |
+| `market_cap` | `momentum_features.market_cap` | reported market cap, `null` when the gate used an estimate or had none. Added to the list 2026-09-24 at the product owner's request |
+| `market_cap_est` | `momentum_features.market_cap_est` | §3.9's shares-outstanding × close estimate, set only when the reported value was missing |
+| `market_cap_is_proxy` | `momentum_features.market_cap_is_proxy` | `true` when the gate used `market_cap_est`. The frontend must visibly mark an estimate (never render it as if reported) |
 | `momentum_score_100` | `momentum_scores.momentum_score_100` | **integer or `null`.** Null when the symbol has no score row yet (e.g. fundamentals pass hasn't populated market cap — see Phase 1 §10.1.0a). The frontend must render "—", never `0`, for a null score — a real `0` and a missing score are different facts. |
 | `score_attainable` | derived from `momentum_scores.null_inputs` | **integer or `null`**, `null` exactly when `momentum_score_100` is. The row's own ceiling, same derivation as the detail view's `score.attainable` (90 allocated minus the weights of this row's null inputs; 75 while `catalyst_tier` is null). Added 2026-09-24 so the list shows "53/75", never a bare "53" that reads as "out of 100". Varies per row once catalyst data differs. |
 | `score_status` | constant | always the literal string `"unvalidated"` in the current build. Not computed per-row — it's a build-level fact about the whole scoring system (Phase 1 §10.1.0's ruling), not a per-symbol property. Kept as a field rather than hardcoded in the frontend so a future, actually-validated model version has exactly one place to change it (see §2.4's `model_version`). |
 
 **Still excluded from the list view, and why:** sub-scores, penalties,
 `null_inputs`, `vol_accel`, `above_vwap`, `atr_pct`, `gate_failures`,
-`market_cap`, `float_shares_est`. Not because they're hidden on principle —
+`float_shares_est`. (`market_cap` was here until 2026-09-24; it is now served
+with its provenance fields above.) Not because they're hidden on principle —
 the score itself no longer is — but because the list view's job is the
 at-a-glance screener row, and the full breakdown belongs in the detail view
 (§2.4) where there's room to show it with its actual evidence attached rather

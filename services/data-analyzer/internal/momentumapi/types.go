@@ -29,18 +29,23 @@ type bucket struct {
 }
 
 type candidate struct {
-	Symbol           string   `json:"symbol"`
-	Exchange         *string  `json:"exchange"`
-	CompanyName      *string  `json:"company_name"`
-	Bucket           string   `json:"bucket"`
-	Close            *float64 `json:"close"`
-	ChangePct        *float64 `json:"change_pct"`
-	RVol20           *float64 `json:"rvol_20"`
-	DollarVolume     *float64 `json:"dollar_volume"`
-	RSI14            *float64 `json:"rsi_14"`
-	BreakoutState    *string  `json:"breakout_state"`
-	PctOf52wHigh     *float64 `json:"pct_of_52w_high"`
-	CatalystTier     *string  `json:"catalyst_tier"`
+	Symbol        string   `json:"symbol"`
+	Exchange      *string  `json:"exchange"`
+	CompanyName   *string  `json:"company_name"`
+	Bucket        string   `json:"bucket"`
+	Close         *float64 `json:"close"`
+	ChangePct     *float64 `json:"change_pct"`
+	RVol20        *float64 `json:"rvol_20"`
+	DollarVolume  *float64 `json:"dollar_volume"`
+	RSI14         *float64 `json:"rsi_14"`
+	BreakoutState *string  `json:"breakout_state"`
+	PctOf52wHigh  *float64 `json:"pct_of_52w_high"`
+	CatalystTier  *string  `json:"catalyst_tier"`
+	// Same three fields and meaning as the detail view: MarketCap is reported,
+	// MarketCapEst is the shares×close estimate the gate used when it was not.
+	MarketCap        *float64 `json:"market_cap"`
+	MarketCapEst     *float64 `json:"market_cap_est"`
+	MarketCapIsProxy bool     `json:"market_cap_is_proxy"`
 	MomentumScore100 *int     `json:"momentum_score_100"`
 	// ScoreAttainable is the row's own ceiling (see momentum.Attainable), so a
 	// bare score never reads as "out of 100". Null exactly when the score is.

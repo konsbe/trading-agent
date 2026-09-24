@@ -301,6 +301,34 @@ func TestToday_ScoreAttainableIsPerRow(t *testing.T) {
 	}
 }
 
+// The list serves market cap with its provenance, same fields as the detail
+// view: a shares×close estimate is never presented as a reported value.
+func TestToday_MarketCapCarriesProvenance(t *testing.T) {
+	st := fixtureStore()
+	st.candidates = []store.CandidateRow{
+		{Symbol: "REP", Bucket: "market", MarketCap: ptr(4.3e9)},
+		{Symbol: "EST", Bucket: "market", MarketCapEst: ptr(8.1e7), MarketCapIsProxy: true},
+		{Symbol: "NONE", Bucket: "market"},
+	}
+	body := decode(t, get(t, newTestServer(t, st, freshNow), "/api/v1/scanner/today"))
+	got := map[string]map[string]any{}
+	for _, c := range body["buckets"].(map[string]any)["market"].(map[string]any)["candidates"].([]any) {
+		m := c.(map[string]any)
+		got[m["symbol"].(string)] = m
+	}
+	if r := got["REP"]; r["market_cap"] != 4.3e9 || r["market_cap_est"] != nil || r["market_cap_is_proxy"] != false {
+		t.Errorf("reported: %v", r)
+	}
+	if e := got["EST"]; e["market_cap"] != nil || e["market_cap_est"] != 8.1e7 || e["market_cap_is_proxy"] != true {
+		t.Errorf("estimate: %v", e)
+	}
+	for _, k := range []string{"market_cap", "market_cap_est", "market_cap_is_proxy"} {
+		if _, present := got["NONE"][k]; !present {
+			t.Errorf("unknown market cap: %q missing, want explicit null/false", k)
+		}
+	}
+}
+
 func TestToday_NonFiniteNumbersAreNull(t *testing.T) {
 	st := fixtureStore()
 	st.candidates = []store.CandidateRow{{Symbol: "NAN", Bucket: "market", RVol20: ptr(math.NaN()), Close: ptr(math.Inf(1))}}

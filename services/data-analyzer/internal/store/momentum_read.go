@@ -101,6 +101,13 @@ type CandidateRow struct {
 	CatalystTier  *string
 	MomentumScore *int
 
+	// Market cap as the gate saw it: the reported value, or §3.9's estimate
+	// (shares outstanding × close) with IsProxy set. Both served, so an
+	// estimate is never displayed as if it were reported.
+	MarketCap        *float64
+	MarketCapEst     *float64
+	MarketCapIsProxy bool
+
 	// ScoreNullInputs is the score row's null_inputs, read so the list can show
 	// each score against its own attainable ceiling. Nil when there is no score.
 	ScoreNullInputs []string
@@ -118,7 +125,8 @@ func Candidates(ctx context.Context, q Querier, date time.Time) ([]CandidateRow,
 SELECT mf.symbol, u.exchange, u.name, mf.bucket,
        mf.close, mf.change_pct, mf.rvol_20, mf.dollar_volume, mf.rsi_14,
        mf.breakout_state, mf.pct_of_52w_high, mf.catalyst_tier,
-       ms.momentum_score_100, ms.null_inputs
+       ms.momentum_score_100, ms.null_inputs,
+       mf.market_cap, mf.market_cap_est, COALESCE(mf.market_cap_is_proxy, false)
 FROM momentum_features mf
 LEFT JOIN universe_symbols u ON u.symbol = mf.symbol
 LEFT JOIN momentum_scores ms ON ms.symbol = mf.symbol AND ms.ts = mf.ts
@@ -136,7 +144,8 @@ ORDER BY mf.bucket, mf.rvol_20 DESC NULLS LAST, mf.symbol`, date)
 		if err := rows.Scan(&c.Symbol, &c.Exchange, &c.CompanyName, &bucket,
 			&c.Close, &c.ChangePct, &c.RVol20, &c.DollarVolume, &c.RSI14,
 			&c.BreakoutState, &c.PctOf52wHigh, &c.CatalystTier,
-			&c.MomentumScore, &c.ScoreNullInputs); err != nil {
+			&c.MomentumScore, &c.ScoreNullInputs,
+			&c.MarketCap, &c.MarketCapEst, &c.MarketCapIsProxy); err != nil {
 			return nil, fmt.Errorf("scan candidate: %w", err)
 		}
 		if bucket == nil {
