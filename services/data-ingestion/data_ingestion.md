@@ -674,6 +674,30 @@ unexplained empty penny bucket later.
 
 ---
 
+## Worker 9 — `intraday-bars`
+
+Stores **5-minute regular-session bars** for the symbols someone is looking at:
+the latest scan's gate-passing candidates plus every symbol on any watchlist
+(`watchlist_items`). They feed the 1D and 5D ranges of the web app's detail chart
+through momentum-api's bars endpoint. Longer ranges use the existing daily bars.
+
+| | |
+|---|---|
+| Source | Yahoo Finance chart endpoint (`internal/fetch/yahoo`, `FetchBars` with `5Min`): free, no key, consolidated volume, `includePrePost=false` |
+| Writes | `equity_ohlcv`, `interval = '5Min'`, `source = 'yahoo_finance'` — every daily reader filters `interval = '1Day'`, so the scanner never sees these rows |
+| Scope | candidates + watchlist, capped by `INTRADAY_BARS_MAX_SYMBOLS` (candidates kept first) — never the whole universe, because Yahoo access depends on IP reputation |
+| Run | `make run-intraday-bars` (loop) or `go run ./cmd/intraday-bars -once` |
+
+| Env var | Default | Meaning |
+|---|---|---|
+| `INTRADAY_BARS_POLL_INTERVAL` | `30m` | Time between passes |
+| `INTRADAY_BARS_LOOKBACK_DAYS` | `8` | Calendar days of bars kept per pass (≥ 5 sessions) |
+| `INTRADAY_BARS_MAX_SYMBOLS` | `200` | Hard cap on symbols per pass |
+
+Rows are upserted on `(symbol, interval, ts, source)` and never pruned; at ~78
+bars per symbol per session this is small, but prune old `5Min` rows if the
+watchlist grows large. A failed symbol is logged and skipped until the next pass.
+
 ## Shared API rate budgets
 
 Five workers hold a Finnhub client: `data-equity`, `data-sentiment`,
@@ -1126,6 +1150,38 @@ data-macro-intel → economic_calendar_events, earnings_calendar_events,
 - `SEC EDGAR API`. Finnhub's `/stock/financials-reported` endpoint is a pre-parsed wrapper over SEC EDGAR filings. Finnhub downloads the 10-Q and 10-K XBRL filings from EDGAR, parses the XBRL tags, normalises the concept names, and serves the result through their REST API. Your code in data-fundamental/main.go calls Finnhub — it never touches sec.gov directly.
 
 ---
+
+## Cross-service runtime dependencies
+
+Services here are separate containers, but a few share a file or a table in a
+way that lets a change made for one service break another that was working.
+Each entry names who depends on what, what failure looks like, and where the
+wiring lives. Add to this list whenever a service starts requiring something it
+does not own.
+
+| Shared thing | Owner / writer | Required by | If it is missing |
+|---|---|---|---|
+| `shared/content/momentum_caveats.json` (`EVIDENCE_CAVEAT`, `RESEARCH_SCORE_CAVEAT`) | edited by hand; one source for both services | **analyst-bot** (`notifier/discord/momentum.py`) and **momentum-api** (`services/data-analyzer/cmd/momentum-api`) | Both refuse to start and log exactly which path was tried and how to fix it. There is deliberately no fallback text — a fallback would be a second source of the claim |
+| `watchlist_items` (migration 024) | momentum-api (`PUT/DELETE /api/v1/watchlist/{symbol}`) | **intraday-bars** reads it to pick symbols | Not a failure: the job just fetches candidates only |
+| `momentum_features`, `momentum_scores` | `momentum-scanner` (data-analyzer) | analyst-bot (`/scanner`, `/score`, alerts), momentum-api | Not a startup failure: both serve the last stored scan; momentum-api reports it via `scan.is_stale` |
+
+**The caveats file is the one that can break a running service.** It was
+introduced for momentum-api, but analyst-bot reads it too. Rebuilding or
+redeploying the bot without the Compose wiring stops the bot at boot with
+`analyst-bot cannot start: ...` naming the missing file or unset `MOMENTUM_CAVEATS_PATH` and the fix. The
+wiring both services need, in `infra/docker-compose.yml`:
+
+```yaml
+environment:
+  MOMENTUM_CAVEATS_PATH: /shared/content/momentum_caveats.json
+volumes:
+  - ../shared/content:/shared/content:ro
+```
+
+Neither Docker image bakes the file in (each build context is its own service
+directory), so any deployment outside this Compose file must provide the same
+mount. Running from a repo checkout needs nothing: both default to the
+repo-relative path.
 
 ## Multi-source `equity_ohlcv`: the reader's preference is a correctness setting
 

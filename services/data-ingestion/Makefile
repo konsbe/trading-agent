@@ -1,4 +1,4 @@
-.PHONY: tidy build docker-build run-crypto run-equity run-onchain run-sentiment run-fundamental run-technical
+.PHONY: tidy build docker-build run-crypto run-equity run-onchain run-sentiment run-fundamental run-technical run-intraday-bars
 
 BIN := bin
 
@@ -14,6 +14,7 @@ build:
 	go build -o $(BIN)/data-sentiment ./cmd/data-sentiment
 	go build -o $(BIN)/data-technical ./cmd/data-technical
 	go build -o $(BIN)/data-macro-intel ./cmd/data-macro-intel
+	go build -o $(BIN)/intraday-bars ./cmd/intraday-bars
 
 docker-build:
 	docker build -t trading-agent/data-ingestion:latest .
@@ -38,3 +39,8 @@ run-technical: build
 
 run-macro-intel: build
 	./$(BIN)/data-macro-intel
+
+# 5-minute bars (Yahoo, free) for the latest candidates + watchlist symbols;
+# feeds the detail chart's 1D/5D ranges. Loops every INTRADAY_BARS_POLL_INTERVAL.
+run-intraday-bars: build
+	./$(BIN)/intraday-bars
