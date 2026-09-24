@@ -1,4 +1,9 @@
 .app-shell {
+    /* The shell never scrolls; scrolling happens inside the hosted MFE.
+       position: relative makes this the containing block for absolutely
+       positioned descendants (chart canvases, visually-hidden labels), so
+       overflow: hidden clips them instead of letting them stretch the page. */
+    position: relative;
     display: flex;
     flex-direction: column;
     height: 100vh;

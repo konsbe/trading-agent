@@ -1,0 +1,38 @@
+/* Card chrome (surface, radius, header toggle) comes from the shared CollapsibleCard. */
+
+.scanner-bucket__title {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-sm);
+}
+
+.scanner-bucket__count {
+    padding: 0 var(--space-sm);
+    border-radius: var(--radius-full);
+    background: var(--color-surface-variant);
+    color: var(--color-on-surface-variant);
+    font-family: var(--font-family-label);
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-medium);
+    line-height: var(--line-height);
+}
+
+.scanner-bucket__sort-label {
+    margin: 0;
+    color: var(--color-on-surface-variant);
+    font-size: var(--font-size-xs);
+}
+
+.scanner-bucket__empty {
+    margin: 0;
+    padding: var(--space-md);
+    border: 1px dashed var(--color-outline-variant);
+    border-radius: var(--radius-md);
+    color: var(--color-on-surface-variant);
+    text-align: center;
+}
+
+.scanner-bucket__more {
+    display: flex;
+    justify-content: center;
+}

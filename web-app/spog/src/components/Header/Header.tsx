@@ -1,6 +1,6 @@
 import { useContext } from "react";
 import { Link } from "react-router-dom";
-import { Button, MenuIcon } from "@trading-agent/shared-components";
+import { Button, DisclaimerPill, MenuIcon } from "@trading-agent/shared-components";
 import UserMenu from "../UserMenu";
 import { AuthContext } from "../../providers/AuthProvider/AuthProvider";
 import { HeaderProps } from "./types";
@@ -29,6 +29,7 @@ const Header = ({ isSidebarOpen, onToggleSidebar }: HeaderProps) => {
                 {appName}
             </Link>
             <div className="app-header__actions">
+                <DisclaimerPill />
                 <UserMenu
                     userName={authDataProps?.userName || "anonymous"}
                     userRoles={authDataProps?.userRoles || []}

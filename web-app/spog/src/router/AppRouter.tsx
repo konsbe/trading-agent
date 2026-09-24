@@ -3,6 +3,7 @@ import { createBrowserRouter, Navigate, RouteObject } from "react-router-dom";
 
 import Layout from "../layouts/AppLayout/Layout";
 import PageNotFound from "../pages/PageNotFound/PageNotFound";
+import SingleMfePage from "../pages/SingleMfePage";
 import UserAccessControl from "../components/UserAccessControl/UserAccessControl";
 import { DEFAULT_ROUTE } from "../constants/routes";
 
@@ -23,7 +24,19 @@ export const routes: RouteObject[] = [
             },
             {
                 path: "candidates/*",
-                element: <PrivateRouter component={<>Candidates</>} />,
+                element: (
+                    <PrivateRouter
+                        component={
+                            <SingleMfePage
+                                mfe_key="mfe_scanner"
+                                mfe_component="./Scanner"
+                                mfe_header_title="Today's Candidates"
+                                mfe_navigation_path="/candidates"
+                                mfe_enable_navigation={false}
+                            />
+                        }
+                    />
+                ),
             },
             {
                 path: "stock-detail/*",

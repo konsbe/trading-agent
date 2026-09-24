@@ -1,0 +1,58 @@
+/* Reusable scanner classes shared across features. */
+
+.scanner-link {
+    color: var(--color-primary);
+    text-decoration: none;
+    border-radius: var(--radius-sm);
+}
+
+.scanner-link:hover {
+    text-decoration: underline;
+}
+
+.scanner-card {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+    padding: var(--space-md);
+    border-radius: var(--radius-lg);
+    background: var(--color-surface-container);
+    color: var(--color-on-surface);
+}
+
+.scanner-card__title {
+    margin: 0;
+    font-family: var(--font-family-headline);
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-bold);
+}
+
+.scanner-card__subtitle {
+    margin: 0;
+    font-family: var(--font-family-headline);
+    font-size: var(--font-size-md);
+    font-weight: var(--font-weight-medium);
+}
+
+.scanner-code {
+    padding: 0 var(--space-xs);
+    border-radius: var(--radius-sm);
+    background: var(--color-surface-container-highest);
+    color: var(--color-on-surface-variant);
+    font-family: var(--font-family-label);
+    font-size: var(--font-size-xs);
+}
+
+.scanner-sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+}
+
+.scanner-muted {
+    margin: 0;
+    color: var(--color-on-surface-variant);
+}

@@ -14,6 +14,8 @@ Visual UI comes from **Stitch AI**, owned in `web-app/shared-components` and imp
 - Theme tokens → Stitch `tokens.json` applied by `ThemeProvider` from `@trading-agent/shared-components`; mode-independent spacing/radius in `@trading-agent/shared-components/theme.css`
 - Shared components (Button, Input, Table, Dialog, layout, …) → `@trading-agent/shared-components`
 
+Every screen widget/card must use `CollapsibleCard` from `@trading-agent/shared-components` (collapse to its header on click, `persistKey` per widget) — see "Widgets are collapsible" in `.cursor/agents/ui-developer.md`.
+
 Before building a visual component:
 
 1. Search `web-app/shared-components` and existing Stitch/Figma exports

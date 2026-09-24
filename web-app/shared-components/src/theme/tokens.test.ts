@@ -33,6 +33,9 @@ describe('design tokens', () => {
         expect(dark['--color-text-secondary']).toBe('#c1c7ce');
         expect(dark['--color-border']).toBe('#41474d');
         expect(dark['--color-focus-ring']).toContain('#0ea5e9');
+        expect(dark['--color-price-up']).toBe(dark['--color-secondary']);
+        expect(dark['--color-price-down']).toBe(dark['--color-error']);
+        expect(getThemeVariables('light')['--color-price-up']).toBe('#0d9488');
         expect(dark['--font-family']).toBe('Inter, sans-serif');
         expect(dark['--font-family-label']).toBe('JetBrains Mono, monospace');
         expect(getThemeVariables('light')['--color-primary']).toBe('#0284c7');

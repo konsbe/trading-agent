@@ -19,6 +19,40 @@ Work in `web-app/ui/spog` (host) or `web-app/ui/mfe-<name>` (remotes). When a St
 
 Do not create one-off visual primitives that duplicate the kit.
 
+## Widgets are collapsible (mandatory)
+
+Every widget/card on a screen — a titled panel such as a table section, a facts
+grid, a chart, a score breakdown — is built with **`CollapsibleCard`** from
+`@trading-agent/shared-components`. Clicking (or Enter/Space on) its header
+collapses it to the header row; clicking again shows the full content. Do not
+build a one-off collapsible or a plain card for a widget.
+
+```tsx
+import { CollapsibleCard } from '@trading-agent/shared-components';
+
+<CollapsibleCard
+  id="scanner-detail-facts"
+  title="Primary facts"
+  meta={<span className="muted">Session close · computed 10:21 PM</span>}
+  persistKey="scanner.detail.facts"
+>
+  <FactsGrid facts={facts} />
+</CollapsibleCard>
+```
+
+- **`title`** goes in the toggle button; **`meta`** (badges, sort labels, range
+  tabs, other controls) sits beside it, outside the toggle, so clicking a
+  control never collapses the card and meta stays visible while collapsed.
+- **`persistKey`**: give every widget a stable `<mfe>.<page>.<widget>` key so
+  its state survives navigating between records in the same tab
+  (sessionStorage). Omit it only for throwaway/one-off content.
+- Collapsed content is **unmounted**. Anything stateful the user set (sort
+  order, "show all", chart range) must live above the card so it survives
+  collapse; charts are rebuilt on expand and must size themselves then.
+- Tests: toggle by click and Enter/Space, `aria-expanded`/`aria-controls`,
+  meta clicks don't toggle, persisted state per key.
+
+
 ---
 
 ## 🎨 Project Structure for MFE's

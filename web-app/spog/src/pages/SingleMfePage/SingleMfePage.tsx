@@ -20,7 +20,7 @@ const SingleMfePage = ({
     mfe_key: string,
     mfe_component: string,
     mfe_header_title: string,
-    mfe_header_icon: React.ComponentType<any>,
+    mfe_header_icon?: React.ComponentType<any>,
     mfe_navigation_path: string,
     mfe_enable_navigation: boolean,
     header_scrollable?: boolean,

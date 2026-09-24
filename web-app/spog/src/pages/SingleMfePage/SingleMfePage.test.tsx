@@ -176,6 +176,14 @@ describe('SingleMfePage Component', () => {
     });
 
     describe('Component Props Validation', () => {
+        it('renders the header without an icon when mfe_header_icon is omitted', () => {
+            customRenderWithAllProviders(<CandidatesPage mfe_header_icon={undefined} />);
+
+            const headerComponent = screen.getByTestId('header-component-mfe_candidates');
+            expect(headerComponent).toHaveTextContent('Candidates');
+            expect(screen.queryByTestId('mfe-header-icon')).not.toBeInTheDocument();
+        });
+
         it('should verify HeaderComponent structure', () => {
             customRenderWithAllProviders(<CandidatesPage />);
 

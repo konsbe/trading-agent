@@ -51,6 +51,8 @@ declare global {
     keycloakUrl?: string;
     keycloakRealm?: string;
     keycloakClientId?: string;
+    /** momentum-api base URL, read by mfe-scanner. */
+    momentumApiUrl?: string;
   }
 
   interface MFEConfigEntry {

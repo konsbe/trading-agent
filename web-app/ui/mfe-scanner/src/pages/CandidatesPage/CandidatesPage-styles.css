@@ -1,0 +1,10 @@
+.scanner-candidates__meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-xxs) var(--space-sm);
+}
+
+.scanner-candidates__meta > span + span::before {
+    content: '·';
+    margin-right: var(--space-sm);
+}

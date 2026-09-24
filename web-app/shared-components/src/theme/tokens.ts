@@ -40,6 +40,11 @@ const buildThemeVariables = (mode: ThemeMode): ThemeVariables => {
         '--color-text-secondary': color('on-surface-variant'),
         '--color-border': color('outline-variant'),
         '--color-focus-ring': `color-mix(in srgb, ${color('primary')} 45%, transparent)`,
+        // Price-movement deltas ONLY (day change, chart candles). Stitch reserves
+        // green/red for exactly this and defines no dedicated tokens, so they
+        // alias its green (secondary) and red (error). Never use them in chrome.
+        '--color-price-up': color('secondary'),
+        '--color-price-down': color('error'),
         '--font-family': fontFamily.body.value,
         '--font-family-headline': fontFamily.headline.value,
         '--font-family-label': fontFamily.label.value,

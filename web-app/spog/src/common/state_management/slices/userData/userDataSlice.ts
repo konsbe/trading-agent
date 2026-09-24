@@ -44,10 +44,12 @@ export const userDataSlice = createSlice({
             };
         },
         updateUserDataTheme: (state, action: PayloadAction<{currentUser: UserData}>) => {
+            // state.theme must follow the switch even before anyone signs in:
+            // MFEs read it from the published slice when currentUser is null.
+            const newTheme = action.payload.currentUser?.theme || state.currentUser?.theme || defaultTheme;
+            state.theme = newTheme;
             if (state.currentUser) {
-                const newTheme = action.payload.currentUser?.theme || state.currentUser?.theme || defaultTheme;
                 state.currentUser.theme = newTheme;
-                state.theme = newTheme;
             }
         },
         updateUserDataStoreToken: (state, action: PayloadAction<{currentUser: UserData}>) => {

@@ -1,0 +1,76 @@
+/* Renders inside the shell grid cell: fill it, never 100vh. */
+/*
+ * The MFE's scroll container. position: relative makes it the containing
+ * block for absolutely positioned descendants (chart internals, visually
+ * hidden labels), so they scroll with the content instead of escaping every
+ * overflow box and stretching the shell's document.
+ */
+.scanner-page {
+    position: relative;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+    width: 100%;
+    min-width: 0;
+    height: 100%;
+    padding: var(--space-sm) var(--space-lg);
+    overflow: auto;
+    background: var(--color-surface);
+    color: var(--color-on-surface);
+    font-family: var(--font-family);
+    font-size: var(--font-size-md);
+    line-height: var(--line-height);
+}
+
+.scanner-page__back {
+    font-size: var(--font-size-sm);
+}
+
+.scanner-page__header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--space-sm) var(--space-md);
+}
+
+.scanner-page__heading {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xxs);
+    min-width: 0;
+}
+
+.scanner-page__title {
+    margin: 0;
+    font-family: var(--font-family-headline);
+    font-size: var(--font-size-xl);
+    font-weight: var(--font-weight-bold);
+    color: var(--color-on-surface);
+}
+
+.scanner-page__subtitle {
+    color: var(--color-on-surface-variant);
+    font-size: var(--font-size-sm);
+}
+
+.scanner-page__actions {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    margin-left: auto;
+}
+
+.scanner-page__body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+    min-width: 0;
+}
+
+/* Focus treatment for every scanner screen. */
+.scanner-page :focus-visible {
+    outline: 2px solid var(--color-focus-ring);
+    outline-offset: 2px;
+}

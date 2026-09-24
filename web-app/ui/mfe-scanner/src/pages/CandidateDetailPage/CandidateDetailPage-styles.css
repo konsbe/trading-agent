@@ -1,0 +1,17 @@
+.scanner-detail__skeleton {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+}
+
+.scanner-detail__no-score {
+    margin: 0;
+    color: var(--color-on-surface-variant);
+}
+
+.scanner-detail__footer-nav {
+    display: flex;
+    justify-content: center;
+    padding-bottom: var(--space-md);
+    font-size: var(--font-size-sm);
+}

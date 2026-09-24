@@ -217,7 +217,9 @@ describe('userDataSlice', () => {
         expect(nextState.theme).toBe('dark');
     });
 
-    it('should not update theme if currentUser is null', () => {
+    // MFEs read the theme from the published slice when nobody is signed in, so
+    // the switch must reach state.theme even without a currentUser.
+    it('should update state.theme but not create a user when currentUser is null', () => {
         const state: UserState = {
             theme: "light",
             currentUser: null,
@@ -226,7 +228,9 @@ describe('userDataSlice', () => {
         const nextState = reducer(state, updateUserDataTheme({
             currentUser: { userName: '', userRoles: [], token: '', authenticated: false, theme: "dark" },
         }));
-        expect(nextState).toEqual(state);
+        expect(nextState.theme).toBe("dark");
+        expect(nextState.currentUser).toBeNull();
+        expect(nextState.isAuthenticated).toBe(false);
     });
 });
 

@@ -28,6 +28,21 @@ jest.mock('../components/UserAccessControl/UserAccessControl', () => {
     };
 });
 
+jest.mock('../pages/SingleMfePage', () => {
+    return function MockSingleMfePage(props: Record<string, unknown>) {
+        return (
+            <div
+                data-testid="single-mfe-page"
+                data-mfe-key={props.mfe_key as string}
+                data-mfe-component={props.mfe_component as string}
+                data-navigation-path={props.mfe_navigation_path as string}
+            >
+                {props.mfe_header_title as string}
+            </div>
+        );
+    };
+});
+
 const RoutesUnderTest = () => {
     const location = useLocation();
     return (
@@ -59,7 +74,9 @@ describe('AppRouter', () => {
         });
     });
 
-    it.each(APP_ROUTES.map(({ path, label }) => [path, label]))(
+    it.each(
+        APP_ROUTES.filter(({ path }) => path !== '/candidates').map(({ path, label }) => [path, label])
+    )(
         'renders the %s placeholder inside the layout and access control',
         (path, label) => {
             renderAt(path);
@@ -68,6 +85,23 @@ describe('AppRouter', () => {
             expect(screen.getByTestId('layout')).toContainElement(accessControl);
             expect(accessControl).toHaveTextContent(label);
             expect(accessControl).toHaveAttribute('data-roles', '');
+        }
+    );
+
+    it.each(['/candidates', '/candidates/NEXR'])(
+        'renders the mfe_scanner remote for %s inside the layout and access control',
+        (path) => {
+            renderAt(path);
+
+            const accessControl = screen.getByTestId('user-access-control');
+            const mfePage = screen.getByTestId('single-mfe-page');
+            expect(screen.getByTestId('layout')).toContainElement(accessControl);
+            expect(accessControl).toContainElement(mfePage);
+            expect(accessControl).toHaveAttribute('data-roles', '');
+            expect(mfePage).toHaveAttribute('data-mfe-key', 'mfe_scanner');
+            expect(mfePage).toHaveAttribute('data-mfe-component', './Scanner');
+            expect(mfePage).toHaveAttribute('data-navigation-path', '/candidates');
+            expect(mfePage).toHaveTextContent("Today's Candidates");
         }
     );
 
@@ -81,7 +115,7 @@ describe('AppRouter', () => {
         renderAt('/');
 
         expect(screen.getByTestId('pathname')).toHaveTextContent('/candidates');
-        expect(screen.getByText('Candidates')).toBeInTheDocument();
+        expect(screen.getByTestId('single-mfe-page')).toHaveAttribute('data-mfe-key', 'mfe_scanner');
     });
 
     it('renders the 404 page', () => {

@@ -16,6 +16,12 @@ body,
     margin: 0;
 }
 
+/* The app is a fixed-height shell; the document itself never scrolls. */
+html,
+body {
+    overflow: hidden;
+}
+
 body {
     font-family: var(--font-family);
     font-size: var(--font-size-md);

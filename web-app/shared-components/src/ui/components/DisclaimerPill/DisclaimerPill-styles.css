@@ -1,0 +1,14 @@
+.ta-disclaimer-pill {
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
+    padding: var(--space-xxs) var(--space-sm);
+    border-radius: var(--radius-full);
+    background: var(--color-tertiary-container);
+    color: var(--color-on-tertiary-container);
+    font-family: var(--font-family-label);
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-medium);
+    line-height: var(--line-height);
+    white-space: nowrap;
+}

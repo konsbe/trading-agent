@@ -1,0 +1,98 @@
+.scanner-gates .ta-collapsible-card__title {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+}
+
+.scanner-gates__icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.25rem;
+    height: 1.25rem;
+    border: 1px solid var(--color-primary);
+    border-radius: var(--radius-full);
+    color: var(--color-primary);
+    font-size: var(--font-size-xs);
+}
+
+.scanner-gates__icon.is-failed {
+    border-color: var(--color-on-error-container);
+    background: var(--color-error-container);
+    color: var(--color-on-error-container);
+}
+
+.scanner-gates__badge {
+    padding: var(--space-xxs) var(--space-sm);
+    border: 1px solid var(--color-outline);
+    border-radius: var(--radius-sm);
+    color: var(--color-on-surface-variant);
+    font-family: var(--font-family-label);
+    font-size: var(--font-size-xs);
+}
+
+.scanner-gates__checks {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
+    gap: var(--space-xs) var(--space-md);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.scanner-gates__check {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-sm);
+    padding: var(--space-xs) var(--space-sm);
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-sm);
+}
+
+.scanner-gates__check-icon {
+    flex-shrink: 0;
+    width: 1rem;
+    color: var(--color-primary);
+    font-weight: var(--font-weight-bold);
+}
+
+.scanner-gates__check.is-failed {
+    background: var(--color-error-container);
+    color: var(--color-on-error-container);
+}
+
+.scanner-gates__check.is-failed .scanner-gates__check-icon {
+    color: var(--color-on-error-container);
+}
+
+.scanner-gates__check-body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xxs);
+    min-width: 0;
+}
+
+.scanner-gates__line {
+    font-family: var(--font-family-label);
+    font-size: var(--font-size-xs);
+}
+
+.scanner-gates__reasons {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xxs);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-size: var(--font-size-xs);
+}
+
+.scanner-gates__unmapped {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+    padding: var(--space-sm);
+    border-radius: var(--radius-md);
+    background: var(--color-tertiary-container);
+    color: var(--color-on-tertiary-container);
+}

@@ -1,0 +1,74 @@
+.scanner-facts__computed {
+    font-size: var(--font-size-xs);
+}
+
+/*
+ * Hairlines are drawn per cell (right + bottom shadows, clipped at the outer
+ * edge) so a partly filled last row leaves plain surface, not a grey block.
+ */
+.scanner-facts__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+    margin: 0;
+    overflow: hidden;
+    border: 1px solid var(--color-outline-variant);
+    border-radius: var(--radius-md);
+    background: var(--color-surface-container-low);
+}
+
+.scanner-facts__cell {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xxs);
+    min-width: 0;
+    padding: var(--space-sm) var(--space-md);
+    box-shadow:
+        1px 0 0 var(--color-outline-variant),
+        0 1px 0 var(--color-outline-variant);
+}
+
+.scanner-facts__cell.is-wide {
+    grid-column: 1 / -1;
+}
+
+.scanner-facts__label {
+    color: var(--color-on-surface-variant);
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-medium);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.scanner-facts__value-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xxs);
+    margin: 0;
+}
+
+.scanner-facts__value {
+    color: var(--color-on-surface);
+    font-family: var(--font-family-label);
+    font-size: var(--font-size-md);
+    font-weight: var(--font-weight-medium);
+    font-variant-numeric: tabular-nums;
+}
+
+.scanner-facts__value.is-plain {
+    font-family: var(--font-family);
+}
+
+/* Price-movement colours: allowed only for the day's price delta. */
+.scanner-facts__value.is-price-up {
+    color: var(--color-price-up);
+}
+
+.scanner-facts__value.is-price-down {
+    color: var(--color-price-down);
+}
+
+.scanner-facts__sub {
+    color: var(--color-on-surface-variant);
+    font-family: var(--font-family-label);
+    font-size: var(--font-size-xs);
+}

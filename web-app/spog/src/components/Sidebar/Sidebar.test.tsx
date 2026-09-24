@@ -26,7 +26,7 @@ describe('Sidebar', () => {
         renderSidebar(true, '/watchlist');
 
         expect(screen.getByRole('link', { name: 'Watchlist' })).toHaveClass('app-sidebar__link--active');
-        expect(screen.getByRole('link', { name: 'Candidates' })).not.toHaveClass('app-sidebar__link--active');
+        expect(screen.getByRole('link', { name: APP_ROUTES[0].label })).not.toHaveClass('app-sidebar__link--active');
     });
 
     it('is hidden when closed', () => {

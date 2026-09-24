@@ -16,9 +16,21 @@
       "spogDomain": "http://localhost:3000",
       "keycloakUrl": "http://localhost:8080",
       "keycloakRealm": "trading-agent",
-      "keycloakClientId": "spog"
+      "keycloakClientId": "spog",
+      "momentumApiUrl": "http://localhost:8090"
     }
   },
-  "mfes": {},
+  "mfes": {
+    "mfe_scanner": {
+      "label": "Momentum Scanner",
+      "version": "1.0.0",
+      "endpoint": "http://localhost:3001/remoteEntry.js",
+      "module": "./Scanner",
+      "scope": "mfe_scanner",
+      "description": "Today's momentum scanner candidates and score breakdown",
+      "roles": [],
+      "enabled": true
+    }
+  },
   "iframes": {}
 }

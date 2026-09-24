@@ -58,6 +58,11 @@ Every Stitch colour is exposed as `--color-<token>`, e.g. `--color-surface-conta
 
 Other theme variables: `--color-focus-ring`, `--color-overlay`, `--shadow-sm`, `--shadow-lg`.
 
+**Price-movement colours** — `--color-price-up` (= `secondary`, green) and
+`--color-price-down` (= `error`, red). Use them **only** for price deltas: the day's
+change, a chart's up/down candles and volume bars. Stitch reserves green/red for
+this and defines no dedicated tokens, so these are aliases (decision 2026-09-24).
+
 Hover/pressed states are state layers over the base colour, not new tokens:
 
 ```css
@@ -77,10 +82,31 @@ The shell loads Inter and JetBrains Mono from Google Fonts in `web-app/spog/publ
 Roundness is `ROUND_FOUR`: `--radius-md` = 4px (default), `--radius-sm` = 2px,
 `--radius-lg` = 8px (cards), `--radius-full` for pills.
 
+## Charts
+
+Price charts use **[TradingView Lightweight Charts](https://github.com/tradingview/lightweight-charts)**
+(Apache-2.0, free, no subscription or API key; ~45 KB, canvas-based). Chosen over
+D3 (decision 2026-09-24) because candlesticks, volume histograms, crosshair,
+time scale, zoom and pan are built in — D3 would need each of those hand-built.
+D3 remains a fine choice for non-financial, bespoke visualisations; don't add a
+second price-charting library.
+
+- Colours come from the theme's CSS variables, read at runtime from the element
+  (`getComputedStyle(el).getPropertyValue('--color-…')`) and re-applied when the
+  theme changes — never hard-coded hex. Up/down candles use `--color-price-up` /
+  `--color-price-down`; grid lines `--color-outline-variant`; text
+  `--color-on-surface-variant`; background transparent over the card surface.
+- Data: `GET /api/v1/scanner/symbols/{symbol}/bars?range=1D|5D|1M|6M|1Y|ALL`
+  (momentum-api). 1D/5D are 5-minute regular-session bars (Yahoo, via
+  data-ingestion's `intraday-bars` job, candidates + watchlist symbols only);
+  longer ranges are adjusted daily bars (Tiingo). When a symbol has no intraday
+  bars, 1D/5D fall back to daily and the response says so (`fallback`).
+
 ## Rules
 
 1. **Green and red are reserved for price movement deltas.** Never use them in
-   UI chrome (buttons, nav, borders, badges). Live telemetry uses
+   UI chrome (buttons, nav, borders, badges). Use `--color-price-up` /
+   `--color-price-down` for those deltas. Live telemetry uses
    `secondary`; system alerts use `error`.
 2. **Disclaimer pill "Screener — not a forecast"** uses the tertiary (amber)
    palette (`tertiary-container` fill, `on-tertiary-container` text) and stays

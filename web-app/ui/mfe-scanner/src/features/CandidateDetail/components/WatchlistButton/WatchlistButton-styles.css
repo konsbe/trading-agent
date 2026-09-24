@@ -1,0 +1,23 @@
+.scanner-watchlist {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+}
+
+.scanner-watchlist__icon {
+    margin-right: var(--space-xs);
+}
+
+.scanner-watchlist__error {
+    margin: 0;
+    padding: var(--space-xs) var(--space-sm);
+    border-radius: var(--radius-md);
+    background: var(--color-error-container);
+    color: var(--color-on-error-container);
+    font-size: var(--font-size-sm);
+}
+
+.scanner-watchlist__note {
+    font-size: var(--font-size-xs);
+    text-align: center;
+}

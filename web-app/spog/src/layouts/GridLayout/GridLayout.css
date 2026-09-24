@@ -13,6 +13,9 @@
     grid-template-columns: repeat(24, 1fr);
     height: 100%;
     flex: 1;
+    /* Flex items default to min-height: auto and grow to fit their content;
+       0 keeps a row inside its container so tall content scrolls in its cell. */
+    min-height: 0;
 }
 
 /* Row with splitter - use flexbox instead of grid */
@@ -607,6 +610,9 @@
 
 /* Component Content */
 .grid-layout-component-content {
+    /* A flex item's default min-height:auto would grow to fit the content and
+       defeat the cell's scrolling; 0 lets tall content (e.g. an MFE) scroll. */
+    min-height: 0;
     padding: 10px;
     flex: 1;
     display: flex;
@@ -617,6 +623,9 @@
 
 /* Component Content No Padding */
 .grid-layout-component-content-no-padding {
+    /* A flex item's default min-height:auto would grow to fit the content and
+       defeat the cell's scrolling; 0 lets tall content (e.g. an MFE) scroll. */
+    min-height: 0;
     padding: 0;
     flex: 1;
     display: flex;

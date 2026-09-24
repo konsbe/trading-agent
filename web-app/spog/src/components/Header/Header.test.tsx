@@ -42,6 +42,15 @@ describe('Header', () => {
         expect(screen.getByTestId('app-header-brand')).toHaveTextContent('My Desk');
     });
 
+    it('shows the persistent "Screener — not a forecast" disclaimer pill', () => {
+        renderHeader();
+
+        const pill = screen.getByTestId('disclaimer-pill');
+        expect(pill).toHaveTextContent('Screener — not a forecast');
+        expect(pill).toHaveClass('ta-disclaimer-pill');
+        expect(screen.getByTestId('app-header')).toContainElement(pill);
+    });
+
     it('toggles the sidebar and reflects its state', () => {
         const { onToggleSidebar } = renderHeader();
 
