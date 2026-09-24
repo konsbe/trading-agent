@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "momentum_chain_runs",
+  "description": "Durable progress of the daily momentum chain, one row per NYSE session (migration 025).",
+  "type": "object",
+  "required": [
+    "session",
+    "attempts",
+    "updated_at"
+  ],
+  "properties": {
+    "session": {
+      "type": "string",
+      "format": "date"
+    },
+    "attempts": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "scanner_completed_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "tracker_completed_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "gave_up_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "last_error": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

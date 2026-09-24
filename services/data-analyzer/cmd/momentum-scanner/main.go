@@ -26,6 +26,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -66,8 +67,10 @@ func main() {
 	gcfg := momentum.DefaultGateConfig()
 	stats := momentum.NewGateStats()
 
-	var featuresWritten, scoresWritten, skipped int
-	var errs int
+	var skipped int
+	var writes []store.ScanWrite
+	var latest []time.Time
+	var candidates []string
 
 	for sym, series := range bars {
 		if len(series) == 0 {
@@ -111,16 +114,10 @@ func main() {
 		row.Gate = g
 		stats.Add(g)
 
-		if !*dryRun {
-			if err := store.UpsertFeatures(ctx, pool, row); err != nil {
-				fmt.Fprintln(os.Stderr, err)
-				errs++
-				continue
-			}
-		}
-		featuresWritten++
-
+		w := store.ScanWrite{Feature: row}
+		latest = append(latest, ts)
 		if !g.Passed {
+			writes = append(writes, w)
 			continue
 		}
 
@@ -132,26 +129,39 @@ func main() {
 			si.CatalystTier = momentum.CatalystTier(*row.CatalystTier)
 		}
 		s, ok := momentum.ScoreCandidate(&f, si, g)
-		if !ok {
-			continue
+		if ok {
+			w.Score = &s
+			candidates = append(candidates, fmt.Sprintf("  candidate %-7s %s score=%d/%d", sym, s.Bucket, s.Total, momentum.WeightAllocated))
 		}
-		if !*dryRun {
-			if err := store.UpsertScore(ctx, pool, ts, sym, s); err != nil {
-				fmt.Fprintln(os.Stderr, err)
-				errs++
-				continue
-			}
+		writes = append(writes, w)
+	}
+
+	session, ok := store.ScanSession(latest)
+	if !ok {
+		fmt.Println("no symbol had a usable close; nothing to write")
+		return
+	}
+	// One transaction for the whole scan, marker included: a scanner killed
+	// part-way leaves nothing, never a partial scan that looks fresh.
+	if !*dryRun {
+		if err := store.WriteScan(ctx, pool, session, writes); err != nil {
+			fmt.Fprintln(os.Stderr, err, "— nothing was written; the scan is all-or-nothing")
+			os.Exit(1)
 		}
-		scoresWritten++
-		fmt.Printf("  candidate %-7s %s score=%d/%d\n", sym, s.Bucket, s.Total, momentum.WeightAllocated)
+	}
+	for _, c := range candidates {
+		fmt.Println(c)
 	}
 
 	fmt.Println("\n§8.2 scanner:")
 	fmt.Printf("  symbols with bars:    %d\n", len(bars))
 	fmt.Printf("  no usable close:      %d\n", skipped)
-	fmt.Printf("  feature rows written: %d\n", featuresWritten)
-	fmt.Printf("  score rows written:   %d (gate-passing only)\n", scoresWritten)
-	fmt.Printf("  write errors:         %d\n", errs)
+	fmt.Printf("  session:              %s\n", session.Format(time.DateOnly))
+	fmt.Printf("  feature rows written: %d\n", len(writes))
+	fmt.Printf("  score rows written:   %d (gate-passing only)\n", len(candidates))
+	if !*dryRun {
+		fmt.Printf("  committed:            one transaction, with the momentum_chain_runs marker\n")
+	}
 	fmt.Printf("  gate rejections:      %v\n", stats.TopFailures(6))
 	if *dryRun {
 		fmt.Println("  DRY RUN — nothing written")

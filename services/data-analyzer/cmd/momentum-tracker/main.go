@@ -132,9 +132,9 @@ func main() {
 	// again today is not immediately evaluated against a reference price set
 	// moments ago. Opening first would give every new row one spurious session
 	// of elapsed time.
-	closed, advanced := evaluateExits(ctx, pool, bars, fcfg, ecfg, *dryRun)
+	closed, advanced, exitFailures := evaluateExits(ctx, pool, bars, fcfg, ecfg, *dryRun)
 
-	opened := openNewPositions(ctx, pool, bars, fcfg, rule, *dryRun, sc)
+	opened, openFailures := openNewPositions(ctx, pool, bars, fcfg, rule, *dryRun, sc)
 
 	fmt.Printf("\n§5 tracker: %d opened, %d advanced, %d closed", opened, advanced, len(closed))
 	if *dryRun {
@@ -149,6 +149,31 @@ func main() {
 	}
 
 	reportOutcomes(ctx, pool)
+
+	// Completion marker last, and only when every write landed. Each row write
+	// is idempotent (evaluation floor, ON CONFLICT DO NOTHING), so a run killed
+	// or failed before this line is repaired by running the tracker again —
+	// which momentum-daily does, because the session stays unmarked.
+	if *dryRun {
+		return
+	}
+	if failures := exitFailures + openFailures; failures > 0 {
+		fmt.Fprintf(os.Stderr, "tracker: %d write failures — session NOT marked complete; re-run to finish\n", failures)
+		os.Exit(1)
+	}
+	latest := make([]time.Time, 0, len(bars))
+	for _, series := range bars {
+		if len(series) > 0 {
+			latest = append(latest, series[len(series)-1].TS)
+		}
+	}
+	if session, ok := store.ScanSession(latest); ok {
+		if err := store.MarkTrackerCompleted(ctx, pool, session); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		fmt.Printf("tracker complete for session %s\n", session.Format(time.DateOnly))
+	}
 }
 
 type closedPosition struct {
@@ -163,14 +188,12 @@ func evaluateExits(
 	fcfg momentum.Config,
 	ecfg momentum.ExitConfig,
 	dry bool,
-) ([]closedPosition, int) {
+) (closed []closedPosition, advanced, failures int) {
 	active, err := store.ActiveTracked(ctx, pool)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "active tracked:", err)
-		return nil, 0
+		return nil, 0, 1
 	}
-	var closed []closedPosition
-	advanced := 0
 
 	for _, row := range active {
 		series := bars[row.Symbol]
@@ -202,6 +225,7 @@ func evaluateExits(
 			if !dry {
 				if err := store.AdvanceTracked(ctx, pool, row.Symbol, row.AlertedTS, ts, d); err != nil {
 					fmt.Fprintln(os.Stderr, err)
+					failures++
 					continue
 				}
 			}
@@ -212,12 +236,13 @@ func evaluateExits(
 		if !dry {
 			if err := store.CloseTracked(ctx, pool, row.Symbol, row.AlertedTS, ts, step.close, d); err != nil {
 				fmt.Fprintln(os.Stderr, err)
+				failures++
 				continue
 			}
 		}
 		closed = append(closed, closedPosition{row.Symbol, d})
 	}
-	return closed, advanced
+	return closed, advanced, failures
 }
 
 func openNewPositions(
@@ -228,14 +253,13 @@ func openNewPositions(
 	rule openRule,
 	dry bool,
 	scope reportscope.Scope,
-) int {
+) (opened, failures int) {
 	gcfg := momentum.DefaultGateConfig()
 	marketCaps := loadMetric(ctx, pool, "market_cap", scope)
 	sharesOut := loadMetric(ctx, pool, "shares_outstanding", scope)
 	reportscope.ReportMetricCoverage("market_cap", len(marketCaps), len(bars))
 	reportscope.ReportMetricCoverage("shares_outstanding", len(sharesOut), len(bars))
 
-	opened := 0
 	for sym, series := range bars {
 		if len(series) == 0 {
 			continue
@@ -290,6 +314,7 @@ func openNewPositions(
 		created, err := store.OpenTracked(ctx, pool, row)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
+			failures++
 			continue
 		}
 		if created {
@@ -297,7 +322,7 @@ func openNewPositions(
 			opened++
 		}
 	}
-	return opened
+	return opened, failures
 }
 
 // reportOutcomes prints the dataset §5's rules will eventually be judged on.

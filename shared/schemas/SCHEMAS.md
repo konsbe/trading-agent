@@ -83,6 +83,7 @@ nothing else. Diagnosability is worth more than the saved table.
 | [catalyst_events](#catalyst_events) | `catalyst_events` | `007_momentum.sql` | `data-universe` (company news) |
 | [momentum_tracked](#momentum_tracked) | `momentum_tracked` | `007_momentum.sql` | `momentum-scanner`, `analyst-bot` |
 | [watchlist_items](#watchlist_items) | `watchlist_items` | `024_watchlist.sql` | `momentum-api` (watchlist endpoints) |
+| [momentum_chain_runs](#momentum_chain_runs) | `momentum_chain_runs` | `025_momentum_chain_runs.sql` | `momentum-scanner`, `momentum-tracker`, `momentum-daily` |
 | [api_rate_budget](#api_rate_budget) | `api_rate_budget` | `008_api_rate_budget.sql` | every worker calling a shared-quota API |
 | [fundamental_fetch_state](#fundamental_fetch_state) | `fundamental_fetch_state` | `009_fundamental_fetch_state.sql` | `data-fundamental` |
 
@@ -772,6 +773,24 @@ Symbols a user chose to follow, written by momentum-api's watchlist endpoints
 
 Unique on `(COALESCE(owner_sub, ''), symbol)` — a plain UNIQUE would let NULL
 owners duplicate a symbol.
+
+## momentum_chain_runs
+
+**File:** `momentum_chain_runs.schema.json`
+**Migration:** `025_momentum_chain_runs.sql`
+
+Durable progress of the daily chain, one row per NYSE session, so that neither
+a restart nor a kill mid-run depends on a process remembering what finished.
+
+| Column | Type | Nullable | Notes |
+|---|---|---|---|
+| `session` | date | no | Primary key. The scan's modal latest-bar date |
+| `attempts` | integer | no | Chain attempts by momentum-daily; the retry limit survives restarts |
+| `scanner_completed_at` | timestamptz | **yes** | Set by momentum-scanner **in the same transaction** as the session's features and scores. Non-NULL = the whole scan committed. analyst-bot alerts only on these sessions |
+| `tracker_completed_at` | timestamptz | **yes** | Set by momentum-tracker after all rows are evaluated and opened. momentum-daily treats a session as done only when this is set |
+| `gave_up_at` | timestamptz | **yes** | momentum-daily gave up (bars never landed, or attempts exhausted) |
+| `last_error` | text | **yes** | Why the last attempt or give-up happened |
+| `updated_at` | timestamptz | no | Default `now()` |
 
 ## momentum_tracked
 

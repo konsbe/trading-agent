@@ -603,12 +603,28 @@ NYSE session (same holiday calendar as momentum-api) it:
    `MOMENTUM_DAILY_MAX_ATTEMPTS` (3) times;
 3. gives up on the session after `MOMENTUM_DAILY_GIVE_UP_AFTER` (14h) and logs it.
 
-"Completed" is kept in memory, so after a restart it re-runs the latest due
-session if its bars are in. That is safe by design: the scanner upserts the same
-rows, the tracker skips bars it already evaluated, and the bot posts a session
-once (verified on the first Compose start: tracker 0 opened / 0 advanced / 0
-closed). In Compose it runs next to `data-universe`, both `restart:
-unless-stopped`, against the live `ta-phase1` database.
+Progress is **durable**, in `momentum_chain_runs` (migration 025), never in
+memory — a restart or a kill mid-run cannot make a session look finished:
+
+- `momentum-scanner` writes the whole scan **and** `scanner_completed_at` in one
+  transaction. Killed part-way, Postgres rolls it all back: no rows, no marker.
+  (Verified live on 2026-09-24 with `kill -9` inside the transaction.) A symbol
+  that no longer passes on a re-run loses its old score for that bar.
+- `momentum-tracker` sets `tracker_completed_at` only after every write
+  landed; any write failure exits non-zero with no marker. Its row writes are
+  each one statement and idempotent, so a partial run is finished by re-running.
+- `momentum-daily` counts `attempts` **before** each run (a crash still uses
+  one up, so a step that always dies stops after 3) and records `gave_up_at` /
+  `last_error`. A session is done only when `tracker_completed_at` is set. A
+  committed scan is not redone (it may already have been alerted).
+- analyst-bot's freshness gate reads `scanner_completed_at`, not the feature
+  rows, so a partial scan can never be alerted.
+
+A give-up is final. To retry a session by hand, clear it first:
+`UPDATE momentum_chain_runs SET gave_up_at = NULL, attempts = 0 WHERE session = 'YYYY-MM-DD';`
+
+In Compose it runs next to `data-universe`, both `restart: unless-stopped`,
+against the live `ta-phase1` database.
 
 It does **not** ingest bars — data-ingestion's `data-universe` worker must be
 running — and it does **not** backfill missed sessions: a session skipped while

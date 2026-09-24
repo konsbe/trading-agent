@@ -10,8 +10,14 @@
 // universe, and gives up loudly (never runs on partial data) if they have not
 // landed by MOMENTUM_DAILY_GIVE_UP_AFTER.
 //
-// Both steps are idempotent (the scanner upserts; the tracker skips bars it has
-// already evaluated), so a restart that re-runs a session is safe.
+// Progress is durable, never in memory: each step records its own completion
+// in momentum_chain_runs (migration 025) — the scanner inside the same
+// transaction as its scan, the tracker after its last write — and this daemon
+// persists attempts and give-ups there too. So a restart, or a kill part-way
+// through either step, can never make a session look finished when it is not,
+// nor lose the retry count: an unmarked step is simply run again, which is
+// safe because the scan is all-or-nothing and every tracker write is
+// idempotent.
 //
 //	DATABASE_URL=... go run ./cmd/momentum-daily          # daemon
 //	DATABASE_URL=... go run ./cmd/momentum-daily -once    # latest session, then exit
@@ -41,6 +47,7 @@ import (
 	"github.com/konsbe/trading-agent/services/data-analyzer/internal/db"
 	"github.com/konsbe/trading-agent/services/data-analyzer/internal/logx"
 	"github.com/konsbe/trading-agent/services/data-analyzer/internal/momentumapi"
+	"github.com/konsbe/trading-agent/services/data-analyzer/internal/store"
 )
 
 type config struct {
@@ -92,7 +99,7 @@ func main() {
 	log.Info("momentum-daily: started", "grace", cfg.grace.String(), "poll", cfg.poll.String(),
 		"min_coverage", cfg.minCoverage, "give_up_after", cfg.giveUpAfter.String(), "bin_dir", cfg.binDir)
 
-	st := &state{attempts: map[string]int{}}
+	st := &logState{}
 	for {
 		done := tick(ctx, log, pool, cfg, st, time.Now())
 		if *once && done {
@@ -106,12 +113,9 @@ func main() {
 	}
 }
 
-// state is in memory on purpose: after a restart the chain re-runs the latest
-// session, which is safe because both steps are idempotent.
-type state struct {
-	completed string // latest session the chain finished (or gave up on)
-	attempts  map[string]int
-}
+// logState only de-duplicates log lines across polls. It holds no progress:
+// everything that decides what to run is read from momentum_chain_runs.
+type logState struct{ doneLogged string }
 
 type decision int
 
@@ -122,16 +126,29 @@ const (
 	decideDone
 )
 
-// decide is the pure scheduling rule: given the due session, whether it was
-// already handled, the current bar coverage and the time, what to do.
-func decide(session time.Time, completed string, coverage, minCoverage float64,
-	attempts, maxAttempts int, now time.Time, giveUpAfter time.Duration) decision {
-	key := session.Format(time.DateOnly)
-	if completed == key {
+// runState is what the scheduling rule needs from the session's persisted row.
+type runState struct {
+	trackerDone bool // tracker_completed_at set: the whole chain finished
+	gaveUp      bool
+	attempts    int
+}
+
+func runStateOf(r store.ChainRun, found bool) runState {
+	if !found {
+		return runState{}
+	}
+	return runState{trackerDone: r.TrackerCompletedAt != nil, gaveUp: r.GaveUpAt != nil, attempts: r.Attempts}
+}
+
+// decide is the pure scheduling rule: given the session's persisted state, the
+// current bar coverage and the time, what to do.
+func decide(session time.Time, rs runState, coverage, minCoverage float64,
+	maxAttempts int, now time.Time, giveUpAfter time.Duration) decision {
+	if rs.trackerDone || rs.gaveUp {
 		return decideDone
 	}
 	if coverage >= minCoverage {
-		if attempts >= maxAttempts {
+		if rs.attempts >= maxAttempts {
 			return decideGiveUp
 		}
 		return decideRun
@@ -149,14 +166,26 @@ func sessionClose(session time.Time) time.Time {
 
 // tick handles the currently due session and reports whether it is finished
 // (run or given up) — used by -once.
-func tick(ctx context.Context, log *slog.Logger, pool *pgxpool.Pool, cfg config, st *state, now time.Time) bool {
+func tick(ctx context.Context, log *slog.Logger, pool *pgxpool.Pool, cfg config, st *logState, now time.Time) bool {
 	session, err := momentumapi.ExpectedSession(now, cfg.grace)
 	if err != nil {
 		log.Error("momentum-daily: session calendar", "err", err)
 		return false
 	}
 	key := session.Format(time.DateOnly)
-	if st.completed == key {
+
+	run, found, err := store.LoadChainRun(ctx, pool, session)
+	if err != nil {
+		log.Error("momentum-daily: chain state", "session", key, "err", err)
+		return false
+	}
+	rs := runStateOf(run, found)
+	if rs.trackerDone || rs.gaveUp {
+		if st.doneLogged != key {
+			log.Info("momentum-daily: session already handled", "session", key,
+				"chain_complete", rs.trackerDone, "gave_up", rs.gaveUp, "attempts", rs.attempts)
+			st.doneLogged = key
+		}
 		return true
 	}
 
@@ -166,7 +195,7 @@ func tick(ctx context.Context, log *slog.Logger, pool *pgxpool.Pool, cfg config,
 		return false
 	}
 
-	switch decide(session, st.completed, coverage, cfg.minCoverage, st.attempts[key], cfg.maxAttempts, now, cfg.giveUpAfter) {
+	switch decide(session, rs, coverage, cfg.minCoverage, cfg.maxAttempts, now, cfg.giveUpAfter) {
 	case decideDone:
 		return true
 	case decideWait:
@@ -174,24 +203,57 @@ func tick(ctx context.Context, log *slog.Logger, pool *pgxpool.Pool, cfg config,
 			"landed", landed, "eligible", eligible, "need", cfg.minCoverage)
 		return false
 	case decideGiveUp:
+		reason := giveUpReason(coverage, cfg)
 		log.Error("momentum-daily: giving up on session — chain NOT run", "session", key,
 			"coverage", round(coverage), "landed", landed, "eligible", eligible,
-			"attempts", st.attempts[key], "reason", giveUpReason(coverage, cfg))
-		st.completed = key
+			"attempts", rs.attempts, "reason", reason)
+		if err := store.MarkChainGaveUp(ctx, pool, session, reason); err != nil {
+			log.Error("momentum-daily: could not record give-up; will retry", "session", key, "err", err)
+			return false
+		}
 		return true
 	}
 
-	st.attempts[key]++
-	log.Info("momentum-daily: bars landed, running chain", "session", key,
-		"coverage", round(coverage), "attempt", st.attempts[key])
-	for _, step := range []string{"momentum-scanner", "momentum-tracker"} {
-		if err := runStep(ctx, log, filepath.Join(cfg.binDir, step)); err != nil {
-			log.Error("momentum-daily: step failed; retrying next poll", "session", key, "step", step, "err", err)
-			return false
-		}
+	// Counted BEFORE running, so a crash or kill mid-run still uses up an
+	// attempt and a step that dies every time cannot be retried forever.
+	attempt, err := store.BeginChainAttempt(ctx, pool, session)
+	if err != nil {
+		log.Error("momentum-daily: could not record attempt; not running", "session", key, "err", err)
+		return false
 	}
-	log.Info("momentum-daily: chain complete", "session", key)
-	st.completed = key
+	log.Info("momentum-daily: bars landed, running chain", "session", key,
+		"coverage", round(coverage), "attempt", attempt, "of", cfg.maxAttempts)
+
+	fail := func(step string, err error) bool {
+		log.Error("momentum-daily: step failed; retrying next poll", "session", key, "step", step, "err", err)
+		if rerr := store.RecordChainError(ctx, pool, session, step+": "+err.Error()); rerr != nil {
+			log.Error("momentum-daily: could not record step error", "session", key, "err", rerr)
+		}
+		return false
+	}
+
+	// A scan that already committed is not redone: re-scanning after the bot
+	// may have posted it could change the candidate set under those alerts.
+	if run.ScannerCompletedAt == nil {
+		if err := runStep(ctx, log, filepath.Join(cfg.binDir, "momentum-scanner")); err != nil {
+			return fail("momentum-scanner", err)
+		}
+		if r, ok, err := store.LoadChainRun(ctx, pool, session); err != nil || !ok || r.ScannerCompletedAt == nil {
+			return fail("momentum-scanner", fmt.Errorf("exited 0 but did not mark session %s scanned "+
+				"(it scanned a different session, or the marker write failed): %v", key, err))
+		}
+	} else {
+		log.Info("momentum-daily: scan already committed for session; not re-scanning", "session", key)
+	}
+
+	if err := runStep(ctx, log, filepath.Join(cfg.binDir, "momentum-tracker")); err != nil {
+		return fail("momentum-tracker", err)
+	}
+	if r, ok, err := store.LoadChainRun(ctx, pool, session); err != nil || !ok || r.TrackerCompletedAt == nil {
+		return fail("momentum-tracker", fmt.Errorf("exited 0 but did not mark session %s tracked: %v", key, err))
+	}
+	log.Info("momentum-daily: chain complete", "session", key, "attempt", attempt)
+	st.doneLogged = key
 	return true
 }
 

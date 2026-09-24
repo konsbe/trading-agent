@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgxpool"
-
 	"github.com/konsbe/trading-agent/services/data-analyzer/internal/momentum"
 )
 
@@ -84,7 +82,7 @@ type FeatureRow struct {
 // table: §3.2's failures are only meaningful next to the values that caused
 // them, and /score's "why is this not a candidate" answer needs both in one
 // read.
-func UpsertFeatures(ctx context.Context, pool *pgxpool.Pool, r FeatureRow) error {
+func UpsertFeatures(ctx context.Context, pool Execer, r FeatureRow) error {
 	f := r.Features
 	if f == nil {
 		return fmt.Errorf("upsert features %s: nil features", r.Symbol)
@@ -157,7 +155,7 @@ ON CONFLICT (symbol, ts) DO UPDATE SET
 // inverted was only computable because each was stored on its own. The zeroed
 // components are still written for the same reason — their relationship to
 // outcomes still needs measuring at larger scale.
-func UpsertScore(ctx context.Context, pool *pgxpool.Pool, ts time.Time, symbol string, s momentum.Score) error {
+func UpsertScore(ctx context.Context, pool Execer, ts time.Time, symbol string, s momentum.Score) error {
 	// penalties is jsonb and null_inputs is text[] — two different shapes for
 	// two similar-looking fields. Marshalled explicitly rather than joined.
 	penalties := s.Penalties
@@ -168,7 +166,10 @@ func UpsertScore(ctx context.Context, pool *pgxpool.Pool, ts time.Time, symbol s
 	if err != nil {
 		return fmt.Errorf("marshal penalties %s: %w", symbol, err)
 	}
-	var nulls []string
+	// Never a nil slice: pgx sends nil as SQL NULL, and null_inputs is NOT
+	// NULL. A score with every input present would otherwise fail to write —
+	// and, since the scan commits as one transaction, fail the whole scan.
+	nulls := []string{}
 	if len(s.NullInputs) > 0 {
 		nulls = s.NullInputs
 	}

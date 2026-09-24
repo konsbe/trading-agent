@@ -97,14 +97,20 @@ async def top_candidates(
 
 
 async def latest_scan_date(pool) -> "date | None":
-    """The trading day of the most recent persisted scan.
+    """The most recent session whose scan fully committed.
 
-    Read from momentum_features, not momentum_scores: scores exist only for
-    gate-passers, so a day with zero candidates has no score rows and would
-    make the latest scan look older than it is (same reasoning as momentum-api).
+    Read from momentum_chain_runs (migration 025), not from the feature rows:
+    momentum-scanner sets scanner_completed_at in the same transaction as the
+    session's features and scores, so a session appears here only once its
+    whole scan exists. max(momentum_features.ts) moved on the first row written,
+    so a scanner killed part-way looked like a fresh scan to this gate, and a
+    few freshly backfilled symbols with a newer bar could make an old scan look
+    new.
     """
     async with pool.acquire() as conn:
-        return await conn.fetchval("SELECT max(ts)::date FROM momentum_features")
+        return await conn.fetchval(
+            "SELECT max(session) FROM momentum_chain_runs WHERE scanner_completed_at IS NOT NULL"
+        )
 
 
 async def alertable_candidates(
