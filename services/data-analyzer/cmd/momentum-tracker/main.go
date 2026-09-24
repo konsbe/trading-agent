@@ -2,8 +2,11 @@
 //
 // Two passes per run:
 //
-//  1. OPEN — every candidate clearing its bucket's threshold gets a
-//     momentum_tracked row, idempotently.
+//  1. OPEN — every §3.2 gate pass gets a momentum_tracked row, idempotently
+//     (-open-mode=gates, the default: the same criterion the bot's screener
+//     alerts use, so "tracked" means "alerted"). -open-mode=score restores the
+//     retired per-bucket score thresholds; Phase 1 §10.1.9's replay figures
+//     were produced in that mode.
 //  2. EVALUATE — every active row is checked against §5's five exit conditions
 //     and closed on the first match, recording the realized outcome.
 //
@@ -42,8 +45,9 @@ import (
 func main() {
 	source := flag.String("source", "tiingo", "equity_ohlcv.source to read")
 	interval := flag.String("interval", "1Day", "equity_ohlcv.interval to read")
-	minMarket := flag.Int("min-score-market", 65, "§4.4 market-bucket alert threshold")
-	minPenny := flag.Int("min-score-penny", 72, "§4.4 penny-bucket alert threshold")
+	openModeFlag := flag.String("open-mode", string(openOnGates), "which candidates open a tracked row: gates (every gate pass, matches screener alerts) or score (retired per-bucket thresholds)")
+	minMarket := flag.Int("min-score-market", 65, "§4.4 market-bucket alert threshold (open-mode=score only)")
+	minPenny := flag.Int("min-score-penny", 72, "§4.4 penny-bucket alert threshold (open-mode=score only)")
 	dryRun := flag.Bool("dry-run", false, "evaluate and report without writing")
 	// Walks the stored history bar by bar, opening positions when a candidate
 	// clears its threshold and evaluating exits on every subsequent session.
@@ -59,6 +63,13 @@ func main() {
 	minBars := flag.Int("min-bars", 252, "§3.1 history minimum")
 	scopeFlag := flag.String("scope", "eligible", "symbol scope: eligible (full §3.1 universe) or pilot (the frozen 450, in-sample for v2)")
 	flag.Parse()
+
+	mode, err := parseOpenMode(*openModeFlag)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(2)
+	}
+	rule := openRule{mode: mode, minMarket: *minMarket, minPenny: *minPenny}
 
 	ctx := context.Background()
 	pool, err := pgxpool.New(ctx, os.Getenv("DATABASE_URL"))
@@ -110,7 +121,7 @@ func main() {
 	ecfg := momentum.DefaultExitConfig()
 
 	if *replay {
-		replayHistory(ctx, pool, bars, fcfg, ecfg, *minBars, *minMarket, *minPenny, sc)
+		replayHistory(ctx, pool, bars, fcfg, ecfg, *minBars, rule, sc)
 		return
 	}
 
@@ -122,7 +133,7 @@ func main() {
 	// of elapsed time.
 	closed, advanced := evaluateExits(ctx, pool, bars, fcfg, ecfg, *dryRun)
 
-	opened := openNewPositions(ctx, pool, bars, fcfg, *minMarket, *minPenny, *dryRun, sc)
+	opened := openNewPositions(ctx, pool, bars, fcfg, rule, *dryRun, sc)
 
 	fmt.Printf("\n§5 tracker: %d opened, %d advanced, %d closed", opened, advanced, len(closed))
 	if *dryRun {
@@ -212,7 +223,7 @@ func openNewPositions(
 	pool *pgxpool.Pool,
 	bars map[string][]compute.Bar,
 	fcfg momentum.Config,
-	minMarket, minPenny int,
+	rule openRule,
 	dry bool,
 	scope reportscope.Scope,
 ) int {
@@ -256,11 +267,7 @@ func openNewPositions(
 			continue
 		}
 
-		threshold := minMarket
-		if g.Bucket == momentum.BucketPenny {
-			threshold = minPenny
-		}
-		if s.Total < threshold {
+		if !rule.opens(g.Bucket, s.Total) {
 			continue
 		}
 
@@ -393,7 +400,8 @@ func replayHistory(
 	bars map[string][]compute.Bar,
 	fcfg momentum.Config,
 	ecfg momentum.ExitConfig,
-	minBars, minMarket, minPenny int,
+	minBars int,
+	rule openRule,
 	scope reportscope.Scope,
 ) {
 	gcfg := momentum.DefaultGateConfig()
@@ -459,11 +467,7 @@ func replayHistory(
 			if !ok {
 				continue
 			}
-			threshold := minMarket
-			if g.Bucket == momentum.BucketPenny {
-				threshold = minPenny
-			}
-			if sc.Total < threshold {
+			if !rule.opens(g.Bucket, sc.Total) {
 				continue
 			}
 			openScore = sc.Total
@@ -484,12 +488,12 @@ func replayHistory(
 		}
 	}
 
-	reportReplay(outcomes, stillOpen, minMarket, minPenny)
+	reportReplay(outcomes, stillOpen, rule)
 }
 
-func reportReplay(outcomes []replayOutcome, stillOpen, minMarket, minPenny int) {
+func reportReplay(outcomes []replayOutcome, stillOpen int, rule openRule) {
 	fmt.Println("═══ §5 exit-rule replay over stored history ═══")
-	fmt.Printf("  thresholds: market >=%d, penny >=%d\n", minMarket, minPenny)
+	fmt.Printf("  open rule: %s\n", rule)
 	fmt.Printf("  positions closed: %d   still open at end of history: %d (excluded)\n",
 		len(outcomes), stillOpen)
 	if len(outcomes) == 0 {
@@ -601,4 +605,48 @@ func medianOf(xs []replayOutcome, f func(replayOutcome) float64) float64 {
 		return v[m]
 	}
 	return (v[m-1] + v[m]) / 2
+}
+
+// openMode selects which candidates open a momentum_tracked row.
+type openMode string
+
+const (
+	// openOnGates tracks every §3.2 gate pass — the same criterion the bot's
+	// screener-mode alerts fire on, so the tracked set is the alerted set.
+	openOnGates openMode = "gates"
+	// openOnScore is the retired per-bucket score threshold (§4.4), kept so
+	// Phase 1 §10.1.9's replay remains reproducible.
+	openOnScore openMode = "score"
+)
+
+func parseOpenMode(s string) (openMode, error) {
+	switch m := openMode(strings.ToLower(strings.TrimSpace(s))); m {
+	case openOnGates, openOnScore:
+		return m, nil
+	default:
+		return "", fmt.Errorf("-open-mode must be %q or %q, got %q", openOnGates, openOnScore, s)
+	}
+}
+
+// openRule decides whether a gate-passing, scored candidate opens a row.
+type openRule struct {
+	mode                openMode
+	minMarket, minPenny int
+}
+
+func (r openRule) opens(bucket momentum.Bucket, total int) bool {
+	if r.mode != openOnScore {
+		return true
+	}
+	if bucket == momentum.BucketPenny {
+		return total >= r.minPenny
+	}
+	return total >= r.minMarket
+}
+
+func (r openRule) String() string {
+	if r.mode == openOnScore {
+		return fmt.Sprintf("score thresholds (market >=%d, penny >=%d)", r.minMarket, r.minPenny)
+	}
+	return "every gate pass (screener mode)"
 }
