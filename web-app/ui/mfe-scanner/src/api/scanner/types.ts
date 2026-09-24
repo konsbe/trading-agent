@@ -37,6 +37,12 @@ export interface Candidate {
     /** Raw ratio (0.93 = 93%). */
     pct_of_52w_high: number | null;
     catalyst_tier: CatalystTier | null;
+    /** Reported market cap; null when missing (the gate may then have used `market_cap_est`). */
+    market_cap: number | null;
+    /** Shares outstanding × close, set only when the reported value was missing. */
+    market_cap_est: number | null;
+    /** True when the gate used the estimate; an estimate must never render as if reported. */
+    market_cap_is_proxy: boolean;
     /** Integer; null means "no score row", which is not the same as 0. */
     momentum_score_100: number | null;
     /** This row's practical ceiling (e.g. 75 while catalyst_tier is null); null exactly when the score is. */

@@ -77,10 +77,14 @@
     font-variant-numeric: tabular-nums;
 }
 
-/* Header sort control: full-cell button so the whole header is the hit target. */
+/*
+ * Header sort control: full-cell button so the whole header is the hit target.
+ * Label and indicator are centred on each other (not bottom-aligned), and the
+ * indicator is a fixed box, so no state change moves the label.
+ */
 .scanner-table__sort {
     display: inline-flex;
-    align-items: flex-end;
+    align-items: center;
     gap: var(--space-xxs);
     width: 100%;
     padding: var(--space-xs) var(--space-sm);
@@ -122,10 +126,25 @@
     outline-offset: -2px;
 }
 
+.scanner-table__sort-label {
+    min-width: 0;
+}
+
 .scanner-table__sort-indicator {
-    flex-shrink: 0;
-    font-size: var(--font-size-xs);
-    opacity: 0.4;
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    width: 8px;
+    height: 12px;
+    opacity: 0.45;
+}
+
+.scanner-table__sort-indicator svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+    fill: currentColor;
 }
 
 .scanner-table__sort-indicator.is-active {
@@ -244,6 +263,11 @@
     line-height: 1.25;
 }
 
+/* Market cap stays neutral; an estimate carries "(est.)" in its text and a tooltip. */
+.scanner-table__market-cap.is-estimate {
+    cursor: help;
+}
+
 /* Price-movement colours: only for the day's change (a price delta). */
 .scanner-table__change.is-price-up {
     color: var(--color-price-up);
@@ -253,8 +277,22 @@
     color: var(--color-price-down);
 }
 
-/* With room to spare (the wrap is an inline-size container), keep Breakout on one line. */
-@container (min-width: 1180px) {
+/*
+ * Every header fits on one line from here (the auto layout would otherwise
+ * still wrap one); narrower tables wrap headers before scrolling.
+ */
+@container (min-width: 1190px) {
+    .scanner-table thead th {
+        white-space: nowrap;
+    }
+}
+
+/*
+ * With room to spare (the wrap is an inline-size container), keep Breakout on
+ * one line. Below this the unwrapped label would squeeze the header labels
+ * onto two lines instead.
+ */
+@container (min-width: 1320px) {
     .scanner-table td[data-column='breakout_state'] {
         max-width: none;
         white-space: nowrap;

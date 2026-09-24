@@ -5,7 +5,6 @@ import {
     dayChangeText,
     fromPeakText,
     gateLine,
-    marketCapText,
     penaltyDescription,
     penaltyPoints,
     penaltyTotalText,
@@ -71,11 +70,7 @@ describe('facts text', () => {
         expect(fromPeakText(null)).toBeNull();
     });
 
-    it('marks estimated market caps and describes VWAP distance', () => {
-        expect(marketCapText(makeFacts())).toBe('$390M');
-        expect(marketCapText(makeFacts({ market_cap_is_proxy: true }))).toBe('$390M (est.)');
-        expect(marketCapText(makeFacts({ market_cap: null, market_cap_est: 120e6 }))).toBe('$120M (est.)');
-        expect(marketCapText(makeFacts({ market_cap: null }))).toBe('—');
+    it('describes VWAP distance', () => {
         expect(vwapDistanceText(makeFacts())).toBe('15.9% above');
         expect(vwapDistanceText(makeFacts({ vwap_dist_pct: -3.2, above_vwap: false }))).toBe('3.2% below');
         expect(vwapDistanceText(makeFacts({ vwap_dist_pct: null }))).toBe('—');

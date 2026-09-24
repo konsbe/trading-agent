@@ -1,4 +1,5 @@
 import { Candidate } from '@/api';
+import { marketCapValue } from '@/common/format/format';
 
 export type SortKey =
     | 'symbol'
@@ -6,6 +7,7 @@ export type SortKey =
     | 'change_pct'
     | 'rvol_20'
     | 'dollar_volume'
+    | 'market_cap'
     | 'rsi_14'
     | 'breakout_state'
     | 'pct_of_52w_high'
@@ -49,6 +51,8 @@ export const sortValue = (candidate: Candidate, key: SortKey): number | string |
                 : BREAKOUT_RANK[candidate.breakout_state] ?? UNKNOWN_BREAKOUT_RANK;
         case 'catalyst_tier':
             return candidate.catalyst_tier === null ? null : CATALYST_RANK[candidate.catalyst_tier] ?? null;
+        case 'market_cap':
+            return marketCapValue(candidate);
         default:
             return finiteOrNull(candidate[key]);
     }

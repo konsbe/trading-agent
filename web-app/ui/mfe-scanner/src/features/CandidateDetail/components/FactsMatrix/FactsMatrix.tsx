@@ -10,16 +10,10 @@ import {
     formatPrice,
     formatSignedPercent,
     formatUsdShort,
-} from '@/common/format/format';
-import {
-    catalystText,
-    dayChangeText,
-    fromPeakText,
     marketCapText,
-    priceDirection,
-    vwapDistanceText,
     withEst,
-} from '../../utils/describe';
+} from '@/common/format/format';
+import { catalystText, dayChangeText, fromPeakText, priceDirection, vwapDistanceText } from '../../utils/describe';
 import { FactCell, FactsMatrixProps } from './types';
 import '@/styles/scanner-global.css';
 import './FactsMatrix-styles.css';

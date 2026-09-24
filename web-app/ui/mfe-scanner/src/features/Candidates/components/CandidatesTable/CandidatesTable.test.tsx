@@ -3,7 +3,7 @@ import { join } from 'path';
 import { render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { makeCandidate } from '@/test-utils/fixtures';
-import { DEFAULT_SORT } from '../../utils/sortCandidates';
+import { DEFAULT_SORT, SortState } from '../../utils/sortCandidates';
 import CandidatesTable from './CandidatesTable';
 
 const renderTable = (rows = [makeCandidate({ symbol: 'LOBO', company_name: 'LOBO TECHNOLOGIES LTD-A', exchange: 'NASDAQ' })]) =>
@@ -74,7 +74,7 @@ describe('CandidatesTable', () => {
         });
 
         it('keeps Breakout on one line when the table area is wide, and compacts the stacked symbol lines', () => {
-            expect(css).toMatch(/@container \(min-width: 1180px\)\s*\{\s*\.scanner-table td\[data-column='breakout_state'\]\s*\{\s*max-width: none;\s*white-space: nowrap;/);
+            expect(css).toMatch(/@container \(min-width: 1320px\)\s*\{\s*\.scanner-table td\[data-column='breakout_state'\]\s*\{\s*max-width: none;\s*white-space: nowrap;/);
             expect(rule('.scanner-table__wrap')).toMatch(/container-type:\s*inline-size/);
             expect(rule('.scanner-table__symbol')).toMatch(/line-height:\s*1\.3/);
         });
@@ -82,6 +82,106 @@ describe('CandidatesTable', () => {
         it('lets Breakout wrap and keeps each score on one line with its marker', () => {
             expect(rule(".scanner-table td[data-column='breakout_state']")).toMatch(/white-space:\s*normal/);
             expect(rule(".scanner-table td[data-column='momentum_score_100']")).toMatch(/white-space:\s*nowrap/);
+        });
+
+        it('keeps header labels on one line once the table area is wide enough, wrapping below that', () => {
+            expect(rule('.scanner-table thead th')).toMatch(/white-space:\s*normal/);
+            expect(css).toMatch(/@container \(min-width: 1190px\)\s*\{\s*\.scanner-table thead th\s*\{\s*white-space: nowrap;/);
+        });
+
+        it('centres the sort indicator on the label in a fixed box, so no state shifts the label', () => {
+            expect(rule('.scanner-table__sort')).toMatch(/align-items:\s*center/);
+            const indicator = rule('.scanner-table__sort-indicator');
+            expect(indicator).toMatch(/flex:\s*0 0 auto/);
+            expect(indicator).toMatch(/width:\s*8px/);
+            expect(indicator).toMatch(/height:\s*12px/);
+            expect(indicator).toMatch(/align-items:\s*center/);
+            expect(indicator).toMatch(/justify-content:\s*center/);
+        });
+    });
+
+    describe('market cap column', () => {
+        const cell = (symbol: string) =>
+            within(screen.getByTestId(`candidate-row-${symbol}`)).getByTestId('market-cap-value');
+
+        it('sits right after $ Volume as a numeric column with an estimate-aware tooltip', () => {
+            renderTable();
+            const headers = screen.getAllByRole('columnheader').map(th => th.getAttribute('data-column'));
+            expect(headers.indexOf('market_cap')).toBe(headers.indexOf('dollar_volume') + 1);
+
+            const header = screen.getByRole('columnheader', { name: /^Market cap/ });
+            expect(header).toHaveClass('is-numeric');
+            expect(header).toHaveAttribute('title', expect.stringMatching(/estimate.*\(est\.\)/));
+            expect(cell('LOBO').closest('td')).toHaveClass('is-numeric');
+        });
+
+        it('renders a reported value unmarked, an estimate with its marker, and "—" when neither exists', () => {
+            renderTable([
+                makeCandidate({ symbol: 'REP', market_cap: 4328181000, market_cap_est: null, market_cap_is_proxy: false }),
+                makeCandidate({ symbol: 'EST', market_cap: null, market_cap_est: 120e6, market_cap_is_proxy: true }),
+                makeCandidate({ symbol: 'PRX', market_cap: 390473360, market_cap_est: null, market_cap_is_proxy: true }),
+                makeCandidate({ symbol: 'NIL', market_cap: null, market_cap_est: null, market_cap_is_proxy: false }),
+            ]);
+
+            expect(cell('REP')).toHaveTextContent(/^\$4\.3B$/);
+            expect(cell('REP')).not.toHaveClass('is-estimate');
+            expect(cell('REP')).not.toHaveAttribute('title');
+
+            expect(cell('EST')).toHaveTextContent(/^\$120M \(est\.\)$/);
+            expect(cell('EST')).toHaveClass('is-estimate');
+            expect(cell('EST')).toHaveAttribute('title', 'Estimated: shares outstanding × close');
+            expect(cell('PRX')).toHaveTextContent(/^\$390M \(est\.\)$/);
+
+            expect(cell('NIL')).toHaveTextContent(/^—$/);
+            expect(cell('NIL')).not.toHaveClass('is-estimate');
+        });
+
+        it('stays neutral (never price-toned)', () => {
+            renderTable([makeCandidate({ symbol: 'REP' })]);
+            expect(cell('REP').closest('td')!.querySelector('.is-price-up, .is-price-down')).toBeNull();
+            expect(cell('REP')).not.toHaveClass('is-price-up');
+            expect(cell('REP')).not.toHaveClass('is-price-down');
+        });
+    });
+
+    describe('sort headers', () => {
+        const renderSorted = (sort: SortState) =>
+            render(
+                <MemoryRouter>
+                    <CandidatesTable id="t" caption="Market candidates" rows={[makeCandidate()]} sort={sort} onSort={jest.fn()} />
+                </MemoryRouter>
+            );
+        const indicator = (label: RegExp) =>
+            within(screen.getByRole('columnheader', { name: label })).getByTestId('sort-indicator');
+
+        it.each<[SortState['direction'], 'ascending' | 'descending']>([
+            ['asc', 'ascending'],
+            ['desc', 'descending'],
+        ])('marks the %s column with aria-sort and a single decorative arrow', (direction, aria) => {
+            renderSorted({ key: 'market_cap', direction });
+
+            const header = screen.getByRole('columnheader', { name: /^Market cap/ });
+            expect(header).toHaveAttribute('aria-sort', aria);
+            expect(within(header).getByRole('button')).toHaveClass('is-active');
+            expect(indicator(/^Market cap/)).toHaveAttribute('data-sort-state', direction);
+            expect(indicator(/^Market cap/)).toHaveAttribute('aria-hidden', 'true');
+            expect(indicator(/^Market cap/)).toHaveClass('is-active');
+            expect(indicator(/^Market cap/).querySelectorAll('path')).toHaveLength(1);
+        });
+
+        it('shows the two-way arrow, inactive, on every unsorted header and keeps the label as the accessible name', () => {
+            renderSorted({ key: 'market_cap', direction: 'desc' });
+
+            const unsorted = screen.getAllByRole('columnheader').filter(th => th.getAttribute('aria-sort') === 'none');
+            expect(unsorted).toHaveLength(10);
+            unsorted.forEach(th => {
+                const mark = within(th).getByTestId('sort-indicator');
+                expect(mark).toHaveAttribute('data-sort-state', 'none');
+                expect(mark).toHaveAttribute('aria-hidden', 'true');
+                expect(mark).not.toHaveClass('is-active');
+                expect(mark.querySelectorAll('path')).toHaveLength(2);
+            });
+            expect(within(screen.getByRole('columnheader', { name: /^Close/ })).getByRole('button')).toHaveAccessibleName('Close');
         });
     });
 });

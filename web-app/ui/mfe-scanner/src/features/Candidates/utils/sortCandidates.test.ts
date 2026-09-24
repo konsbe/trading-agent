@@ -4,10 +4,10 @@ import { DEFAULT_SORT, initialDirection, SortKey, sortCandidates } from './sortC
 const symbols = (list: { symbol: string }[]) => list.map(c => c.symbol);
 
 const rows = [
-    makeCandidate({ symbol: 'BBB', close: 5, change_pct: -3, rvol_20: 2, dollar_volume: 2e6, rsi_14: 40, breakout_state: 'breakout', pct_of_52w_high: 0.5, catalyst_tier: 'B', momentum_score_100: 40 }),
-    makeCandidate({ symbol: 'AAA', close: 10, change_pct: 12, rvol_20: 8, dollar_volume: 9e6, rsi_14: 70, breakout_state: 'none', pct_of_52w_high: 0.9, catalyst_tier: 'none', momentum_score_100: 70 }),
-    makeCandidate({ symbol: 'NUL', close: null, change_pct: null, rvol_20: null, dollar_volume: null, rsi_14: null, breakout_state: null, pct_of_52w_high: null, catalyst_tier: null, momentum_score_100: null }),
-    makeCandidate({ symbol: 'CCC', close: 1, change_pct: 4, rvol_20: 5, dollar_volume: 5e5, rsi_14: 55, breakout_state: 'breakout_from_consolidation', pct_of_52w_high: 0.1, catalyst_tier: 'A', momentum_score_100: 0 }),
+    makeCandidate({ symbol: 'BBB', close: 5, change_pct: -3, rvol_20: 2, dollar_volume: 2e6, market_cap: 2e8, rsi_14: 40, breakout_state: 'breakout', pct_of_52w_high: 0.5, catalyst_tier: 'B', momentum_score_100: 40 }),
+    makeCandidate({ symbol: 'AAA', close: 10, change_pct: 12, rvol_20: 8, dollar_volume: 9e6, market_cap: null, market_cap_est: 9e8, market_cap_is_proxy: true, rsi_14: 70, breakout_state: 'none', pct_of_52w_high: 0.9, catalyst_tier: 'none', momentum_score_100: 70 }),
+    makeCandidate({ symbol: 'NUL', close: null, change_pct: null, rvol_20: null, dollar_volume: null, market_cap: null, market_cap_est: null, rsi_14: null, breakout_state: null, pct_of_52w_high: null, catalyst_tier: null, momentum_score_100: null }),
+    makeCandidate({ symbol: 'CCC', close: 1, change_pct: 4, rvol_20: 5, dollar_volume: 5e5, market_cap: 5e7, rsi_14: 55, breakout_state: 'breakout_from_consolidation', pct_of_52w_high: 0.1, catalyst_tier: 'A', momentum_score_100: 0 }),
 ];
 
 describe('sortCandidates', () => {
@@ -22,6 +22,7 @@ describe('sortCandidates', () => {
         ['change_pct', ['BBB', 'CCC', 'AAA', 'NUL']],
         ['rvol_20', ['BBB', 'CCC', 'AAA', 'NUL']],
         ['dollar_volume', ['CCC', 'BBB', 'AAA', 'NUL']],
+        ['market_cap', ['CCC', 'BBB', 'AAA', 'NUL']],
         ['rsi_14', ['BBB', 'CCC', 'AAA', 'NUL']],
         ['breakout_state', ['AAA', 'BBB', 'CCC', 'NUL']],
         ['pct_of_52w_high', ['CCC', 'BBB', 'AAA', 'NUL']],
@@ -48,6 +49,18 @@ describe('sortCandidates', () => {
         ];
         expect(symbols(sortCandidates(list, { key: 'breakout_state', direction: 'desc' })).slice(0, 2)).toEqual(['ZZ', 'YY']);
         expect(symbols(sortCandidates(list.slice(2), { key: 'rvol_20', direction: 'desc' }))).toEqual(['XA', 'XB']);
+    });
+
+    it('sorts market cap by the value shown (reported, else estimate), nulls last both ways', () => {
+        const list = [
+            makeCandidate({ symbol: 'REP', market_cap: 5e8, market_cap_est: 1e6, market_cap_is_proxy: false }),
+            makeCandidate({ symbol: 'EST', market_cap: null, market_cap_est: 3e8, market_cap_is_proxy: true }),
+            makeCandidate({ symbol: 'NIL', market_cap: null, market_cap_est: null }),
+            makeCandidate({ symbol: 'BIG', market_cap: 4e9, market_cap_est: null }),
+        ];
+        expect(symbols(sortCandidates(list, { key: 'market_cap', direction: 'asc' }))).toEqual(['EST', 'REP', 'BIG', 'NIL']);
+        expect(symbols(sortCandidates(list, { key: 'market_cap', direction: 'desc' }))).toEqual(['BIG', 'REP', 'EST', 'NIL']);
+        expect(initialDirection('market_cap')).toBe('desc');
     });
 
     it('does not mutate its input', () => {

@@ -257,6 +257,21 @@ describe('CandidatesPage', () => {
             expect(within(market).getByRole('columnheader', { name: /^RVOL/ })).toHaveAttribute('aria-sort', 'descending');
             expect(within(market).getByTestId('bucket-market-sort-label')).toHaveTextContent('Sorted by RVOL — descriptive, not predictive');
         });
+
+        it('shows each candidate\'s market cap in both buckets, marking an estimate', () => {
+            const data = makeTodayResponse();
+            data.buckets.penny = {
+                total_candidates: 1,
+                candidates: [makeCandidate({ symbol: 'PNY', bucket: 'penny', market_cap: null, market_cap_est: 2868803.3, market_cap_is_proxy: true })],
+            };
+            mockHook({ data });
+            renderPage();
+
+            expect(within(screen.getByTestId('bucket-penny')).getByRole('columnheader', { name: /^Market cap/ })).toBeInTheDocument();
+            expect(cell('VGZ', 'market_cap')).toHaveTextContent(/^\$390M$/);
+            expect(cell('NULLS', 'market_cap')).toHaveTextContent(/^—$/);
+            expect(cell('PNY', 'market_cap')).toHaveTextContent(/^\$2\.9M \(est\.\)$/);
+        });
     });
 
     describe('navigation', () => {

@@ -11,6 +11,8 @@ import {
     formatRatioAsPercent,
     formatScore,
     formatSignedPercent,
+    marketCapIsEstimate,
+    marketCapText,
 } from '@/common/format/format';
 import { SortKey } from '../../utils/sortCandidates';
 import { CandidateColumn } from './types';
@@ -34,6 +36,20 @@ const ChangeCell = ({ value }: { value: number | null }) => {
     return (
         <span className={`scanner-table__change${tone}`} data-testid="change-value">
             {formatSignedPercent(value)}
+        </span>
+    );
+};
+
+/** Reported cap, or the estimate with its "(est.)" marker (spec §2.2: never shown as if reported). */
+const MarketCapCell = ({ candidate }: { candidate: Candidate }) => {
+    const estimate = marketCapIsEstimate(candidate);
+    return (
+        <span
+            className={`scanner-table__market-cap${estimate ? ' is-estimate' : ''}`}
+            title={estimate ? 'Estimated: shares outstanding × close' : undefined}
+            data-testid="market-cap-value"
+        >
+            {marketCapText(candidate)}
         </span>
     );
 };
@@ -88,6 +104,14 @@ export const COLUMNS: CandidateColumn[] = [
         render: c => formatMultiple(c.rvol_20),
     },
     { key: 'dollar_volume', label: '$ Volume', numeric: true, render: c => formatCompactUsd(c.dollar_volume) },
+    {
+        key: 'market_cap',
+        label: 'Market cap',
+        numeric: true,
+        description:
+            'Reported market capitalisation. When none is reported, an estimate (shares outstanding × close) is shown and marked "(est.)".',
+        render: c => <MarketCapCell candidate={c} />,
+    },
     { key: 'rsi_14', label: 'RSI', numeric: true, description: '14-day RSI', render: c => formatInteger(c.rsi_14) },
     { key: 'breakout_state', label: 'Breakout', numeric: false, render: c => formatBreakoutState(c.breakout_state) },
     {

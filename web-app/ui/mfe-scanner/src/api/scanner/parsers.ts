@@ -55,6 +55,7 @@ const catalystTier = (value: unknown, path: string): CatalystTier =>
 
 const optStr = nullable(str);
 const optNum = nullable(num);
+const optBool = nullable(bool);
 
 export const parseScanMeta = (value: unknown, path = 'scan'): ScanMeta => {
     const o = obj(value, path);
@@ -82,6 +83,9 @@ export const parseCandidate = (value: unknown, path = 'candidate'): Candidate =>
         breakout_state: optStr(o.breakout_state, `${path}.breakout_state`),
         pct_of_52w_high: optNum(o.pct_of_52w_high, `${path}.pct_of_52w_high`),
         catalyst_tier: nullable(catalystTier)(o.catalyst_tier, `${path}.catalyst_tier`),
+        market_cap: optNum(o.market_cap, `${path}.market_cap`),
+        market_cap_est: optNum(o.market_cap_est, `${path}.market_cap_est`),
+        market_cap_is_proxy: optBool(o.market_cap_is_proxy, `${path}.market_cap_is_proxy`) ?? false,
         momentum_score_100: optNum(o.momentum_score_100, `${path}.momentum_score_100`),
         score_attainable: optNum(o.score_attainable, `${path}.score_attainable`),
         score_status: str(o.score_status, `${path}.score_status`),
@@ -137,8 +141,6 @@ const parsePenaltyRule = (value: unknown, path: string): PenaltyRule => {
         applied: bool(o.applied, `${path}.applied`),
     };
 };
-
-const optBool = nullable(bool);
 
 const parseSymbolScore = (value: unknown, path = 'score'): SymbolScore => {
     const o = obj(value, path);

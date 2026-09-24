@@ -68,6 +68,28 @@ export const formatUsdShort = (value: number | null | undefined): string => {
     return `$${text}${unit}`;
 };
 
+/** Appends the estimate marker; never to EMPTY_VALUE. */
+export const withEst = (text: string, isProxy: boolean | null) => (isProxy && text !== EMPTY_VALUE ? `${text} (est.)` : text);
+
+/** Fields shared by list candidates and detail facts. */
+export interface MarketCapFields {
+    market_cap: number | null;
+    market_cap_est: number | null;
+    market_cap_is_proxy: boolean | null;
+}
+
+/** The value shown: reported, else the estimate, else null. */
+export const marketCapValue = ({ market_cap, market_cap_est }: MarketCapFields): number | null =>
+    isNum(market_cap) ? market_cap : isNum(market_cap_est) ? market_cap_est : null;
+
+/** Whether the shown value is an estimate (flagged as a proxy, or only the estimate is present). */
+export const marketCapIsEstimate = (fields: MarketCapFields): boolean =>
+    isNum(fields.market_cap) ? Boolean(fields.market_cap_is_proxy) : isNum(fields.market_cap_est);
+
+/** "$4.3B", "$120M (est.)", or "—". */
+export const marketCapText = (fields: MarketCapFields): string =>
+    withEst(formatUsdShort(marketCapValue(fields)), marketCapIsEstimate(fields));
+
 /** 0.48 → "+$0.48", -0.48 → "-$0.48". */
 export const formatSignedUsd = (value: number | null | undefined): string => {
     if (!isNum(value)) return EMPTY_VALUE;

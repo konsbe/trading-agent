@@ -17,6 +17,10 @@ import {
     formatScore,
     formatSignedPercent,
     formatTradingDay,
+    marketCapIsEstimate,
+    marketCapText,
+    marketCapValue,
+    withEst,
 } from './format';
 
 describe('format', () => {
@@ -81,6 +85,41 @@ describe('format', () => {
         expect(formatCatalystTier('none')).toBe('None');
         expect(formatCatalystTier('A')).toBe('Tier A');
         expect(formatCatalystTier('B')).toBe('Tier B');
+    });
+
+    describe('market cap', () => {
+        const cap = (market_cap: number | null, market_cap_est: number | null, market_cap_is_proxy: boolean | null) => ({
+            market_cap,
+            market_cap_est,
+            market_cap_is_proxy,
+        });
+
+        it('shows the reported value unmarked', () => {
+            expect(marketCapText(cap(4328181000, null, false))).toBe('$4.3B');
+            expect(marketCapText(cap(2868803.3, null, false))).toBe('$2.9M');
+            expect(marketCapText(cap(390473360, 100e6, null))).toBe('$390M');
+            expect(marketCapIsEstimate(cap(390473360, null, false))).toBe(false);
+        });
+
+        it('marks an estimate, whether flagged as proxy or only the estimate is present', () => {
+            expect(marketCapText(cap(390473360, null, true))).toBe('$390M (est.)');
+            expect(marketCapText(cap(null, 120e6, true))).toBe('$120M (est.)');
+            expect(marketCapText(cap(null, 120e6, false))).toBe('$120M (est.)');
+            expect(marketCapIsEstimate(cap(null, 120e6, false))).toBe(true);
+        });
+
+        it('renders "—" with no marker when neither value is present', () => {
+            expect(marketCapText(cap(null, null, true))).toBe(EMPTY_VALUE);
+            expect(marketCapIsEstimate(cap(null, null, true))).toBe(false);
+            expect(withEst(EMPTY_VALUE, true)).toBe(EMPTY_VALUE);
+        });
+
+        it('uses the value actually shown: reported, else estimate', () => {
+            expect(marketCapValue(cap(5, 9, false))).toBe(5);
+            expect(marketCapValue(cap(null, 9, true))).toBe(9);
+            expect(marketCapValue(cap(null, null, false))).toBeNull();
+            expect(marketCapValue(cap(Number.NaN, 9, false))).toBe(9);
+        });
     });
 
     it('formats a trading day as a calendar date', () => {

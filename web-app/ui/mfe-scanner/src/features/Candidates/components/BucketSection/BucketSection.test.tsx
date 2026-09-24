@@ -23,10 +23,10 @@ const sortButton = (label: string) => within(header(label)).getByRole('button');
 
 /** Same rows as utils/sortCandidates.test — one null-everything row (NUL). */
 const rows = [
-    makeCandidate({ symbol: 'BBB', close: 5, change_pct: -3, rvol_20: 2, dollar_volume: 2e6, rsi_14: 40, breakout_state: 'breakout', pct_of_52w_high: 0.5, catalyst_tier: 'B', momentum_score_100: 40, score_attainable: 90 }),
-    makeCandidate({ symbol: 'AAA', close: 10, change_pct: 12, rvol_20: 8, dollar_volume: 9e6, rsi_14: 70, breakout_state: 'none', pct_of_52w_high: 0.9, catalyst_tier: 'none', momentum_score_100: 70, score_attainable: 75 }),
-    makeCandidate({ symbol: 'NUL', exchange: null, company_name: null, close: null, change_pct: null, rvol_20: null, dollar_volume: null, rsi_14: null, breakout_state: null, pct_of_52w_high: null, catalyst_tier: null, momentum_score_100: null, score_attainable: null }),
-    makeCandidate({ symbol: 'CCC', close: 1, change_pct: 4, rvol_20: 5, dollar_volume: 5e5, rsi_14: 55, breakout_state: 'breakout_from_consolidation', pct_of_52w_high: 0.1, catalyst_tier: 'A', momentum_score_100: 0, score_attainable: 60 }),
+    makeCandidate({ symbol: 'BBB', close: 5, change_pct: -3, rvol_20: 2, dollar_volume: 2e6, market_cap: 2e8, rsi_14: 40, breakout_state: 'breakout', pct_of_52w_high: 0.5, catalyst_tier: 'B', momentum_score_100: 40, score_attainable: 90 }),
+    makeCandidate({ symbol: 'AAA', close: 10, change_pct: 12, rvol_20: 8, dollar_volume: 9e6, market_cap: null, market_cap_est: 9e8, market_cap_is_proxy: true, rsi_14: 70, breakout_state: 'none', pct_of_52w_high: 0.9, catalyst_tier: 'none', momentum_score_100: 70, score_attainable: 75 }),
+    makeCandidate({ symbol: 'NUL', exchange: null, company_name: null, close: null, change_pct: null, rvol_20: null, dollar_volume: null, market_cap: null, rsi_14: null, breakout_state: null, pct_of_52w_high: null, catalyst_tier: null, momentum_score_100: null, score_attainable: null }),
+    makeCandidate({ symbol: 'CCC', close: 1, change_pct: 4, rvol_20: 5, dollar_volume: 5e5, market_cap: 5e7, rsi_14: 55, breakout_state: 'breakout_from_consolidation', pct_of_52w_high: 0.1, catalyst_tier: 'A', momentum_score_100: 0, score_attainable: 60 }),
 ];
 
 const ASCENDING: Record<string, string[]> = {
@@ -35,6 +35,7 @@ const ASCENDING: Record<string, string[]> = {
     'Change %': ['BBB', 'CCC', 'AAA', 'NUL'],
     RVOL: ['BBB', 'CCC', 'AAA', 'NUL'],
     '$ Volume': ['CCC', 'BBB', 'AAA', 'NUL'],
+    'Market cap': ['CCC', 'BBB', 'AAA', 'NUL'],
     RSI: ['BBB', 'CCC', 'AAA', 'NUL'],
     Breakout: ['AAA', 'BBB', 'CCC', 'NUL'],
     '% of 52w high': ['CCC', 'BBB', 'AAA', 'NUL'],
@@ -71,10 +72,10 @@ describe('BucketSection', () => {
         COLUMNS.filter(c => c.key !== 'rvol_20').forEach(c => expect(header(c.label)).toHaveAttribute('aria-sort', 'none'));
     });
 
-    it('has one sortable header per column, all ten of them', () => {
+    it('has one sortable header per column, all eleven of them', () => {
         renderBucket(rows);
         expect(Object.keys(ASCENDING)).toEqual(COLUMNS.map(c => c.label));
-        expect(within(table()).getAllByRole('columnheader')).toHaveLength(10);
+        expect(within(table()).getAllByRole('columnheader')).toHaveLength(11);
     });
 
     it.each(Object.entries(ASCENDING))('sorts by %s both ways, nulls last, score marker on every row', async (label, ascending) => {
@@ -227,7 +228,7 @@ describe('BucketSection', () => {
     });
 
     describe('collapsible card', () => {
-        const toggle = () => screen.getByRole('button', { name: /^Market/ });
+        const toggle = () => screen.getByRole('button', { name: /^Market \d/ });
         const renderPenny = (candidates: Candidate[]) =>
             render(
                 <MemoryRouter>

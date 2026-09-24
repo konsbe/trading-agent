@@ -28,8 +28,21 @@ describe('parseScannerToday', () => {
         expect(unscored).toMatchObject({ momentum_score_100: null, score_attainable: null });
     });
 
+    it('parses market_cap, market_cap_est and market_cap_is_proxy, defaulting the flag to false when omitted', () => {
+        const body = clone(makeTodayResponse());
+        Object.assign(body.buckets.market.candidates[0], { market_cap: null, market_cap_est: 120e6, market_cap_is_proxy: true });
+        delete body.buckets.market.candidates[1].market_cap;
+        delete body.buckets.market.candidates[1].market_cap_est;
+        delete body.buckets.market.candidates[1].market_cap_is_proxy;
+        const [estimated, missing] = parseScannerToday(body).buckets.market.candidates;
+        expect(estimated).toMatchObject({ market_cap: null, market_cap_est: 120e6, market_cap_is_proxy: true });
+        expect(missing).toMatchObject({ market_cap: null, market_cap_est: null, market_cap_is_proxy: false });
+    });
+
     it.each([
         ['missing buckets', (b: any) => delete b.buckets],
+        ['non-numeric market_cap', (b: any) => { b.buckets.market.candidates[0].market_cap = '4328181000'; }],
+        ['non-boolean market_cap_is_proxy', (b: any) => { b.buckets.market.candidates[0].market_cap_is_proxy = 'no'; }],
         ['non-numeric score_attainable', (b: any) => { b.buckets.market.candidates[0].score_attainable = '75'; }],
         ['missing penny bucket', (b: any) => delete b.buckets.penny],
         ['non-numeric close', (b: any) => { b.buckets.market.candidates[0].close = '1.2'; }],

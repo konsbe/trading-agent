@@ -95,14 +95,6 @@ export const fromPeakText = (ratio: number | null): string | null => {
     return `${MINUS}${formatNumber((1 - ratio) * 100, 1)}% from peak`;
 };
 
-export const withEst = (text: string, isProxy: boolean | null) => (isProxy && text !== EMPTY_VALUE ? `${text} (est.)` : text);
-
-export const marketCapText = (facts: SymbolFacts): string => {
-    if (isNum(facts.market_cap)) return withEst(formatUsdShort(facts.market_cap), facts.market_cap_is_proxy);
-    if (isNum(facts.market_cap_est)) return withEst(formatUsdShort(facts.market_cap_est), true);
-    return EMPTY_VALUE;
-};
-
 export const vwapDistanceText = (facts: SymbolFacts): string => {
     if (!isNum(facts.vwap_dist_pct)) return EMPTY_VALUE;
     const above = facts.above_vwap ?? facts.vwap_dist_pct >= 0;

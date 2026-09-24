@@ -10,11 +10,34 @@ const ariaSort = (column: CandidateColumn, sort: SortState) => {
     return sort.direction === 'asc' ? 'ascending' : 'descending';
 };
 
-const SortIndicator = ({ active, direction }: { active: boolean; direction: SortState['direction'] }) => (
-    <span className={`scanner-table__sort-indicator${active ? ' is-active' : ''}`} aria-hidden="true">
-        {active ? (direction === 'asc' ? '▲' : '▼') : '↕'}
-    </span>
-);
+/**
+ * Drawn, not typed: text arrows (↕ ▲ ▼) come from fallback fonts whose ink sits
+ * at different heights and widths, so they never centre on the label and the
+ * header shifts when the state changes. One fixed box for all three states.
+ */
+const SORT_ICON_PATHS: Record<SortState['direction'] | 'none', string[]> = {
+    none: ['M4 1.5 7 5H1z', 'M4 10.5 1 7h6z'],
+    asc: ['M4 4.25 7 7.75H1z'],
+    desc: ['M4 7.75 1 4.25h6z'],
+};
+
+const SortIndicator = ({ active, direction }: { active: boolean; direction: SortState['direction'] }) => {
+    const state = active ? direction : 'none';
+    return (
+        <span
+            className={`scanner-table__sort-indicator${active ? ' is-active' : ''}`}
+            data-sort-state={state}
+            data-testid="sort-indicator"
+            aria-hidden="true"
+        >
+            <svg viewBox="0 0 8 12" focusable="false">
+                {SORT_ICON_PATHS[state].map(d => (
+                    <path key={d} d={d} />
+                ))}
+            </svg>
+        </span>
+    );
+};
 
 /**
  * Semantic, sortable candidate table. Rows navigate to the detail route on
@@ -73,7 +96,7 @@ const CandidatesTable = ({ id, caption, rows, sort, onSort }: CandidatesTablePro
                                         className={`scanner-table__sort${active ? ' is-active' : ''}`}
                                         onClick={() => onSort(column.key)}
                                     >
-                                        <span>{column.label}</span>
+                                        <span className="scanner-table__sort-label">{column.label}</span>
                                         <SortIndicator active={active} direction={sort.direction} />
                                     </button>
                                 </th>
