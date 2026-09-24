@@ -44,7 +44,19 @@ export const routes: RouteObject[] = [
             },
             {
                 path: "backtest-lab/*",
-                element: <PrivateRouter component={<>Backtest Lab</>} />,
+                element: (
+                    <PrivateRouter
+                        component={
+                            <SingleMfePage
+                                mfe_key="mfe_backtest_lab"
+                                mfe_component="./BacktestLab"
+                                mfe_header_title="Backtest Lab"
+                                mfe_navigation_path="/backtest-lab"
+                                mfe_enable_navigation={false}
+                            />
+                        }
+                    />
+                ),
             },
             {
                 path: "alarm-history/*",

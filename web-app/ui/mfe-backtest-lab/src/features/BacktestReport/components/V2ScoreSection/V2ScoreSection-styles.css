@@ -1,0 +1,101 @@
+/*
+ * Contrast by layout and weight only: the pooled side is recessed (low surface,
+ * regular figures), the per-bucket side carries the emphasis. No red/green.
+ */
+.backtest-v2__contrast {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    align-items: stretch;
+    gap: var(--space-md);
+}
+
+.backtest-v2__side {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+    min-width: 0;
+    padding: var(--space-sm) var(--space-md);
+    border: 1px solid var(--color-outline-variant);
+    border-radius: var(--radius-md);
+    background: var(--color-surface-container-low);
+}
+
+.backtest-v2__side.is-stratified {
+    border-color: var(--color-outline);
+    background: var(--color-surface-container-high);
+}
+
+.backtest-v2__side p {
+    margin: 0;
+}
+
+.backtest-v2__figure {
+    margin: 0;
+    color: var(--color-on-surface-variant);
+    font-size: var(--font-size-xl);
+    font-weight: var(--font-weight-regular);
+}
+
+.backtest-v2__side.is-stratified .backtest-v2__figure {
+    color: var(--color-on-surface);
+    font-weight: var(--font-weight-bold);
+}
+
+.backtest-v2__figure-label {
+    color: var(--color-on-surface-variant);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-regular);
+}
+
+.backtest-v2__buckets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-xs) var(--space-lg);
+    margin: 0;
+}
+
+.backtest-v2__bucket {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-xs);
+}
+
+.backtest-v2__versus {
+    align-self: center;
+    margin: 0;
+    color: var(--color-on-surface-variant);
+    font-family: var(--font-family-headline);
+    font-size: var(--font-size-sm);
+    text-transform: uppercase;
+}
+
+.backtest-v2__stratified-verdict {
+    color: var(--color-on-surface);
+    font-weight: var(--font-weight-bold);
+}
+
+.backtest-v2__callout {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--space-sm);
+    margin: 0;
+    padding: var(--space-sm) var(--space-md);
+    border-left: 4px solid var(--color-primary);
+    border-radius: var(--radius-md);
+    background: var(--color-surface-container-low);
+    font-size: var(--font-size-lg);
+}
+
+.backtest-v2__callout-value {
+    color: var(--color-primary);
+    font-size: 1.75rem;
+    font-weight: var(--font-weight-bold);
+    line-height: 1.1;
+}
+
+@media (max-width: 720px) {
+    .backtest-v2__contrast {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}

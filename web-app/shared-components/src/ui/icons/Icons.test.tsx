@@ -1,7 +1,7 @@
 import React from 'react';
 import { render } from '@testing-library/react';
 import '@testing-library/jest-dom';
-import { ArrowLeftIcon, ChevronDownIcon, CloseIcon, LogoutIcon, MenuIcon, MonitorIcon, MoonIcon, SunIcon } from './Icons';
+import { ArrowLeftIcon, ChevronDownIcon, CloseIcon, LockIcon, LogoutIcon, MenuIcon, MonitorIcon, MoonIcon, SunIcon } from './Icons';
 
 describe('Icons', () => {
     it.each([
@@ -13,6 +13,7 @@ describe('Icons', () => {
         ['SunIcon', SunIcon],
         ['MoonIcon', MoonIcon],
         ['MonitorIcon', MonitorIcon],
+        ['LockIcon', LockIcon],
     ])('%s renders a decorative 20px svg by default', (displayName, Icon) => {
         const { container } = render(<Icon />);
 

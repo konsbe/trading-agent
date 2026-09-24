@@ -1,0 +1,9 @@
+.backtest-sample {
+    padding-top: var(--space-sm);
+    border-top: 1px solid var(--color-outline-variant);
+    font-size: var(--font-size-xs);
+}
+
+.backtest-sample__label {
+    font-weight: var(--font-weight-medium);
+}

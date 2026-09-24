@@ -60,6 +60,13 @@ export const MoonIcon = createIcon('MoonIcon', (
     <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
 ));
 
+export const LockIcon = createIcon('LockIcon', (
+    <>
+        <rect x="4" y="11" width="16" height="10" rx="2" />
+        <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+    </>
+));
+
 export const MonitorIcon = createIcon('MonitorIcon', (
     <>
         <rect x="2" y="3" width="20" height="14" rx="2" />

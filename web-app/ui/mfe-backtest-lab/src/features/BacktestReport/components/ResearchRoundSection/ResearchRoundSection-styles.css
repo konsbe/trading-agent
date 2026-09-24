@@ -1,0 +1,111 @@
+.backtest-round__scroll {
+    overflow-x: auto;
+    border: 1px solid var(--color-outline-variant);
+    border-radius: var(--radius-md);
+}
+
+.backtest-round__table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--font-size-md);
+}
+
+.backtest-round__table th {
+    padding: var(--space-sm) var(--space-md);
+    border-bottom: 1px solid var(--color-outline-variant);
+    background: var(--color-surface-container-low);
+    color: var(--color-on-surface-variant);
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-medium);
+    letter-spacing: 0.04em;
+    text-align: left;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.backtest-round__table td {
+    padding: var(--space-sm) var(--space-md);
+    border-bottom: 1px solid var(--color-outline-variant);
+    vertical-align: top;
+}
+
+.backtest-round__table tbody tr:last-child td {
+    border-bottom: 0;
+}
+
+/* A row followed by its (open) note reads as one entry. */
+.backtest-round__row:has(+ .backtest-round__note-row:not([hidden])) td {
+    border-bottom: 0;
+}
+
+.backtest-round__hypothesis {
+    min-width: 18rem;
+}
+
+.backtest-round__hypothesis p {
+    margin: 0;
+}
+
+.backtest-round__label {
+    color: var(--color-on-surface);
+    font-weight: var(--font-weight-medium);
+}
+
+.backtest-round__id {
+    color: var(--color-on-surface-variant);
+    font-size: var(--font-size-sm);
+}
+
+.backtest-round__reason {
+    margin-top: var(--space-xxs);
+    font-size: var(--font-size-sm);
+}
+
+.backtest-round__effect {
+    color: var(--color-on-surface);
+    white-space: nowrap;
+}
+
+.backtest-round__verdict-cell {
+    white-space: nowrap;
+}
+
+/* Every verdict: same colour, same weight. */
+.backtest-round__verdict {
+    color: var(--color-on-surface);
+    font-weight: var(--font-weight-regular);
+}
+
+.backtest-round__note-toggle {
+    margin-left: var(--space-sm);
+    vertical-align: baseline;
+}
+
+.backtest-round__note-chevron {
+    margin-left: var(--space-xxs);
+    transition: transform var(--transition-fast);
+}
+
+.backtest-round__note-toggle.is-open .backtest-round__note-chevron {
+    transform: rotate(180deg);
+}
+
+.backtest-round__note-row td {
+    padding-top: 0;
+}
+
+.backtest-round__note {
+    margin: 0;
+    padding: var(--space-sm) var(--space-md);
+    border-left: 2px solid var(--color-outline);
+    border-radius: var(--radius-sm);
+    background: var(--color-surface-container-low);
+    color: var(--color-on-surface);
+    font-size: var(--font-size-sm);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .backtest-round__note-chevron {
+        transition: none;
+    }
+}

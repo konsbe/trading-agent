@@ -1,0 +1,44 @@
+/* Reusable Backtest Lab classes shared across features. */
+
+.backtest-muted {
+    margin: 0;
+    color: var(--color-on-surface-variant);
+}
+
+.backtest-text {
+    margin: 0;
+    color: var(--color-on-surface);
+}
+
+.backtest-code {
+    padding: 0 var(--space-xs);
+    border-radius: var(--radius-sm);
+    background: var(--color-surface-container-highest);
+    color: var(--color-on-surface-variant);
+    font-family: var(--font-family-label);
+    font-size: var(--font-size-xs);
+}
+
+.backtest-mono {
+    font-family: var(--font-family-label);
+    font-variant-numeric: tabular-nums;
+}
+
+.backtest-sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+}
+
+/* Small uppercase caption above a figure. */
+.backtest-eyebrow {
+    margin: 0;
+    color: var(--color-on-surface-variant);
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-medium);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}

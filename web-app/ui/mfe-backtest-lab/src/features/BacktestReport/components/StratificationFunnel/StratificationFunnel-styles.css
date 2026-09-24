@@ -1,0 +1,147 @@
+/*
+ * One grid per row (text | value | track) with identical columns, so every
+ * track shares the same x-axis. Each track draws its own slice of the OR 1.0
+ * line, extended by half the row gap, so the slices join into one line.
+ */
+.backtest-funnel__chart {
+    --backtest-funnel-gap: var(--space-md);
+    display: flex;
+    flex-direction: column;
+    gap: var(--backtest-funnel-gap);
+}
+
+.backtest-funnel__legend {
+    font-size: var(--font-size-sm);
+}
+
+.backtest-funnel__steps {
+    display: flex;
+    flex-direction: column;
+    gap: var(--backtest-funnel-gap);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.backtest-funnel__row {
+    display: grid;
+    grid-template-columns: minmax(14rem, 2fr) 5rem minmax(12rem, 3fr);
+    align-items: center;
+    gap: var(--space-md);
+}
+
+.backtest-funnel__text {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xxs);
+    min-width: 0;
+}
+
+.backtest-funnel__text p {
+    margin: 0;
+}
+
+/* Labels wrap; never truncated. */
+.backtest-funnel__label {
+    color: var(--color-on-surface);
+    font-weight: var(--font-weight-medium);
+    overflow-wrap: anywhere;
+}
+
+.backtest-funnel__details {
+    font-size: var(--font-size-sm);
+}
+
+.backtest-funnel__verdict {
+    color: var(--color-on-surface);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-bold);
+}
+
+.backtest-funnel__value {
+    margin: 0;
+    color: var(--color-on-surface);
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-bold);
+    text-align: right;
+}
+
+.backtest-funnel__value-head {
+    text-align: right;
+}
+
+.backtest-funnel__track {
+    position: relative;
+    display: flex;
+    align-self: stretch;
+    align-items: center;
+    min-height: 1.75rem;
+    border-radius: var(--radius-sm);
+    background: var(--color-surface-container-low);
+}
+
+.backtest-funnel__track::after {
+    content: '';
+    position: absolute;
+    top: calc(var(--backtest-funnel-gap) / -2);
+    bottom: calc(var(--backtest-funnel-gap) / -2);
+    left: var(--backtest-funnel-ref);
+    border-left: 2px dashed var(--color-on-surface-variant);
+    pointer-events: none;
+}
+
+.backtest-funnel__steps .backtest-funnel__row:last-child .backtest-funnel__track::after {
+    bottom: 0;
+}
+
+.backtest-funnel__bar {
+    display: block;
+    height: 1.25rem;
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+    background: var(--color-primary);
+}
+
+/* Header row: the axis ticks and the labelled reference line. */
+.backtest-funnel__axis-track {
+    min-height: 1.5rem;
+    background: transparent;
+    font-family: var(--font-family-label);
+    font-size: var(--font-size-xs);
+}
+
+.backtest-funnel__axis-track::after {
+    top: 1.35rem;
+}
+
+.backtest-funnel__tick,
+.backtest-funnel__ref-label {
+    position: absolute;
+    top: 0;
+    color: var(--color-on-surface-variant);
+    white-space: nowrap;
+}
+
+.backtest-funnel__tick.is-start {
+    left: 0;
+}
+
+.backtest-funnel__tick.is-end {
+    right: 0;
+}
+
+.backtest-funnel__ref-label {
+    left: var(--backtest-funnel-ref);
+    transform: translateX(-50%);
+    color: var(--color-on-surface);
+    font-weight: var(--font-weight-bold);
+}
+
+@media (max-width: 720px) {
+    .backtest-funnel__row {
+        grid-template-columns: minmax(0, 1fr) 4.5rem;
+    }
+
+    .backtest-funnel__track {
+        grid-column: 1 / -1;
+    }
+}

@@ -40,6 +40,16 @@
       "description": "Shared watchlist with current price data and symbol search",
       "roles": [],
       "enabled": true
+    },
+    "mfe_backtest_lab": {
+      "label": "Backtest Lab",
+      "version": "1.0.0",
+      "endpoint": "http://localhost:3003/remoteEntry.js",
+      "module": "./BacktestLab",
+      "scope": "mfe_backtest_lab",
+      "description": "Frozen Phase 2 backtest report: why the screener makes no predictive claim",
+      "roles": [],
+      "enabled": true
     }
   },
   "iframes": {}

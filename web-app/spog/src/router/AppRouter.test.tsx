@@ -77,6 +77,7 @@ describe('AppRouter', () => {
     const REMOTE_ROUTES: Record<string, { key: string; component: string; title: string }> = {
         '/candidates': { key: 'mfe_scanner', component: './Scanner', title: "Today's Candidates" },
         '/watchlist': { key: 'mfe_watchlist', component: './Watchlist', title: 'Watchlist' },
+        '/backtest-lab': { key: 'mfe_backtest_lab', component: './BacktestLab', title: 'Backtest Lab' },
     };
 
     it.each(
@@ -98,6 +99,8 @@ describe('AppRouter', () => {
         ['/candidates/NEXR', '/candidates'],
         ['/watchlist', '/watchlist'],
         ['/watchlist/VGZ', '/watchlist'],
+        ['/backtest-lab', '/backtest-lab'],
+        ['/backtest-lab/anything', '/backtest-lab'],
     ])(
         'renders the remote for %s inside the layout and access control',
         (path, base) => {

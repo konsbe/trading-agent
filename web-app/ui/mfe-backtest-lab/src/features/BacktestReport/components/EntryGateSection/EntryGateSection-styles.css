@@ -1,0 +1,76 @@
+/* The trust marker: primary, never success-green — it describes method, not outcome. */
+.backtest-gate__committed {
+    display: inline-flex;
+    align-self: flex-start;
+    align-items: center;
+    gap: var(--space-sm);
+    margin: 0;
+    padding: var(--space-xs) var(--space-md);
+    border: 1px solid var(--color-primary);
+    border-radius: var(--radius-full);
+    background: var(--color-primary-container);
+    color: var(--color-on-primary-container);
+    font-weight: var(--font-weight-bold);
+}
+
+.backtest-gate__committed-icon {
+    flex-shrink: 0;
+}
+
+.backtest-gate__test {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xxs);
+}
+
+.backtest-gate__stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+    margin: 0;
+    overflow: hidden;
+    border: 1px solid var(--color-outline-variant);
+    border-radius: var(--radius-md);
+    background: var(--color-surface-container-low);
+}
+
+.backtest-gate__stat {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xxs);
+    padding: var(--space-sm) var(--space-md);
+    box-shadow: 1px 0 0 var(--color-outline-variant);
+}
+
+.backtest-gate__stat-value {
+    margin: 0;
+    color: var(--color-on-surface);
+    font-size: var(--font-size-xl);
+    font-weight: var(--font-weight-bold);
+}
+
+.backtest-gate__outcome {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xxs);
+    margin: 0;
+}
+
+.backtest-gate__outcome-row {
+    display: grid;
+    grid-template-columns: 7rem minmax(0, 1fr);
+    gap: var(--space-sm);
+    align-items: baseline;
+}
+
+.backtest-gate__outcome-row dd {
+    margin: 0;
+}
+
+.backtest-gate__outcome-label {
+    color: var(--color-on-surface-variant);
+    font-size: var(--font-size-sm);
+}
+
+.backtest-gate__verdict {
+    font-weight: var(--font-weight-bold);
+}
