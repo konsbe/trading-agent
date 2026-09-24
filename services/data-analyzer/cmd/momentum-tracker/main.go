@@ -181,20 +181,21 @@ func evaluateExits(
 			fmt.Printf("  %-7s no bars — session skipped, state unchanged\n", row.Symbol)
 			continue
 		}
-		last := len(series) - 1
-		f := momentum.ComputeAt(series, last, fcfg)
-		ts := series[last].TS
-
-		if alreadyEvaluated(row, ts) {
-			// Already evaluated against this bar. Re-evaluating would double-count
-			// the session and halve every time-based condition's effective horizon.
+		step := stepExits(row, series, fcfg, ecfg)
+		if step.sessions == 0 {
+			// Already evaluated against every stored bar. Re-evaluating would
+			// double-count a session and halve every time-based condition's
+			// effective horizon.
 			continue
 		}
-
-		d := momentum.EvaluateExit(row.ToTrackedState(), &f, ecfg)
+		d := step.decision
+		ts := step.ts
 
 		if len(d.Unevaluable) > 0 {
 			fmt.Printf("  %-7s unevaluable conditions: %v\n", row.Symbol, d.Unevaluable)
+		}
+		if step.sessions > 1 {
+			fmt.Printf("  %-7s caught up %d sessions through %s\n", row.Symbol, step.sessions, ts.Format(time.DateOnly))
 		}
 
 		if !d.Exit {
@@ -209,7 +210,7 @@ func evaluateExits(
 		}
 
 		if !dry {
-			if err := store.CloseTracked(ctx, pool, row.Symbol, row.AlertedTS, ts, *f.Close, d); err != nil {
+			if err := store.CloseTracked(ctx, pool, row.Symbol, row.AlertedTS, ts, step.close, d); err != nil {
 				fmt.Fprintln(os.Stderr, err)
 				continue
 			}
@@ -665,4 +666,42 @@ func alreadyEvaluated(row store.TrackedRow, ts time.Time) bool {
 		floor = *row.LastEvaluatedTS
 	}
 	return !ts.After(floor)
+}
+
+// exitStep is the outcome of evaluating one row over its unevaluated bars.
+type exitStep struct {
+	sessions int // bars evaluated this run; 0 = nothing new
+	ts       time.Time
+	close    float64
+	decision momentum.ExitDecision
+}
+
+// stepExits evaluates EVERY bar after the row's floor, oldest first, carrying
+// the state forward and stopping at the first exit — the same fold -replay
+// does. Evaluating only the latest bar silently merged sessions whenever a run
+// covered more than one (a missed day, a bars catch-up): on 2026-09-24 that
+// counted 22nd+23rd as one session and judged exits on the 23rd alone.
+func stepExits(row store.TrackedRow, series []compute.Bar, fcfg momentum.Config, ecfg momentum.ExitConfig) exitStep {
+	st := row.ToTrackedState()
+	var out exitStep
+	for i := range series {
+		if alreadyEvaluated(row, series[i].TS) {
+			continue
+		}
+		f := momentum.ComputeAt(series, i, fcfg)
+		d := momentum.EvaluateExit(st, &f, ecfg)
+		st.HighestCloseSince = d.HighestCloseSince
+		st.LowRVolStreak = d.LowRVolStreak
+		st.SessionsElapsed = d.SessionsElapsed
+		out.sessions++
+		out.ts = series[i].TS
+		out.decision = d
+		if f.Close != nil {
+			out.close = *f.Close
+		}
+		if d.Exit {
+			break
+		}
+	}
+	return out
 }

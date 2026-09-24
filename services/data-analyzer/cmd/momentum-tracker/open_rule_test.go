@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/konsbe/trading-agent/services/data-analyzer/internal/compute"
 	"github.com/konsbe/trading-agent/services/data-analyzer/internal/momentum"
 	"github.com/konsbe/trading-agent/services/data-analyzer/internal/store"
 )
@@ -59,5 +60,60 @@ func TestAlreadyEvaluated(t *testing.T) {
 	}
 	if alreadyEvaluated(advanced, later) {
 		t.Error("a newer bar must be evaluated")
+	}
+}
+
+func flatSeries(n int, start time.Time) []compute.Bar {
+	out := make([]compute.Bar, n)
+	for i := range out {
+		out[i] = compute.Bar{TS: start.AddDate(0, 0, i), Open: 10, High: 10.1, Low: 9.9, Close: 10, Volume: 1e6}
+	}
+	return out
+}
+
+func TestStepExitsEvaluatesEverySessionSinceTheFloor(t *testing.T) {
+	start := time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)
+	series := flatSeries(60, start)
+	alertIdx := 57 // two unevaluated sessions follow, like the 2026-09-22/23 catch-up
+	row := store.TrackedRow{
+		Symbol: "X", Bucket: "market", ReferencePrice: 10,
+		AlertedTS: series[alertIdx].TS, HighestCloseSince: 10,
+	}
+	cfg, ecfg := momentum.DefaultConfig(), momentum.DefaultExitConfig()
+
+	step := stepExits(row, series, cfg, ecfg)
+	if step.decision.Exit {
+		t.Fatalf("flat series should not exit within 2 sessions: %+v", step.decision)
+	}
+	if step.sessions != 2 || step.decision.SessionsElapsed != 2 {
+		t.Fatalf("evaluated %d sessions, elapsed %d; want 2 and 2 (only the latest bar was evaluated before)",
+			step.sessions, step.decision.SessionsElapsed)
+	}
+	if !step.ts.Equal(series[59].TS) {
+		t.Fatalf("advanced to %s, want the latest bar %s", step.ts, series[59].TS)
+	}
+
+	evaluated := series[59].TS
+	row.LastEvaluatedTS = &evaluated
+	if again := stepExits(row, series, cfg, ecfg); again.sessions != 0 {
+		t.Fatalf("re-run evaluated %d sessions, want 0", again.sessions)
+	}
+}
+
+func TestStepExitsStopsAtTheFirstExit(t *testing.T) {
+	start := time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)
+	series := flatSeries(60, start)
+	alertIdx := 40
+	row := store.TrackedRow{
+		Symbol: "X", Bucket: "market", ReferencePrice: 10,
+		AlertedTS: series[alertIdx].TS, HighestCloseSince: 10,
+	}
+	step := stepExits(row, series, momentum.DefaultConfig(), momentum.DefaultExitConfig())
+	if !step.decision.Exit {
+		t.Skip("default exit config does not time out a flat series within 19 sessions")
+	}
+	want := series[alertIdx+step.sessions].TS
+	if !step.ts.Equal(want) || step.sessions >= len(series)-1-alertIdx {
+		t.Fatalf("exit at %s after %d sessions; want the fold to stop at the first exit (%s)", step.ts, step.sessions, want)
 	}
 }

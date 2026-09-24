@@ -579,9 +579,14 @@ opens on every §3.2 gate pass — the same criterion the bot's screener alerts
 use, so tracked = alerted. `-open-mode=score` restores the retired 65/72 score
 thresholds (Phase 1 §10.1.9's replay figures used it). `-replay` is in-memory and
 writes nothing. Run after `momentum-scanner`:
-`go run ./cmd/momentum-tracker` (or `-dry-run`). Re-running it for a session it
-has already evaluated is a no-op (each row only evaluates bars after its
-`last_evaluated_ts`), so a retried chain cannot double-count a session.
+`go run ./cmd/momentum-tracker` (or `-dry-run`). Each active row is evaluated on
+**every** bar after its `last_evaluated_ts` (or alert bar), oldest first,
+stopping at the first exit — the same fold `-replay` does — so a run that
+covers several sessions (a missed day, a bars catch-up) counts each one.
+Re-running for a session already evaluated is a no-op, so a retried chain
+cannot double-count. (Until 2026-09-24 only the latest bar was evaluated; the
+first multi-session catch-up merged 09-22 into 09-23, and those 7 rows were
+reset to their opening state and re-tracked.)
 
 ## `momentum-daily` — the scheduled chain
 
