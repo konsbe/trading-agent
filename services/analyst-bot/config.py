@@ -16,6 +16,7 @@ from __future__ import annotations
 
 from typing import Optional
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -112,6 +113,26 @@ class BotConfig(BaseSettings):
     discord_penny_sell_channel_id: Optional[int] = None
     discord_market_buy_channel_id: Optional[int] = None
     discord_market_sell_channel_id: Optional[int] = None
+
+    @field_validator(
+        "discord_guild_id",
+        "discord_daily_report_channel_id",
+        "discord_alerts_channel_id",
+        "discord_commands_channel_id",
+        "discord_actions_channel_id",
+        "discord_penny_buy_channel_id",
+        "discord_penny_sell_channel_id",
+        "discord_market_buy_channel_id",
+        "discord_market_sell_channel_id",
+        mode="before",
+    )
+    @classmethod
+    def _blank_id_is_unset(cls, v):
+        # `KEY=` in .env arrives as "", which int parsing rejects — that crashed
+        # the bot at startup although an unset channel is meant to post nothing.
+        if isinstance(v, str) and not v.strip():
+            return None
+        return v
 
     # ── Momentum scanner behaviour (§4.4, §8.3) ──────────────────────────────
     bot_momentum_scan_enable: bool = False
