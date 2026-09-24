@@ -700,8 +700,12 @@ and tracked, active rows show `sessions_elapsed: 0` and `unrealized_pct: 0`.
 
 ### 6.1 UI brief for step 4 — `mfe-tracked` (deferred; build after real rows accumulate)
 
-Recorded from the product owner, 2026-09-24. Build only once the fixed tracker
-has run on real sessions and this endpoint returns real, evolving data.
+Recorded from the product owner, 2026-09-24. **Build only once the full daily
+chain — bars (data-universe) → `momentum-scanner` → `momentum-tracker` — has
+completed live at least once** and this endpoint returns real, evolving data.
+Scheduling scanner + tracker is not enough on its own: on 2026-09-24 both were
+scheduled, but the bars worker had skipped 2026-09-22 and -23, so the chain was
+wired up but stalled.
 
 This is **research instrumentation, not a portfolio or trading dashboard** — the
 system has never executed a trade. No "P&L", "your holdings", or portfolio-app
@@ -729,4 +733,33 @@ the literal percentages.
 - **Themes:** both dark and light from the existing token set.
 - Also surface `evaluation_behind` honestly (e.g. a neutral note that sessions
   elapsed is as of `last_evaluated_date`) rather than hiding a lagging count.
+- **System-level freshness banner** (added 2026-09-24): one banner above the
+  tabs, never per row, when the daily chain itself is behind. This is distinct
+  from `evaluation_behind`: that flag explains **one** lagging row while the
+  rest are current (e.g. a symbol missing a bar); the banner explains the case
+  where **every** row is stale at once because nothing upstream ran. That case
+  is real — a bars-worker outage stalls the whole chain — and per-row flags
+  alone show it as N identical row notes with no cause. Two variants, both
+  neutral (informational styling, not an error colour or alarm icon — no data
+  is wrong, it is old):
+  - **No fresh scan:** "No new scan for N trading sessions — the latest is
+    {last_scan_date}. Tracked figures below are as of that date." Shown when
+    `sessions_behind ≥ 1`.
+  - **Scan fresh, tracker behind:** "The {date} scan exists but tracking has
+    not been updated since {last_tracked_session}." Shown when the scan is
+    current but the tracker did not complete for it.
+
+  Count in **trading sessions** (the NYSE calendar the API already has), not
+  calendar days, so weekends and holidays never raise it. When the banner is
+  showing, keep the per-row notes (they stay true) but they need no further
+  emphasis — the banner already states the cause.
+
+  **API addition this needs** (none exists yet — `/scanner/tracked` returns
+  only `summary` and rows): a `chain` object on that response, computed
+  server-side from the same calendar and scan-grace rule as `scan.is_stale`:
+  `expected_session` (latest session whose scan should exist by now),
+  `last_scan_date` (max `momentum_features.ts`), `last_tracked_session` (latest
+  session the tracker evaluated), `sessions_behind` (trading sessions from
+  `last_scan_date` to `expected_session`), and `tracker_behind` (bool). Build it
+  with the MFE, not before; the UI must not derive staleness from row dates.
 
