@@ -40,6 +40,8 @@ type fakeStore struct {
 	known         map[string]bool
 	watchlist     []store.WatchlistItem
 	owners        []*string
+	symbols       []store.SymbolMatch
+	searched      []string
 
 	tracked       []store.TrackedPositionRow
 	trackedCounts store.TrackedCounts
@@ -60,7 +62,7 @@ func (f *fakeStore) ScanSummary(context.Context, time.Time) (store.ScanSummary, 
 func (f *fakeStore) Candidates(context.Context, time.Time) ([]store.CandidateRow, error) {
 	return f.candidates, f.queryErr
 }
-func (f *fakeStore) SymbolDetail(_ context.Context, _ time.Time, sym string) (store.SymbolDetailRow, bool, error) {
+func (f *fakeStore) SymbolDetail(_ context.Context, sym string) (store.SymbolDetailRow, bool, error) {
 	f.detailLookup = append(f.detailLookup, sym)
 	d, ok := f.details[sym]
 	return d, ok, f.queryErr
@@ -119,6 +121,10 @@ func (f *fakeStore) AddToWatchlist(_ context.Context, owner *string, sym string)
 	}
 	f.watchlist = append([]store.WatchlistItem{{Symbol: sym, AddedAt: scanDay}}, f.watchlist...)
 	return true, f.queryErr
+}
+func (f *fakeStore) SearchSymbols(_ context.Context, q string, limit int) ([]store.SymbolMatch, error) {
+	f.searched = append(f.searched, q)
+	return f.symbols, f.queryErr
 }
 func (f *fakeStore) RemoveFromWatchlist(_ context.Context, owner *string, sym string) (bool, error) {
 	f.owners = append(f.owners, owner)

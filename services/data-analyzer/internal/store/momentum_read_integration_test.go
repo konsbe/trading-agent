@@ -212,7 +212,7 @@ func TestMomentumRead_SymbolDetail(t *testing.T) {
 	tx := fixtureTx(t)
 	insertFixture(t, tx, marketFixture())
 
-	d, ok, err := SymbolDetail(ctx, tx, fixtureDay, "zzm01")
+	d, ok, err := SymbolDetail(ctx, tx, "zzm01")
 	if err != nil || !ok {
 		t.Fatalf("SymbolDetail(zzm01) = %v %v", ok, err)
 	}
@@ -230,13 +230,13 @@ func TestMomentumRead_SymbolDetail(t *testing.T) {
 		t.Errorf("null_inputs = %v", sc.NullInputs)
 	}
 
-	failed, ok, err := SymbolDetail(ctx, tx, fixtureDay, "ZZP01")
+	failed, ok, err := SymbolDetail(ctx, tx, "ZZP01")
 	if err != nil || !ok || failed.GatesPassed || failed.Score != nil ||
 		len(failed.GateFailures) != 1 || failed.GateFailures[0] != "rvol_20_below_min" {
 		t.Errorf("gate-failed detail = %+v %v %v", failed, ok, err)
 	}
 
-	if _, ok, err := SymbolDetail(ctx, tx, fixtureDay, "ZZNONE"); err != nil || ok {
+	if _, ok, err := SymbolDetail(ctx, tx, "ZZNONE"); err != nil || ok {
 		t.Errorf("unknown symbol: ok=%v err=%v, want not found", ok, err)
 	}
 }
@@ -256,11 +256,30 @@ INSERT INTO momentum_features (ts, symbol, rvol_20, bucket, gates_passed) VALUES
 INSERT INTO momentum_scores (ts, symbol, bucket, momentum_score_100) VALUES ($1, 'ZZD01', 'market', 50)`, fixtureDay); err != nil {
 		t.Fatal(err)
 	}
-	d, ok, err := SymbolDetail(ctx, tx, fixtureDay, "ZZD01")
+	d, ok, err := SymbolDetail(ctx, tx, "ZZD01")
 	if err != nil || !ok || d.Score == nil {
 		t.Fatalf("detail = %+v ok=%v err=%v", d, ok, err)
 	}
 	if len(d.Score.Penalties) != 0 {
 		t.Errorf("penalties = %v, want none", d.Score.Penalties)
+	}
+}
+
+// The detail row is the symbol's own newest row, even when that is older than
+// the latest scan; a symbol with no row at all is not found.
+func TestMomentumRead_SymbolDetailUsesTheSymbolsNewestRow(t *testing.T) {
+	ctx := context.Background()
+	tx := fixtureTx(t)
+	older := time.Date(2099, 5, 1, 0, 0, 0, 0, time.UTC)
+	newer := time.Date(2099, 5, 2, 0, 0, 0, 0, time.UTC)
+	latest := time.Date(2099, 5, 9, 0, 0, 0, 0, time.UTC) // someone else's newer scan
+	if _, err := tx.Exec(ctx, `
+INSERT INTO momentum_features (ts, symbol, close, gates_passed) VALUES
+ ($1, 'ZZDN1', 1.0, true), ($2, 'ZZDN1', 2.0, false), ($3, 'ZZDN2', 9.0, true)`, older, newer, latest); err != nil {
+		t.Fatal(err)
+	}
+	d, ok, err := SymbolDetail(ctx, tx, "zzdn1")
+	if err != nil || !ok || !d.TS.Equal(newer) || d.GatesPassed || d.Facts.Close == nil || *d.Facts.Close != 2.0 {
+		t.Fatalf("detail = %+v ok=%v err=%v; want ZZDN1's own newest row (%s, close 2)", d, ok, err, newer.Format(time.DateOnly))
 	}
 }

@@ -122,3 +122,100 @@ VALUES ($1, 'ZZB01', '5Min', 'yahoo_finance', 1, 2, 0.5, 1.5, 10)`, ts); err != 
 		t.Errorf("no 15Min bars stored: got %d, err %v", len(none), err)
 	}
 }
+
+// The list carries each symbol's LATEST features row — gate pass or not — and
+// keeps a symbol with no row at all, with nulls.
+func TestWatchlist_LatestFactsWithoutGateFilter(t *testing.T) {
+	ctx := context.Background()
+	tx := fixtureTx(t)
+	if _, err := tx.Exec(ctx, `INSERT INTO universe_symbols (symbol, exchange, name) VALUES
+		('ZZW11','NASDAQ','Watch Eleven'), ('ZZW12','NYSE','Watch Twelve')`); err != nil {
+		t.Fatal(err)
+	}
+	older := time.Date(2099, 4, 1, 0, 0, 0, 0, time.UTC)
+	newer := time.Date(2099, 4, 2, 0, 0, 0, 0, time.UTC)
+	if _, err := tx.Exec(ctx, `INSERT INTO momentum_features (ts, symbol, close, change_pct, rvol_20, gates_passed) VALUES
+		($1, 'ZZW11', 1.00, 0.01, 1.1, true),
+		($2, 'ZZW11', 1.25, 0.25, 3.3, false)`, older, newer); err != nil {
+		t.Fatal(err)
+	}
+	for _, s := range []string{"ZZW11", "ZZW12"} {
+		if _, err := AddToWatchlist(ctx, tx, nil, s); err != nil {
+			t.Fatal(err)
+		}
+	}
+	items, err := ListWatchlist(ctx, tx, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]WatchlistItem{}
+	for _, it := range items {
+		got[it.Symbol] = it
+	}
+	w := got["ZZW11"]
+	if w.AsOf == nil || !w.AsOf.Equal(newer) || w.Close == nil || *w.Close != 1.25 || *w.ChangePct != 0.25 || *w.RVol20 != 3.3 {
+		t.Errorf("ZZW11 = %+v; want the newer, NON-gate-passing row (as_of %s, close 1.25)", w, newer.Format(time.DateOnly))
+	}
+	n, ok := got["ZZW12"]
+	if !ok {
+		t.Fatal("a symbol with no features row disappeared from the list")
+	}
+	if n.AsOf != nil || n.Close != nil || n.ChangePct != nil || n.RVol20 != nil {
+		t.Errorf("ZZW12 has no features row, want all nil: %+v", n)
+	}
+}
+
+func TestSearchSymbols_OrderAndLiteralInput(t *testing.T) {
+	ctx := context.Background()
+	tx := fixtureTx(t)
+	if _, err := tx.Exec(ctx, `INSERT INTO universe_symbols (symbol, exchange, name, is_eligible) VALUES
+		('ZZQ',   'NASDAQ', 'Quux Holdings',        false),
+		('ZZQA',  'NASDAQ', 'Alpha Zzqfoo Corp',    true),
+		('ZZQAB', 'NYSE',   'Zzq Beta Inc',         true),
+		('ZZ_Q1', 'NYSE',   'Underscore 100% Corp', true)`); err != nil {
+		t.Fatal(err)
+	}
+	res, err := SearchSymbols(ctx, tx, "zzq", 20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var syms []string
+	for _, m := range res {
+		syms = append(syms, m.Symbol)
+	}
+	// Exact ticker first even though it is ineligible; then eligible ticker
+	// prefixes (shorter first). ZZ_Q1 must not match: '_' is literal.
+	if len(syms) < 3 || syms[0] != "ZZQ" || syms[1] != "ZZQA" || syms[2] != "ZZQAB" {
+		t.Errorf("order = %v, want [ZZQ ZZQA ZZQAB ...]", syms)
+	}
+	for _, s := range syms {
+		if s == "ZZ_Q1" {
+			t.Error("LIKE wildcard in data matched: input must be literal")
+		}
+	}
+	if res, _ := SearchSymbols(ctx, tx, "zz_", 20); len(res) != 1 || res[0].Symbol != "ZZ_Q1" {
+		t.Errorf("'zz_' = %+v, want only ZZ_Q1 ('_' literal, not a wildcard)", res)
+	}
+	// '10%' as a wildcard would match the word "100%"; literal, it must not.
+	res, _ = SearchSymbols(ctx, tx, "10%", 20)
+	for _, m := range res {
+		if m.Symbol == "ZZ_Q1" {
+			t.Errorf("'10%%' matched ZZ_Q1's \"100%%\": '%%' must be literal")
+		}
+	}
+	if res, _ := SearchSymbols(ctx, tx, "100%", 20); len(res) == 0 || !containsSymbol(res, "ZZ_Q1") {
+		t.Errorf("'100%%' should match the literal word \"100%%\" in ZZ_Q1's name: %+v", res)
+	}
+	if res, _ := SearchSymbols(ctx, tx, "zzqfoo", 20); len(res) != 1 || res[0].Symbol != "ZZQA" {
+		t.Errorf("word-prefix on company name: %+v, want ZZQA", res)
+	}
+}
+
+func containsSymbol(ms []SymbolMatch, sym string) bool {
+	for _, m := range ms {
+		if m.Symbol == sym {
+			return true
+		}
+	}
+	return false
+}

@@ -297,8 +297,19 @@ Detail view — the full score breakdown, matching `/score` in Discord.
   detail view is exactly the place someone lands after wondering "why isn't
   this symbol showing up on the list" — `/score` already provides this in
   Discord for the same reason.
-- If the symbol has no row for the current scan date at all (never computed,
-  outside the universe, etc.) — `404`, body `{"error": "no_data_for_symbol"}`.
+- **Any symbol with a features row is served** (widened 2026-09-24, for the
+  watchlist): the row is the symbol's **own most recent** `momentum_features`
+  row, not only rows from the latest scan. It is labelled honestly:
+  `as_of` (that row's date, possibly older than the latest scan), `is_stale`
+  (the candidates endpoint's `scan.is_stale` rule applied to `as_of`),
+  `latest_scan_date`, and `is_candidate_today` (`gates_passed` **in the latest
+  scan** — a symbol that passed on an older date is never presented as a
+  candidate today). Non-candidates have far more nulls (no score row, no
+  sub-scores, often no catalyst, RVOL or 52-week data); every null renders
+  "—" in the UI, never 0.
+- If the scanner has never written a row for the symbol (outside the
+  universe, etc.) — `404`, body `{"error": "no_data_for_symbol"}`. That is a
+  real absence, not staleness.
 
 **Extended 2026-09-24 for the Stitch detail design** (all values as stored — the
 API still computes nothing):
@@ -333,9 +344,29 @@ The one **write path**, designed separately from the read-only scanner routes
 
 | Route | Result |
 |---|---|
-| `GET /api/v1/watchlist` | `200 {"owner": "unauthenticated", "items": [{symbol, company_name, exchange, added_at}]}` newest first |
+| `GET /api/v1/watchlist` | `200 {"owner": "unauthenticated", "items": [{symbol, company_name, exchange, added_at, as_of, is_stale, close, change_pct, rvol_20}]}` newest first |
 | `PUT /api/v1/watchlist/{symbol}` | Idempotent add. `201` when added, `200` when already present; body is the updated list. `404 unknown_symbol` if not in `universe_symbols`; `400 invalid_symbol` |
 | `DELETE /api/v1/watchlist/{symbol}` | Idempotent remove. `200` with the updated list |
+| `GET /api/v1/symbols?q=` | Symbol search for the add flow (added 2026-09-24). `200 {"query", "results": [{symbol, company_name, exchange, is_eligible}]}`, at most 20. `400 invalid_query` when `q` is blank or over 40 characters |
+
+- **Current data per item** (added 2026-09-24). `close`, `change_pct`,
+  `rvol_20` come from the symbol's **most recent** `momentum_features` row —
+  **without** the `gates_passed` filter the candidates endpoint uses, since a
+  watched symbol usually isn't a candidate. `LEFT JOIN`, so a symbol with no
+  features row (e.g. not in the eligible universe) stays in the list with
+  nulls. `as_of` is that row's date (`null` when there is none); `is_stale` is
+  the candidates endpoint's `scan.is_stale` rule applied to `as_of` (older than
+  the session expected by now), and `true` when there is no row — so an old
+  price is never presented as current. Same visual rules as the candidates
+  screen: price and `change_pct` are the only red/green, and no score,
+  breakout state or other signal framing is served here.
+- **Search.** Ticker prefix, company-name prefix, or a word in the company
+  name starting with `q`; case-insensitive and literal (`%` / `_` are not
+  wildcards). Exact ticker first, then eligible symbols, then shorter tickers.
+  It searches every `universe_symbols` row — the same set `PUT` accepts — and
+  `is_eligible: false` marks symbols the scanner doesn't cover (watchable, but
+  no price data). `PUT`'s `404 unknown_symbol` stays the authority on what can
+  be added; search only helps find a symbol. Not cached.
 
 - **Owner.** A signed-in user's items are keyed by their identity-provider
   subject; without auth every request uses the shared **unauthenticated** list

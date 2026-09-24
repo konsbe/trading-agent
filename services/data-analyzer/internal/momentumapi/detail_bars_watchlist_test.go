@@ -3,6 +3,7 @@ package momentumapi
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -286,5 +287,96 @@ func TestCORS_AllowsWatchlistWriteMethods(t *testing.T) {
 	srv.Handler().ServeHTTP(rec, req)
 	if got := rec.Header().Get("Access-Control-Allow-Methods"); got != "GET, PUT, DELETE, OPTIONS" {
 		t.Errorf("Allow-Methods = %q", got)
+	}
+}
+
+func TestWatchlist_ItemFactsAndStaleness(t *testing.T) {
+	st := fixtureStore()
+	fresh := time.Date(2026, 9, 17, 0, 0, 0, 0, time.UTC) // the session expected at freshNow
+	old := time.Date(2026, 9, 10, 0, 0, 0, 0, time.UTC)
+	st.watchlist = []store.WatchlistItem{
+		{Symbol: "NOW", AddedAt: scanDay, AsOf: &fresh, Close: ptr(2.5), ChangePct: ptr(0.12), RVol20: ptr(4.2)},
+		{Symbol: "OLD", AddedAt: scanDay, AsOf: &old, Close: ptr(1.0)},
+		{Symbol: "NONE", AddedAt: scanDay},
+	}
+	body := decode(t, get(t, newTestServer(t, st, freshNow), "/api/v1/watchlist"))
+	got := map[string]map[string]any{}
+	for _, it := range body["items"].([]any) {
+		m := it.(map[string]any)
+		got[m["symbol"].(string)] = m
+	}
+	if n := got["NOW"]; n["as_of"] != "2026-09-17" || n["is_stale"] != false || n["close"] != 2.5 || n["change_pct"] != 0.12 || n["rvol_20"] != 4.2 {
+		t.Errorf("fresh item = %v", n)
+	}
+	if o := got["OLD"]; o["as_of"] != "2026-09-10" || o["is_stale"] != true {
+		t.Errorf("old row must be flagged stale, same rule as scan.is_stale: %v", o)
+	}
+	nn := got["NONE"]
+	for _, k := range []string{"as_of", "close", "change_pct", "rvol_20"} {
+		if v, present := nn[k]; !present || v != nil {
+			t.Errorf("no-data item %q = %v (present=%v), want explicit null", k, v, present)
+		}
+	}
+	if nn["is_stale"] != true {
+		t.Errorf("no-data item is_stale = %v, want true", nn["is_stale"])
+	}
+}
+
+func TestSymbolSearch(t *testing.T) {
+	st := fixtureStore()
+	st.symbols = []store.SymbolMatch{{Symbol: "VGZ", IsEligible: true}, {Symbol: "VGZX"}}
+	srv := newTestServer(t, st, freshNow)
+
+	rec := get(t, srv, "/api/v1/symbols?q=%20vgz%20")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status %d %s", rec.Code, rec.Body)
+	}
+	body := decode(t, rec)
+	res := body["results"].([]any)
+	if body["query"] != "vgz" || len(res) != 2 || res[0].(map[string]any)["is_eligible"] != true || res[1].(map[string]any)["is_eligible"] != false {
+		t.Errorf("body = %v", body)
+	}
+	if len(st.searched) != 1 || st.searched[0] != "vgz" {
+		t.Errorf("store asked %v, want the trimmed query", st.searched)
+	}
+	for _, q := range []string{"", "%20%20", strings.Repeat("a", 41)} {
+		if rec := get(t, srv, "/api/v1/symbols?q="+q); rec.Code != http.StatusBadRequest || decode(t, rec)["error"] != "invalid_query" {
+			t.Errorf("q=%q: %d %s, want 400 invalid_query", q, rec.Code, rec.Body)
+		}
+	}
+	st.symbols = nil
+	if res := decode(t, get(t, srv, "/api/v1/symbols?q=zz"))["results"]; res == nil || len(res.([]any)) != 0 {
+		t.Errorf("no matches must be [], got %v", res)
+	}
+}
+
+// Any symbol with a features row is served, labelled by its own date — not
+// only symbols in the latest scan.
+func TestDetail_ServesAnySymbolLabelledByItsOwnDate(t *testing.T) {
+	st := fixtureStore()
+	old := time.Date(2026, 9, 10, 0, 0, 0, 0, time.UTC)
+	st.details["OLDC"] = store.SymbolDetailRow{Symbol: "OLDC", TS: old, GatesPassed: true} // candidate a week ago
+	st.details["TODAYFAIL"] = store.SymbolDetailRow{Symbol: "TODAYFAIL", TS: scanDay, GateFailures: []string{"rvol_20_below_min"}}
+	srv := newTestServer(t, st, freshNow)
+
+	cases := []struct {
+		sym                   string
+		asOf                  string
+		stale, candidateToday bool
+	}{
+		{"NEXR", "2026-09-17", false, true},       // today's candidate
+		{"TODAYFAIL", "2026-09-17", false, false}, // in today's scan, failed gates
+		{"OLDC", "2026-09-10", true, false},       // passed on an old date: NOT a candidate today
+	}
+	for _, c := range cases {
+		rec := get(t, srv, "/api/v1/scanner/today/"+c.sym)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("%s: %d %s", c.sym, rec.Code, rec.Body)
+		}
+		b := decode(t, rec)
+		if b["as_of"] != c.asOf || b["is_stale"] != c.stale || b["is_candidate_today"] != c.candidateToday || b["latest_scan_date"] != "2026-09-17" {
+			t.Errorf("%s: as_of=%v is_stale=%v is_candidate_today=%v latest=%v; want %s %v %v 2026-09-17",
+				c.sym, b["as_of"], b["is_stale"], b["is_candidate_today"], b["latest_scan_date"], c.asOf, c.stale, c.candidateToday)
+		}
 	}
 }

@@ -19,7 +19,7 @@ type Store interface {
 	LatestScanDate(ctx context.Context) (time.Time, bool, error)
 	ScanSummary(ctx context.Context, date time.Time) (store.ScanSummary, error)
 	Candidates(ctx context.Context, date time.Time) ([]store.CandidateRow, error)
-	SymbolDetail(ctx context.Context, date time.Time, symbol string) (store.SymbolDetailRow, bool, error)
+	SymbolDetail(ctx context.Context, symbol string) (store.SymbolDetailRow, bool, error)
 	LatestDailyBarTS(ctx context.Context, symbol string) (time.Time, bool, error)
 	DailyBars(ctx context.Context, symbol string, from time.Time) ([]store.PriceBar, error)
 	IntradayBars(ctx context.Context, symbol, interval string, sessions int) ([]store.PriceBar, error)
@@ -27,6 +27,7 @@ type Store interface {
 	ListWatchlist(ctx context.Context, owner *string) ([]store.WatchlistItem, error)
 	AddToWatchlist(ctx context.Context, owner *string, symbol string) (bool, error)
 	RemoveFromWatchlist(ctx context.Context, owner *string, symbol string) (bool, error)
+	SearchSymbols(ctx context.Context, query string, limit int) ([]store.SymbolMatch, error)
 	TrackedPositions(ctx context.Context, status store.TrackedStatusFilter, latestScan *time.Time) ([]store.TrackedPositionRow, error)
 	TrackedCounts(ctx context.Context) (store.TrackedCounts, error)
 	Ping(ctx context.Context) error
@@ -47,8 +48,8 @@ func (s DBStore) ScanSummary(ctx context.Context, d time.Time) (store.ScanSummar
 func (s DBStore) Candidates(ctx context.Context, d time.Time) ([]store.CandidateRow, error) {
 	return store.Candidates(ctx, s.Q, d)
 }
-func (s DBStore) SymbolDetail(ctx context.Context, d time.Time, sym string) (store.SymbolDetailRow, bool, error) {
-	return store.SymbolDetail(ctx, s.Q, d, sym)
+func (s DBStore) SymbolDetail(ctx context.Context, sym string) (store.SymbolDetailRow, bool, error) {
+	return store.SymbolDetail(ctx, s.Q, sym)
 }
 func (s DBStore) LatestDailyBarTS(ctx context.Context, sym string) (time.Time, bool, error) {
 	return store.LatestDailyBarTS(ctx, s.Q, sym)
@@ -64,6 +65,9 @@ func (s DBStore) SymbolKnown(ctx context.Context, sym string) (bool, error) {
 }
 func (s DBStore) ListWatchlist(ctx context.Context, owner *string) ([]store.WatchlistItem, error) {
 	return store.ListWatchlist(ctx, s.Q, owner)
+}
+func (s DBStore) SearchSymbols(ctx context.Context, query string, limit int) ([]store.SymbolMatch, error) {
+	return store.SearchSymbols(ctx, s.Q, query, limit)
 }
 func (s DBStore) AddToWatchlist(ctx context.Context, owner *string, sym string) (bool, error) {
 	return store.AddToWatchlist(ctx, s.Q, owner, sym)
@@ -124,6 +128,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/watchlist", s.handleWatchlistList)
 	mux.HandleFunc("PUT /api/v1/watchlist/{symbol}", s.handleWatchlistAdd)
 	mux.HandleFunc("DELETE /api/v1/watchlist/{symbol}", s.handleWatchlistRemove)
+	mux.HandleFunc("GET /api/v1/symbols", s.handleSymbolSearch)
 	return s.cors(mux)
 }
 
@@ -214,27 +219,39 @@ func (s *Server) handleDetail(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusServiceUnavailable, errorResponse{Error: "no_scan_available"})
 		return
 	}
-	row, found, err := s.cfg.Store.SymbolDetail(ctx, date, symbol)
+	row, found, err := s.cfg.Store.SymbolDetail(ctx, symbol)
 	if err != nil {
 		s.storeError(w, r, err)
 		return
 	}
 	if !found {
+		// A real absence: the scanner has never written a row for it.
 		writeJSON(w, http.StatusNotFound, errorResponse{Error: "no_data_for_symbol"})
 		return
 	}
+	stale, err := IsStale(row.TS, s.cfg.Now(), s.cfg.SessionReadyAfter)
+	if err != nil {
+		s.cfg.Log.Error("momentum-api: detail is_stale", "err", err)
+		writeJSON(w, http.StatusInternalServerError, errorResponse{Error: "session_calendar_unavailable"})
+		return
+	}
+	latest := date.UTC().Format(time.DateOnly)
+	asOf := row.TS.UTC().Format(time.DateOnly)
 
 	resp := detailResponse{
-		Symbol:       row.Symbol,
-		Exchange:     row.Exchange,
-		CompanyName:  row.CompanyName,
-		Bucket:       row.Bucket,
-		AsOf:         row.TS.Format(time.DateOnly),
-		GatesPassed:  row.GatesPassed,
-		GateFailures: nonNil(row.GateFailures),
-		Gates:        buildGateChecks(row),
-		Facts:        buildFacts(row.Facts),
-		EvidenceNote: s.cfg.Caveats.Evidence,
+		Symbol:           row.Symbol,
+		Exchange:         row.Exchange,
+		CompanyName:      row.CompanyName,
+		Bucket:           row.Bucket,
+		AsOf:             asOf,
+		IsStale:          stale,
+		LatestScanDate:   latest,
+		IsCandidateToday: row.GatesPassed && asOf == latest,
+		GatesPassed:      row.GatesPassed,
+		GateFailures:     nonNil(row.GateFailures),
+		Gates:            buildGateChecks(row),
+		Facts:            buildFacts(row.Facts),
+		EvidenceNote:     s.cfg.Caveats.Evidence,
 	}
 	if sc := row.Score; sc != nil {
 		resp.Score = &scoreDetail{

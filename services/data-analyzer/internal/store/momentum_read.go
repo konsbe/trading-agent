@@ -220,10 +220,12 @@ type SymbolDetailRow struct {
 	Score        *ScoreRow
 }
 
-// SymbolDetail returns the symbol's row for the scan date, or ok=false when it
-// has none. Gate-failed rows are returned too: "why is this not on the list"
-// is the question the detail view answers.
-func SymbolDetail(ctx context.Context, q Querier, date time.Time, symbol string) (SymbolDetailRow, bool, error) {
+// SymbolDetail returns the symbol's MOST RECENT features row (its own latest
+// scan date, which may be older than the latest scan), or ok=false when the
+// scanner has never written one. Gate-failed rows are returned too: "why is
+// this not on the list" is the question the detail view answers, and watched
+// symbols are usually not candidates.
+func SymbolDetail(ctx context.Context, q Querier, symbol string) (SymbolDetailRow, bool, error) {
 	var d SymbolDetailRow
 	f := &d.Facts
 	var total *int
@@ -244,7 +246,9 @@ SELECT mf.symbol, u.exchange, u.name, mf.bucket, mf.ts, mf.gates_passed, mf.gate
 FROM momentum_features mf
 LEFT JOIN universe_symbols u ON u.symbol = mf.symbol
 LEFT JOIN momentum_scores ms ON ms.symbol = mf.symbol AND ms.ts = mf.ts
-WHERE mf.ts = $1 AND mf.symbol = upper($2)`, date, symbol).Scan(
+WHERE mf.symbol = upper($1)
+ORDER BY mf.ts DESC
+LIMIT 1`, symbol).Scan(
 		&d.Symbol, &d.Exchange, &d.CompanyName, &d.Bucket, &d.TS, &d.GatesPassed, &d.GateFailures,
 		&f.Close, &f.PriorClose, &f.ChangePct, &f.GapPct, &f.Volume, &f.AvgVol20,
 		&f.DollarVolume, &f.RVol20, &f.VolAccel, &f.ATRPct, &f.RSI14,

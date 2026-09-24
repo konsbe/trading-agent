@@ -54,17 +54,25 @@ type candidate struct {
 }
 
 type detailResponse struct {
-	Symbol       string       `json:"symbol"`
-	Exchange     *string      `json:"exchange"`
-	CompanyName  *string      `json:"company_name"`
-	Bucket       *string      `json:"bucket"`
-	AsOf         string       `json:"as_of"`
-	GatesPassed  bool         `json:"gates_passed"`
-	GateFailures []string     `json:"gate_failures"`
-	Gates        gatesDetail  `json:"gates"`
-	Facts        factsDetail  `json:"facts"`
-	EvidenceNote string       `json:"evidence_note"`
-	Score        *scoreDetail `json:"score"`
+	Symbol      string  `json:"symbol"`
+	Exchange    *string `json:"exchange"`
+	CompanyName *string `json:"company_name"`
+	Bucket      *string `json:"bucket"`
+	// AsOf is the date of the symbol's own most recent scanner row, which is
+	// older than LatestScanDate for a symbol the latest scan did not cover.
+	// IsStale is the candidates endpoint's scan.is_stale rule applied to AsOf.
+	// IsCandidateToday: passed its gates in the LATEST scan — a symbol that was
+	// a candidate on an older date is never presented as one today.
+	AsOf             string       `json:"as_of"`
+	IsStale          bool         `json:"is_stale"`
+	LatestScanDate   string       `json:"latest_scan_date"`
+	IsCandidateToday bool         `json:"is_candidate_today"`
+	GatesPassed      bool         `json:"gates_passed"`
+	GateFailures     []string     `json:"gate_failures"`
+	Gates            gatesDetail  `json:"gates"`
+	Facts            factsDetail  `json:"facts"`
+	EvidenceNote     string       `json:"evidence_note"`
+	Score            *scoreDetail `json:"score"`
 }
 
 // gatesDetail explains §3.2 per gate. Thresholds are the scanner's gate
@@ -176,6 +184,30 @@ type watchlistItem struct {
 	CompanyName *string `json:"company_name"`
 	Exchange    *string `json:"exchange"`
 	AddedAt     string  `json:"added_at"`
+
+	// From the symbol's most recent momentum_features row (any row, not only
+	// gate passes). AsOf is that row's date; IsStale uses the same rule as the
+	// candidates endpoint's scan.is_stale, applied to AsOf, and is true when
+	// there is no row at all. Values are null when there is no row.
+	AsOf      *string  `json:"as_of"`
+	IsStale   bool     `json:"is_stale"`
+	Close     *float64 `json:"close"`
+	ChangePct *float64 `json:"change_pct"`
+	RVol20    *float64 `json:"rvol_20"`
+}
+
+type symbolSearchResponse struct {
+	Query   string        `json:"query"`
+	Results []symbolMatch `json:"results"`
+}
+
+type symbolMatch struct {
+	Symbol      string  `json:"symbol"`
+	CompanyName *string `json:"company_name"`
+	Exchange    *string `json:"exchange"`
+	// IsEligible is false for a symbol the scanner does not cover: it can be
+	// watched, but it will have no price data.
+	IsEligible bool `json:"is_eligible"`
 }
 
 type errorResponse struct {

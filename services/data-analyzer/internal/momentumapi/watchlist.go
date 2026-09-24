@@ -12,6 +12,7 @@ import (
 //	GET    /api/v1/watchlist           list
 //	PUT    /api/v1/watchlist/{symbol}  add (idempotent)
 //	DELETE /api/v1/watchlist/{symbol}  remove (idempotent)
+//	GET    /api/v1/symbols?q=          search, for the add flow
 //
 // Never cached: a list must reflect the write that just happened.
 
@@ -87,10 +88,54 @@ func (s *Server) writeWatchlist(w http.ResponseWriter, r *http.Request, status i
 	}
 	resp := watchlistResponse{Owner: ownerLabel(owner), Items: []watchlistItem{}}
 	for _, it := range items {
-		resp.Items = append(resp.Items, watchlistItem{
+		item := watchlistItem{
 			Symbol: it.Symbol, CompanyName: it.CompanyName, Exchange: it.Exchange,
-			AddedAt: it.AddedAt.UTC().Format(time.RFC3339),
-		})
+			AddedAt:   it.AddedAt.UTC().Format(time.RFC3339),
+			IsStale:   true,
+			Close:     finite(it.Close),
+			ChangePct: finite(it.ChangePct),
+			RVol20:    finite(it.RVol20),
+		}
+		if it.AsOf != nil {
+			d := it.AsOf.Format(time.DateOnly)
+			item.AsOf = &d
+			stale, err := IsStale(*it.AsOf, s.cfg.Now(), s.cfg.SessionReadyAfter)
+			if err != nil {
+				s.cfg.Log.Error("momentum-api: watchlist is_stale", "err", err)
+				writeJSON(w, http.StatusInternalServerError, errorResponse{Error: "session_calendar_unavailable"})
+				return
+			}
+			item.IsStale = stale
+		}
+		resp.Items = append(resp.Items, item)
 	}
 	writeJSON(w, status, resp)
+}
+
+const (
+	symbolSearchLimit    = 20
+	symbolSearchMaxQuery = 40
+)
+
+// handleSymbolSearch backs the watchlist's add flow. Read-only; PUT
+// /watchlist/{symbol} stays the authority on what can be added (its 404
+// unknown_symbol), this only helps the user find a symbol.
+func (s *Server) handleSymbolSearch(w http.ResponseWriter, r *http.Request) {
+	q := strings.TrimSpace(r.URL.Query().Get("q"))
+	if q == "" || len([]rune(q)) > symbolSearchMaxQuery {
+		writeJSON(w, http.StatusBadRequest, errorResponse{Error: "invalid_query"})
+		return
+	}
+	matches, err := s.cfg.Store.SearchSymbols(r.Context(), q, symbolSearchLimit)
+	if err != nil {
+		s.storeError(w, r, err)
+		return
+	}
+	resp := symbolSearchResponse{Query: q, Results: []symbolMatch{}}
+	for _, m := range matches {
+		resp.Results = append(resp.Results, symbolMatch{
+			Symbol: m.Symbol, CompanyName: m.CompanyName, Exchange: m.Exchange, IsEligible: m.IsEligible,
+		})
+	}
+	writeJSON(w, http.StatusOK, resp)
 }
