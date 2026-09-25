@@ -69,6 +69,20 @@ const buildThemeVariables = (mode: ThemeMode): ThemeVariables => {
         '--color-status-nodata': color('outline'),
         '--color-status-nodata-container': color('surface-container-high'),
         '--color-on-status-nodata-container': color('on-surface-variant'),
+        // Alert severity (API `severity`: info / notice / warning) ONLY for
+        // alert-worthy items: heuristic signals and fired alerts. Never plain
+        // facts, never price. `notice` is a muted amber so it doesn't compete
+        // with the tertiary-container disclaimer / caveat amber; `warning` is
+        // the alert red (Stitch: "alerts use error").
+        '--color-severity-info': color('outline'),
+        '--color-severity-info-container': color('surface-container-high'),
+        '--color-on-severity-info-container': color('on-surface-variant'),
+        '--color-severity-notice': color('tertiary'),
+        '--color-severity-notice-container': `color-mix(in srgb, ${color('tertiary')} 14%, ${color('surface-container')})`,
+        '--color-on-severity-notice-container': color('on-surface'),
+        '--color-severity-warning': color('error'),
+        '--color-severity-warning-container': color('error-container'),
+        '--color-on-severity-warning-container': color('on-error-container'),
         '--font-family': fontFamily.body.value,
         '--font-family-headline': fontFamily.headline.value,
         '--font-family-label': fontFamily.label.value,

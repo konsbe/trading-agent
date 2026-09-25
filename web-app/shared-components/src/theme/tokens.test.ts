@@ -72,6 +72,31 @@ describe('design tokens', () => {
         });
     });
 
+    it.each(THEME_MODES)('aliases the alert severity tokens onto Stitch colours (%s)', mode => {
+        const vars = getThemeVariables(mode);
+
+        expect(vars['--color-severity-info']).toBe(vars['--color-outline']);
+        expect(vars['--color-severity-info-container']).toBe(vars['--color-surface-container-high']);
+        expect(vars['--color-on-severity-info-container']).toBe(vars['--color-on-surface-variant']);
+        expect(vars['--color-severity-notice']).toBe(vars['--color-tertiary']);
+        expect(vars['--color-severity-notice-container']).toBe(
+            `color-mix(in srgb, ${vars['--color-tertiary']} 14%, ${vars['--color-surface-container']})`
+        );
+        expect(vars['--color-on-severity-notice-container']).toBe(vars['--color-on-surface']);
+        expect(vars['--color-severity-warning']).toBe(vars['--color-error']);
+        expect(vars['--color-severity-warning-container']).toBe(vars['--color-error-container']);
+        expect(vars['--color-on-severity-warning-container']).toBe(vars['--color-on-error-container']);
+    });
+
+    it('keeps the notice fill distinct from the disclaimer amber and severities from each other', () => {
+        THEME_MODES.forEach(mode => {
+            const vars = getThemeVariables(mode);
+            expect(vars['--color-severity-notice-container']).not.toBe(vars['--color-tertiary-container']);
+            const dots = ['info', 'notice', 'warning'].map(s => vars[`--color-severity-${s}`]);
+            expect(new Set(dots).size).toBe(3);
+        });
+    });
+
     it('applyTheme writes variables, data-theme and color-scheme to the element', () => {
         const element = document.createElement('div');
 

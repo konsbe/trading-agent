@@ -84,6 +84,20 @@ threshold logic, and a null / `display_only` tone gets no indicator. Always pair
 the colour with its icon shape and an accessible name ("Status: stressed").
 Never use these for price or a stock signal.
 
+**Alert severity colours** (API `severity` field) — each with `-container` /
+`on-…-container`. Use them **only** for alert-worthy items: heuristic signals
+(chart patterns, action signals, readings the API flags) and fired alerts
+(e.g. the candidates-list alert badge). Never on plain informational facts,
+never for price.
+
+| Variable | Dot / border | Container / text | Backend `severity` |
+|----------|--------------|------------------|--------------------|
+| `--color-severity-info` | `outline` (gray) | `surface-container-high` / `on-surface-variant` | `info` |
+| `--color-severity-notice` | `tertiary` (amber) | 14% `tertiary` over `surface-container` / `on-surface` — deliberately paler than the disclaimer's `tertiary-container` so the two don't compete | `notice` |
+| `--color-severity-warning` | `error` (red) | `error-container` / `on-error-container` | `warning` |
+
+Always pair the colour with the severity word in the badge text.
+
 Hover/pressed states are state layers over the base colour, not new tokens:
 
 ```css
