@@ -421,6 +421,28 @@ only bootstrap-based bar written before any result was momentum Phase 2
 §4.2.0 Rule 2's "bootstrap 90% CI lower bound > 1.05", which Amendment 5
 listed as reported-beside-the-verdict, not as a criterion.
 
+**Decision (user, 2026-09-25):** H2's standing bar is Rule 2's — MH OR ≥ 1.25
+with month-block bootstrap 90% lower bound > 1.05 — because it predates H1–H10
+and was not chosen after seeing H2's interval. In-sample H2 clears both (1.256;
+1.170). Step 6 proceeds for H2 only.
+
+## 5g. Step 6 — lockbox criterion for H2, fixed before any lockbox label is computed
+
+- **Rows:** `heuristic_ep_rsi_oversold` rows with `in_lockbox`, vs
+  `heuristic_comparison_days` rows with `in_lockbox` and not
+  `fired_rsi_oversold`. Labels computed once by `cmd/heuristics-lockbox`
+  with the harness's own `LabelsFor` on the same bar loader, stored in
+  `heuristic_lockbox_h2_rows`; a one-row-per-hypothesis guard table makes a
+  second run fail. No other hypothesis's lockbox outcome is computed or read.
+- **Strata:** 126-session folds over the lockbox sessions × ATR tercile, with
+  the in-sample cut points (from non-lockbox comparison days).
+- **Confirmed in the lockbox** = MH OR ≥ 1.25 **and** ≥ 3.0pp in at least one
+  ATR tercile **and** month-block bootstrap 90% lower bound > 1.05 (1,000
+  resamples, same seed). Single test, no multiplicity correction. The region
+  spans only ~14 calendar months, so the bootstrap has few blocks; that is
+  reported with the result, not used to change the bar.
+- Whatever the outcome, it is reported and the lockbox is spent.
+
 ---
 
 ## 6. What this does not do
