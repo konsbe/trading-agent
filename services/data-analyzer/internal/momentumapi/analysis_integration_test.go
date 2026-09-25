@@ -124,4 +124,29 @@ func TestIntegration_AnalysisComputesOnDemandThenServesStoredRows(t *testing.T) 
 	if obj(t, body, "balance_sheet", "roe")["band"] != "excellent" {
 		t.Errorf("balance_sheet = %v", body["balance_sheet"])
 	}
+	if body["scanner_data"] != true {
+		t.Errorf("scanner_data = %v for a scanned symbol", body["scanner_data"])
+	}
+
+	// Never scanned, but has daily bars: served, flagged scanner_data=false.
+	// A single bar is too little to compute from, so it settles as ready/no_data.
+	exec(`INSERT INTO equity_ohlcv (ts, symbol, interval, open, high, low, close, volume, source)
+		VALUES ($1, 'ZZAN02', '1Day', 10, 11, 9, 10.5, 1e6, 'tiingo')`, day)
+	rec = get(t, srv, "/api/v1/scanner/today/ZZAN02/analysis")
+	if b := decode(t, rec); rec.Code != http.StatusAccepted || b["status"] != "computing" || b["scanner_data"] != false {
+		t.Fatalf("unscanned first view: %d %s", rec.Code, rec.Body)
+	}
+	srv.analysis.wg.Wait()
+	rec = get(t, srv, "/api/v1/scanner/today/ZZAN02/analysis")
+	if b := decode(t, rec); rec.Code != http.StatusOK || b["status"] != "ready" || b["scanner_data"] != false {
+		t.Fatalf("unscanned second view: %d %s", rec.Code, rec.Body)
+	}
+	if rec := get(t, srv, "/api/v1/scanner/today/ZZAN02"); rec.Code != http.StatusNotFound {
+		t.Errorf("GET /today/ZZAN02 = %d, want 404 (no scanner row)", rec.Code)
+	}
+	// No daily bars at all: 404.
+	rec = get(t, srv, "/api/v1/scanner/today/ZZAN03/analysis")
+	if rec.Code != http.StatusNotFound || decode(t, rec)["error"] != "no_data_for_symbol" {
+		t.Errorf("no bars: %d %s", rec.Code, rec.Body)
+	}
 }

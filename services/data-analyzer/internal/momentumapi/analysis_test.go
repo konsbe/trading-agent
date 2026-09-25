@@ -58,7 +58,7 @@ var (
 )
 
 func freshAnalysis() store.AnalysisFreshness {
-	return store.AnalysisFreshness{LatestBarTS: ptr(barTS), TechnicalTS: ptr(barTS), DerivedTS: ptr(derivedTS), RawTS: ptr(rawTS)}
+	return store.AnalysisFreshness{LatestBarTS: ptr(barTS), TechnicalTS: ptr(barTS), DerivedTS: ptr(derivedTS), RawTS: ptr(rawTS), ScannerData: true}
 }
 
 func rows(t *testing.T, m map[string]string, values map[string]float64) map[string]store.StoredRow {
@@ -232,7 +232,7 @@ func TestAnalysis_ReadyServesStoredRowsWithoutComputing(t *testing.T) {
 	h := newAnalysisHarness(t)
 	h.st.fresh["NEXR"] = freshAnalysis()
 	code, body, _ := h.get("nexr")
-	if code != http.StatusOK || body["status"] != "ready" || body["symbol"] != "NEXR" {
+	if code != http.StatusOK || body["status"] != "ready" || body["symbol"] != "NEXR" || body["scanner_data"] != true {
 		t.Fatalf("got %d %v", code, body)
 	}
 	if h.callCount() != 0 {
@@ -387,8 +387,8 @@ func TestAnalysis_HeuristicCaveatIsTheSharedConstantByteForByte(t *testing.T) {
 	if got := obj(t, body, "heuristic_signals")["caveat"]; got != want {
 		t.Errorf("caveat = %q\nshared   = %q", got, want)
 	}
-	// The same, on a symbol with no stored rows at all.
-	h.st.fresh["KVUE"] = store.AnalysisFreshness{}
+	// The same, on a symbol with bars but no stored rows at all.
+	h.st.fresh["KVUE"] = store.AnalysisFreshness{LatestBarTS: ptr(barTS)}
 	h.result = func(string) error { return nil }
 	h.get("KVUE")
 	h.wait()
@@ -545,7 +545,7 @@ func TestAnalysis_ConcurrencyIsBounded(t *testing.T) {
 // that is "ready" with nulls and no_data sections, never an endless computing.
 func TestAnalysis_NothingToComputeIsReadyWithNulls(t *testing.T) {
 	h := newAnalysisHarness(t)
-	h.st.fresh["KVUE"] = store.AnalysisFreshness{}
+	h.st.fresh["KVUE"] = store.AnalysisFreshness{LatestBarTS: ptr(barTS)}
 	h.result = func(string) error { return nil }
 	if code, _, _ := h.get("KVUE"); code != http.StatusAccepted {
 		t.Fatalf("first view = %d", code)
@@ -580,11 +580,45 @@ func TestAnalysis_NothingToComputeIsReadyWithNulls(t *testing.T) {
 	}
 }
 
+// A symbol the scanner never wrote a row for (an ETF, a foreign listing) is
+// served as long as it has daily bars, flagged scanner_data=false; only a
+// symbol with no daily bars is 404. GET /today/{symbol} keeps its own 404.
+func TestAnalysis_UnscannedSymbolWithBarsIsServed(t *testing.T) {
+	h := newAnalysisHarness(t)
+	h.st.fresh["TSM"] = store.AnalysisFreshness{LatestBarTS: ptr(barTS)}
+	h.result = func(sym string) error {
+		fr := freshAnalysis()
+		fr.ScannerData = false
+		h.st.setFresh(sym, fr)
+		return nil
+	}
+	code, body, _ := h.get("tsm")
+	if code != http.StatusAccepted || body["status"] != "computing" || body["scanner_data"] != false {
+		t.Fatalf("first view: %d %v", code, body)
+	}
+	h.wait()
+	code, body, _ = h.get("TSM")
+	if code != http.StatusOK || body["status"] != "ready" || body["scanner_data"] != false {
+		t.Fatalf("after computing: %d %v", code, body)
+	}
+	if slices.Contains(h.st.detailLookup, "TSM") {
+		t.Error("the analysis must not depend on the scanner's detail row")
+	}
+	if rec := get(t, h.srv, "/api/v1/scanner/today/TSM"); rec.Code != http.StatusNotFound {
+		t.Errorf("GET /today/TSM = %d, want its own 404 unchanged", rec.Code)
+	}
+}
+
 func TestAnalysis_SameErrorsAsDetail(t *testing.T) {
 	h := newAnalysisHarness(t)
 	code, body, _ := h.get("NOPE")
 	if code != http.StatusNotFound || body["error"] != "no_data_for_symbol" {
-		t.Errorf("unknown symbol: %d %v", code, body)
+		t.Errorf("symbol with no daily bars: %d %v", code, body)
+	}
+	// A scanned symbol whose bars are gone is no different.
+	h.st.fresh["KVUE"] = store.AnalysisFreshness{ScannerData: true}
+	if code, body, _ := h.get("KVUE"); code != http.StatusNotFound || body["error"] != "no_data_for_symbol" {
+		t.Errorf("scanner row but no bars: %d %v", code, body)
 	}
 	if h.callCount() != 0 {
 		t.Error("an unknown symbol must not trigger a computation")

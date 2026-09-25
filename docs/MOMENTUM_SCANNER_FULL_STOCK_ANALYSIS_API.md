@@ -96,6 +96,7 @@ the real kinds are `rsi_oversold`, `rsi_overbought`, `bb_squeeze`,
 
 Extends the existing detail endpoint's data, not a new symbol lookup.
 Same 404 behavior as `/today/{symbol}` for an unknown/no-data symbol.
+*(Superseded 2026-09-26: any symbol with daily bars is served — §2.5.)*
 
 ### 2.1 Response shape (high level)
 
@@ -290,13 +291,29 @@ from them stay null.
 | Missing/stale and no computation running | `202`, starts one; body below, `Retry-After` header (seconds) |
 | A computation for the symbol is running | `202`, same body; concurrent requests share the one computation |
 | The last computation for these inputs failed (error or timeout), within `MOMENTUM_API_ANALYSIS_FAILED_RETRY_AFTER` (1m) | `500`, `{"symbol", "status": "failed", "error": "analysis_failed", "message", "retry_after_ms"}` + `Retry-After`; the next request after that starts a new attempt |
-| No scan ever stored / unknown symbol / DB down | `503 no_scan_available` / `404 no_data_for_symbol` / `503 database_unavailable` — same as `/today/{symbol}` |
+| No scan ever stored / DB down | `503 no_scan_available` / `503 database_unavailable` — same as `/today/{symbol}` |
+| The symbol has no daily bars (`equity_ohlcv`, interval `1Day`) | `404 no_data_for_symbol` |
 
 ```json
 {"symbol": "WRBY", "status": "computing",
  "message": "Computing analysis for this symbol -- first view only",
- "retry_after_ms": 3000}
+ "retry_after_ms": 3000, "scanner_data": true}
 ```
+
+#### Which symbols are served (widened 2026-09-26)
+
+**Any symbol with daily bars**, scanned or not — the analysis is computed from
+bars and fundamentals, not from the scanner's row. So TSM, SHEL, SPY, QQQ and
+other watchlist ETFs / foreign listings the scanner never covers go
+`computing` → `ready` like any candidate. Only a symbol with no `1Day` bars in
+`equity_ohlcv` is `404`. `GET /today/{symbol}` is unchanged: it still `404`s
+without a `momentum_features` row.
+
+Every analysis body (`200` ready, `202` computing, `500` failed) carries
+`"scanner_data": true | false` — whether momentum-scanner has **ever** written
+a `momentum_features` row for the symbol (any date, gate-passed or not). The UI
+reads it to show "No scanner data for this symbol" (and to skip the
+`/today/{symbol}` call) instead of inferring it from a 404.
 
 Limits: `MOMENTUM_API_ANALYSIS_CONCURRENCY` (2) computations at once, each
 bounded by `MOMENTUM_API_ANALYSIS_TIMEOUT` (2m, queueing included), single
@@ -307,7 +324,7 @@ poll. Measured on the live DB: a scanner candidate outside the watchlist
 
 #### Ready body (additions to §2.1)
 
-`status`, `as_of` (session of the technical rows), `fundamentals_computed_at`,
+`status`, `scanner_data` (above), `as_of` (session of the technical rows), `fundamentals_computed_at`,
 `sections: {technical, fundamentals}` each `ready` / `stale` / `no_data`, and a
 `qualitative` section. Every band/tier-bearing reading is an object
 (`{value, band}` or `{score, tier}`), including `adx_14`, `fcf_yield`, `roa` and
@@ -376,9 +393,10 @@ any alert kind or emittable pattern has no severity.
 - **The action rule's VIX regime is not the stored `vix_regime` row**: the
   bot's engine classifies the newest `VIXCLS` with hardcoded 35/20/12, whatever
   `TECHNICAL_VIX_*` say. `action_signal.vix_regime` shows what it read.
-- **TSM, the §2.1 example, gets 404**: it has no scanner row, and the endpoint
-  keeps `/today/{symbol}`'s 404. So do SHEL, QQQ, SPY and other watchlist ETFs
-  / foreign listings, even though their analysis is stored.
+- **TSM, the §2.1 example, got 404** (it has no scanner row, and the endpoint
+  kept `/today/{symbol}`'s 404; so did SHEL, QQQ, SPY). **Resolved
+  2026-09-26:** the endpoint now serves any symbol with daily bars and flags
+  `scanner_data: false` (see "Which symbols are served").
 - **§2.1 tone words** (`yellow`, `red`) are not stored; the stored macrotone
   words (`constructive` / `neutral` / `stressed`) are served.
 - **Stored fundamentals with implausible units** (seen live, not changed here:

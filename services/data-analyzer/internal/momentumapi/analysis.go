@@ -67,6 +67,7 @@ type analysisPending struct {
 	Message      string `json:"message"`
 	RetryAfterMS int64  `json:"retry_after_ms"`
 	Error        string `json:"error,omitempty"`
+	ScannerData  bool   `json:"scanner_data"`
 }
 
 func (s *Server) handleAnalysis(w http.ResponseWriter, r *http.Request) {
@@ -78,7 +79,7 @@ func (s *Server) handleAnalysis(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx := r.Context()
 
-	// Same 404 / 503 as GET /today/{symbol}.
+	// Same 503s as GET /today/{symbol}.
 	if _, ok, err := s.cfg.Store.LatestScanDate(ctx); err != nil {
 		s.storeError(w, r, err)
 		return
@@ -86,17 +87,16 @@ func (s *Server) handleAnalysis(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusServiceUnavailable, errorResponse{Error: "no_scan_available"})
 		return
 	}
-	if _, found, err := s.cfg.Store.SymbolDetail(ctx, symbol); err != nil {
-		s.storeError(w, r, err)
-		return
-	} else if !found {
-		writeJSON(w, http.StatusNotFound, errorResponse{Error: "no_data_for_symbol"})
-		return
-	}
 
 	fr, err := s.cfg.Store.AnalysisFreshness(ctx, symbol)
 	if err != nil {
 		s.storeError(w, r, err)
+		return
+	}
+	// Any symbol with daily bars is served, scanned or not: the analysis is
+	// computed from bars and fundamentals, not from the scanner's row.
+	if fr.LatestBarTS == nil {
+		writeJSON(w, http.StatusNotFound, errorResponse{Error: "no_data_for_symbol"})
 		return
 	}
 	now := s.cfg.Now()
@@ -107,17 +107,17 @@ func (s *Server) handleAnalysis(w http.ResponseWriter, r *http.Request) {
 		settled := seen && job.state != jobRunning && job.key == k
 		switch {
 		case seen && job.state == jobRunning:
-			s.writeComputing(w, symbol)
+			s.writeComputing(w, symbol, fr.ScannerData)
 			return
 		case settled && job.state == jobFailed && now.Sub(job.finished) < s.cfg.AnalysisFailedRetryAfter:
-			s.writeAnalysisFailed(w, symbol, job, now)
+			s.writeAnalysisFailed(w, symbol, fr.ScannerData, job, now)
 			return
 		case settled && job.state == jobDone && now.Sub(job.finished) <= s.cfg.FundamentalsMaxAge:
 			// Computed against these inputs and still not current: the symbol
 			// has too little data for that part. Serve what is stored.
 		default:
 			s.analysis.start(symbol, k, AnalysisParts{Technical: !techFresh, Fundamentals: !faFresh})
-			s.writeComputing(w, symbol)
+			s.writeComputing(w, symbol, fr.ScannerData)
 			return
 		}
 	}
@@ -142,17 +142,17 @@ func (s *Server) handleAnalysis(w http.ResponseWriter, r *http.Request) {
 	writeBody(w, http.StatusOK, body)
 }
 
-func (s *Server) writeComputing(w http.ResponseWriter, symbol string) {
+func (s *Server) writeComputing(w http.ResponseWriter, symbol string, scannerData bool) {
 	ra := s.cfg.AnalysisRetryAfter
 	w.Header().Set("Retry-After", strconv.Itoa(int(math.Ceil(ra.Seconds()))))
 	writeJSON(w, http.StatusAccepted, analysisPending{
 		Symbol: symbol, Status: analysisComputing,
 		Message:      "Computing analysis for this symbol -- first view only",
-		RetryAfterMS: ra.Milliseconds(),
+		RetryAfterMS: ra.Milliseconds(), ScannerData: scannerData,
 	})
 }
 
-func (s *Server) writeAnalysisFailed(w http.ResponseWriter, symbol string, job analysisJob, now time.Time) {
+func (s *Server) writeAnalysisFailed(w http.ResponseWriter, symbol string, scannerData bool, job analysisJob, now time.Time) {
 	retry := s.cfg.AnalysisFailedRetryAfter - now.Sub(job.finished)
 	if retry < time.Second {
 		retry = time.Second
@@ -161,7 +161,7 @@ func (s *Server) writeAnalysisFailed(w http.ResponseWriter, symbol string, job a
 	writeJSON(w, http.StatusInternalServerError, analysisPending{
 		Symbol: symbol, Status: analysisFailed, Error: "analysis_failed",
 		Message:      "Computing the analysis for this symbol failed; it will be retried on a later request.",
-		RetryAfterMS: retry.Milliseconds(),
+		RetryAfterMS: retry.Milliseconds(), ScannerData: scannerData,
 	})
 }
 
@@ -170,6 +170,9 @@ func (s *Server) writeAnalysisFailed(w http.ResponseWriter, symbol string, job a
 type analysisResponse struct {
 	Symbol string `json:"symbol"`
 	Status string `json:"status"`
+	// ScannerData: momentum-scanner has a row for the symbol. False for a
+	// symbol served only because it has daily bars (never scanned).
+	ScannerData bool `json:"scanner_data"`
 	// AsOf is the session (UTC date) of the technical rows.
 	AsOf *string `json:"as_of"`
 	// FundamentalsComputedAt is when the derived fundamentals were written.
@@ -426,8 +429,9 @@ func sectionStatus(stored, fresh bool) string {
 func buildAnalysis(symbol string, in store.AnalysisInputs, fr store.AnalysisFreshness, techFresh, faFresh bool,
 	n technical.Names, caveats Caveats) analysisResponse {
 	out := analysisResponse{
-		Symbol: symbol,
-		Status: analysisReady,
+		Symbol:      symbol,
+		Status:      analysisReady,
+		ScannerData: fr.ScannerData,
 		Sections: map[string]string{
 			"technical":    sectionStatus(len(in.Indicators) > 0, techFresh),
 			"fundamentals": sectionStatus(len(in.Derived) > 0, faFresh),

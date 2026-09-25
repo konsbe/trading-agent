@@ -28,6 +28,9 @@ type AnalysisFreshness struct {
 	// fundamental row (any other source) — the derived rows' inputs.
 	DerivedTS *time.Time
 	RawTS     *time.Time
+	// ScannerData is whether momentum-scanner has ever written a
+	// momentum_features row for the symbol (any date, gate-passed or not).
+	ScannerData bool
 }
 
 func AnalysisFreshnessFor(ctx context.Context, q Querier, symbol, interval string) (AnalysisFreshness, error) {
@@ -46,8 +49,9 @@ SELECT (SELECT max(ts) FROM technical_indicators
        (SELECT max(ts) FROM equity_fundamentals
          WHERE symbol = $1 AND source = 'fundamental_analysis'),
        (SELECT max(ts) FROM equity_fundamentals
-         WHERE symbol = $1 AND source <> 'fundamental_analysis')`,
-		symbol, interval).Scan(&f.TechnicalTS, &f.DerivedTS, &f.RawTS); err != nil {
+         WHERE symbol = $1 AND source <> 'fundamental_analysis'),
+       EXISTS (SELECT 1 FROM momentum_features WHERE symbol = $1)`,
+		symbol, interval).Scan(&f.TechnicalTS, &f.DerivedTS, &f.RawTS, &f.ScannerData); err != nil {
 		return f, fmt.Errorf("analysis freshness %s: %w", symbol, err)
 	}
 	for _, p := range []*time.Time{f.TechnicalTS, f.DerivedTS, f.RawTS} {
