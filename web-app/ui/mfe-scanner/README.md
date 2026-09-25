@@ -28,8 +28,8 @@ hosted (mounted under spog's `candidates/*`):
 
 | Path | Page |
 |------|------|
-| index | `CandidatesPage` — both buckets as sortable tables (default RVOL desc, nulls last), top 10 + "and N more" per bucket, row/Enter/link to detail; Change % uses `--color-price-up`/`--color-price-down` (zero neutral) |
-| `:symbol` | `CandidateDetailPage` — Stitch "Stock Detail & Score Breakdown": header, gates panel (value vs threshold per check), evidence note, primary facts matrix, price chart (1D 5D 1M 6M 1Y ALL), score breakdown (sub-metric evaluator, penalty rules, footer), shared-watchlist toggle |
+| index | `CandidatesPage` — both buckets as sortable tables (default RVOL desc, nulls last), top 10 + "and N more" per bucket, row/Enter/link to detail; Change % uses `--color-price-up`/`--color-price-down` (zero neutral); a row with a `recent_alert` gets a severity badge ("notice — liquidity sweep") beside the ticker that opens detail at `#classical-signals` |
+| `:symbol` | `CandidateDetailPage` — Stitch "Stock Detail & Score Breakdown": header, gates panel (value vs threshold per check), evidence note, primary facts matrix, price chart (1D 5D 1M 6M 1Y ALL), score breakdown (sub-metric evaluator, penalty rules, footer), then the full analysis (below), shared-watchlist toggle. A symbol the scanner never stored (`/today/{symbol}` 404, or `scanner_data: false`) shows "No scanner data for this symbol" instead of gates/facts/score and still renders the analysis |
 
 Hosted vs standalone: `app-root` (hosted) wraps the app in `HostModeProvider hosted`;
 `bootstrap` (standalone) does not. Hosted screens omit the page title and the
@@ -52,12 +52,43 @@ collapsed card stays collapsed while clicking through candidates in the same
 tab. Bucket sort order and "and N more" survive collapse/expand. Collapsing the
 chart disposes it; expanding builds a new one at the visible size.
 
+## Full analysis (Stock Detail)
+
+From `GET /api/v1/scanner/today/{symbol}/analysis`
+(`docs/MOMENTUM_SCANNER_FULL_STOCK_ANALYSIS_API.md` §2), loaded by
+`useStockAnalysis` independently of the gates/facts/score request. Order, all
+`CollapsibleCard`s (`scanner.detail.<widget>`):
+
+1. **Technical analysis** (`technical`) — plain fact grid; bands as text ("50.1 (normal)").
+2. **Fundamentals** (`fundamentals`) — composite line, then tiers/readings. PEG and
+   earnings surprise are not served by the API and always read "—".
+3. **Balance sheet** (`balance-sheet`) — composite line, ROE/ROA/ROIC, ratios.
+4. **Correlations** (`correlations`) — composite, cluster health, master signal, aligned/divergent sentences.
+5. **Sentiment & news** (`news`) — title + source + link only.
+6. **Classical technical signals** (`classical-signals`) — primary-accent framing;
+   the heuristic caveat verbatim first, then every technical reading the API
+   gave a `severity` (e.g. RSI, VIX, BB squeeze), chart patterns and the action
+   signal (label as-is, confluence as "3/4" text), each with a severity badge.
+
+Sections 1–5 never show severity badges; section 6 is the one place that lists
+what is currently flagged, and only what the API flagged. Every band, tier and
+severity is the API's — nothing is re-derived client-side; null is "—".
+
+States: `computing` (202) shows the API's message verbatim and polls after
+`retry_after_ms` / `Retry-After` until `ready`; `failed` (500) shows its
+message with Retry; `404` (no daily bars) is a plain note. `#classical-signals`
+in the URL opens section 6 expanded, scrolled to and highlighted.
+
+Severity badges (`src/components/SeverityBadge`) use the
+`--color-severity-info|notice|warning` aliases from shared-components.
+
 ## momentum-api endpoints used
 
 | Endpoint | Used by |
 |---|---|
 | `GET /api/v1/scanner/today` | `useScannerToday` → list |
 | `GET /api/v1/scanner/today/{symbol}` (incl. `facts`, `gates`, `score.weights`, `score.penalty_rules`) | `useScannerSymbol` → detail |
+| `GET /api/v1/scanner/today/{symbol}/analysis` (200 ready / 202 computing / 500 failed) | `useStockAnalysis` → analysis sections |
 | `GET /api/v1/scanner/symbols/{symbol}/bars?range=1D\|5D\|1M\|6M\|1Y\|ALL` | `usePriceBars` → price chart |
 | `GET /api/v1/watchlist`, `PUT`/`DELETE /api/v1/watchlist/{symbol}` | `useWatchlist` → watchlist button (shared, unauthenticated list; optimistic with rollback) |
 
