@@ -1,0 +1,25 @@
+.market-report-context {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
+    gap: var(--space-sm);
+    font-size: var(--font-size-sm);
+}
+
+.market-report-intermarket {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+}
+
+.market-report-intermarket__list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xxs);
+    margin: 0;
+    padding-left: var(--space-lg);
+    font-size: var(--font-size-sm);
+}
+
+.market-report-intermarket__name {
+    font-weight: var(--font-weight-medium);
+}

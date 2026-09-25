@@ -79,6 +79,7 @@ describe('AppRouter', () => {
         '/watchlist': { key: 'mfe_watchlist', component: './Watchlist', title: 'Watchlist' },
         '/backtest-lab': { key: 'mfe_backtest_lab', component: './BacktestLab', title: 'Backtest Lab' },
         '/data-source': { key: 'mfe_data_source', component: './DataSource', title: 'Data Source' },
+        '/market-report': { key: 'mfe_market_report', component: './MarketReport', title: 'Daily Market Report' },
     };
 
     it.each(
@@ -104,6 +105,8 @@ describe('AppRouter', () => {
         ['/backtest-lab/anything', '/backtest-lab'],
         ['/data-source', '/data-source'],
         ['/data-source/tiingo', '/data-source'],
+        ['/market-report', '/market-report'],
+        ['/market-report/SPY', '/market-report'],
     ])(
         'renders the remote for %s inside the layout and access control',
         (path, base) => {

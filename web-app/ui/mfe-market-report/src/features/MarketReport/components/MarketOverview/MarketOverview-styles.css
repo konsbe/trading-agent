@@ -1,0 +1,67 @@
+.market-report-strip {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    margin: 0;
+    overflow: hidden;
+    border: 1px solid var(--color-outline-variant);
+    border-radius: var(--radius-md);
+    background: var(--color-surface-container-low);
+}
+
+.market-report-strip__item {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xxs);
+    padding: var(--space-sm) var(--space-md);
+    box-shadow: 1px 0 0 var(--color-outline-variant);
+}
+
+.market-report-strip__item dd {
+    margin: 0;
+}
+
+.market-report-strip__value {
+    color: var(--color-on-surface);
+    font-size: var(--font-size-xl);
+    font-weight: var(--font-weight-bold);
+}
+
+.market-report-readings {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
+    align-items: start;
+    gap: var(--space-sm);
+}
+
+.market-report-signals {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.market-report-signals__item {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--space-xxs) var(--space-sm);
+    font-size: var(--font-size-sm);
+}
+
+.market-report-signals__name {
+    color: var(--color-on-surface);
+    font-weight: var(--font-weight-medium);
+}
+
+/* Plain text, same colour as the body: a status word, not a signal badge. */
+.market-report-signals__status {
+    color: var(--color-on-surface);
+}
+
+@media (max-width: 720px) {
+    .market-report-strip {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}

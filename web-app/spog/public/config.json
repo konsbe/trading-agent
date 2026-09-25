@@ -60,6 +60,16 @@
       "description": "Provider budgets and daily-chain health, checked on demand",
       "roles": [],
       "enabled": true
+    },
+    "mfe_market_report": {
+      "label": "Daily Market Report",
+      "version": "1.0.0",
+      "endpoint": "http://localhost:3005/remoteEntry.js",
+      "module": "./MarketReport",
+      "scope": "mfe_market_report",
+      "description": "Daily market report: global macro sections and per-instrument price and market cycle",
+      "roles": [],
+      "enabled": true
     }
   },
   "iframes": {}

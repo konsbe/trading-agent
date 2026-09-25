@@ -133,6 +133,13 @@ type Config struct {
 	// MarketReportCacheTTL: the report is regenerated every 6h, so it is not
 	// held to the 5-minute data TTL; watchlist writes drop it early.
 	MarketReportCacheTTL time.Duration
+	// EarningsCoveredSymbols is the list data-macro-intel fetches earnings for
+	// (read by main from the same env vars, same precedence), so the report can
+	// tell "not ingested" from "no earnings in the window".
+	EarningsCoveredSymbols []string
+	// GPRSourceConfigured mirrors data-macro-intel's GPR_CSV_URL: without it the
+	// geopolitical-risk index is never ingested.
+	GPRSourceConfigured bool
 
 	// Now is injectable for tests; defaults to time.Now.
 	Now func() time.Time

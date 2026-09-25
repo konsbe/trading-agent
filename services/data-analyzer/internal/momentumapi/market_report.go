@@ -124,7 +124,10 @@ func (s *Server) handleMarketReport(w http.ResponseWriter, r *http.Request) {
 		s.storeError(w, r, err)
 		return
 	}
-	body, err := json.Marshal(buildMarketReport(in, now))
+	body, err := json.Marshal(buildMarketReport(in, now, reportOpts{
+		earningsCovered: toSet(s.cfg.EarningsCoveredSymbols),
+		gprConfigured:   s.cfg.GPRSourceConfigured,
+	}))
 	if err != nil {
 		s.cfg.Log.Error("momentum-api: encode market report", "err", err)
 		writeJSON(w, http.StatusInternalServerError, errorResponse{Error: "internal_error"})
@@ -134,8 +137,35 @@ func (s *Server) handleMarketReport(w http.ResponseWriter, r *http.Request) {
 	writeBody(w, http.StatusOK, body)
 }
 
+// reportOpts carries the configuration facts the report states about coverage.
+type reportOpts struct {
+	earningsCovered map[string]bool
+	gprConfigured   bool
+}
+
+func toSet(xs []string) map[string]bool {
+	m := map[string]bool{}
+	for _, x := range xs {
+		m[strings.ToUpper(strings.TrimSpace(x))] = true
+	}
+	return m
+}
+
+type earningsCoverage struct {
+	Symbol string `json:"symbol"`
+	// Status: upcoming (dates in the window), none_in_window (fetched, nothing
+	// in the next 14 days) or not_ingested (data-macro-intel never fetches it).
+	Status string `json:"status"`
+	Note   string `json:"note,omitempty"`
+}
+
+type dataGap struct {
+	Key  string `json:"key"`
+	Note string `json:"note"`
+}
+
 // buildMarketReport is pure: every section's shape is testable from inputs.
-func buildMarketReport(in store.MarketReportInputs, now time.Time) map[string]any {
+func buildMarketReport(in store.MarketReportInputs, now time.Time, opts reportOpts) map[string]any {
 	var generated time.Time
 	for _, row := range in.Macro {
 		if row.TS.After(generated) {
@@ -200,6 +230,52 @@ func buildMarketReport(in store.MarketReportInputs, now time.Time) map[string]an
 	}
 	out["instruments"] = instruments
 	out["earnings_calendar"] = orEmpty(in.Earnings)
+
+	// Earnings coverage per equity instrument (ETFs, yields and crypto have no
+	// earnings), so a symbol without dates is never silently omitted.
+	var dated []struct {
+		Symbol string `json:"symbol"`
+	}
+	_ = json.Unmarshal(orEmpty(in.Earnings), &dated)
+	hasDate := map[string]bool{}
+	for _, d := range dated {
+		hasDate[d.Symbol] = true
+	}
+	coverage := []earningsCoverage{}
+	for _, inst := range instruments {
+		if inst.Type != "equity" {
+			continue
+		}
+		switch {
+		case hasDate[inst.Symbol]:
+			coverage = append(coverage, earningsCoverage{Symbol: inst.Symbol, Status: "upcoming"})
+		case opts.earningsCovered[inst.Symbol]:
+			coverage = append(coverage, earningsCoverage{Symbol: inst.Symbol, Status: "none_in_window",
+				Note: "No earnings date in the next 14 days."})
+		default:
+			coverage = append(coverage, earningsCoverage{Symbol: inst.Symbol, Status: "not_ingested",
+				Note: "Earnings data not available for this symbol — data-macro-intel does not fetch it."})
+		}
+	}
+	out["earnings_coverage"] = coverage
+
+	// Known data gaps, each stated with its condition and cause.
+	gaps := []dataGap{}
+	if len(in.GPR) == 0 {
+		if !opts.gprConfigured {
+			gaps = append(gaps, dataGap{"gpr", "Geopolitical risk index (GPR): not ingested — GPR_CSV_URL is not configured for data-macro-intel."})
+		} else {
+			gaps = append(gaps, dataGap{"gpr", "Geopolitical risk index (GPR): configured, but no readings stored yet."})
+		}
+	}
+	if in.EconomicStored30d == 0 {
+		gaps = append(gaps, dataGap{"economic_calendar", "Economic calendar: no events stored in the last 30 days. " +
+			"Last observed cause (2026-09-24): Finnhub's economic-calendar endpoint answered 403 (no access on the current plan)."})
+	}
+	if len(in.GDELT) == 0 {
+		gaps = append(gaps, dataGap{"gdelt", "GDELT news tone: no readings stored."})
+	}
+	out["data_gaps"] = gaps
 	return out
 }
 

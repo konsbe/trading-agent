@@ -1,0 +1,75 @@
+.market-report-instrument__header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-xs) var(--space-sm);
+}
+
+.market-report-instrument__price-block {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xxs);
+}
+
+.market-report-instrument__price-line {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--space-xs) var(--space-sm);
+}
+
+.market-report-instrument__price {
+    color: var(--color-on-surface);
+    font-size: var(--font-size-xl);
+    font-weight: var(--font-weight-bold);
+}
+
+.market-report-instrument__change {
+    color: var(--color-on-surface-variant);
+    font-weight: var(--font-weight-medium);
+}
+
+/* Price-movement colours: allowed only for the day's change. */
+.market-report-instrument__change.is-price-up {
+    color: var(--color-price-up);
+}
+
+.market-report-instrument__change.is-price-down {
+    color: var(--color-price-down);
+}
+
+.market-report-instrument__forming {
+    font-style: italic;
+}
+
+.market-report-instrument__reason {
+    font-size: var(--font-size-sm);
+}
+
+.market-report-instrument__facts {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: var(--space-xxs) var(--space-sm);
+    margin: 0;
+    font-size: var(--font-size-sm);
+}
+
+.market-report-instrument__facts div {
+    display: contents;
+}
+
+.market-report-instrument__facts dt {
+    color: var(--color-on-surface-variant);
+}
+
+.market-report-instrument__facts dd {
+    margin: 0;
+    color: var(--color-on-surface);
+}
+
+.market-report-instrument__flag {
+    color: var(--color-on-surface);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+}

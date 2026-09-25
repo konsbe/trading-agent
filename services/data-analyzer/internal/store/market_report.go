@@ -201,6 +201,9 @@ type MarketReportInputs struct {
 	GPR       json.RawMessage // nil = none
 	GDELT     json.RawMessage // nil = none
 	Watchlist []WatchlistItem
+	// EconomicStored30d counts economic-calendar rows from the last 30 days
+	// onward: zero means the source is not delivering, not merely a quiet week.
+	EconomicStored30d int
 }
 
 // InstrumentRef names an instrument whose closes the report needs.
@@ -251,6 +254,10 @@ func LoadMarketReport(ctx context.Context, q Querier, fixed []InstrumentRef, ear
 	}
 	if in.Earnings, err = UpcomingEarnings(ctx, q, earn, from, to); err != nil {
 		return in, err
+	}
+	if err = q.QueryRow(ctx, `SELECT count(*) FROM economic_calendar_events WHERE event_ts >= $1`,
+		now.AddDate(0, 0, -30)).Scan(&in.EconomicStored30d); err != nil {
+		return in, fmt.Errorf("economic calendar count: %w", err)
 	}
 	if in.Headlines, err = MacroHeadlines(ctx, q, 8); err != nil {
 		return in, err

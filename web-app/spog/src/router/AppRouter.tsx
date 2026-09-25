@@ -39,6 +39,22 @@ export const routes: RouteObject[] = [
                 ),
             },
             {
+                path: "market-report/*",
+                element: (
+                    <PrivateRouter
+                        component={
+                            <SingleMfePage
+                                mfe_key="mfe_market_report"
+                                mfe_component="./MarketReport"
+                                mfe_header_title="Daily Market Report"
+                                mfe_navigation_path="/market-report"
+                                mfe_enable_navigation={false}
+                            />
+                        }
+                    />
+                ),
+            },
+            {
                 path: "stock-detail/*",
                 element: <PrivateRouter component={<>Stock Detail</>} />,
             },

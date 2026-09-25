@@ -1,0 +1,6 @@
+.market-report-instruments {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
+    align-items: start;
+    gap: var(--space-sm);
+}

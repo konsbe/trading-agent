@@ -126,7 +126,9 @@ func main() {
 		SessionsShown:      7,
 		BarSource:          env("MOMENTUM_DAILY_BAR_SOURCE", "tiingo"),
 
-		MarketReportCacheTTL: reportTTL,
+		MarketReportCacheTTL:   reportTTL,
+		EarningsCoveredSymbols: earningsSymbols(),
+		GPRSourceConfigured:    strings.TrimSpace(os.Getenv("GPR_CSV_URL")) != "",
 	})
 	httpServer := &http.Server{
 		Addr:              addr,
@@ -178,6 +180,23 @@ func csv(raw string) []string {
 		if p = strings.TrimSpace(p); p != "" {
 			out = append(out, p)
 		}
+	}
+	return out
+}
+
+// earningsSymbols mirrors data-macro-intel's precedence (data-ingestion
+// internal/config: MACRO_INTEL_EARNINGS_SYMBOLS, else ALPACA_DATA_SYMBOLS,
+// else EQUITY_SYMBOLS_STOCKS + _ETFS + _COMMODITY_ETFS) — the symbols it
+// actually fetches earnings for. Both read the shared .env.
+func earningsSymbols() []string {
+	for _, key := range []string{"MACRO_INTEL_EARNINGS_SYMBOLS", "ALPACA_DATA_SYMBOLS"} {
+		if s := csv(env(key, "")); len(s) > 0 {
+			return s
+		}
+	}
+	var out []string
+	for _, key := range []string{"EQUITY_SYMBOLS_STOCKS", "EQUITY_SYMBOLS_ETFS", "EQUITY_SYMBOLS_COMMODITY_ETFS"} {
+		out = append(out, csv(env(key, ""))...)
 	}
 	return out
 }

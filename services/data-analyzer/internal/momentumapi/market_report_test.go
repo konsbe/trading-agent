@@ -58,7 +58,7 @@ func reportFixture() store.MarketReportInputs {
 
 func reportBody(t *testing.T, in store.MarketReportInputs, now time.Time) map[string]any {
 	t.Helper()
-	raw, err := json.Marshal(buildMarketReport(in, now))
+	raw, err := json.Marshal(buildMarketReport(in, now, reportOpts{earningsCovered: toSet([]string{"SHEL", "NVDA"})}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -146,7 +146,7 @@ func TestMarketReport_WatchlistMergesAndIsLabelled(t *testing.T) {
 // §5: automation_status is the snapshot's list, unchanged — every
 // not_automated / needs_data / partial entry included.
 func TestMarketReport_AutomationStatusPassesThroughUnchanged(t *testing.T) {
-	raw, _ := json.Marshal(buildMarketReport(reportFixture(), reportNow))
+	raw, _ := json.Marshal(buildMarketReport(reportFixture(), reportNow, reportOpts{}))
 	var top struct {
 		Global struct {
 			AutomationStatus json.RawMessage `json:"automation_status"`
@@ -257,5 +257,47 @@ func TestMarketReport_DatabaseDownIs503(t *testing.T) {
 	rec := get(t, newTestServer(t, st, reportNow), "/api/v1/market-report/today")
 	if rec.Code != http.StatusServiceUnavailable || decode(t, rec)["error"] != "database_unavailable" {
 		t.Errorf("got %d %s", rec.Code, rec.Body)
+	}
+}
+
+func TestMarketReport_EarningsCoverageNeverOmitsASymbol(t *testing.T) {
+	body := reportBody(t, reportFixture(), reportNow)
+	got := map[string]string{}
+	for _, c := range body["earnings_coverage"].([]any) {
+		m := c.(map[string]any)
+		got[m["symbol"].(string)] = m["status"].(string)
+	}
+	want := map[string]string{"SHEL": "upcoming", "NVDA": "none_in_window", "INFQ": "not_ingested"}
+	for sym, st := range want {
+		if got[sym] != st {
+			t.Errorf("%s = %q, want %q", sym, got[sym], st)
+		}
+	}
+	for _, other := range []string{"SPY", "GLD", "USO", "BTCUSDT", "DGS10"} {
+		if _, ok := got[other]; ok {
+			t.Errorf("%s has an earnings entry; only equities report earnings", other)
+		}
+	}
+}
+
+func TestMarketReport_DataGapsStateConditionAndCause(t *testing.T) {
+	body := reportBody(t, reportFixture(), reportNow) // no GPR, no GDELT, no economic rows
+	keys := map[string]string{}
+	for _, g := range body["data_gaps"].([]any) {
+		m := g.(map[string]any)
+		keys[m["key"].(string)] = m["note"].(string)
+	}
+	for _, k := range []string{"gpr", "economic_calendar", "gdelt"} {
+		if keys[k] == "" {
+			t.Errorf("missing data gap %q: %v", k, keys)
+		}
+	}
+	in := reportFixture()
+	in.EconomicStored30d = 12
+	in.GDELT = json.RawMessage(`{"day_ts":"2026-09-24"}`)
+	for _, g := range reportBody(t, in, reportNow)["data_gaps"].([]any) {
+		if k := g.(map[string]any)["key"]; k == "economic_calendar" || k == "gdelt" {
+			t.Errorf("gap %v reported although its data is present", k)
+		}
 	}
 }

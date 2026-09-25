@@ -1,0 +1,922 @@
+{
+  "data_gaps": [
+    {
+      "key": "gpr",
+      "note": "Geopolitical risk index (GPR): not ingested — GPR_CSV_URL is not configured for data-macro-intel."
+    },
+    {
+      "key": "economic_calendar",
+      "note": "Economic calendar: no events stored in the last 30 days. Last observed cause (2026-09-24): Finnhub's economic-calendar endpoint answered 403 (no access on the current plan)."
+    }
+  ],
+  "earnings_calendar": [],
+  "earnings_coverage": [
+    {
+      "symbol": "SHEL",
+      "status": "none_in_window",
+      "note": "No earnings date in the next 14 days."
+    },
+    {
+      "symbol": "INFQ",
+      "status": "not_ingested",
+      "note": "Earnings data not available for this symbol — data-macro-intel does not fetch it."
+    },
+    {
+      "symbol": "MRVL",
+      "status": "not_ingested",
+      "note": "Earnings data not available for this symbol — data-macro-intel does not fetch it."
+    },
+    {
+      "symbol": "NVDA",
+      "status": "none_in_window",
+      "note": "No earnings date in the next 14 days."
+    }
+  ],
+  "generated_at": "2026-09-25T05:38:37Z",
+  "global": {
+    "automation_status": {
+      "factor": {
+        "hint": "Quality/value overlap fundamental-analysis; momentum/vol from technical-analysis OHLCV — no separate factor ETF pipeline yet.",
+        "status": "partial"
+      },
+      "sentiment": {
+        "hint": "PCR, IV skew, short interest, margin — need options/FINRA feeds (see HTML data sources).",
+        "status": "needs_data"
+      },
+      "intermarket": {
+        "hint": "Live rolling ρ in aa_reference_snapshot (bond, oil, VIX vs benchmark). Other pairs in HTML are regime guides.",
+        "status": "partial_live"
+      },
+      "seasonality": {
+        "hint": "Static month almanac + presidential cycle in payload — not backtested on your DB history.",
+        "status": "live_static"
+      },
+      "event_driven": {
+        "hint": "M&A, spinoffs, index adds — would need SEC/index parsers + event tables.",
+        "status": "not_automated"
+      },
+      "relative_value": {
+        "hint": "Pairs / sector ratios — configure ETF universe + second worker pass (future).",
+        "status": "not_automated"
+      },
+      "alternative_data": {
+        "hint": "Vendor datasets only — no ingestion.",
+        "status": "not_automated"
+      },
+      "flow_microstructure": {
+        "hint": "UOA, GEX, dark pool, max pain — paid options / FINRA OTC APIs not wired.",
+        "status": "needs_data"
+      }
+    },
+    "calendars": {
+      "economic": []
+    },
+    "geopolitical_intel": {
+      "gdelt": {
+        "day_ts": "2026-09-25",
+        "query_label": "macro_query_default",
+        "article_count": 120,
+        "avg_tone": 0,
+        "avg_goldstein": 0
+      },
+      "gpr": null
+    },
+    "global_geopolitical": {
+      "score": 0.43,
+      "label": "elevated_stress",
+      "as_of": "2026-09-25",
+      "stance": {
+        "score": 0.43,
+        "stance": "elevated_stress",
+        "china_regime": "slowing",
+        "signals_used": 4,
+        "dollar_regime": "major_global_stress",
+        "fiscal_regime": "elevated_supply_risk",
+        "usdjpy_regime": "carry_intact",
+        "interpretation": "+1 = max USD/carry/fiscal stress; -1 = benign global liquidity"
+      },
+      "signals": {
+        "gg_broad_dollar": {
+          "value": 119.5133,
+          "as_of": "2026-09-25",
+          "payload": {
+            "index": 119.513,
+            "score": 1,
+            "regime": "major_global_stress",
+            "series": "DTWEXBGS",
+            "not_ice_dxy": true,
+            "interpretation": "broad USD goods TWI — proxy for USD strength vs ICE DXY"
+          }
+        },
+        "gg_china_gdp": {
+          "value": 3.4667698772531175,
+          "as_of": "2026-09-25",
+          "payload": {
+            "score": 0.35,
+            "regime": "slowing",
+            "series": "CHNGDPNQDSMEI",
+            "yoy_pct": 3.47,
+            "frequency": "quarterly_oecd"
+          }
+        },
+        "gg_fiscal": {
+          "value": 5.46,
+          "as_of": "2026-09-25",
+          "payload": {
+            "note": "FYFSD is fiscal-year; GDP is latest quarterly SAAR — ratio is indicative",
+            "score": 0.4,
+            "regime": "elevated_supply_risk",
+            "series_gdp": "GDP",
+            "fyfsd_millions": -1774684,
+            "series_deficit": "FYFSD",
+            "deficit_pct_gdp": 5.46,
+            "gdp_billions_saar": 32486.1
+          }
+        },
+        "gg_usdjpy": {
+          "value": 156.87,
+          "as_of": "2026-09-25",
+          "payload": {
+            "score": -0.05,
+            "regime": "carry_intact",
+            "series": "DEXJPUS",
+            "latest_spot": 156.87,
+            "pct_chg_20d": -1.7,
+            "lookback_obs": 22
+          }
+        }
+      }
+    },
+    "growth_cycle": {
+      "score": 0.42500000000000004,
+      "label": "expansion",
+      "as_of": "2026-09-25",
+      "stance": {
+        "score": 0.425,
+        "stance": "expansion",
+        "gdp_regime": "moderate",
+        "lei_regime": "expanding",
+        "pmi_regime": "no_data",
+        "empl_regime": "moderate",
+        "capex_regime": "expanding",
+        "signals_used": 8,
+        "claims_regime": "tight_labor",
+        "housing_regime": "moderate",
+        "consumer_regime": "slowing"
+      },
+      "signals": {
+        "gc_capex": {
+          "value": 3.866687778359701,
+          "as_of": "2026-09-25",
+          "payload": {
+            "score": 0.8,
+            "regime": "expanding",
+            "series": "NEWORDER",
+            "dgorder_latest": 339392,
+            "neworder_3m_pct": 3.87,
+            "neworder_latest": 85716
+          }
+        },
+        "gc_claims": {
+          "value": 202250,
+          "as_of": "2026-09-25",
+          "payload": {
+            "score": 0.9,
+            "regime": "tight_labor",
+            "icsa_4w_ma": 202250,
+            "ccsa_latest": 1719000,
+            "icsa_latest": 197000
+          }
+        },
+        "gc_consumer": {
+          "value": 2.5283509946086635,
+          "as_of": "2026-09-25",
+          "payload": {
+            "score": 0,
+            "regime": "slowing",
+            "rrsfs_yoy_pct": 2.53,
+            "rrsfs_current_mn": 231630,
+            "rsafs_nominal_mn": 773947
+          }
+        },
+        "gc_consumer_sentiment": {
+          "value": 55.2,
+          "as_of": "2026-09-25",
+          "payload": {
+            "score": 0.3,
+            "regime": "near_bottom",
+            "series": "UMCSENT"
+          }
+        },
+        "gc_employment": {
+          "value": 162,
+          "as_of": "2026-09-25",
+          "payload": {
+            "score": 0.3,
+            "regime": "moderate",
+            "sahm_pp": -0.07,
+            "payems_k": 162,
+            "unrate_pct": 4.1,
+            "ahe_yoy_pct": 3.09
+          }
+        },
+        "gc_gdp": {
+          "value": 1.4836587880023622,
+          "as_of": "2026-09-25",
+          "payload": {
+            "score": 0.3,
+            "regime": "moderate",
+            "series": "GDPC1",
+            "ann_pct": 1.48,
+            "gdpc1_bn": 24270
+          }
+        },
+        "gc_housing": {
+          "value": 1275,
+          "as_of": "2026-09-25",
+          "payload": {
+            "score": 0.2,
+            "regime": "moderate",
+            "houst_k_ann": 1275,
+            "permit_k_ann": 1403
+          }
+        },
+        "gc_lei": {
+          "value": 9.059999999999999,
+          "as_of": "2026-09-25",
+          "payload": {
+            "score": 0.8,
+            "regime": "expanding",
+            "series": "USSLIND",
+            "latest_mom_pct": 1.72,
+            "six_month_rate_pct": 9.06
+          }
+        },
+        "gc_pmi": {
+          "value": null,
+          "as_of": "2026-09-25",
+          "payload": {
+            "regime": "no_data"
+          }
+        }
+      }
+    },
+    "inflation": {
+      "score": 0.525,
+      "label": "hot",
+      "as_of": "2026-09-25",
+      "stance": {
+        "score": 0.525,
+        "stance": "hot",
+        "cpi_regime": "rising",
+        "oil_regime": "elevated",
+        "ppi_regime": "elevated",
+        "wage_regime": "target_consistent",
+        "signals_used": 7,
+        "copper_regime": "global_expansion",
+        "core_cpi_regime": "above_target",
+        "core_pce_regime": "aggressive_tightening"
+      },
+      "signals": {
+        "inf_copper": {
+          "value": 38.60815086638751,
+          "as_of": "2026-09-25",
+          "payload": {
+            "score": 0.8,
+            "regime": "global_expansion",
+            "series": "PCOPPUSDM",
+            "copper_yoy_pct": 38.61,
+            "copper_usd_per_ton": 13543
+          }
+        },
+        "inf_core_cpi": {
+          "value": 2.7634613395318253,
+          "as_of": "2026-09-25",
+          "payload": {
+            "score": 0.5,
+            "regime": "above_target",
+            "series": "CPILFESL",
+            "yoy_pct": 2.76
+          }
+        },
+        "inf_core_pce": {
+          "value": 3.3441430040338282,
+          "as_of": "2026-09-25",
+          "payload": {
+            "score": 1,
+            "regime": "aggressive_tightening",
+            "series": "PCEPILFE",
+            "fed_target": 2,
+            "core_pce_yoy": 3.34,
+            "headline_pce_yoy": 3.7
+          }
+        },
+        "inf_cpi": {
+          "value": 3.7129581058388483,
+          "as_of": "2026-09-25",
+          "payload": {
+            "score": 0.3,
+            "regime": "rising",
+            "series": "CPIAUCSL",
+            "yoy_pct": 3.71
+          }
+        },
+        "inf_oil": {
+          "value": 96.41,
+          "as_of": "2026-09-25",
+          "payload": {
+            "score": 0.5,
+            "regime": "elevated",
+            "series": "DCOILWTICO",
+            "wti_usd": 96.41,
+            "brent_usd": 114.89,
+            "brent_wti_spread": 18.48
+          }
+        },
+        "inf_ppi": {
+          "value": 5.444716524159343,
+          "as_of": "2026-09-25",
+          "payload": {
+            "score": 0.6,
+            "regime": "elevated",
+            "series": "PPIFID",
+            "ppiaco_yoy": 9.85,
+            "ppifid_yoy": 5.44,
+            "margin_signal": "neutral",
+            "ppi_cpi_spread": 1.73,
+            "lead_months_cpi": "3–6 months"
+          }
+        },
+        "inf_ppi_cpi_spread": {
+          "value": 1.73,
+          "as_of": "2026-09-25",
+          "payload": {
+            "spread_ppt": 1.73,
+            "warning_thresh": 3
+          }
+        },
+        "inf_shelter": {
+          "value": 3.4371085588715378,
+          "as_of": "2026-09-25",
+          "payload": {
+            "regime": "moderating",
+            "series": "CUSR0000SAH1",
+            "yoy_pct": 3.44,
+            "lag_note": "shelter CPI lags market rents by ~18 months",
+            "cpi_weight": "~35% of headline CPI"
+          }
+        },
+        "inf_wages": {
+          "value": 3.085745494265435,
+          "as_of": "2026-09-25",
+          "payload": {
+            "score": 0,
+            "regime": "target_consistent",
+            "series_ahe": "CES0500000003",
+            "series_eci": "ECIALLCIV",
+            "ahe_yoy_pct": 3.09,
+            "eci_yoy_pct": 3.38
+          }
+        }
+      }
+    },
+    "intermarket": {
+      "oil_equity_60d": {
+        "label": "Negative correlation — possible supply-shock or defensive equity phase vs energy.",
+        "regime": "decoupled",
+        "symbol": "SPY",
+        "series_id": "DCOILWTICO",
+        "description": "Benchmark log return vs daily change in WTI ($/bbl)",
+        "correlation_60d": -0.598,
+        "insufficient_data": false,
+        "observations_used": 60,
+        "window_trading_days": 60
+      },
+      "vix_equity_60d": {
+        "label": "Equities rise when VIX falls — usual fear gauge wiring over the window.",
+        "regime": "typical_fear_greed",
+        "symbol": "SPY",
+        "series_id": "VIXCLS",
+        "description": "Benchmark log return vs daily change in VIX index",
+        "correlation_60d": -0.733,
+        "insufficient_data": false,
+        "observations_used": 60,
+        "window_trading_days": 60
+      },
+      "bond_equity_60d": {
+        "label": "Bonds and equities negatively correlated — classic flight-to-quality hedge (60d rolling).",
+        "regime": "deflationary_hedge",
+        "symbol": "SPY",
+        "series_id": "DGS10",
+        "yield_series": "DGS10",
+        "correlation_60d": -0.531,
+        "insufficient_data": false,
+        "observations_used": 60,
+        "window_trading_days": 60
+      }
+    },
+    "macro": {
+      "eur_usd": {
+        "value": 1.1464,
+        "as_of": "2026-09-18"
+      },
+      "us10y_pct": {
+        "value": 5.11,
+        "as_of": "2026-09-23"
+      },
+      "vix": {
+        "value": 14.21,
+        "as_of": "2026-09-22"
+      }
+    },
+    "macro_correlations_regime": {
+      "as_of": "2026-09-25",
+      "payload": {
+        "flags": [
+          "real_rates_headwind",
+          "inflation_hot",
+          "usd_strong_em_headwind",
+          "global_stress",
+          "energy_price_pressure"
+        ],
+        "label": "Elevated global stress with USD or JPY stress — tighter financial conditions for EM and commodities.",
+        "score": -0.52,
+        "inputs": {
+          "gdp": "moderate",
+          "oil": "elevated",
+          "credit": "benign",
+          "dollar": "major_global_stress",
+          "usdjpy": "carry_intact",
+          "gc_stance": "expansion",
+          "gg_stance": "elevated_stress",
+          "mp_stance": "neutral",
+          "real_rate": "headwind",
+          "inf_stance": "hot",
+          "yield_curve": "normal"
+        },
+        "regime": "global_liquidity_stress",
+        "reference": "macro_analysis_reference.html — Macro Correlations panel"
+      },
+      "score": -0.52
+    },
+    "market_cycle_composite": {
+      "as_of": "2026-09-25",
+      "payload": {
+        "close": 767.18,
+        "inputs": {
+          "gc_stance": "expansion",
+          "gg_stance": "elevated_stress",
+          "mp_stance": "neutral",
+          "inf_stance": "hot"
+        },
+        "sma200": 718.01,
+        "symbol": "SPY",
+        "peak_ts": "2026-08-13T13:30:00Z",
+        "interval": "1Day",
+        "bars_used": 320,
+        "peak_high": 779.37,
+        "reference": "macro_analysis_reference.html — Market Cycles panel",
+        "has_sma200": true,
+        "price_phase": "bull_extended",
+        "drawdown_pct": -1.56,
+        "crash_warning": false,
+        "days_off_peak": 29,
+        "pct_vs_sma200": 6.85,
+        "composite_label": "Price extended vs 200DMA with tight macro (policy/inflation) — late-cycle playbook; tighten stops.",
+        "composite_phase": "late_cycle_stretched",
+        "min_bars_expected": 200
+      },
+      "score": 0.15
+    },
+    "monetary_policy": {
+      "score": 0.4,
+      "label": "neutral",
+      "as_of": "2026-09-25",
+      "stance": {
+        "note": "Composite of free FRED data only. Adding CME FedWatch + FOMC LLM scoring would substantially improve signal.",
+        "score": "0.40",
+        "stance": "neutral",
+        "weights": "rate×2 + yield_curve×2 + real_rate×1.5 + balance_sheet×1 + credit×2 + breakeven×1 + m2×0.5",
+        "thresholds": "accommodative >0.4 | neutral -0.4–0.4 | restrictive <-0.4",
+        "todo_global": "ECB/BoE/BoJ rates + global PMI required for cross-border regime overlay",
+        "todo_growth": "Growth panel (GDP/PMI/jobless claims) would enable full macro regime detection",
+        "signals_used": [
+          "rate_regime",
+          "yield_curve",
+          "real_rate",
+          "balance_sheet",
+          "credit_spread",
+          "breakeven_infl",
+          "m2_supply"
+        ]
+      },
+      "signals": {
+        "mp_balance_sheet": {
+          "value": 6747.704,
+          "as_of": "2026-09-25",
+          "payload": {
+            "note": "Fed balance sheet peaked ~$9T (2022). QT pace 2022-24 ~$60-95B/month. Material pace change signals policy shift before formal announcement. Source: FRED WALCL.",
+            "regime": "neutral",
+            "thresholds": "4w change >+100Bn=QE | <-100Bn=QT | else neutral",
+            "4w_change_billions": 16.8,
+            "total_assets_billions": 6747.7
+          }
+        },
+        "mp_breakeven_inflation": {
+          "value": 2.33,
+          "as_of": "2026-09-25",
+          "payload": {
+            "note": "Stable 2.0-2.5% = Fed comfortable. Rising >2.5% = unanchoring risk. >3% = 2022 scenario, expect aggressive hikes. Source: FRED T10YIE / T5YIE.",
+            "regime": "anchored",
+            "todo_5y5y": "5Y5Y forward inflation swap (Fed's preferred long-run anchor) requires Bloomberg terminal or paid ICE data.",
+            "thresholds": "<2.5% anchored | 2.5–3.0% rising | >3.0% unanchored",
+            "breakeven_5y_pct": 2.33,
+            "breakeven_10y_pct": 2.33
+          }
+        },
+        "mp_credit_spread": {
+          "value": 273,
+          "as_of": "2026-09-25",
+          "payload": {
+            "note": "Credit stress leads equity drawdowns 4-8 weeks. 2020 peak 1100bps, 2009 peak 1900bps. TEDRATE discontinued May 2023.",
+            "regime": "benign",
+            "source": "FRED BAMLH0A0HYM2 (HY) / BAMLC0A0CM (IG)",
+            "todo_ted": "TEDRATE discontinued FRED May 2023. Consider SOFR-OIS spread as modern interbank stress proxy.",
+            "thresholds": "<300bps benign | 300–600bps elevated | >600bps crisis",
+            "hy_spread_bps": 273,
+            "ig_spread_bps": 77
+          }
+        },
+        "mp_m2_supply": {
+          "value": 5.658908412771701,
+          "as_of": "2026-09-25",
+          "payload": {
+            "note": "M2 leads inflation 12-24 months. 2020: +27% surge → 2021-22 inflation. 2022-23: first contraction since 1930s → lagged disinflation. Source: FRED M2SL.",
+            "regime": "normal",
+            "yoy_pct": "5.66",
+            "todo_m2v": "M2 Velocity (M2V, quarterly) provides monetarist context but updates infrequently.",
+            "thresholds": ">15% inflationary | 4–15% normal | <0% deflationary",
+            "m2_billions": 23342.8
+          }
+        },
+        "mp_rate": {
+          "value": 3.63,
+          "as_of": "2026-09-25",
+          "payload": {
+            "regime": "cutting",
+            "strategy": "cutting=bullish growth/tech, buy duration | neutral=stock-picking | hiking=value>growth, banks outperform",
+            "thresholds": "hiking: YoY change >+25bps | neutral: ±25bps | cutting: <-25bps",
+            "fedfunds_pct": 3.63,
+            "todo_fomc_llm": "FOMC statement hawkish/dovish scoring scheduled for LLM layer integration",
+            "change_yoy_bps": -70.00000000000001,
+            "todo_cme_watch": "CME FedWatch rate probabilities require paid CME API — adds real-time forward rate expectations"
+          }
+        },
+        "mp_real_rate": {
+          "value": 2.76,
+          "as_of": "2026-09-25",
+          "payload": {
+            "note": "2020-21 deeply negative real rates caused asset bubble. 2022 rapid rise to +2% was most destabilizing event for growth stocks. Source: FRED DFII10.",
+            "regime": "headwind",
+            "thresholds": "<-2% deeply negative | -2–2% balanced | >2% headwind",
+            "breakeven_10y_pct": 2.33,
+            "real_rate_10y_pct": 2.76
+          }
+        },
+        "mp_treasury_yields": {
+          "value": 5.11,
+          "as_of": "2026-09-25",
+          "payload": {
+            "note": "Every +100bps in 10Y reduces equity fair value ~10-15% via discount rate. Earnings Yield = 1/PE*100 vs 10Y = Equity Risk Premium. ERP <1% = equities expensive vs bonds.",
+            "2y_pct": 4.85,
+            "source": "FRED DGS2 / DGS10 / DGS30",
+            "10y_pct": 5.11,
+            "30y_pct": 5.4,
+            "todo_erp": "Full Equity Risk Premium calculation requires S&P composite P/E from fundamental-analysis derived table (future cross-service query)."
+          }
+        },
+        "mp_yield_curve": {
+          "value": 0.31,
+          "as_of": "2026-09-25",
+          "payload": {
+            "note": "3m10y is most reliable recession predictor (12-18 month lag). Re-steepening AFTER inversion = recession arriving. Source: FRED T10Y2Y / T10Y3M.",
+            "regime": "normal",
+            "thresholds": ">1.0 steep | 0–1.0 normal | -0.5–0 flat | <-0.5 inverted",
+            "lookback_min_pct": 0.2,
+            "spread_2s10s_pct": 0.31,
+            "spread_3m10y_pct": 0.94
+          }
+        }
+      }
+    },
+    "news": [
+      {
+        "ts": "2026-09-25T01:54:00+00:00",
+        "source": "finnhub_macro_general",
+        "headline": "Allies unite behind Saudi Arabia as Houthis step up attacks - Reuters",
+        "url": "https://news.google.com/rss/articles/CBMirwFBVV95cUxOSktoVFV5TmFoZFFlNGJOdHNQbl9ZNWVfOFVvRTN2UXpLMlBhSnZ6ZVZLdFNlRU5CR3RjaHYxWDJRclcyb1lrVzh1WG83MWtmcjRyVnpRdTZIcTdtY01WRlFaVXZ5aWFBSXgzdk9LdzZNdmlQWHJlUmJuci1TSFI1bWRtYXJwYWdEYjBVMHJlVnpYbndpR1lQbllKNkphM0t1SmhXaXNYQmVncDFVOHFJ?oc=5"
+      },
+      {
+        "ts": "2026-09-25T01:11:00+00:00",
+        "source": "finnhub_macro_general",
+        "headline": "Oil prices fall as markets look to Iran truce, but remain wary of attacks on oil facilities - reuters.com",
+        "url": "https://news.google.com/rss/articles/CBMixAFBVV95cUxQV3EzX3oydnQxRk5Ld1BKbk82ek14ZVdyLVpTdldjdEpqeDJfTVZ2Q0F1TnhvaWlhR1p0Z3hScDV0S2Z1UFR5OXhKSWk3NmtqTzd0SkJfa2RLRFpOOUlEcE5mR1d4Z21Td2FCQVZqNHV1eDloQkplT1NHaHhyTDlqOG5DYlFFdnRERThxNU0yX29LcTRyal9pMHQ4ZzNoU0VKZkdHN2hFYjhCZUpZZ3d2am11SDJYYVBiN0JxWVBtczNRYkh1?oc=5"
+      },
+      {
+        "ts": "2026-09-25T01:11:00+00:00",
+        "source": "finnhub_macro_general",
+        "headline": "Oil prices fall as markets look to Iran truce, but remain wary of attacks on oil facilities - Reuters",
+        "url": "https://news.google.com/rss/articles/CBMixAFBVV95cUxQV3EzX3oydnQxRk5Ld1BKbk82ek14ZVdyLVpTdldjdEpqeDJfTVZ2Q0F1TnhvaWlhR1p0Z3hScDV0S2Z1UFR5OXhKSWk3NmtqTzd0SkJfa2RLRFpOOUlEcE5mR1d4Z21Td2FCQVZqNHV1eDloQkplT1NHaHhyTDlqOG5DYlFFdnRERThxNU0yX29LcTRyal9pMHQ4ZzNoU0VKZkdHN2hFYjhCZUpZZ3d2am11SDJYYVBiN0JxWVBtczNRYkh1?oc=5"
+      },
+      {
+        "ts": "2026-09-25T00:58:00+00:00",
+        "source": "finnhub_macro_general",
+        "headline": "Russian, Iranian foreign ministers say only diplomatic solution to conflict around Iran - Reuters",
+        "url": "https://news.google.com/rss/articles/CBMizAFBVV95cUxNVWhvaDZsMTZLcDdLUWxBV0twQ1d1NWFUdHduZWhmUlp6NW01ODFLQVJDZjVQcEtydk5VR1FKMUo4YU9wNHY3bGRQdGRFUFhLT1FGMWNkWVMyQkVZZjQ5ZEJpalVkWjA2RXJoaG5QSkJHLTZ2MVJOMTBFWm1NcW1Hamh0ejBTdU42c1BxTS0tdXJYTFBNRXdJNFZSN0xLU0RYUGFDcXBfeFdRQ3ViUGVSd2I3b0ZQb0lneEdlNm1ZVXBrN1lmekhCajBXemg?oc=5"
+      },
+      {
+        "ts": "2026-09-25T00:17:00+00:00",
+        "source": "finnhub_macro_general",
+        "headline": "Saudi Grand Mufti tells troops to be ready to sacrifice their lives fighting Houthis - Reuters",
+        "url": "https://news.google.com/rss/articles/CBMizAFBVV95cUxPTXZJVk41ZE5xYUdhR0dIQjd0eVNzaWlmNVd3VmNNZTEyc2dZOWlnZm1nYW9xU19UNTNia0ZLaDUya2xYcXpYRW1tcUJVa0phSUlfOU82SXJHZjc1WHJTUFV5MkNRZUJ0LXFOSG8zRUswZGtJbHktVkZPeGJKd1lUMVBldUlwbGlXOW5qYm1VbnhJVU9QQ0x3Z1ZtNVpjMTVRNXZOZTJvbHZyNjZINzBYc3hvYVpWRndIbldwWjBCUDhJMnhyWVNmTkhxVUU?oc=5"
+      },
+      {
+        "ts": "2026-09-25T00:17:00+00:00",
+        "source": "finnhub_macro_general",
+        "headline": "Saudi Grand Mufti tells troops to be ready to sacrifice their lives fighting Houthis - reuters.com",
+        "url": "https://news.google.com/rss/articles/CBMizAFBVV95cUxPTXZJVk41ZE5xYUdhR0dIQjd0eVNzaWlmNVd3VmNNZTEyc2dZOWlnZm1nYW9xU19UNTNia0ZLaDUya2xYcXpYRW1tcUJVa0phSUlfOU82SXJHZjc1WHJTUFV5MkNRZUJ0LXFOSG8zRUswZGtJbHktVkZPeGJKd1lUMVBldUlwbGlXOW5qYm1VbnhJVU9QQ0x3Z1ZtNVpjMTVRNXZOZTJvbHZyNjZINzBYc3hvYVpWRndIbldwWjBCUDhJMnhyWVNmTkhxVUU?oc=5"
+      },
+      {
+        "ts": "2026-09-24T23:42:35+00:00",
+        "source": "finnhub_macro_general",
+        "headline": "Iran's president says it is up to US to choose if it wants to end Iran war - Reuters",
+        "url": "https://news.google.com/rss/articles/CBMiugFBVV95cUxOb21pSm1ydXhYbXJ1SFNldm9vNm5nS0t3bmhGczZBS1Vfd3QwMTRJcnExUUY5cXh1OEZ4aDVSbDE2eFAtYk03Y0RfS1VROXZSV21mWkNwRUdjYWxqa2dzNVpVbWVxNGxEalNZc01qa3JVa1FGd3JVbXY4Ujdtb1dQcWFFdlVEUngyZng4WTlMZjhEa2dJVGY5OHhqNXFpZGxxVlFWLWl5d3FtNGV4aXdpYWVYaWQtMFI0dmc?oc=5"
+      },
+      {
+        "ts": "2026-09-24T23:42:35+00:00",
+        "source": "finnhub_macro_general",
+        "headline": "Iran's president says it is up to US to choose if it wants to end Iran war - reuters.com",
+        "url": "https://news.google.com/rss/articles/CBMiugFBVV95cUxOb21pSm1ydXhYbXJ1SFNldm9vNm5nS0t3bmhGczZBS1Vfd3QwMTRJcnExUUY5cXh1OEZ4aDVSbDE2eFAtYk03Y0RfS1VROXZSV21mWkNwRUdjYWxqa2dzNVpVbWVxNGxEalNZc01qa3JVa1FGd3JVbXY4Ujdtb1dQcWFFdlVEUngyZng4WTlMZjhEa2dJVGY5OHhqNXFpZGxxVlFWLWl5d3FtNGV4aXdpYWVYaWQtMFI0dmc?oc=5"
+      }
+    ],
+    "presidential_cycle": {
+      "bias": "choppy",
+      "note": "Year 2 — midterm year; often volatile, corrections common before midterms.",
+      "label": "midterm",
+      "cycle_year": 2
+    },
+    "seasonality": {
+      "bias": "weak_bear",
+      "note": "September effect — worst month on average.",
+      "month": 9,
+      "score": -0.5,
+      "avg_hist": "~−0.7%",
+      "disclaimer": "Static almanac from reference doc — tie-breaker only; do not trade in isolation.",
+      "month_name": "September"
+    }
+  },
+  "instruments": [
+    {
+      "key": "sp500",
+      "label": "S&P 500",
+      "symbol": "SPY",
+      "type": "etf_index",
+      "source": "fixed_list",
+      "price": {
+        "close": 767.18,
+        "change_pct": -0.08,
+        "as_of": "2026-09-24",
+        "session_closed": true
+      },
+      "market_cycle": {
+        "as_of": "2026-09-24",
+        "as_of_basis": "session close",
+        "crash_velocity_flag": false,
+        "drawdown_from_peak_pct": -1.56,
+        "phase": "bull_extended",
+        "vs_200dma_pct": 6.85,
+        "windows": {
+          "sma_period": 200,
+          "peak_lookback": 252,
+          "crash_close_bars": 5,
+          "crash_high_window": 10
+        }
+      }
+    },
+    {
+      "key": "gold",
+      "label": "Gold",
+      "symbol": "GLD",
+      "type": "etf",
+      "source": "fixed_list",
+      "price": {
+        "close": 391.69,
+        "change_pct": -0.3,
+        "as_of": "2026-09-24",
+        "session_closed": true
+      },
+      "market_cycle": {
+        "as_of": "2026-09-24",
+        "as_of_basis": "session close",
+        "crash_velocity_flag": false,
+        "drawdown_from_peak_pct": -23.15,
+        "phase": "bear",
+        "vs_200dma_pct": -5.93,
+        "windows": {
+          "sma_period": 200,
+          "peak_lookback": 252,
+          "crash_close_bars": 5,
+          "crash_high_window": 10
+        }
+      }
+    },
+    {
+      "key": "oil",
+      "label": "Oil (WTI)",
+      "symbol": "USO",
+      "type": "etf",
+      "source": "fixed_list",
+      "price": {
+        "close": 153.09,
+        "change_pct": 2.86,
+        "as_of": "2026-09-24",
+        "session_closed": true
+      },
+      "market_cycle": {
+        "as_of": "2026-09-24",
+        "as_of_basis": "session close",
+        "crash_velocity_flag": false,
+        "drawdown_from_peak_pct": -6.28,
+        "phase": "pullback",
+        "vs_200dma_pct": 35.68,
+        "windows": {
+          "sma_period": 200,
+          "peak_lookback": 252,
+          "crash_close_bars": 5,
+          "crash_high_window": 10
+        }
+      }
+    },
+    {
+      "key": "us10y",
+      "label": "US 10-Year Treasury",
+      "symbol": "DGS10",
+      "type": "treasury_yield",
+      "source": "fixed_list",
+      "yield": {
+        "value": 5.11,
+        "as_of": "2026-09-23"
+      },
+      "market_cycle": null
+    },
+    {
+      "key": "us5y",
+      "label": "US 5-Year Treasury",
+      "symbol": "DGS5",
+      "type": "treasury_yield",
+      "source": "fixed_list",
+      "yield": {
+        "value": 4.99,
+        "as_of": "2026-09-23"
+      },
+      "market_cycle": null
+    },
+    {
+      "key": "us2y",
+      "label": "US 2-Year Treasury",
+      "symbol": "DGS2",
+      "type": "treasury_yield",
+      "source": "fixed_list",
+      "yield": {
+        "value": 4.85,
+        "as_of": "2026-09-23"
+      },
+      "market_cycle": null
+    },
+    {
+      "key": "shell",
+      "label": "Shell",
+      "symbol": "SHEL",
+      "type": "equity",
+      "source": "fixed_list",
+      "price": {
+        "close": 95.6,
+        "change_pct": 0.2,
+        "as_of": "2026-09-24",
+        "session_closed": true
+      },
+      "market_cycle": {
+        "as_of": "2026-09-24",
+        "as_of_basis": "session close",
+        "crash_velocity_flag": false,
+        "drawdown_from_peak_pct": -3.59,
+        "phase": "pullback",
+        "vs_200dma_pct": 13.1,
+        "windows": {
+          "sma_period": 200,
+          "peak_lookback": 252,
+          "crash_close_bars": 5,
+          "crash_high_window": 10
+        }
+      }
+    },
+    {
+      "key": "bitcoin",
+      "label": "Bitcoin",
+      "symbol": "BTCUSDT",
+      "type": "crypto",
+      "source": "fixed_list",
+      "price": {
+        "close": 84410.24,
+        "change_pct": 0.01,
+        "as_of": "2026-09-24",
+        "session_closed": true
+      },
+      "market_cycle": {
+        "as_of": "2026-09-24",
+        "as_of_basis": "00:00 UTC daily close (closed candles only)",
+        "crash_velocity_flag": false,
+        "drawdown_from_peak_pct": -33.11,
+        "phase": "bear",
+        "vs_200dma_pct": 19.08,
+        "windows": {
+          "sma_period": 200,
+          "peak_lookback": 365,
+          "crash_close_bars": 7,
+          "crash_high_window": 14
+        }
+      }
+    },
+    {
+      "key": "INFQ",
+      "label": "INFLEQTION INC",
+      "symbol": "INFQ",
+      "type": "equity",
+      "source": "watchlist",
+      "price": {
+        "close": 14.3,
+        "change_pct": 3.4,
+        "as_of": "2026-09-24",
+        "session_closed": true
+      },
+      "market_cycle": null,
+      "unavailable_reason": "153 1Day bars stored for INFQ; need at least 200"
+    },
+    {
+      "key": "MRVL",
+      "label": "MARVELL TECHNOLOGY INC",
+      "symbol": "MRVL",
+      "type": "equity",
+      "source": "watchlist",
+      "price": {
+        "close": 258.95,
+        "change_pct": -0.75,
+        "as_of": "2026-09-24",
+        "session_closed": true
+      },
+      "market_cycle": {
+        "as_of": "2026-09-24",
+        "as_of_basis": "session close",
+        "crash_velocity_flag": false,
+        "drawdown_from_peak_pct": -21.48,
+        "phase": "bear",
+        "vs_200dma_pct": 60.23,
+        "windows": {
+          "sma_period": 200,
+          "peak_lookback": 252,
+          "crash_close_bars": 5,
+          "crash_high_window": 10
+        }
+      }
+    },
+    {
+      "key": "NVDA",
+      "label": "NVIDIA CORP",
+      "symbol": "NVDA",
+      "type": "equity",
+      "source": "watchlist",
+      "price": {
+        "close": 224.58,
+        "change_pct": -0.41,
+        "as_of": "2026-09-24",
+        "session_closed": true
+      },
+      "market_cycle": {
+        "as_of": "2026-09-24",
+        "as_of_basis": "session close",
+        "crash_velocity_flag": false,
+        "drawdown_from_peak_pct": -4.84,
+        "phase": "pullback",
+        "vs_200dma_pct": 12.9,
+        "windows": {
+          "sma_period": 200,
+          "peak_lookback": 252,
+          "crash_close_bars": 5,
+          "crash_high_window": 10
+        }
+      }
+    }
+  ],
+  "is_stale": false,
+  "report_date": "2026-09-25"
+}

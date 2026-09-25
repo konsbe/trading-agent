@@ -22,6 +22,16 @@ describe('Sidebar', () => {
         });
     });
 
+    it('lists Daily Market Report right after Today\'s Candidates', () => {
+        renderSidebar();
+
+        const labels = within(screen.getByRole('navigation', { name: 'Main navigation' }))
+            .getAllByRole('link')
+            .map(link => link.textContent);
+        expect(labels.slice(0, 3)).toEqual(["Today's Candidates", 'Daily Market Report', 'Stock Detail']);
+        expect(screen.getByRole('link', { name: 'Daily Market Report' })).toHaveAttribute('href', '/market-report');
+    });
+
     it('marks the current route as active', () => {
         renderSidebar(true, '/watchlist');
 

@@ -1,0 +1,82 @@
+.market-report-calendar-news {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(22rem, 1fr));
+    align-items: start;
+    gap: var(--space-md);
+}
+
+.market-report-calendar-news__block {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+    min-width: 0;
+    font-size: var(--font-size-sm);
+}
+
+.market-report-calendar-news__block > h3 {
+    margin: 0;
+}
+
+.market-report-calendar__empty {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xxs);
+    padding: var(--space-sm) var(--space-md);
+    border: 1px dashed var(--color-outline);
+    border-radius: var(--radius-md);
+}
+
+.market-report-calendar__empty p {
+    margin: 0;
+}
+
+.market-report-calendar__empty-title {
+    font-weight: var(--font-weight-bold);
+}
+
+.market-report-calendar {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+}
+
+.market-report-calendar__date {
+    margin: 0 0 var(--space-xxs);
+    font-weight: var(--font-weight-bold);
+}
+
+.market-report-calendar__events,
+.market-report-earnings,
+.market-report-news {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.market-report-calendar__name {
+    color: var(--color-on-surface);
+    font-weight: var(--font-weight-medium);
+}
+
+.market-report-earnings li {
+    display: grid;
+    grid-template-columns: 4.5rem minmax(0, 1fr);
+    gap: var(--space-sm);
+}
+
+.market-report-earnings__symbol {
+    font-weight: var(--font-weight-bold);
+}
+
+.market-report-news__link {
+    color: var(--color-primary);
+    text-decoration: none;
+    border-radius: var(--radius-sm);
+}
+
+.market-report-news__link:hover {
+    text-decoration: underline;
+}

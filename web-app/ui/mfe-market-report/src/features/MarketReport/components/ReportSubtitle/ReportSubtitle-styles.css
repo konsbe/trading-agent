@@ -1,0 +1,15 @@
+.market-report-subtitle {
+    color: var(--color-on-surface-variant);
+}
+
+.market-report-subtitle.is-stale {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xxs);
+}
+
+/* Muted amber: Stitch's tertiary is the warning hue (docs/design-system/README.md). */
+.market-report-subtitle__stale-note {
+    color: var(--color-tertiary);
+    font-weight: var(--font-weight-medium);
+}

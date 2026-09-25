@@ -6,6 +6,7 @@ export interface AppRoute {
 
 export const APP_ROUTES: AppRoute[] = [
     { path: '/candidates', label: 'Today\'s Candidates' },
+    { path: '/market-report', label: 'Daily Market Report' },
     { path: '/stock-detail', label: 'Stock Detail' },
     { path: '/backtest-lab', label: 'Backtest Lab' },
     { path: '/alarm-history', label: 'Alarm History' },
