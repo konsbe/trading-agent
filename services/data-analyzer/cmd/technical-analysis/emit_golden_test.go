@@ -149,3 +149,21 @@ func firstDiff(a, b []byte) string {
 	}
 	return "length differs"
 }
+
+// technical.NamesFor is how momentum-api finds the rows it reads; every
+// single-series name must be one the emitter actually writes.
+func TestNamesAreWhatTheEmitterWrites(t *testing.T) {
+	cfg := liveTechnicalConfig(t)
+	written := map[string]bool{}
+	technical.Emitter{Cfg: cfg}.Emit(goldenBars(600), func(name string, _ *float64, _ any) { written[name] = true })
+	n := technical.NamesFor(technical.Emitter{Cfg: cfg})
+	for _, name := range []string{n.RSI, n.MACD, n.ADX, n.ATR, n.Trend, n.MARibbon, n.BBSqueeze, n.FVG,
+		n.OrderBlocks, n.LiquiditySweep, n.HSPattern, n.Flag, n.Triangle, n.ChartPatternHints, n.PivotsPriorBar} {
+		if !written[name] {
+			t.Errorf("%q is not an indicator the emitter writes", name)
+		}
+	}
+	if n.MACD != "macd_12_26_9" || n.OrderBlocks != "order_blocks_sw3_imp1.5" || n.HSPattern != "hs_pattern_sw5" || n.Flag != "flag_pole5_len10" {
+		t.Errorf("names = %+v", n)
+	}
+}

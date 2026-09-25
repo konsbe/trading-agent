@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 )
 
@@ -16,11 +17,13 @@ type parityCase struct {
 	BearishOB      bool     `json:"bearish_ob"`
 	TrendDir       string   `json:"trend_dir"`
 	VIXRegime      string   `json:"vix_regime"`
+	TotalSweeps    int      `json:"total_sweeps"`
 	WantAction     string   `json:"want_action"`
 	WantConfluence int      `json:"want_confluence"`
+	WantReasons    []string `json:"want_reasons"`
 }
 
-// Every row's expected (action, confluence) was produced by running the live
+// Every row's expected (action, confluence, reasons) was produced by running the live
 // services/analyst-bot/actions/rules/liquidity_sweep.py:evaluate — regenerate
 // with testdata/gen_sweep_rule_parity.py, never by hand.
 func TestSweepRuleMatchesPython(t *testing.T) {
@@ -39,14 +42,18 @@ func TestSweepRuleMatchesPython(t *testing.T) {
 	}
 	outcomes := map[SweepRuleResult]int{}
 	for _, c := range fx.Cases {
-		got := EvaluateSweepRule(SweepRuleInput{
+		in := SweepRuleInput{
 			Kind: c.Kind, BarClose: c.BarClose, SweptLevel: c.SweptLevel,
 			BullishOB: c.BullishOB, BearishOB: c.BearishOB,
 			TrendDir: c.TrendDir, VIXRegime: c.VIXRegime,
-		})
+		}
+		got := EvaluateSweepRule(in)
 		want := SweepRuleResult{Action: c.WantAction, Confluence: c.WantConfluence}
 		if got != want {
 			t.Errorf("%s: go %+v, python %+v", c.Name, got, want)
+		}
+		if reasons := SweepRuleReasons(in, c.TotalSweeps); !slices.Equal(reasons, c.WantReasons) {
+			t.Errorf("%s: reasons\n go     %q\n python %q", c.Name, reasons, c.WantReasons)
 		}
 		outcomes[want]++
 	}
