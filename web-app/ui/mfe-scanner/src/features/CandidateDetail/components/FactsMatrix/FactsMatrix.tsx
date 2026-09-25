@@ -14,7 +14,8 @@ import {
     withEst,
 } from '@/common/format/format';
 import { catalystText, dayChangeText, fromPeakText, priceDirection, vwapDistanceText } from '../../utils/describe';
-import { FactCell, FactsMatrixProps } from './types';
+import FactGrid, { FactCell } from '../FactGrid';
+import { FactsMatrixProps } from './types';
 import '@/styles/scanner-global.css';
 import './FactsMatrix-styles.css';
 
@@ -74,26 +75,7 @@ const FactsMatrix = ({ facts }: FactsMatrixProps) => (
             ) : undefined
         }
     >
-        <dl className="scanner-facts__grid">
-            {buildFacts(facts).map(cell => (
-                <div
-                    key={cell.key}
-                    className={`scanner-facts__cell${cell.wide ? ' is-wide' : ''}`}
-                    data-testid={`fact-${cell.key}`}
-                >
-                    <dt className="scanner-facts__label">{cell.label}</dt>
-                    <dd className="scanner-facts__value-wrap">
-                        <span
-                            className={`scanner-facts__value${cell.plain ? ' is-plain' : ''}${cell.tone ? ` is-${cell.tone}` : ''}`}
-                            data-testid={`fact-${cell.key}-value`}
-                        >
-                            {cell.value}
-                        </span>
-                        {cell.sub && <span className="scanner-facts__sub">{cell.sub}</span>}
-                    </dd>
-                </div>
-            ))}
-        </dl>
+        <FactGrid cells={buildFacts(facts)} />
     </CollapsibleCard>
 );
 

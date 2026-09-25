@@ -45,7 +45,7 @@ describe('FactsMatrix', () => {
     });
 
     it('uses the price aliases in CSS (never raw colours)', () => {
-        const css = readFileSync(join(__dirname, 'FactsMatrix-styles.css'), 'utf8');
+        const css = readFileSync(join(__dirname, '../FactGrid/FactGrid-styles.css'), 'utf8');
         expect(css).toMatch(/\.is-price-up\s*\{\s*color:\s*var\(--color-price-up\)/);
         expect(css).toMatch(/\.is-price-down\s*\{\s*color:\s*var\(--color-price-down\)/);
         expect(css).not.toMatch(/#[0-9a-f]{3,6}\b/i);

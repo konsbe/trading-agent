@@ -52,6 +52,33 @@
     white-space: nowrap;
 }
 
+/* Caveat callout (research score, heuristic signals): same prominence wherever it appears. */
+.scanner-caveat {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xxs);
+    padding: var(--space-sm) var(--space-md);
+    border-left: 4px solid var(--color-tertiary);
+    border-radius: var(--radius-md);
+    background: var(--color-surface-container-high);
+}
+
+.scanner-caveat__title {
+    margin: 0;
+    color: var(--color-on-surface);
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-bold);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.scanner-caveat__text {
+    margin: 0;
+    color: var(--color-on-surface-variant);
+    font-size: var(--font-size-sm);
+    white-space: pre-line;
+}
+
 .scanner-muted {
     margin: 0;
     color: var(--color-on-surface-variant);

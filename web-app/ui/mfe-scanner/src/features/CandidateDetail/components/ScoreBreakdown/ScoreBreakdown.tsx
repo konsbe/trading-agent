@@ -54,9 +54,9 @@ const ScoreBreakdown = ({ score, facts }: ScoreBreakdownProps) => (
             <span className="scanner-muted scanner-score__allocated">({formatScore(score.allocated)} allocated)</span>
         </p>
 
-        <aside className="scanner-score__caveat" aria-label="Research caveat" data-testid="score-caveat-callout">
-            <p className="scanner-score__caveat-title">Research caveat</p>
-            <p className="scanner-score__caveat-text" data-testid="score-caveat">{score.caveat}</p>
+        <aside className="scanner-caveat" aria-label="Research caveat" data-testid="score-caveat-callout">
+            <p className="scanner-caveat__title">Research caveat</p>
+            <p className="scanner-caveat__text" data-testid="score-caveat">{score.caveat}</p>
         </aside>
 
         <table className="scanner-score__table" data-testid="sub-scores">

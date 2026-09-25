@@ -1,0 +1,41 @@
+/* Alert severity tag: colours are the --color-severity-* aliases (docs/design-system/README.md). */
+.scanner-severity {
+    --scanner-severity: var(--color-severity-info);
+    --scanner-severity-container: var(--color-severity-info-container);
+    --scanner-on-severity-container: var(--color-on-severity-info-container);
+
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: var(--space-xxs);
+    padding: 0 var(--space-xs);
+    border: 1px solid color-mix(in srgb, var(--scanner-severity) 55%, transparent);
+    border-radius: var(--radius-full);
+    background: var(--scanner-severity-container);
+    color: var(--scanner-on-severity-container);
+    font-family: var(--font-family);
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-medium);
+    line-height: 1.6;
+    white-space: nowrap;
+}
+
+.scanner-severity.is-notice {
+    --scanner-severity: var(--color-severity-notice);
+    --scanner-severity-container: var(--color-severity-notice-container);
+    --scanner-on-severity-container: var(--color-on-severity-notice-container);
+}
+
+.scanner-severity.is-warning {
+    --scanner-severity: var(--color-severity-warning);
+    --scanner-severity-container: var(--color-severity-warning-container);
+    --scanner-on-severity-container: var(--color-on-severity-warning-container);
+}
+
+.scanner-severity__dot {
+    flex-shrink: 0;
+    width: 6px;
+    height: 6px;
+    border-radius: var(--radius-full);
+    background: var(--scanner-severity);
+}
