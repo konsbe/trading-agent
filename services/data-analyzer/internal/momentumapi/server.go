@@ -19,7 +19,7 @@ import (
 type Store interface {
 	LatestScanDate(ctx context.Context) (time.Time, bool, error)
 	ScanSummary(ctx context.Context, date time.Time) (store.ScanSummary, error)
-	Candidates(ctx context.Context, date time.Time) ([]store.CandidateRow, error)
+	Candidates(ctx context.Context, date, alertsSince time.Time) ([]store.CandidateRow, error)
 	SymbolDetail(ctx context.Context, symbol string) (store.SymbolDetailRow, bool, error)
 	LatestDailyBarTS(ctx context.Context, symbol string) (time.Time, bool, error)
 	DailyBars(ctx context.Context, symbol string, from time.Time) ([]store.PriceBar, error)
@@ -53,8 +53,8 @@ func (s DBStore) LatestScanDate(ctx context.Context) (time.Time, bool, error) {
 func (s DBStore) ScanSummary(ctx context.Context, d time.Time) (store.ScanSummary, error) {
 	return store.GetScanSummary(ctx, s.Q, d)
 }
-func (s DBStore) Candidates(ctx context.Context, d time.Time) ([]store.CandidateRow, error) {
-	return store.Candidates(ctx, s.Q, d)
+func (s DBStore) Candidates(ctx context.Context, d, alertsSince time.Time) ([]store.CandidateRow, error) {
+	return store.Candidates(ctx, s.Q, d, alertsSince)
 }
 func (s DBStore) SymbolDetail(ctx context.Context, sym string) (store.SymbolDetailRow, bool, error) {
 	return store.SymbolDetail(ctx, s.Q, sym)
@@ -111,6 +111,14 @@ func (s DBStore) Analysis(ctx context.Context, sym string) (store.AnalysisInputs
 	return store.LoadAnalysis(ctx, s.Q, sym, AnalysisInterval, analysisHeadlines)
 }
 func (s DBStore) Ping(ctx context.Context) error { return s.PingFn(ctx) }
+
+// RecentAlertWindow is how far back a candidate's recent_alert looks: the
+// newest equity fired_alerts row fired within this window before the request
+// (full-stock-analysis addendum §4). Wide enough to span the gap between the
+// evening alert scan and the next morning's view, short enough that the badge
+// means "worth a look now". The 5-minute response cache can hold an alert up
+// to one TTL past the window.
+const RecentAlertWindow = 24 * time.Hour
 
 // Buckets always present in /today, even when empty: zero candidates is the
 // empty state, not a missing bucket.
@@ -275,12 +283,13 @@ func (s *Server) handleToday(w http.ResponseWriter, r *http.Request) {
 		s.storeError(w, r, err)
 		return
 	}
-	rows, err := s.cfg.Store.Candidates(ctx, date)
+	now := s.cfg.Now()
+	rows, err := s.cfg.Store.Candidates(ctx, date, now.Add(-RecentAlertWindow))
 	if err != nil {
 		s.storeError(w, r, err)
 		return
 	}
-	stale, err := IsStale(date, s.cfg.Now(), s.cfg.SessionReadyAfter)
+	stale, err := IsStale(date, now, s.cfg.SessionReadyAfter)
 	if err != nil {
 		s.cfg.Log.Error("momentum-api: is_stale", "err", err)
 		writeJSON(w, http.StatusInternalServerError, errorResponse{Error: "session_calendar_unavailable"})
@@ -418,7 +427,16 @@ func toCandidate(row store.CandidateRow) candidate {
 		MomentumScore100: row.MomentumScore,
 		ScoreAttainable:  attainable,
 		ScoreStatus:      momentum.ScoreStatus,
+		RecentAlert:      toRecentAlert(row.RecentAlert),
 	}
+}
+
+func toRecentAlert(a *store.RecentAlert) *recentAlert {
+	if a == nil {
+		return nil
+	}
+	return &recentAlert{AlertType: a.AlertType, Severity: a.Severity, Message: a.Message,
+		FiredAt: a.FiredAt.UTC().Format(time.RFC3339)}
 }
 
 // storeError distinguishes an unreachable database (503) from a failing query

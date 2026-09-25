@@ -480,6 +480,37 @@ badge is a "something's worth a look" flag, not a full log. Clicking it
 (or the row generally) goes to Stock Detail, where the full
 `heuristic_signals`/alert history is visible.
 
+### 4.1 As built (2026-09-26)
+
+Every candidate in `GET /api/v1/scanner/today` now carries `recent_alert`:
+**always present as a key**, `null` when there is no alert, otherwise
+
+```json
+"recent_alert": {
+  "alert_type": "liquidity_sweep",
+  "severity": "notice",
+  "message": "Liquidity sweep detected (4 sweeps)",
+  "fired_at": "2026-09-25T20:14:06Z"
+}
+```
+
+- **Window: 24 hours**, the constant `RecentAlertWindow` in
+  `internal/momentumapi/server.go`: rows with `fired_at >= now − 24h` at request
+  time. Long enough to span the evening alert scan to the next morning's view,
+  short enough that the badge means "worth a look now". The list's 5-minute
+  response cache can keep an alert up to one TTL past the window.
+- **Most recent only**: `LEFT JOIN LATERAL (… ORDER BY fired_at DESC, id DESC
+  LIMIT 1)` in `store.Candidates`, so each candidate gets at most one alert and
+  a candidate with none keeps its row (test-checked: no row dropped or
+  duplicated; only the newest returned; alerts before the window ignored).
+- **Equity alerts only** (`exchange_type = 'equity'`): candidates are equities,
+  and a crypto row must never badge an equity ticker that happens to share its
+  symbol.
+- `severity` and `message` are the stored columns as the bot wrote them (§2.3
+  scale); `fired_at` is RFC3339 UTC.
+- `vix_elevated` is market-wide but stored under the symbol whose scan detected
+  it first (migration 026), so it badges that one candidate only.
+
 ---
 
 ## 5. Testing

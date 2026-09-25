@@ -33,6 +33,7 @@ type fakeStore struct {
 
 	calls        int
 	detailLookup []string
+	alertsSince  []time.Time
 
 	daily         map[string][]store.PriceBar
 	intraday      map[string][]store.PriceBar
@@ -82,7 +83,8 @@ func (f *fakeStore) LatestScanDate(context.Context) (time.Time, bool, error) {
 func (f *fakeStore) ScanSummary(context.Context, time.Time) (store.ScanSummary, error) {
 	return f.summary, f.queryErr
 }
-func (f *fakeStore) Candidates(context.Context, time.Time) ([]store.CandidateRow, error) {
+func (f *fakeStore) Candidates(_ context.Context, _ time.Time, alertsSince time.Time) ([]store.CandidateRow, error) {
+	f.alertsSince = append(f.alertsSince, alertsSince)
 	return f.candidates, f.queryErr
 }
 func (f *fakeStore) SymbolDetail(_ context.Context, sym string) (store.SymbolDetailRow, bool, error) {
@@ -388,6 +390,39 @@ func TestToday_MarketCapCarriesProvenance(t *testing.T) {
 		if _, present := got["NONE"][k]; !present {
 			t.Errorf("unknown market cap: %q missing, want explicit null/false", k)
 		}
+	}
+}
+
+// §4: recent_alert is always a key, null without an alert, and the window
+// handed to the query is RecentAlertWindow before the request.
+func TestToday_RecentAlert(t *testing.T) {
+	st := fixtureStore()
+	st.candidates = []store.CandidateRow{
+		{Symbol: "ALRT", Bucket: "market", RecentAlert: &store.RecentAlert{AlertType: "liquidity_sweep", Severity: "notice",
+			Message: "Liquidity sweep detected (4 sweeps)", FiredAt: time.Date(2026, 9, 18, 11, 8, 0, 0, time.FixedZone("EEST", 3*3600))}},
+		{Symbol: "QUIET", Bucket: "market"},
+	}
+	body := decode(t, get(t, newTestServer(t, st, freshNow), "/api/v1/scanner/today"))
+	cands := body["buckets"].(map[string]any)["market"].(map[string]any)["candidates"].([]any)
+	if len(cands) != 2 {
+		t.Fatalf("candidates = %d, want both", len(cands))
+	}
+	a := cands[0].(map[string]any)["recent_alert"].(map[string]any)
+	want := map[string]any{"alert_type": "liquidity_sweep", "severity": "notice",
+		"message": "Liquidity sweep detected (4 sweeps)", "fired_at": "2026-09-18T08:08:00Z"}
+	if len(a) != len(want) {
+		t.Errorf("recent_alert = %v, want exactly %v", a, want)
+	}
+	for k, v := range want {
+		if a[k] != v {
+			t.Errorf("recent_alert.%s = %v, want %v", k, a[k], v)
+		}
+	}
+	if v, present := cands[1].(map[string]any)["recent_alert"]; !present || v != nil {
+		t.Errorf("no alert: recent_alert = %v (present=%v), want explicit null", v, present)
+	}
+	if len(st.alertsSince) != 1 || !st.alertsSince[0].Equal(freshNow.Add(-24*time.Hour)) {
+		t.Errorf("alertsSince = %v, want now - 24h", st.alertsSince)
 	}
 }
 

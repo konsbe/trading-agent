@@ -111,6 +111,19 @@ type CandidateRow struct {
 	// ScoreNullInputs is the score row's null_inputs, read so the list can show
 	// each score against its own attainable ceiling. Nil when there is no score.
 	ScoreNullInputs []string
+
+	// RecentAlert is the symbol's newest equity fired_alerts row at or after
+	// the caller's alertsSince, nil when there is none.
+	RecentAlert *RecentAlert
+}
+
+// RecentAlert is one fired_alerts row (migration 026), as the candidates list
+// badges it.
+type RecentAlert struct {
+	AlertType string
+	Severity  string
+	Message   string
+	FiredAt   time.Time
 }
 
 // Candidates returns every gate-passing row for the scan date, both buckets,
@@ -119,19 +132,29 @@ type CandidateRow struct {
 // No LIMIT: the frontend re-sorts the full set client-side. LEFT JOIN on
 // scores so a candidate without a score row is still returned with a null
 // score, and LEFT JOIN on universe_symbols for the same reason — a missing
-// directory row must not silently drop a real candidate.
-func Candidates(ctx context.Context, q Querier, date time.Time) ([]CandidateRow, error) {
+// directory row must not silently drop a real candidate. The newest equity
+// alert fired at or after alertsSince comes from a LEFT JOIN LATERAL, for the
+// same reason: a candidate with no alert keeps its row.
+func Candidates(ctx context.Context, q Querier, date, alertsSince time.Time) ([]CandidateRow, error) {
 	rows, err := q.Query(ctx, `
 SELECT mf.symbol, u.exchange, u.name, mf.bucket,
        mf.close, mf.change_pct, mf.rvol_20, mf.dollar_volume, mf.rsi_14,
        mf.breakout_state, mf.pct_of_52w_high, mf.catalyst_tier,
        ms.momentum_score_100, ms.null_inputs,
-       mf.market_cap, mf.market_cap_est, COALESCE(mf.market_cap_is_proxy, false)
+       mf.market_cap, mf.market_cap_est, COALESCE(mf.market_cap_is_proxy, false),
+       fa.alert_type, fa.severity, fa.message, fa.fired_at
 FROM momentum_features mf
 LEFT JOIN universe_symbols u ON u.symbol = mf.symbol
 LEFT JOIN momentum_scores ms ON ms.symbol = mf.symbol AND ms.ts = mf.ts
+LEFT JOIN LATERAL (
+    SELECT alert_type, severity, message, fired_at
+    FROM fired_alerts
+    WHERE symbol = mf.symbol AND exchange_type = 'equity' AND fired_at >= $2
+    ORDER BY fired_at DESC, id DESC
+    LIMIT 1
+) fa ON true
 WHERE mf.ts = $1 AND mf.gates_passed
-ORDER BY mf.bucket, mf.rvol_20 DESC NULLS LAST, mf.symbol`, date)
+ORDER BY mf.bucket, mf.rvol_20 DESC NULLS LAST, mf.symbol`, date, alertsSince)
 	if err != nil {
 		return nil, fmt.Errorf("candidates %s: %w", date.Format(time.DateOnly), err)
 	}
@@ -140,13 +163,19 @@ ORDER BY mf.bucket, mf.rvol_20 DESC NULLS LAST, mf.symbol`, date)
 	var out []CandidateRow
 	for rows.Next() {
 		var c CandidateRow
-		var bucket *string
+		var bucket, alertType, alertSeverity, alertMessage *string
+		var alertAt *time.Time
 		if err := rows.Scan(&c.Symbol, &c.Exchange, &c.CompanyName, &bucket,
 			&c.Close, &c.ChangePct, &c.RVol20, &c.DollarVolume, &c.RSI14,
 			&c.BreakoutState, &c.PctOf52wHigh, &c.CatalystTier,
 			&c.MomentumScore, &c.ScoreNullInputs,
-			&c.MarketCap, &c.MarketCapEst, &c.MarketCapIsProxy); err != nil {
+			&c.MarketCap, &c.MarketCapEst, &c.MarketCapIsProxy,
+			&alertType, &alertSeverity, &alertMessage, &alertAt); err != nil {
 			return nil, fmt.Errorf("scan candidate: %w", err)
+		}
+		if alertType != nil {
+			c.RecentAlert = &RecentAlert{AlertType: *alertType, Severity: *alertSeverity,
+				Message: *alertMessage, FiredAt: alertAt.UTC()}
 		}
 		if bucket == nil {
 			// A gate pass always assigns a bucket; a null here is a writer bug,

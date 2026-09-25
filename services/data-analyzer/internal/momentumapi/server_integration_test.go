@@ -43,13 +43,31 @@ VALUES ($1, $2, 'market', $3, '{catalyst_tier}')`, day, sym, 50+i); err != nil {
 		}
 	}
 
+	// ZZE03's newest alert in the 24h window is served; the older one, and
+	// ZZE05's alert from before the window, are not.
+	now := ny("2026-09-18 09:00")
+	for _, a := range []struct {
+		sym, kind string
+		at        time.Time
+	}{
+		{"ZZE03", "bb_squeeze", now.Add(-3 * time.Hour)},
+		{"ZZE03", "liquidity_sweep", now.Add(-time.Hour)},
+		{"ZZE05", "rsi_overbought", now.Add(-25 * time.Hour)},
+	} {
+		if _, err := tx.Exec(ctx, `
+INSERT INTO fired_alerts (symbol, exchange_type, alert_type, interval, severity, message, fired_at)
+VALUES ($1, 'equity', $2, '1Day', 'notice', $2 || ' fired', $3)`, a.sym, a.kind, a.at); err != nil {
+			t.Fatal(err)
+		}
+	}
+
 	srv := NewServer(Config{
 		Store:             DBStore{Q: tx, PingFn: pool.Ping},
 		Caveats:           loadSharedCaveats(t),
 		Log:               slog.New(slog.NewTextHandler(io.Discard, nil)),
 		SessionReadyAfter: 6 * time.Hour,
 		// A covered "now": the future fixture scan is simply newer than expected.
-		Now: func() time.Time { return ny("2026-09-18 09:00") },
+		Now: func() time.Time { return now },
 	})
 
 	rec := get(t, srv, "/api/v1/scanner/today")
@@ -81,6 +99,19 @@ VALUES ($1, $2, 'market', $3, '{catalyst_tier}')`, day, sym, 50+i); err != nil {
 		fmt.Sscanf(m["symbol"].(string), "ZZE%d", &n)
 		if n%2 == 1 && score != nil {
 			t.Errorf("%v has no score row but momentum_score_100 = %v", m["symbol"], score)
+		}
+		alert, present := m["recent_alert"]
+		if !present {
+			t.Errorf("%v: recent_alert key missing", m["symbol"])
+		}
+		if n == 3 {
+			a, _ := alert.(map[string]any)
+			if a["alert_type"] != "liquidity_sweep" || a["message"] != "liquidity_sweep fired" ||
+				a["fired_at"] != now.Add(-time.Hour).UTC().Format(time.RFC3339) {
+				t.Errorf("ZZE03 recent_alert = %v, want only the newest", alert)
+			}
+		} else if alert != nil {
+			t.Errorf("%v recent_alert = %v, want null", m["symbol"], alert)
 		}
 	}
 

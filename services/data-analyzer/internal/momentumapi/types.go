@@ -51,6 +51,16 @@ type candidate struct {
 	// bare score never reads as "out of 100". Null exactly when the score is.
 	ScoreAttainable *int   `json:"score_attainable"`
 	ScoreStatus     string `json:"score_status"`
+	// RecentAlert is the newest equity alert fired within RecentAlertWindow,
+	// always present as a key and null when there is none.
+	RecentAlert *recentAlert `json:"recent_alert"`
+}
+
+type recentAlert struct {
+	AlertType string `json:"alert_type"`
+	Severity  string `json:"severity"`
+	Message   string `json:"message"`
+	FiredAt   string `json:"fired_at"` // RFC3339, UTC
 }
 
 type detailResponse struct {

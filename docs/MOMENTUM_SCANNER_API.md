@@ -167,7 +167,8 @@ is a plausible future need — out of scope here; don't build it speculatively.)
   "catalyst_tier": null,
   "momentum_score_100": 68,
   "score_attainable": 75,
-  "score_status": "unvalidated"
+  "score_status": "unvalidated",
+  "recent_alert": null
 }
 ```
 
@@ -191,6 +192,7 @@ Field-by-field, with the schema question flagged where one exists:
 | `market_cap_is_proxy` | `momentum_features.market_cap_is_proxy` | `true` when the gate used `market_cap_est`. The frontend must visibly mark an estimate (never render it as if reported) |
 | `momentum_score_100` | `momentum_scores.momentum_score_100` | **integer or `null`.** Null when the symbol has no score row yet (e.g. fundamentals pass hasn't populated market cap — see Phase 1 §10.1.0a). The frontend must render "—", never `0`, for a null score — a real `0` and a missing score are different facts. |
 | `score_attainable` | derived from `momentum_scores.null_inputs` | **integer or `null`**, `null` exactly when `momentum_score_100` is. The row's own ceiling, same derivation as the detail view's `score.attainable` (90 allocated minus the weights of this row's null inputs; 75 while `catalyst_tier` is null). Added 2026-09-24 so the list shows "53/75", never a bare "53" that reads as "out of 100". Varies per row once catalyst data differs. |
+| `recent_alert` | `fired_alerts` (migration 026), `LEFT JOIN LATERAL` | `null` or `{alert_type, severity, message, fired_at}`: the symbol's newest **equity** alert fired in the last 24h (`RecentAlertWindow`). Added 2026-09-26; see the full-stock-analysis addendum §4.1. A candidate with no alert keeps its row |
 | `score_status` | constant | always the literal string `"unvalidated"` in the current build. Not computed per-row — it's a build-level fact about the whole scoring system (Phase 1 §10.1.0's ruling), not a per-symbol property. Kept as a field rather than hardcoded in the frontend so a future, actually-validated model version has exactly one place to change it (see §2.4's `model_version`). |
 
 **Still excluded from the list view, and why:** sub-scores, penalties,

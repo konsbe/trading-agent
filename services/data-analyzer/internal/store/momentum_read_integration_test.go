@@ -146,7 +146,7 @@ func TestMomentumRead_Candidates(t *testing.T) {
 	tx := fixtureTx(t)
 	insertFixture(t, tx, marketFixture())
 
-	rows, err := Candidates(ctx, tx, fixtureDay)
+	rows, err := Candidates(ctx, tx, fixtureDay, time.Time{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -187,6 +187,56 @@ func TestMomentumRead_Candidates(t *testing.T) {
 	}
 }
 
+// §4 / §5: the recent_alert LEFT JOIN LATERAL never drops a candidate, returns
+// only the newest equity alert, and ignores alerts before the window.
+func TestMomentumRead_CandidatesRecentAlert(t *testing.T) {
+	ctx := context.Background()
+	tx := fixtureTx(t)
+	insertFixture(t, tx, marketFixture())
+	since := time.Date(2099, 1, 2, 12, 0, 0, 0, time.UTC)
+	for _, a := range []struct {
+		symbol, exchange, kind, severity string
+		at                               time.Time
+	}{
+		{"ZZM01", "equity", "rsi_overbought", "notice", since.Add(-time.Hour)}, // before the window
+		{"ZZM01", "equity", "bb_squeeze", "info", since.Add(time.Hour)},
+		{"ZZM01", "equity", "liquidity_sweep", "notice", since.Add(2 * time.Hour)}, // newest
+		{"ZZM02", "equity", "bb_squeeze", "info", since.Add(-time.Minute)},         // only an old one
+		{"ZZM03", "crypto", "liquidity_sweep", "notice", since.Add(time.Hour)},     // not an equity alert
+		{"ZZM04", "equity", "rsi_oversold", "notice", since},                       // exactly at the window start
+	} {
+		if _, err := tx.Exec(ctx, `
+INSERT INTO fired_alerts (symbol, exchange_type, alert_type, interval, value, severity, message, fired_at)
+VALUES ($1, $2, $3, '1Day', 1, $4, $3 || ' message', $5)`, a.symbol, a.exchange, a.kind, a.severity, a.at); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	rows, err := Candidates(ctx, tx, fixtureDay, since)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rows) != 12 {
+		t.Fatalf("got %d candidates, want all 12: an alert join must never drop or duplicate a row", len(rows))
+	}
+	by := map[string]CandidateRow{}
+	for _, r := range rows {
+		by[r.Symbol] = r
+	}
+	if a := by["ZZM01"].RecentAlert; a == nil || a.AlertType != "liquidity_sweep" || a.Severity != "notice" ||
+		a.Message != "liquidity_sweep message" || !a.FiredAt.Equal(since.Add(2*time.Hour)) || a.FiredAt.Location() != time.UTC {
+		t.Errorf("ZZM01 recent alert = %+v, want only the newest", a)
+	}
+	if a := by["ZZM04"].RecentAlert; a == nil || a.AlertType != "rsi_oversold" {
+		t.Errorf("ZZM04 recent alert = %+v, want the alert at the window start", a)
+	}
+	for _, sym := range []string{"ZZM02", "ZZM03", "ZZM05", "ZZM09"} {
+		if a := by[sym].RecentAlert; a != nil {
+			t.Errorf("%s recent alert = %+v, want nil", sym, a)
+		}
+	}
+}
+
 func TestMomentumRead_EmptyBucketDay(t *testing.T) {
 	ctx := context.Background()
 	tx := fixtureTx(t)
@@ -198,7 +248,7 @@ func TestMomentumRead_EmptyBucketDay(t *testing.T) {
 	if err != nil || !ok || !date.Equal(fixtureDay) {
 		t.Fatalf("a day with zero candidates is still the latest scan: got %v %v %v", date, ok, err)
 	}
-	rows, err := Candidates(ctx, tx, date)
+	rows, err := Candidates(ctx, tx, date, time.Time{})
 	if err != nil || len(rows) != 0 {
 		t.Errorf("Candidates = %d rows, err %v; want an empty day, not an error", len(rows), err)
 	}
