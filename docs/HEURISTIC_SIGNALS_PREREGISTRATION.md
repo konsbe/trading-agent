@@ -400,6 +400,27 @@ crosses and chart patterns sit at or below 1.0 in the hypothesis direction.
 **Next:** step 6 (one-shot lockbox) applies to H2 only, pending the user's
 go-ahead.
 
+**Methodological finding for all future hypothesis tests in this codebase.**
+On this episode data the standard CMH / Robins-Breslow-Greenland interval
+understates uncertainty badly. Month-block bootstrap 90% interval width ÷ RBG
+95% interval width, per hypothesis: H1 3.7, H2 4.3, H3 3.8, H4 4.5, H6 3.7,
+H7 3.6, H8a 3.1, H8b 3.1, H9 1.9, H10 2.6. At equal coverage the gap is about
+1.2x larger again (a 90% interval is narrower than a 95% one). The cause is
+the dependence noted above (overlapping label windows, same-day episodes),
+which CMH ignores. Consequences: naive p-values and BH q-values here are far
+too small, and any floor checked against an RBG bound is checked against an
+interval several times too narrow. Future tests on episode data should treat
+a clustering-aware interval (block bootstrap by calendar month or finer) as
+the primary uncertainty estimate, and pre-register its bar.
+
+**Disclosure for the H2 decision.** On 2026-09-25 the user asked for a
+clustering-aware bar on H2's bootstrap lower bound, to be pinned before
+looking. That interval (90% [1.170, 1.391]) had already been computed and
+reported in the table above, so no bar chosen after that point is blind. The
+only bootstrap-based bar written before any result was momentum Phase 2
+§4.2.0 Rule 2's "bootstrap 90% CI lower bound > 1.05", which Amendment 5
+listed as reported-beside-the-verdict, not as a criterion.
+
 ---
 
 ## 6. What this does not do
