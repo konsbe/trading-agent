@@ -21,6 +21,8 @@ import {
     RawObject,
     ScoredPayload,
     StanceSection,
+    Tone,
+    TONES,
 } from './types';
 
 type Json = Record<string, unknown>;
@@ -97,10 +99,19 @@ const macroStrip: Reader<MacroStrip> = (value, path) => {
     };
 };
 
+/**
+ * The stored classification tone. Absent (reports generated before tones were
+ * stored) or null → null; a string outside the known vocabulary → null too, so
+ * a new backend tone renders no indicator rather than a guessed one.
+ */
+const tone: Reader<Tone | null> = (value, path) =>
+    value === undefined || value === null ? null : TONES.includes(str(value, path) as Tone) ? (value as Tone) : null;
+
 const macroSignal: Reader<MacroSignal> = (value, path) => {
     const o = obj(value, path);
     return {
         value: nullable(num)(o.value, `${path}.value`),
+        tone: tone(o.tone, `${path}.tone`),
         as_of: date(o.as_of, `${path}.as_of`),
         payload: present(o.payload, `${path}.payload`),
     };
@@ -111,6 +122,7 @@ const stanceSection: Reader<StanceSection> = (value, path) => {
     return {
         score: nullable(num)(o.score, `${path}.score`),
         label: nullable(str)(o.label, `${path}.label`),
+        tone: tone(o.tone, `${path}.tone`),
         as_of: date(o.as_of, `${path}.as_of`),
         stance: present(o.stance, `${path}.stance`),
         signals: record(macroSignal)(o.signals, `${path}.signals`),
@@ -121,6 +133,7 @@ const scoredPayload: Reader<ScoredPayload> = (value, path) => {
     const o = obj(value, path);
     return {
         score: nullable(num)(o.score, `${path}.score`),
+        tone: tone(o.tone, `${path}.tone`),
         as_of: date(o.as_of, `${path}.as_of`),
         payload: present(o.payload, `${path}.payload`),
     };

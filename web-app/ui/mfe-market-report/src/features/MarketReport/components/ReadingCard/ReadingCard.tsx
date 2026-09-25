@@ -1,18 +1,22 @@
 import { useId, useState } from 'react';
 import { Button, ChevronDownIcon } from '@trading-agent/shared-components';
 import { formatDate, formatNumber } from '../../utils/format';
+import ToneIndicator from '../ToneIndicator';
 import { ReadingCardProps } from './types';
 import '@/styles/market-report-global.css';
 import './ReadingCard-styles.css';
 
 /**
- * One macro reading (a stance, the correlations regime, the market-cycle
- * composite): its plain-text label and score, plus an optional in-card
- * disclosure for the details. The label is the pipeline's own word — no colour.
+ * One macro reading (a classification, or the market-cycle composite): the
+ * stored label verbatim and the score, plus an optional in-card disclosure for
+ * the details. A `classified` reading also shows the indicator for its stored
+ * tone — and the no-data one when the section is missing.
  */
 const ReadingCard = ({
     title,
     label,
+    tone,
+    classified = false,
     score,
     asOf,
     description,
@@ -28,13 +32,17 @@ const ReadingCard = ({
         <article className="market-report-tile market-report-reading" aria-label={title} data-testid={testId}>
             <h3 className="market-report-tile__title">{title}</h3>
             {unavailable ? (
-                <p className="market-report-reading__unavailable" data-testid={testId && `${testId}-unavailable`}>
-                    Unavailable
+                <p className="market-report-reading__headline" data-testid={testId && `${testId}-unavailable`}>
+                    {classified && <ToneIndicator tone="no_data" data-testid={testId && `${testId}-tone`} />}
+                    <span className="market-report-reading__unavailable">no data</span>
                 </p>
             ) : (
                 <>
-                    <p className="market-report-reading__label" data-testid={testId && `${testId}-label`}>
-                        {label ?? '—'}
+                    <p className="market-report-reading__headline">
+                        {classified && <ToneIndicator tone={tone} data-testid={testId && `${testId}-tone`} />}
+                        <span className="market-report-reading__label" data-testid={testId && `${testId}-label`}>
+                            {label ?? '—'}
+                        </span>
                     </p>
                     <p className="market-report-muted market-report-small">
                         Score <span className="market-report-mono">{formatNumber(score)}</span>

@@ -10,6 +10,14 @@ usage table in [`docs/design-system/`](../../docs/design-system/README.md).
 (a test enforces it); `src/theme/tokens.ts` turns it into CSS variables
 (`--color-<token>`, fonts, aliases).
 
+Aliases with restricted use (see the design-system README):
+
+- `--color-price-up` / `--color-price-down` — price deltas only
+- `--color-status-ok` / `--color-status-warning` — infrastructure state (Data Source)
+- `--color-status-constructive` / `-neutral` / `-stressed` / `-nodata` (+ `-container`,
+  `on-…-container`) — the Market Report's macro classification indicators, mapped
+  from the backend's stored `tone`. Never price, never stock signals.
+
 Load the mode-independent tokens (spacing, radius, sizes) once at the app root:
 
 ```ts
@@ -34,7 +42,8 @@ Light/dark is applied only by a ThemeProvider: the shell's provider calls
 - `Dialog` – portal modal with `title`, `footer`, `onClose` (Escape / overlay click)
 - `Spinner`, `Skeleton`, `FullSizeSkeleton`
 - `SplitScreen` + `Pane` – two-pane resizable layout (ratio or pixel sizing)
-- Icons – `MenuIcon`, `ArrowLeftIcon`, `CloseIcon`, `ChevronDownIcon`, `LogoutIcon`
+- Icons – `MenuIcon`, `ArrowLeftIcon`, `CloseIcon`, `ChevronDownIcon`, `LogoutIcon`,
+  `CheckCircleIcon`, `MinusCircleIcon`, `AlertTriangleIcon`, `CircleDashedIcon`, …
 - `ThemeProvider` – applies the Stitch light/dark tokens to an MFE subtree
 - `getThemeVariables`, `applyTheme`, `getSystemTheme` – token helpers (for ThemeProviders only)
 - `ErrorBoundary`, `ContentWrapper`, `ContentRenderer`, `MFEDataWrapper`

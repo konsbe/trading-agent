@@ -1,0 +1,445 @@
+{
+  "macro": {
+    "eur_usd": {
+      "value": 1.1464,
+      "as_of": "2099-01-12"
+    },
+    "us10y_pct": {
+      "value": 5.11,
+      "as_of": "2099-01-14"
+    },
+    "vix": {
+      "value": 14.21,
+      "as_of": "2099-01-13"
+    }
+  },
+  "monetary_policy": {
+    "score": 0.4,
+    "label": "neutral",
+    "tone": "neutral",
+    "as_of": "2099-01-15",
+    "stance": {
+      "stance": "neutral",
+      "score": 0.4,
+      "tone": "neutral"
+    },
+    "signals": {
+      "mp_balance_sheet": {
+        "value": 6747.704,
+        "tone": "neutral",
+        "as_of": "2099-01-15",
+        "payload": {
+          "regime": "neutral",
+          "tone": "neutral",
+          "tier": 3,
+          "tier_group": "Liquidity"
+        }
+      },
+      "mp_breakeven_inflation": {
+        "value": 2.33,
+        "tone": "constructive",
+        "as_of": "2099-01-15",
+        "payload": {
+          "regime": "anchored",
+          "tone": "constructive",
+          "tier": 2,
+          "tier_group": "Policy Rate"
+        }
+      },
+      "mp_credit_spread": {
+        "value": 273,
+        "tone": "constructive",
+        "as_of": "2099-01-15",
+        "payload": {
+          "regime": "benign",
+          "tone": "constructive",
+          "tier": 1,
+          "tier_group": "Leading Indicators"
+        }
+      },
+      "mp_m2_supply": {
+        "value": 5.658908412771701,
+        "tone": "neutral",
+        "as_of": "2099-01-15",
+        "payload": {
+          "regime": "normal",
+          "tone": "neutral",
+          "tier": 3,
+          "tier_group": "Liquidity"
+        }
+      },
+      "mp_rate": {
+        "value": 3.63,
+        "tone": "constructive",
+        "as_of": "2099-01-15",
+        "payload": {
+          "regime": "cutting",
+          "tone": "constructive",
+          "tier": 2,
+          "tier_group": "Policy Rate"
+        }
+      },
+      "mp_real_rate": {
+        "value": 2.76,
+        "tone": "stressed",
+        "as_of": "2099-01-15",
+        "payload": {
+          "regime": "headwind",
+          "tone": "stressed",
+          "tier": 1,
+          "tier_group": "Leading Indicators"
+        }
+      },
+      "mp_treasury_yields": {
+        "value": 5.11,
+        "tone": "display_only",
+        "as_of": "2099-01-15",
+        "payload": {
+          "2y_pct": 4.85,
+          "10y_pct": 5.11,
+          "30y_pct": 5.4,
+          "tone": "display_only"
+        }
+      },
+      "mp_yield_curve": {
+        "value": 0.31,
+        "tone": "constructive",
+        "as_of": "2099-01-15",
+        "payload": {
+          "regime": "normal",
+          "tone": "constructive",
+          "tier": 1,
+          "tier_group": "Leading Indicators"
+        }
+      }
+    }
+  },
+  "growth_cycle": {
+    "score": 0.42500000000000004,
+    "label": "expansion",
+    "tone": "constructive",
+    "as_of": "2099-01-15",
+    "stance": {
+      "stance": "expansion",
+      "score": 0.42500000000000004,
+      "tone": "constructive"
+    },
+    "signals": {
+      "gc_capex": {
+        "value": 3.866687778359701,
+        "tone": "constructive",
+        "as_of": "2099-01-15",
+        "payload": {
+          "score": 0.8,
+          "regime": "expanding",
+          "tone": "constructive",
+          "tier": 2,
+          "tier_group": "Activity"
+        }
+      },
+      "gc_claims": {
+        "value": 202250,
+        "tone": "constructive",
+        "as_of": "2099-01-15",
+        "payload": {
+          "score": 0.9,
+          "regime": "tight_labor",
+          "tone": "constructive",
+          "tier": 1,
+          "tier_group": "Leading Indicators"
+        }
+      },
+      "gc_consumer": {
+        "value": 2.5283509946086635,
+        "tone": "stressed",
+        "as_of": "2099-01-15",
+        "payload": {
+          "score": 0,
+          "regime": "slowing",
+          "tone": "stressed",
+          "tier": 3,
+          "tier_group": "Consumer & Housing"
+        }
+      },
+      "gc_consumer_sentiment": {
+        "value": 55.2,
+        "tone": "stressed",
+        "as_of": "2099-01-15",
+        "payload": {
+          "score": 0.3,
+          "regime": "near_bottom",
+          "tone": "stressed",
+          "tier": 3,
+          "tier_group": "Consumer & Housing"
+        }
+      },
+      "gc_employment": {
+        "value": 162,
+        "tone": "neutral",
+        "as_of": "2099-01-15",
+        "payload": {
+          "score": 0.3,
+          "regime": "moderate",
+          "tone": "neutral",
+          "tier": 2,
+          "tier_group": "Activity"
+        }
+      },
+      "gc_gdp": {
+        "value": 1.4836587880023622,
+        "tone": "neutral",
+        "as_of": "2099-01-15",
+        "payload": {
+          "score": 0.3,
+          "regime": "moderate",
+          "tone": "neutral",
+          "tier": 2,
+          "tier_group": "Activity"
+        }
+      },
+      "gc_housing": {
+        "value": 1275,
+        "tone": "neutral",
+        "as_of": "2099-01-08",
+        "payload": {
+          "score": 0.2,
+          "regime": "moderate",
+          "tone": "neutral",
+          "tier": 3,
+          "tier_group": "Consumer & Housing"
+        }
+      },
+      "gc_lei": {
+        "value": 9.059999999999999,
+        "tone": "constructive",
+        "as_of": "2099-01-15",
+        "payload": {
+          "score": 0.8,
+          "regime": "expanding",
+          "tone": "constructive",
+          "tier": 1,
+          "tier_group": "Leading Indicators"
+        }
+      },
+      "gc_pmi": {
+        "value": null,
+        "tone": "no_data",
+        "as_of": "2099-01-15",
+        "payload": {
+          "regime": "no_data",
+          "tone": "no_data",
+          "tier": 1,
+          "tier_group": "Leading Indicators"
+        }
+      }
+    }
+  },
+  "inflation": {
+    "score": 0.525,
+    "label": "hot",
+    "tone": "stressed",
+    "as_of": "2099-01-15",
+    "stance": {
+      "stance": "hot",
+      "score": 0.525,
+      "tone": "stressed"
+    },
+    "signals": {
+      "inf_copper": {
+        "value": 38.60815086638751,
+        "tone": "neutral",
+        "as_of": "2099-01-15",
+        "payload": {
+          "score": 0.8,
+          "regime": "global_expansion",
+          "tone": "neutral",
+          "tier": 3,
+          "tier_group": "Commodities"
+        }
+      },
+      "inf_core_cpi": {
+        "value": 2.7634613395318253,
+        "tone": "neutral",
+        "as_of": "2099-01-15",
+        "payload": {
+          "score": 0.5,
+          "regime": "above_target",
+          "tone": "neutral",
+          "tier": 1,
+          "tier_group": "Core Inflation"
+        }
+      },
+      "inf_core_pce": {
+        "value": 3.3441430040338282,
+        "tone": "stressed",
+        "as_of": "2099-01-15",
+        "payload": {
+          "score": 1,
+          "regime": "aggressive_tightening",
+          "tone": "stressed",
+          "tier": 1,
+          "tier_group": "Core Inflation"
+        }
+      },
+      "inf_cpi": {
+        "value": 3.7129581058388483,
+        "tone": "stressed",
+        "as_of": "2099-01-15",
+        "payload": {
+          "score": 0.3,
+          "regime": "rising",
+          "tone": "stressed",
+          "tier": 2,
+          "tier_group": "Headline & Pipeline"
+        }
+      },
+      "inf_oil": {
+        "value": 96.41,
+        "tone": "stressed",
+        "as_of": "2099-01-15",
+        "payload": {
+          "score": 0.5,
+          "regime": "elevated",
+          "tone": "stressed",
+          "tier": 3,
+          "tier_group": "Commodities"
+        }
+      },
+      "inf_ppi": {
+        "value": 5.444716524159343,
+        "tone": "stressed",
+        "as_of": "2099-01-15",
+        "payload": {
+          "score": 0.6,
+          "regime": "elevated",
+          "margin_signal": "neutral",
+          "tone": "stressed",
+          "tier": 2,
+          "tier_group": "Headline & Pipeline"
+        }
+      },
+      "inf_ppi_cpi_spread": {
+        "value": 1.73,
+        "tone": "neutral",
+        "as_of": "2099-01-15",
+        "payload": {
+          "spread_ppt": 1.73,
+          "margin_signal": "margin_pressure",
+          "tone": "neutral",
+          "tier": 2,
+          "tier_group": "Headline & Pipeline"
+        }
+      },
+      "inf_shelter": {
+        "value": 3.4371085588715378,
+        "tone": "constructive",
+        "as_of": "2099-01-15",
+        "payload": {
+          "regime": "moderating",
+          "tone": "constructive",
+          "tier": 3,
+          "tier_group": "Wages & Shelter"
+        }
+      },
+      "inf_wages": {
+        "value": 3.085745494265435,
+        "tone": "constructive",
+        "as_of": "2099-01-15",
+        "payload": {
+          "score": 0,
+          "regime": "target_consistent",
+          "tone": "constructive",
+          "tier": 3,
+          "tier_group": "Wages & Shelter"
+        }
+      }
+    }
+  },
+  "global_geopolitical": {
+    "score": 0.43,
+    "label": "elevated_stress",
+    "tone": "stressed",
+    "as_of": "2099-01-15",
+    "stance": {
+      "stance": "elevated_stress",
+      "score": 0.43,
+      "tone": "stressed"
+    },
+    "signals": {
+      "gg_broad_dollar": {
+        "value": 119.5133,
+        "tone": "stressed",
+        "as_of": "2099-01-15",
+        "payload": {
+          "score": 1,
+          "regime": "major_global_stress",
+          "tone": "stressed",
+          "tier": 1,
+          "tier_group": "FX & carry"
+        }
+      },
+      "gg_china_gdp": {
+        "value": 3.4667698772531175,
+        "tone": "stressed",
+        "as_of": "2099-01-15",
+        "payload": {
+          "score": 0.35,
+          "regime": "slowing",
+          "tone": "stressed",
+          "tier": 2,
+          "tier_group": "Global Growth"
+        }
+      },
+      "gg_fiscal": {
+        "value": 5.46,
+        "tone": null,
+        "as_of": "2099-01-15",
+        "payload": {
+          "score": 0.4,
+          "regime": "elevated_supply_risk",
+          "tone": null,
+          "tier": 3,
+          "tier_group": "Fiscal"
+        }
+      },
+      "gg_usdjpy": {
+        "value": 156.87,
+        "tone": "constructive",
+        "as_of": "2099-01-15",
+        "payload": {
+          "score": -0.05,
+          "regime": "carry_intact",
+          "tone": "constructive",
+          "tier": 1,
+          "tier_group": "FX & carry"
+        }
+      }
+    }
+  },
+  "macro_correlations_regime": {
+    "score": -0.52,
+    "tone": "stressed",
+    "as_of": "2099-01-15",
+    "payload": {
+      "regime": "global_liquidity_stress",
+      "label": "Elevated global stress with USD or JPY stress — tighter financial conditions for EM and commodities.",
+      "flags": [
+        "real_rates_headwind",
+        "inflation_hot",
+        "usd_strong_em_headwind",
+        "global_stress",
+        "energy_price_pressure"
+      ],
+      "tone": "stressed"
+    }
+  },
+  "market_cycle_composite": {
+    "score": 0.15,
+    "tone": null,
+    "as_of": "2099-01-15",
+    "payload": {
+      "composite_phase": "late_cycle_stretched",
+      "composite_label": "Price extended vs 200DMA with tight macro (policy/inflation) — late-cycle playbook; tighten stops."
+    }
+  }
+}

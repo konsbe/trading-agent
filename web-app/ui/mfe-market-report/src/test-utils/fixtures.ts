@@ -1,3 +1,4 @@
+import globalTones from './market-report-global.FIXTURE.json';
 import liveReport from './market-report-today.live.json';
 import { MarketReport } from '@/api';
 
@@ -12,6 +13,22 @@ export const LIVE_REPORT_JSON: unknown = liveReport;
 export const makeReportBody = (): any => JSON.parse(JSON.stringify(liveReport));
 
 export const makeReport = (): MarketReport => makeReportBody() as MarketReport;
+
+/**
+ * The live body with Section 1 replaced by a FAKE global overview dated 2099:
+ * every classification and signal carries a stored `tone`, `tier` and
+ * `tier_group` (one signal has a null tone, the treasury yields are
+ * `display_only` and untiered, the PPI–CPI spread labels by `margin_signal`).
+ */
+export const makeToneReportBody = (): any => {
+    const body = makeReportBody();
+    body.report_date = '2099-01-15';
+    body.generated_at = '2099-01-15T05:38:37Z';
+    Object.assign(body.global, JSON.parse(JSON.stringify(globalTones)));
+    return body;
+};
+
+export const makeToneReport = (): MarketReport => makeToneReportBody() as MarketReport;
 
 /** Index of an instrument in the live body by key. */
 export const instrumentIndex = (body: any, key: string): number => {

@@ -87,6 +87,7 @@ type instrumentOut struct {
 type stanceSection struct {
 	Score   *float64             `json:"score"`
 	Label   *string              `json:"label"`
+	Tone    *string              `json:"tone"`
 	AsOf    string               `json:"as_of"`
 	Stance  json.RawMessage      `json:"stance"`
 	Signals map[string]signalOut `json:"signals"`
@@ -94,6 +95,7 @@ type stanceSection struct {
 
 type signalOut struct {
 	Value   *float64        `json:"value"`
+	Tone    *string         `json:"tone"`
 	AsOf    string          `json:"as_of"`
 	Payload json.RawMessage `json:"payload"`
 }
@@ -284,27 +286,52 @@ func buildStance(macro map[string]store.MacroRow, prefix, stanceMetric string) a
 	if !ok {
 		return nil
 	}
-	sec := stanceSection{Score: st.Value, AsOf: st.TS.Format(time.DateOnly), Stance: st.Payload, Signals: map[string]signalOut{}}
-	var p struct {
-		Stance string `json:"stance"`
-	}
-	if json.Unmarshal(st.Payload, &p) == nil && p.Stance != "" {
-		sec.Label = &p.Stance
+	sec := stanceSection{
+		Score:   st.Value,
+		Label:   payloadString(st.Payload, "stance"),
+		Tone:    payloadString(st.Payload, "tone"),
+		AsOf:    st.TS.Format(time.DateOnly),
+		Stance:  st.Payload,
+		Signals: map[string]signalOut{},
 	}
 	for name, row := range macro {
 		if strings.HasPrefix(name, prefix) && name != stanceMetric {
-			sec.Signals[name] = signalOut{Value: row.Value, AsOf: row.TS.Format(time.DateOnly), Payload: row.Payload}
+			sec.Signals[name] = signalOut{
+				Value:   row.Value,
+				Tone:    payloadString(row.Payload, "tone"),
+				AsOf:    row.TS.Format(time.DateOnly),
+				Payload: row.Payload,
+			}
 		}
 	}
 	return sec
 }
 
+// macroPayload serves a single macro_derived row. tone is the stored
+// classification tone (macro-analysis internal/macrotone); nil when the row has none.
 func macroPayload(macro map[string]store.MacroRow, metric string) any {
 	row, ok := macro[metric]
 	if !ok {
 		return nil
 	}
-	return map[string]any{"score": row.Value, "as_of": row.TS.Format(time.DateOnly), "payload": row.Payload}
+	return map[string]any{
+		"score":   row.Value,
+		"tone":    payloadString(row.Payload, "tone"),
+		"as_of":   row.TS.Format(time.DateOnly),
+		"payload": row.Payload,
+	}
+}
+
+// payloadString returns a non-empty string field of a JSON payload, else nil.
+func payloadString(payload json.RawMessage, key string) *string {
+	var m map[string]any
+	if json.Unmarshal(payload, &m) != nil {
+		return nil
+	}
+	if v, ok := m[key].(string); ok && v != "" {
+		return &v
+	}
+	return nil
 }
 
 func pick(payload json.RawMessage, key string, ok bool) json.RawMessage {

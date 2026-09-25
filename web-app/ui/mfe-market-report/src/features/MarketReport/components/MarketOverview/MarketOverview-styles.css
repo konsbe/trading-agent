@@ -33,31 +33,9 @@
     gap: var(--space-sm);
 }
 
-.market-report-signals {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-xs);
-    margin: 0;
-    padding: 0;
-    list-style: none;
-}
-
-.market-report-signals__item {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    gap: var(--space-xxs) var(--space-sm);
-    font-size: var(--font-size-sm);
-}
-
-.market-report-signals__name {
-    color: var(--color-on-surface);
-    font-weight: var(--font-weight-medium);
-}
-
-/* Plain text, same colour as the body: a status word, not a signal badge. */
-.market-report-signals__status {
-    color: var(--color-on-surface);
+/* The five classification cards: one row on a wide screen. */
+.market-report-readings--classifications {
+    grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
 }
 
 @media (max-width: 720px) {

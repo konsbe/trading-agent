@@ -1,0 +1,27 @@
+/*
+ * The only status colours on the page, and only inside Section 1 (a guard test
+ * enforces it). One class per stored tone, one token per class.
+ */
+.market-report-tone {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    line-height: 0;
+}
+
+.market-report-tone--constructive {
+    color: var(--color-status-constructive);
+}
+
+.market-report-tone--neutral {
+    color: var(--color-status-neutral);
+}
+
+.market-report-tone--stressed {
+    color: var(--color-status-stressed);
+}
+
+.market-report-tone--nodata {
+    color: var(--color-status-nodata);
+}

@@ -24,8 +24,18 @@ export interface MacroStrip {
     eur_usd: DatedValue | null;
 }
 
+/**
+ * The classification tone macro-analysis stores next to every label
+ * (internal/macrotone). The UI maps it to a colour and never derives one.
+ */
+export type Tone = 'constructive' | 'neutral' | 'stressed' | 'no_data' | 'display_only';
+
+export const TONES: readonly Tone[] = ['constructive', 'neutral', 'stressed', 'no_data', 'display_only'];
+
 export interface MacroSignal {
     value: number | null;
+    /** Null when the row has none (or an unrecognised one): no indicator. */
+    tone: Tone | null;
     as_of: string;
     /** Raw stored payload (any JSON). */
     payload: unknown;
@@ -34,8 +44,9 @@ export interface MacroSignal {
 /** Monetary policy / growth cycle / inflation / global-geopolitical composite. */
 export interface StanceSection {
     score: number | null;
-    /** The stance payload's `stance` string, e.g. "neutral", "hot". */
+    /** The stance payload's `stance` string, e.g. "neutral", "elevated_stress". */
     label: string | null;
+    tone: Tone | null;
     as_of: string;
     /** Raw stance payload (any JSON). */
     stance: unknown;
@@ -46,6 +57,7 @@ export interface StanceSection {
 /** `mc_macro_correlation` / `mc_market_cycle` rows. */
 export interface ScoredPayload {
     score: number | null;
+    tone: Tone | null;
     as_of: string;
     /** Raw payload (any JSON). */
     payload: unknown;

@@ -1,5 +1,5 @@
 import { parseMarketReport } from './parsers';
-import { instrumentIndex, LIVE_REPORT_JSON, makeNoReportBody, makeReportBody } from '@/test-utils/fixtures';
+import { instrumentIndex, LIVE_REPORT_JSON, makeNoReportBody, makeReportBody, makeToneReportBody } from '@/test-utils/fixtures';
 
 const setAt = (root: any, path: string, value: unknown) => {
     const parts = path.match(/[^.[\]]+/g)!;
@@ -195,6 +195,41 @@ describe('parseMarketReport', () => {
     ])('rejects %s', (_label, path, value) => {
         const { body, real } = bodyWith(path, value);
         expect(() => parseMarketReport(body)).toThrow(`at ${real}:`);
+    });
+
+    describe('stored tones', () => {
+        it('keeps every stored tone as-is', () => {
+            const report = parseMarketReport(makeToneReportBody());
+
+            expect(report.global.inflation?.tone).toBe('stressed');
+            expect(report.global.growth_cycle?.signals.gc_pmi.tone).toBe('no_data');
+            expect(report.global.monetary_policy?.signals.mp_treasury_yields.tone).toBe('display_only');
+            expect(report.global.macro_correlations_regime?.tone).toBe('stressed');
+            expect(report.global.global_geopolitical?.signals.gg_fiscal.tone).toBeNull();
+        });
+
+        it.each([
+            ['absent (reports before tones were stored)', undefined],
+            ['null', null],
+            ['an unknown word', 'bullish'],
+        ])('reads a tone that is %s as null', (_label, value) => {
+            const body = makeToneReportBody();
+            setAt(body, 'global.inflation.tone', value);
+            setAt(body, 'global.inflation.signals.inf_cpi.tone', value);
+            setAt(body, 'global.macro_correlations_regime.tone', value);
+
+            const { global } = parseMarketReport(body);
+
+            expect(global.inflation?.tone).toBeNull();
+            expect(global.inflation?.signals.inf_cpi.tone).toBeNull();
+            expect(global.macro_correlations_regime?.tone).toBeNull();
+        });
+
+        it('rejects a tone that is not a string', () => {
+            const body = makeToneReportBody();
+            setAt(body, 'global.growth_cycle.signals.gc_lei.tone', 1);
+            expect(() => parseMarketReport(body)).toThrow('at global.growth_cycle.signals.gc_lei.tone:');
+        });
     });
 
     describe('instrument invariants', () => {

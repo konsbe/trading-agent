@@ -1,10 +1,12 @@
+import { readdirSync, readFileSync } from 'fs';
+import { join, relative } from 'path';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ApiError, MarketReport, toMarketReportError } from '@/api';
 import useMarketReport, { UseMarketReport } from '@/hooks/marketReport/useMarketReport';
 import { HostModeProvider } from '@/providers/HostModeContext';
 import { findAsciiMinus } from '@/test-utils/asciiMinus';
-import { instrumentIndex, makeNoReportBody, makeReport, makeReportBody } from '@/test-utils/fixtures';
+import { instrumentIndex, makeNoReportBody, makeReport, makeReportBody, makeToneReport, makeToneReportBody } from '@/test-utils/fixtures';
 import MarketReportPage from './MarketReportPage';
 
 jest.mock('@/hooks/marketReport/useMarketReport', () => ({ __esModule: true, default: jest.fn() }));
@@ -37,7 +39,30 @@ const richBody = () => {
 };
 
 const PRICE_CLASS = /price-up|price-down|is-price/;
-const COLOUR_CLASS = /price|success|warning|error|danger|badge|bull|bear|status-ok|status-warning|tone/i;
+const COLOUR_CLASS = /price|success|warning|error|danger|badge|bull|bear|status|tone/i;
+/** The one colour class family allowed beyond price, and only inside Section 1. */
+const SECTION1_TONE_CLASS = /^market-report-tone(--(constructive|neutral|stressed|nodata))?$/;
+/** Instrument layout classes that merely contain the word "price" (no colour). */
+const PRICE_LAYOUT_CLASS = /^market-report-instrument__price(-block|-line)?$/;
+
+/** A Section 1 fixture with every disclosure open, plus the richer live states for the rest of the page. */
+const renderEverythingOpen = async () => {
+    const user = userEvent.setup();
+    const body = richBody();
+    Object.assign(body.global, makeToneReportBody().global);
+    const view = renderReport(body);
+    for (const toggle of document.querySelectorAll<HTMLButtonElement>('.market-report-reading__toggle')) {
+        await user.click(toggle);
+    }
+    return view;
+};
+
+const SRC = join(__dirname, '..', '..');
+const sourceFiles = (dir: string, ext: RegExp): string[] =>
+    readdirSync(dir, { withFileTypes: true }).flatMap(entry => {
+        const full = join(dir, entry.name);
+        return entry.isDirectory() ? sourceFiles(full, ext) : ext.test(entry.name) ? [full] : [];
+    });
 
 beforeEach(() => window.sessionStorage.clear());
 
@@ -100,6 +125,8 @@ describe('header', () => {
 });
 
 describe('Section 1 — market overview', () => {
+    const toneOf = (testId: string) => screen.queryByTestId(testId)?.getAttribute('data-tone') ?? null;
+
     it('is always visible and not collapsible', () => {
         renderReport();
         const overview = screen.getByTestId('market-overview');
@@ -108,15 +135,16 @@ describe('Section 1 — market overview', () => {
         expect(within(overview).getByRole('heading', { level: 2 })).toHaveTextContent('Market overview');
     });
 
-    it('shows each strip value with its own as-of date', () => {
-        renderReport();
+    it('shows each strip value with its own as-of date, in plain text', () => {
+        renderReport(makeToneReport());
 
         expect(screen.getByTestId('strip-vix-value').textContent).toBe('14.21');
-        expect(screen.getByTestId('strip-vix-as-of').textContent).toBe('as of Sep 22, 2026');
+        expect(screen.getByTestId('strip-vix-as-of').textContent).toBe('as of Jan 13, 2099');
         expect(screen.getByTestId('strip-us10y_pct-value').textContent).toBe('5.11%');
-        expect(screen.getByTestId('strip-us10y_pct-as-of').textContent).toBe('as of Sep 23, 2026');
+        expect(screen.getByTestId('strip-us10y_pct-as-of').textContent).toBe('as of Jan 14, 2099');
         expect(screen.getByTestId('strip-eur_usd-value').textContent).toBe('1.1464');
-        expect(screen.getByTestId('strip-eur_usd-as-of').textContent).toBe('as of Sep 18, 2026');
+        expect(screen.getByTestId('strip-eur_usd-as-of').textContent).toBe('as of Jan 12, 2099');
+        expect(screen.getByTestId('macro-strip').querySelector('[role="img"], svg')).toBeNull();
     });
 
     it('shows a null strip value as "—" with "no recent observation"', () => {
@@ -128,75 +156,179 @@ describe('Section 1 — market overview', () => {
         expect(screen.getByTestId('strip-eur_usd-as-of').textContent).toBe('no recent observation');
     });
 
-    it('shows each stance label and score, and expands to every signal with a plain-text status', async () => {
-        const user = userEvent.setup();
-        const { report } = { report: makeReport() };
-        renderReport(report);
-        const card = screen.getByTestId('stance-monetary_policy');
+    it('shows the five classification cards with the stored tone, the stored label verbatim and the score', () => {
+        renderReport(makeToneReport());
+        const cards = within(screen.getByTestId('classification-cards')).getAllByRole('article');
 
+        expect(cards.map(c => c.getAttribute('aria-label'))).toEqual([
+            'Monetary Policy',
+            'Growth Cycle',
+            'Inflation',
+            'Global/Geopolitical Stress',
+            'Macro Correlations Regime',
+        ]);
         expect(screen.getByTestId('stance-monetary_policy-label').textContent).toBe('neutral');
-        expect(card).toHaveTextContent('Score 0.40');
-        expect(screen.getByTestId('stance-global_geopolitical-label').textContent).toBe('elevated stress');
-        expect(screen.queryByTestId('signal-mp_yield_curve')).not.toBeInTheDocument();
+        expect(screen.getByTestId('stance-global_geopolitical-label').textContent).toBe('elevated_stress');
+        expect(screen.getByTestId('macro-correlations-label').textContent).toBe('global_liquidity_stress');
+        expect(screen.getByTestId('stance-monetary_policy')).toHaveTextContent('Score 0.40 · as of Jan 15, 2099');
+        expect(screen.getByTestId('macro-correlations')).toHaveTextContent('Score \u22120.52');
 
-        const toggle = screen.getByTestId('stance-monetary_policy-toggle');
+        expect(toneOf('stance-monetary_policy-tone')).toBe('neutral');
+        expect(toneOf('stance-growth_cycle-tone')).toBe('constructive');
+        expect(toneOf('stance-inflation-tone')).toBe('stressed');
+        expect(toneOf('stance-global_geopolitical-tone')).toBe('stressed');
+        expect(toneOf('macro-correlations-tone')).toBe('stressed');
+        expect(within(screen.getByTestId('stance-inflation')).getByRole('img', { name: 'Status: stressed' })).toBeInTheDocument();
+    });
+
+    it('follows the stored tone, not the label: the same label with another tone gets that tone', () => {
+        const body = makeToneReportBody();
+        body.global.inflation.label = 'neutral';
+        body.global.inflation.tone = 'stressed';
+        body.global.growth_cycle.label = 'elevated_stress';
+        body.global.growth_cycle.tone = 'constructive';
+        renderReport(body);
+
+        expect(toneOf('stance-inflation-tone')).toBe('stressed');
+        expect(toneOf('stance-growth_cycle-tone')).toBe('constructive');
+    });
+
+    it('renders no indicator when the stored tone is null or missing (live data today)', () => {
+        const body = makeToneReportBody();
+        body.global.monetary_policy.tone = null;
+        delete body.global.macro_correlations_regime.tone;
+        const { unmount } = renderReport(body);
+
+        expect(screen.queryByTestId('stance-monetary_policy-tone')).not.toBeInTheDocument();
+        expect(screen.queryByTestId('macro-correlations-tone')).not.toBeInTheDocument();
+        expect(screen.getByTestId('stance-monetary_policy-label').textContent).toBe('neutral');
+        unmount();
+
+        renderReport(makeReport());
+        expect(screen.getByTestId('classification-cards').querySelectorAll('.market-report-tone')).toHaveLength(0);
+    });
+
+    it('shows a null section as a gray no-data indicator and plain "no data"', () => {
+        const body = makeToneReportBody();
+        body.global.growth_cycle = null;
+        body.global.macro_correlations_regime = null;
+        renderReport(body);
+
+        expect(screen.getByTestId('stance-growth_cycle-unavailable').textContent).toBe('no data');
+        expect(toneOf('stance-growth_cycle-tone')).toBe('no_data');
+        expect(screen.getByTestId('stance-growth_cycle-tone')).toHaveClass('market-report-tone--nodata');
+        expect(screen.getByTestId('stance-growth_cycle-tone')).toHaveAccessibleName('Status: no data');
+        expect(screen.queryByTestId('stance-growth_cycle-toggle')).not.toBeInTheDocument();
+        expect(toneOf('macro-correlations-tone')).toBe('no_data');
+    });
+
+    it('expands a card (click and keyboard) to its signals grouped by stored tier, headed with the stored tier_group', async () => {
+        const user = userEvent.setup();
+        const report = makeToneReport();
+        renderReport(report);
+        const toggle = screen.getByTestId('stance-inflation-toggle');
         expect(toggle).toHaveAttribute('aria-expanded', 'false');
+        expect(screen.queryByTestId('stance-inflation-signals')).not.toBeInTheDocument();
+
         await user.click(toggle);
         expect(toggle).toHaveAttribute('aria-expanded', 'true');
-
-        const signals = report.global.monetary_policy!.signals;
-        expect(within(card).getAllByRole('listitem')).toHaveLength(Object.keys(signals).length);
-        expect(screen.getByTestId('signal-mp_yield_curve')).toHaveTextContent('Yield curve');
-        expect(screen.getByTestId('signal-mp_yield_curve-status').textContent).toBe('normal');
-        expect(screen.getByTestId('signal-mp_real_rate-status').textContent).toBe('headwind');
-        within(card).getAllByRole('listitem').forEach(li => {
-            li.querySelectorAll('*').forEach(el => expect(el.getAttribute('class') ?? '').not.toMatch(COLOUR_CLASS));
-            expect(li.querySelector('svg')).toBeNull();
-        });
-    });
-
-    it('shows value only when a signal has no status field, and its as-of when it differs', async () => {
-        const user = userEvent.setup();
-        const body = makeReportBody();
-        body.global.inflation.signals.inf_ppi_cpi_spread.as_of = '2026-09-20';
-        renderReport(body);
-
-        await user.click(screen.getByTestId('stance-inflation-toggle'));
-        const spread = screen.getByTestId('signal-inf_ppi_cpi_spread');
-        expect(screen.queryByTestId('signal-inf_ppi_cpi_spread-status')).not.toBeInTheDocument();
-        expect(spread).toHaveTextContent('PPI CPI spread1.73as of Sep 20, 2026');
-        expect(screen.getByTestId('signal-inf_cpi')).not.toHaveTextContent('as of');
-    });
-
-    it('shows a null stance as "Unavailable" inline', () => {
-        const body = makeReportBody();
-        body.global.growth_cycle = null;
-        renderReport(body);
-
-        expect(screen.getByTestId('stance-growth_cycle-unavailable').textContent).toBe('Unavailable');
-        expect(screen.queryByTestId('stance-growth_cycle-toggle')).not.toBeInTheDocument();
-        expect(screen.getByTestId('stance-inflation-label').textContent).toBe('hot');
-    });
-
-    it('shows the correlations regime with its flags on expand, and the market-wide cycle composite', async () => {
-        const user = userEvent.setup();
-        renderReport();
-
-        expect(screen.getByTestId('macro-correlations-label').textContent).toBe('global liquidity stress');
-        expect(screen.getByTestId('macro-correlations')).toHaveTextContent('Score \u22120.52');
-        await user.click(screen.getByTestId('macro-correlations-toggle'));
-        expect(within(screen.getByTestId('macro-correlations-flags')).getAllByRole('listitem').map(li => li.textContent)).toEqual([
-            'real rates headwind',
-            'inflation hot',
-            'USD strong EM headwind',
-            'global stress',
-            'energy price pressure',
+        const details = document.getElementById(toggle.getAttribute('aria-controls')!)!;
+        expect(details).not.toHaveAttribute('hidden');
+        const groups = within(details).getAllByTestId('signal-group');
+        expect(groups.map(g => within(g).getByRole('heading', { level: 4 }).textContent)).toEqual([
+            'Tier 1 · Core Inflation',
+            'Tier 2 · Headline & Pipeline',
+            'Tier 3 · Commodities',
+            'Tier 3 · Wages & Shelter',
         ]);
+        expect(within(groups[0]).getAllByRole('listitem').map(li => li.getAttribute('data-testid'))).toEqual(['signal-inf_core_cpi', 'signal-inf_core_pce']);
+        expect(within(details).getAllByRole('listitem')).toHaveLength(Object.keys(report.global.inflation!.signals).length);
 
+        toggle.focus();
+        await user.keyboard('{Enter}');
+        expect(toggle).toHaveAttribute('aria-expanded', 'false');
+        await user.keyboard(' ');
+        expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    });
+
+    it('shows each signal row with its own tone, name, stored label verbatim, value and as-of', async () => {
+        const user = userEvent.setup();
+        renderReport(makeToneReport());
+        await user.click(screen.getByTestId('stance-growth_cycle-toggle'));
+
+        const claims = screen.getByTestId('signal-gc_claims');
+        expect(toneOf('signal-gc_claims-tone')).toBe('constructive');
+        expect(claims).toHaveTextContent('Claims');
+        expect(screen.getByTestId('signal-gc_claims-label').textContent).toBe('tight_labor');
+        expect(screen.getByTestId('signal-gc_claims-value').textContent).toBe('202,250');
+        expect(claims).toHaveTextContent('as of Jan 15, 2099');
+        expect(screen.getByTestId('signal-gc_housing')).toHaveTextContent('as of Jan 8, 2099');
+        expect(toneOf('signal-gc_pmi-tone')).toBe('no_data');
+        expect(screen.getByTestId('signal-gc_pmi-label').textContent).toBe('no_data');
+        expect(screen.queryByTestId('signal-gc_pmi-value')).not.toBeInTheDocument();
+        expect(toneOf('signal-gc_consumer-tone')).toBe('stressed');
+    });
+
+    it('labels the PPI–CPI spread by its stored margin_signal', async () => {
+        const user = userEvent.setup();
+        renderReport(makeToneReport());
+        await user.click(screen.getByTestId('stance-inflation-toggle'));
+
+        expect(screen.getByTestId('signal-inf_ppi_cpi_spread-label').textContent).toBe('margin_pressure');
+        expect(toneOf('signal-inf_ppi_cpi_spread-tone')).toBe('neutral');
+        expect(screen.getByTestId('signal-inf_ppi_cpi_spread')).toHaveTextContent('PPI CPI spread1.73');
+    });
+
+    it('renders a signal with a null tone without an indicator', async () => {
+        const user = userEvent.setup();
+        renderReport(makeToneReport());
+        await user.click(screen.getByTestId('stance-global_geopolitical-toggle'));
+
+        expect(screen.queryByTestId('signal-gg_fiscal-tone')).not.toBeInTheDocument();
+        expect(screen.getByTestId('signal-gg_fiscal-label').textContent).toBe('elevated_supply_risk');
+    });
+
+    it('shows display_only treasury yields as plain levels, with no indicator and no label, under the untiered heading last', async () => {
+        const user = userEvent.setup();
+        renderReport(makeToneReport());
+        await user.click(screen.getByTestId('stance-monetary_policy-toggle'));
+
+        const row = screen.getByTestId('signal-mp_treasury_yields');
+        expect(screen.getByTestId('signal-mp_treasury_yields-levels').textContent).toBe('2Y 4.85% · 10Y 5.11% · 30Y 5.40%');
+        expect(row.querySelector('.market-report-tone, svg')).toBeNull();
+        expect(screen.queryByTestId('signal-mp_treasury_yields-label')).not.toBeInTheDocument();
+        const groups = within(screen.getByTestId('stance-monetary_policy-signals')).getAllByTestId('signal-group');
+        expect(groups.map(g => g.getAttribute('data-tier'))).toEqual(['1', '2', '3', 'none']);
+        expect(within(groups[3]).getByRole('heading').textContent).toBe('Other signals');
+        expect(within(groups[3]).getByRole('listitem')).toBe(row);
+    });
+
+    it('expands the correlations regime to its stored label and flags in plain text, with no per-flag indicator', async () => {
+        const user = userEvent.setup();
+        renderReport(makeToneReport());
+        const card = screen.getByTestId('macro-correlations');
+
+        await user.click(screen.getByTestId('macro-correlations-toggle'));
+        expect(card).toHaveTextContent('Elevated global stress with USD or JPY stress');
+        const flags = screen.getByTestId('macro-correlations-flags');
+        expect(within(flags).getAllByRole('listitem').map(li => li.textContent)).toEqual([
+            'real_rates_headwind',
+            'inflation_hot',
+            'usd_strong_em_headwind',
+            'global_stress',
+            'energy_price_pressure',
+        ]);
+        expect(flags.querySelector('.market-report-tone, svg')).toBeNull();
+    });
+
+    it('keeps the market-wide cycle composite as a plain reading', () => {
+        renderReport(makeToneReport());
         const composite = screen.getByTestId('market-cycle-composite');
+
         expect(screen.getByTestId('market-cycle-composite-label').textContent).toBe('late cycle stretched');
         expect(composite).toHaveTextContent('Price extended vs 200DMA with tight macro');
         expect(within(composite).queryByRole('button')).not.toBeInTheDocument();
+        expect(composite.querySelector('.market-report-tone')).toBeNull();
     });
 });
 
@@ -438,11 +570,53 @@ describe('guards', () => {
     });
 
     it('never shows an ASCII hyphen before a digit, with every disclosure open', async () => {
-        const user = userEvent.setup();
-        renderReport(richBody());
-        for (const toggle of document.querySelectorAll<HTMLButtonElement>('.market-report-reading__toggle')) {
-            await user.click(toggle);
-        }
+        await renderEverythingOpen();
         expect(findAsciiMinus(screen.getByTestId('market-report-page'))).toEqual([]);
+    });
+
+    it('allows status colour only inside Section 1 (tone classes), and price colour only on change %', async () => {
+        const { container } = await renderEverythingOpen();
+        const overview = screen.getByTestId('market-overview');
+        const offenders: string[] = [];
+
+        container.querySelectorAll('*').forEach(el => {
+            const classes = (el.getAttribute('class') ?? '').split(/\s+/).filter(c => COLOUR_CLASS.test(c));
+            classes.forEach(cls => {
+                const allowed = overview.contains(el)
+                    ? SECTION1_TONE_CLASS.test(cls)
+                    : PRICE_LAYOUT_CLASS.test(cls) || (PRICE_CLASS.test(cls) && el.classList.contains('market-report-instrument__change'));
+                if (!allowed) offenders.push(`${el.tagName.toLowerCase()}.${cls}`);
+            });
+            if (el.hasAttribute('data-tone') && !overview.contains(el)) offenders.push(`${el.tagName.toLowerCase()}[data-tone]`);
+        });
+
+        expect(offenders).toEqual([]);
+        expect(overview.querySelectorAll('[data-tone]').length).toBeGreaterThan(20);
+        container.querySelectorAll('[data-testid="report-view"] > :not([data-testid="market-overview"])').forEach(section => {
+            expect(section.querySelector('.market-report-tone, [data-tone], [role="img"]')).toBeNull();
+        });
+    });
+
+    it('reads the status tokens only in ToneIndicator, the price tokens only in InstrumentCard, and renders ToneIndicator only from Section 1', () => {
+        const css = sourceFiles(SRC, /\.css$/);
+        const using = (token: RegExp) => css.filter(f => token.test(readFileSync(f, 'utf8'))).map(f => relative(SRC, f));
+
+        expect(using(/--color-status-/)).toEqual(['features/MarketReport/components/ToneIndicator/ToneIndicator-styles.css']);
+        expect(using(/--color-price-/)).toEqual(['features/MarketReport/components/InstrumentCard/InstrumentCard-styles.css']);
+
+        const importers = sourceFiles(SRC, /\.tsx?$/)
+            .filter(f => !/\.test\.tsx?$/.test(f) && !f.includes(`${join('components', 'ToneIndicator')}`))
+            .filter(f => /from '\.\.\/ToneIndicator'|ToneIndicator'/.test(readFileSync(f, 'utf8')))
+            .map(f => relative(SRC, f))
+            .sort();
+        expect(importers).toEqual([
+            'features/MarketReport/components/ReadingCard/ReadingCard.tsx',
+            'features/MarketReport/components/SignalGroups/SignalGroups.tsx',
+        ]);
+        // ReadingCard is Section 1's card; it is rendered only by MarketOverview.
+        const readingCardUsers = sourceFiles(SRC, /\.tsx$/)
+            .filter(f => !/\.test\.tsx$/.test(f) && /from '\.\.\/ReadingCard'/.test(readFileSync(f, 'utf8')))
+            .map(f => relative(SRC, f));
+        expect(readingCardUsers).toEqual(['features/MarketReport/components/MarketOverview/MarketOverview.tsx']);
     });
 });

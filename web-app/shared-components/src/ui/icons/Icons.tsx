@@ -81,6 +81,18 @@ export const AlertTriangleIcon = createIcon('AlertTriangleIcon', (
     </>
 ));
 
+export const MinusCircleIcon = createIcon('MinusCircleIcon', (
+    <>
+        <circle cx="12" cy="12" r="9" />
+        <path d="M8 12h8" />
+    </>
+));
+
+/** An empty dashed ring — "nothing to show", e.g. no data. */
+export const CircleDashedIcon = createIcon('CircleDashedIcon', (
+    <circle cx="12" cy="12" r="9" strokeDasharray="3.5 3.5" />
+));
+
 export const MonitorIcon = createIcon('MonitorIcon', (
     <>
         <rect x="2" y="3" width="20" height="14" rx="2" />

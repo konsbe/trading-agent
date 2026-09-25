@@ -1,8 +1,9 @@
-import { DatedValue, GlobalSection, StanceSection } from '@/api';
-import { EMPTY, formatCompactNumber, formatDate, formatNumber } from '../../utils/format';
-import { humanizeCode, humanizeMetric } from '../../utils/humanize';
-import { asObject, signalStatus, str, strings } from '../../utils/payload';
+import { DatedValue, GlobalSection } from '@/api';
+import { EMPTY, formatDate, formatNumber } from '../../utils/format';
+import { humanizeCode } from '../../utils/humanize';
+import { asObject, str, strings } from '../../utils/payload';
 import ReadingCard from '../ReadingCard';
+import SignalGroups from '../SignalGroups';
 import { MarketOverviewProps } from './types';
 import '@/styles/market-report-global.css';
 import './MarketOverview-styles.css';
@@ -32,38 +33,15 @@ const StripValue = ({ label, value, format, testId }: { label: string; value: Da
     </div>
 );
 
-/** Every underlying signal with its own plain-text status; its as-of only when it differs from the card's. */
-const SignalList = ({ stance }: { stance: StanceSection }) => (
-    <ul className="market-report-signals">
-        {Object.entries(stance.signals).map(([key, signal]) => {
-            const status = signalStatus(signal.payload);
-            return (
-                <li key={key} className="market-report-signals__item" data-testid={`signal-${key}`}>
-                    <span className="market-report-signals__name">{humanizeMetric(key)}</span>
-                    {status && (
-                        <span className="market-report-signals__status" data-testid={`signal-${key}-status`}>
-                            {status}
-                        </span>
-                    )}
-                    {signal.value !== null && (
-                        <span className="market-report-muted market-report-mono market-report-small">
-                            {formatCompactNumber(signal.value)}
-                        </span>
-                    )}
-                    {signal.as_of !== stance.as_of && (
-                        <span className="market-report-muted market-report-small">as of {formatDate(signal.as_of)}</span>
-                    )}
-                </li>
-            );
-        })}
-    </ul>
-);
-
-/** Section 1 — market-wide context. Always visible; only the in-card details disclose. */
+/**
+ * Section 1 — market-wide context. Always visible; only the in-card details
+ * disclose. The only section with status colour: each classification's
+ * indicator comes from its stored `tone` (see ToneIndicator).
+ */
 const MarketOverview = ({ global }: MarketOverviewProps) => {
     const correlations = global.macro_correlations_regime;
     const corrPayload = asObject(correlations?.payload);
-    const corrRegime = str(corrPayload, 'regime');
+    const corrLabel = str(corrPayload, 'label');
     const flags = strings(corrPayload, 'flags');
     const cycle = global.market_cycle_composite;
     const cyclePayload = asObject(cycle?.payload);
@@ -81,7 +59,7 @@ const MarketOverview = ({ global }: MarketOverviewProps) => {
                 ))}
             </dl>
 
-            <div className="market-report-readings">
+            <div className="market-report-readings market-report-readings--classifications" data-testid="classification-cards">
                 {STANCES.map(({ key, title }) => {
                     const stance = global[key];
                     const count = stance ? Object.keys(stance.signals).length : 0;
@@ -89,41 +67,47 @@ const MarketOverview = ({ global }: MarketOverviewProps) => {
                         <ReadingCard
                             key={key}
                             title={title}
+                            classified
                             unavailable={!stance}
-                            label={stance?.label ? humanizeCode(stance.label) : null}
+                            label={stance?.label}
+                            tone={stance?.tone}
                             score={stance?.score}
                             asOf={stance?.as_of}
                             detailsLabel={`Signals (${count})`}
                             data-testid={`stance-${key}`}
                         >
-                            {stance && count > 0 ? <SignalList stance={stance} /> : undefined}
+                            {stance && count > 0 ? <SignalGroups signals={stance.signals} data-testid={`stance-${key}-signals`} /> : undefined}
                         </ReadingCard>
                     );
                 })}
 
                 <ReadingCard
-                    title="Macro correlations regime"
+                    title="Macro Correlations Regime"
+                    classified
                     unavailable={!correlations}
-                    label={corrRegime ? humanizeCode(corrRegime) : null}
+                    label={str(corrPayload, 'regime')}
+                    tone={correlations?.tone}
                     score={correlations?.score}
                     asOf={correlations?.as_of}
-                    detailsLabel={`Flags (${flags.length})`}
+                    detailsLabel={`Details (${flags.length} flags)`}
                     data-testid="macro-correlations"
                 >
-                    {correlations && (flags.length > 0 || str(corrPayload, 'label')) ? (
+                    {correlations && (flags.length > 0 || corrLabel) ? (
                         <>
-                            {str(corrPayload, 'label') && <p className="market-report-reading__description">{str(corrPayload, 'label')}</p>}
+                            {corrLabel && <p className="market-report-reading__description">{corrLabel}</p>}
                             {flags.length > 0 && (
-                                <ul className="market-report-list" data-testid="macro-correlations-flags">
+                                <ul className="market-report-list market-report-mono market-report-small" data-testid="macro-correlations-flags">
                                     {flags.map(flag => (
-                                        <li key={flag}>{humanizeCode(flag)}</li>
+                                        <li key={flag}>{flag}</li>
                                     ))}
                                 </ul>
                             )}
                         </>
                     ) : undefined}
                 </ReadingCard>
+            </div>
 
+            <div className="market-report-readings">
                 <ReadingCard
                     title="Market cycle (market-wide)"
                     unavailable={!cycle}

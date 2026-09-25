@@ -69,6 +69,21 @@ this and defines no dedicated tokens, so these are aliases (decision 2026-09-24)
 page's overall indicator: a pill with a dot and an icon), never for a stock or a
 verdict, and never in place of the price aliases.
 
+**Macro classification status colours** (Daily Market Report, Section 1 only) —
+each with `-container` / `on-…-container`:
+
+| Variable | Alias | Backend `tone` | Icon shape |
+|----------|-------|----------------|------------|
+| `--color-status-constructive` | `secondary` (green) | `constructive` | check circle |
+| `--color-status-neutral` | `tertiary` (amber — Stitch's yellow) | `neutral` | minus circle |
+| `--color-status-stressed` | `error` (red) | `stressed` | alert triangle |
+| `--color-status-nodata` | `outline` (gray); container `surface-container-high` / `on-surface-variant` | `no_data` | dashed circle |
+
+The frontend maps the stored `tone` to a token and nothing else: no label or
+threshold logic, and a null / `display_only` tone gets no indicator. Always pair
+the colour with its icon shape and an accessible name ("Status: stressed").
+Never use these for price or a stock signal.
+
 Hover/pressed states are state layers over the base colour, not new tokens:
 
 ```css

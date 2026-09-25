@@ -1,6 +1,8 @@
 import { EMPTY, formatCompactNumber, formatDate, formatDateTime, formatNumber, formatPercent, formatSignedPercent, formatTime } from './format';
 import { humanizeCode, humanizeMetric, humanizePair } from './humanize';
-import { asObject, num, signalStatus, str, strings } from './payload';
+import { MacroSignal } from '@/api';
+import { asObject, num, signalLabel, str, strings, yieldLevels } from './payload';
+import { groupSignalsByTier } from './signals';
 
 describe('format', () => {
     it('formats dates as calendar dates and nulls as an em dash', () => {
@@ -51,17 +53,27 @@ describe('humanize', () => {
     });
 });
 
+const signal = (payload: unknown, tone: MacroSignal['tone'] = null): MacroSignal => ({ value: 1, tone, as_of: '2099-01-15', payload });
+
 describe('payload', () => {
-    it('reads the regime-like field, in order, and never invents one', () => {
-        expect(signalStatus({ regime: 'tight_labor', stance: 'x' })).toBe('tight labor');
-        expect(signalStatus({ stance: 'hot' })).toBe('hot');
-        expect(signalStatus({ status: 'ok' })).toBe('ok');
-        expect(signalStatus({ label: 'calm' })).toBe('calm');
-        expect(signalStatus({ copper_regime: 'global_expansion' })).toBe('global expansion');
-        expect(signalStatus({ spread_ppt: 1.73 })).toBeNull();
-        expect(signalStatus({ regime: '' })).toBeNull();
-        expect(signalStatus('elevated')).toBeNull();
-        expect(signalStatus(null)).toBeNull();
+    it('reads a signal label verbatim: the stored regime, else the stored margin_signal, never invented', () => {
+        expect(signalLabel({ regime: 'tight_labor', stance: 'x' })).toBe('tight_labor');
+        expect(signalLabel({ margin_signal: 'margin_pressure', spread_ppt: 1.73 })).toBe('margin_pressure');
+        expect(signalLabel({ regime: 'elevated', margin_signal: 'neutral' })).toBe('elevated');
+        expect(signalLabel({ stance: 'hot', status: 'ok', label: 'calm', copper_regime: 'global_expansion' })).toBeNull();
+        expect(signalLabel({ spread_ppt: 1.73 })).toBeNull();
+        expect(signalLabel({ regime: '' })).toBeNull();
+        expect(signalLabel('elevated')).toBeNull();
+        expect(signalLabel(null)).toBeNull();
+    });
+
+    it('reads display-only yield levels by tenor', () => {
+        expect(yieldLevels({ '30y_pct': 5.4, '2y_pct': 4.85, '10y_pct': 5.11, note: 'x', '5y_pct': 'n/a' })).toEqual([
+            { tenor: '2Y', value: 4.85 },
+            { tenor: '10Y', value: 5.11 },
+            { tenor: '30Y', value: 5.4 },
+        ]);
+        expect(yieldLevels(null)).toEqual([]);
     });
 
     it('reads fields defensively', () => {
@@ -73,5 +85,43 @@ describe('payload', () => {
         expect(num(obj, 'a')).toBeNull();
         expect(strings(obj, 'f')).toEqual(['p', 'q']);
         expect(strings(obj, 'a')).toEqual([]);
+    });
+});
+
+describe('groupSignalsByTier', () => {
+    it('orders tier 1, 2, 3 by the stored tier (not payload order), headed by the stored tier_group, untiered last', () => {
+        const groups = groupSignalsByTier({
+            a_untiered: signal({ regime: 'x' }),
+            b_t3: signal({ tier: 3, tier_group: 'Liquidity' }),
+            c_t1: signal({ tier: 1, tier_group: 'Leading Indicators' }),
+            d_t2: signal({ tier: 2, tier_group: 'FX & carry' }),
+            e_t1: signal({ tier: 1, tier_group: 'Leading Indicators' }),
+            f_bad_tier: signal({ tier: 'one', tier_group: 'Nope' }),
+        });
+
+        expect(groups.map(g => [g.tier, g.group, g.signals.map(([name]) => name)])).toEqual([
+            [1, 'Leading Indicators', ['c_t1', 'e_t1']],
+            [2, 'FX & carry', ['d_t2']],
+            [3, 'Liquidity', ['b_t3']],
+            [null, null, ['a_untiered', 'f_bad_tier']],
+        ]);
+    });
+
+    it('keeps two stored groups within one tier apart, and a tier without a group', () => {
+        const groups = groupSignalsByTier({
+            oil: signal({ tier: 3, tier_group: 'Commodities' }),
+            wages: signal({ tier: 3, tier_group: 'Wages & Shelter' }),
+            copper: signal({ tier: 3, tier_group: 'Commodities' }),
+            lone: signal({ tier: 2 }),
+        });
+        expect(groups.map(g => [g.tier, g.group, g.signals.length])).toEqual([
+            [2, null, 1],
+            [3, 'Commodities', 2],
+            [3, 'Wages & Shelter', 1],
+        ]);
+    });
+
+    it('returns no groups for no signals', () => {
+        expect(groupSignalsByTier({})).toEqual([]);
     });
 });

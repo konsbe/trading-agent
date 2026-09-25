@@ -93,6 +93,7 @@ import (
 	"github.com/konsbe/trading-agent/services/data-analyzer/internal/db"
 	"github.com/konsbe/trading-agent/services/data-analyzer/internal/logx"
 	"github.com/konsbe/trading-agent/services/data-analyzer/internal/macrocorr"
+	"github.com/konsbe/trading-agent/services/data-analyzer/internal/macrotone"
 	"github.com/konsbe/trading-agent/services/data-analyzer/internal/marketcycle"
 	"github.com/konsbe/trading-agent/services/data-analyzer/internal/store"
 )
@@ -201,6 +202,9 @@ func (w *worker) analyzeMonetary(ctx context.Context) {
 	ptr := func(v float64) *float64 { return &v }
 
 	upsert := func(metric string, value *float64, payload any) {
+		if !macrotone.Annotate(metric, payload) {
+			w.log.Warn("macro tone missing for classification", "metric", metric)
+		}
 		if err := store.UpsertMacroDerived(ctx, w.pool, ts, metric, value, payload); err != nil {
 			w.log.Error("upsert macro derived", "metric", metric, "err", err)
 		}
@@ -618,6 +622,9 @@ func (w *worker) analyzeGrowth(ctx context.Context) {
 	ptr := func(v float64) *float64 { return &v }
 
 	upsert := func(metric string, value *float64, payload any) {
+		if !macrotone.Annotate(metric, payload) {
+			w.log.Warn("macro tone missing for classification", "metric", metric)
+		}
 		if err := store.UpsertMacroDerived(ctx, w.pool, ts, metric, value, payload); err != nil {
 			w.log.Error("upsert growth derived", "metric", metric, "err", err)
 		}
@@ -1167,6 +1174,9 @@ func (w *worker) analyzeInflation(ctx context.Context) {
 	ptr := func(v float64) *float64 { return &v }
 
 	upsert := func(metric string, value *float64, payload any) {
+		if !macrotone.Annotate(metric, payload) {
+			w.log.Warn("macro tone missing for classification", "metric", metric)
+		}
 		if err := store.UpsertMacroDerived(ctx, w.pool, ts, metric, value, payload); err != nil {
 			w.log.Error("upsert inflation derived", "metric", metric, "err", err)
 		}
@@ -1378,6 +1388,7 @@ func (w *worker) analyzeInflation(ctx context.Context) {
 	ppiRegime := "no_data"
 	var ppiScore float64
 	var ppiCPISpread *float64
+	var ppiMarginSignal string
 	if ppiFidYoy, ok := yoyPct("PPIFID"); ok {
 		switch {
 		case ppiFidYoy >= ic.PPISurge:
@@ -1409,12 +1420,13 @@ func (w *worker) analyzeInflation(ctx context.Context) {
 			ppiCPISpread = ptr(math.Round(spread*100) / 100)
 			payload["ppi_cpi_spread"] = *ppiCPISpread
 			if spread >= ic.PPICPISpreadWarn {
-				payload["margin_signal"] = "margin_pressure"
+				ppiMarginSignal = "margin_pressure"
 			} else if spread <= -ic.PPICPISpreadWarn {
-				payload["margin_signal"] = "margin_expansion"
+				ppiMarginSignal = "margin_expansion"
 			} else {
-				payload["margin_signal"] = "neutral"
+				ppiMarginSignal = "neutral"
 			}
+			payload["margin_signal"] = ppiMarginSignal
 		}
 		// All-commodities PPI for breadth context.
 		if ppiacoYoy, ok2 := yoyPct("PPIACO"); ok2 {
@@ -1614,6 +1626,7 @@ func (w *worker) analyzeInflation(ctx context.Context) {
 		upsert("inf_ppi_cpi_spread", ppiCPISpread, map[string]any{
 			"spread_ppt":     *ppiCPISpread,
 			"warning_thresh": ic.PPICPISpreadWarn,
+			"margin_signal":  ppiMarginSignal,
 		})
 	}
 
@@ -1644,6 +1657,9 @@ func (w *worker) analyzeGlobal(ctx context.Context) {
 	ptr := func(v float64) *float64 { return &v }
 
 	upsert := func(metric string, value *float64, payload any) {
+		if !macrotone.Annotate(metric, payload) {
+			w.log.Warn("macro tone missing for classification", "metric", metric)
+		}
 		if err := store.UpsertMacroDerived(ctx, w.pool, ts, metric, value, payload); err != nil {
 			w.log.Error("upsert global derived", "metric", metric, "err", err)
 		}
@@ -1892,6 +1908,9 @@ func (w *worker) analyzeMarketCycles(ctx context.Context) {
 	cfg := w.cycleCfg
 	ptr := func(v float64) *float64 { return &v }
 	upsert := func(metric string, value *float64, payload any) {
+		if !macrotone.Annotate(metric, payload) {
+			w.log.Warn("macro tone missing for classification", "metric", metric)
+		}
 		if err := store.UpsertMacroDerived(ctx, w.pool, ts, metric, value, payload); err != nil {
 			w.log.Error("upsert macro derived", "metric", metric, "err", err)
 		}
@@ -1970,6 +1989,9 @@ func (w *worker) analyzeMacroCorrelations(ctx context.Context) {
 	ts := time.Now().UTC()
 	ptr := func(v float64) *float64 { return &v }
 	upsert := func(metric string, value *float64, payload any) {
+		if !macrotone.Annotate(metric, payload) {
+			w.log.Warn("macro tone missing for classification", "metric", metric)
+		}
 		if err := store.UpsertMacroDerived(ctx, w.pool, ts, metric, value, payload); err != nil {
 			w.log.Error("upsert macro derived", "metric", metric, "err", err)
 		}
@@ -2029,6 +2051,9 @@ func (w *worker) analyzeAdditionalReference(ctx context.Context) {
 	}
 	ts := time.Now().UTC()
 	upsert := func(metric string, value *float64, payload any) {
+		if !macrotone.Annotate(metric, payload) {
+			w.log.Warn("macro tone missing for classification", "metric", metric)
+		}
 		if err := store.UpsertMacroDerived(ctx, w.pool, ts, metric, value, payload); err != nil {
 			w.log.Error("upsert macro derived", "metric", metric, "err", err)
 		}

@@ -1,12 +1,18 @@
+.market-report-reading__headline {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    min-width: 0;
+}
+
+/* The stored label verbatim (e.g. `elevated_stress`), so no case transform. */
 .market-report-reading__label {
+    min-width: 0;
+    overflow-wrap: anywhere;
     color: var(--color-on-surface);
     font-family: var(--font-family-headline);
     font-size: var(--font-size-lg);
     font-weight: var(--font-weight-bold);
-}
-
-.market-report-reading__label::first-letter {
-    text-transform: uppercase;
 }
 
 .market-report-reading__unavailable {

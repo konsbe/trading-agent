@@ -47,6 +47,31 @@ describe('design tokens', () => {
         expect(getThemeVariables('light')['--color-primary']).toBe('#0284c7');
     });
 
+    it.each(['light', 'dark'] as const)('aliases the macro classification status tokens onto Stitch colours (%s)', mode => {
+        const vars = getThemeVariables(mode);
+
+        expect(vars['--color-status-constructive']).toBe(vars['--color-secondary']);
+        expect(vars['--color-status-constructive-container']).toBe(vars['--color-secondary-container']);
+        expect(vars['--color-on-status-constructive-container']).toBe(vars['--color-on-secondary-container']);
+        expect(vars['--color-status-neutral']).toBe(vars['--color-tertiary']);
+        expect(vars['--color-status-neutral-container']).toBe(vars['--color-tertiary-container']);
+        expect(vars['--color-on-status-neutral-container']).toBe(vars['--color-on-tertiary-container']);
+        expect(vars['--color-status-stressed']).toBe(vars['--color-error']);
+        expect(vars['--color-status-stressed-container']).toBe(vars['--color-error-container']);
+        expect(vars['--color-on-status-stressed-container']).toBe(vars['--color-on-error-container']);
+        expect(vars['--color-status-nodata']).toBe(vars['--color-outline']);
+        expect(vars['--color-status-nodata-container']).toBe(vars['--color-surface-container-high']);
+        expect(vars['--color-on-status-nodata-container']).toBe(vars['--color-on-surface-variant']);
+    });
+
+    it('keeps the four classification colours distinct from each other in both themes', () => {
+        (['light', 'dark'] as const).forEach(mode => {
+            const vars = getThemeVariables(mode);
+            const values = ['constructive', 'neutral', 'stressed', 'nodata'].map(t => vars[`--color-status-${t}`]);
+            expect(new Set(values).size).toBe(4);
+        });
+    });
+
     it('applyTheme writes variables, data-theme and color-scheme to the element', () => {
         const element = document.createElement('div');
 

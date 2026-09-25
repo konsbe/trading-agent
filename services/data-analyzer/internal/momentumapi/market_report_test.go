@@ -28,10 +28,10 @@ func reportFixture() store.MarketReportInputs {
 	}
 	return store.MarketReportInputs{
 		Macro: map[string]store.MacroRow{
-			"mp_stance":            row("mp_stance", 0.4, `{"stance":"neutral","score":"0.40"}`),
-			"mp_yield_curve":       row("mp_yield_curve", 0.31, `{"regime":"normal"}`),
+			"mp_stance":            row("mp_stance", 0.4, `{"stance":"neutral","score":"0.40","tone":"neutral"}`),
+			"mp_yield_curve":       row("mp_yield_curve", 0.31, `{"regime":"normal","tone":"neutral"}`),
 			"gc_stance":            row("gc_stance", 0.425, `{"stance":"expansion"}`),
-			"mc_macro_correlation": row("mc_macro_correlation", -0.52, `{"regime":"global_liquidity_stress","flags":["inflation_hot"]}`),
+			"mc_macro_correlation": row("mc_macro_correlation", -0.52, `{"regime":"global_liquidity_stress","flags":["inflation_hot"],"tone":"stressed"}`),
 			"mc_market_cycle":      row("mc_market_cycle", 0.15, `{"symbol":"SPY","composite_phase":"late_cycle_stretched"}`),
 			"aa_reference_snapshot": row("aa_reference_snapshot", 0,
 				`{"seasonality":{"month":9,"bias":"weak_bear"},"presidential_cycle":{"cycle_year":2},"intermarket":{"bond_equity_60d":{"rho":-0.53}},"reference_modules":`+automationStatus+`}`),
@@ -195,6 +195,23 @@ func TestMarketReport_GlobalSectionsAndFreshness(t *testing.T) {
 	empty := reportBody(t, store.MarketReportInputs{}, reportNow)
 	if empty["report_date"] != nil || empty["is_stale"] != true || len(empty["instruments"].([]any)) != len(fixedInstruments) {
 		t.Errorf("no report generated yet: %v", empty)
+	}
+}
+
+func TestMarketReport_StoredTonePassesThrough(t *testing.T) {
+	g := reportBody(t, reportFixture(), reportNow)["global"].(map[string]any)
+	mp := g["monetary_policy"].(map[string]any)
+	if mp["tone"] != "neutral" {
+		t.Errorf("stance tone = %v", mp["tone"])
+	}
+	if yc := mp["signals"].(map[string]any)["mp_yield_curve"].(map[string]any); yc["tone"] != "neutral" {
+		t.Errorf("signal tone = %v", yc["tone"])
+	}
+	if gc := g["growth_cycle"].(map[string]any); gc["tone"] != nil {
+		t.Errorf("a stance stored without a tone must serve null, not a derived one; got %v", gc["tone"])
+	}
+	if corr := g["macro_correlations_regime"].(map[string]any); corr["tone"] != "stressed" {
+		t.Errorf("correlation tone = %v", corr["tone"])
 	}
 }
 
