@@ -41,7 +41,7 @@ export const buildContextCells = (c: ContextVsBenchmark): FactCell[] => [
 const ContextSection = ({ context }: ContextSectionProps) => (
     <CollapsibleCard
         id="scanner-analysis-context"
-        persistKey="mfe-scanner.detail.context"
+        persistKey="scanner.detail.context"
         data-testid="analysis-context"
         title="Context vs benchmark"
     >

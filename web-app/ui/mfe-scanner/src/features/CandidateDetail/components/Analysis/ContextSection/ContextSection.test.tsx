@@ -51,10 +51,10 @@ describe('ContextSection', () => {
         expect(within(screen.getByTestId('analysis-context')).queryAllByTestId(/severity/)).toHaveLength(0);
     });
 
-    it('persists its collapsed state under mfe-scanner.detail.context', async () => {
+    it('persists its collapsed state under scanner.detail.context', async () => {
         render(<ContextSection context={makeAnalysis().context_vs_benchmark} />);
 
         await userEvent.click(screen.getByRole('button', { name: 'Context vs benchmark' }));
-        expect(window.sessionStorage.getItem('ta-collapsible:mfe-scanner.detail.context')).toBe('false');
+        expect(window.sessionStorage.getItem('ta-collapsible:scanner.detail.context')).toBe('false');
     });
 });

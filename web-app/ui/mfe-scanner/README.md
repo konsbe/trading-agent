@@ -65,9 +65,9 @@ From `GET /api/v1/scanner/today/{symbol}/analysis`
 3. **Balance sheet** (`balance-sheet`) — composite line, ROE/ROA/ROIC, ratios.
 4. **Correlations** (`correlations`) — composite, cluster health, master signal, aligned/divergent sentences.
 5. **Sentiment & news** (`news`) — title + source + link only.
-6. **Qualitative signals** (`mfe-scanner.detail.qualitative`) — moat proxy, insider
+6. **Qualitative signals** (`scanner.detail.qualitative`) — moat proxy, insider
    activity, news sentiment 7d/30d, R&D intensity; tiers as plain-text bands.
-7. **Context vs benchmark** (`mfe-scanner.detail.context`) — benchmark, market-cycle
+7. **Context vs benchmark** (`scanner.detail.context`) — benchmark, market-cycle
    composite and macro correlations regime (stored label verbatim plus the Daily
    Market Report's tone icon, `--color-status-*`), price phase, drawdown from
    peak, relative strength (always "—" today: not stored).

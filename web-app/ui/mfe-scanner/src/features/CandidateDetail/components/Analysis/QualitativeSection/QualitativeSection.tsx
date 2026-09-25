@@ -32,7 +32,7 @@ export const buildQualitativeCells = (q: QualitativeAnalysis): FactCell[] => [
 const QualitativeSection = ({ qualitative }: QualitativeSectionProps) => (
     <CollapsibleCard
         id="scanner-analysis-qualitative"
-        persistKey="mfe-scanner.detail.qualitative"
+        persistKey="scanner.detail.qualitative"
         data-testid="analysis-qualitative"
         title="Qualitative signals"
     >

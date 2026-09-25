@@ -34,10 +34,10 @@ describe('QualitativeSection', () => {
         expect(within(screen.getByTestId('analysis-qualitative')).queryAllByTestId(/severity/)).toHaveLength(0);
     });
 
-    it('persists its collapsed state under mfe-scanner.detail.qualitative', async () => {
+    it('persists its collapsed state under scanner.detail.qualitative', async () => {
         render(<QualitativeSection qualitative={makeAnalysis().qualitative} />);
 
         await userEvent.click(screen.getByRole('button', { name: 'Qualitative signals' }));
-        expect(window.sessionStorage.getItem('ta-collapsible:mfe-scanner.detail.qualitative')).toBe('false');
+        expect(window.sessionStorage.getItem('ta-collapsible:scanner.detail.qualitative')).toBe('false');
     });
 });
