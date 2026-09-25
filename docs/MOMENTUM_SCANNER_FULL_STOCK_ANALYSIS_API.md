@@ -219,6 +219,11 @@ actual repo state confirmed in step 1:
 > validated nor refuted. Treat them as descriptive pattern-matching, not
 > a tested strategy."
 
+**Superseded 2026-09-25:** the heuristic signals were since tested
+(`docs/HEURISTIC_SIGNALS_PREREGISTRATION.md` §7, no hypothesis confirmed), and
+the caveat now cites that result. The live text is `heuristic_ta_caveat` in
+`shared/content/momentum_caveats.json`; the suggestion above is historical.
+
 This is deliberately worded differently from `RESEARCH_SCORE_CAVEAT`,
 which cites a specific measured null result (MH OR 0.991). Don't merge
 the two — they're making different claims and conflating them would
