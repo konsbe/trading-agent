@@ -15,6 +15,7 @@ build:
 	go build -o $(BIN)/momentum-scanner ./cmd/momentum-scanner
 	go build -o $(BIN)/momentum-tracker ./cmd/momentum-tracker
 	go build -o $(BIN)/momentum-daily ./cmd/momentum-daily
+	go build -o $(BIN)/heuristics-replay ./cmd/heuristics-replay
 
 docker-build:
 	docker build -t trading-agent/data-analyzer:latest .
