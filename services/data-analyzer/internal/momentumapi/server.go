@@ -10,6 +10,7 @@ import (
 
 	"github.com/konsbe/trading-agent/services/data-analyzer/internal/momentum"
 	"github.com/konsbe/trading-agent/services/data-analyzer/internal/store"
+	"github.com/konsbe/trading-agent/services/data-analyzer/internal/technical"
 )
 
 // Store is the read surface the handlers need. The production implementation
@@ -35,6 +36,8 @@ type Store interface {
 	MarketReport(ctx context.Context, fixed []store.InstrumentRef, earningsSymbols, fredSeries []string, now time.Time) (store.MarketReportInputs, error)
 	TrackedPositions(ctx context.Context, status store.TrackedStatusFilter, latestScan *time.Time) ([]store.TrackedPositionRow, error)
 	TrackedCounts(ctx context.Context) (store.TrackedCounts, error)
+	AnalysisFreshness(ctx context.Context, symbol string) (store.AnalysisFreshness, error)
+	Analysis(ctx context.Context, symbol string) (store.AnalysisInputs, error)
 	Ping(ctx context.Context) error
 }
 
@@ -101,6 +104,12 @@ func (s DBStore) TrackedPositions(ctx context.Context, st store.TrackedStatusFil
 func (s DBStore) TrackedCounts(ctx context.Context) (store.TrackedCounts, error) {
 	return store.GetTrackedCounts(ctx, s.Q)
 }
+func (s DBStore) AnalysisFreshness(ctx context.Context, sym string) (store.AnalysisFreshness, error) {
+	return store.AnalysisFreshnessFor(ctx, s.Q, sym, AnalysisInterval)
+}
+func (s DBStore) Analysis(ctx context.Context, sym string) (store.AnalysisInputs, error) {
+	return store.LoadAnalysis(ctx, s.Q, sym, AnalysisInterval, analysisHeadlines)
+}
 func (s DBStore) Ping(ctx context.Context) error { return s.PingFn(ctx) }
 
 // Buckets always present in /today, even when empty: zero candidates is the
@@ -141,6 +150,26 @@ type Config struct {
 	// geopolitical-risk index is never ingested.
 	GPRSourceConfigured bool
 
+	// Full stock analysis (GET /today/{symbol}/analysis). AnalysisNames are the
+	// stored indicator names (technical.NamesFor the worker's config).
+	// AnalysisCompute runs the workers' per-symbol code for a symbol whose
+	// stored analysis is missing or out of date; nil disables on-demand
+	// computation (stored rows are served as they are).
+	AnalysisNames   technical.Names
+	AnalysisCompute AnalysisComputer
+	// AnalysisConcurrency bounds simultaneous computations (default 2);
+	// AnalysisTimeout bounds each, queueing included (default 2m).
+	AnalysisConcurrency int
+	AnalysisTimeout     time.Duration
+	// AnalysisRetryAfter is the poll interval suggested with "computing"
+	// (default 3s); AnalysisFailedRetryAfter how long a failure is reported
+	// before a request starts a new attempt (default 1m).
+	AnalysisRetryAfter       time.Duration
+	AnalysisFailedRetryAfter time.Duration
+	// FundamentalsMaxAge is how old derived fundamentals may be before they are
+	// recomputed (default 26h: the worker's 24h cadence plus slack).
+	FundamentalsMaxAge time.Duration
+
 	// Now is injectable for tests; defaults to time.Now.
 	Now func() time.Time
 }
@@ -149,6 +178,7 @@ type Server struct {
 	cfg         Config
 	cache       *responseCache
 	statusCache *responseCache
+	analysis    *analysisJobs
 }
 
 func NewServer(cfg Config) *Server {
@@ -173,8 +203,27 @@ func NewServer(cfg Config) *Server {
 	if cfg.MarketReportCacheTTL <= 0 {
 		cfg.MarketReportCacheTTL = time.Hour
 	}
-	return &Server{cfg: cfg, cache: newResponseCache(cfg.CacheTTL, cfg.Now),
+	if cfg.AnalysisConcurrency <= 0 {
+		cfg.AnalysisConcurrency = 2
+	}
+	if cfg.AnalysisTimeout <= 0 {
+		cfg.AnalysisTimeout = 2 * time.Minute
+	}
+	if cfg.AnalysisRetryAfter <= 0 {
+		cfg.AnalysisRetryAfter = 3 * time.Second
+	}
+	if cfg.AnalysisFailedRetryAfter <= 0 {
+		cfg.AnalysisFailedRetryAfter = time.Minute
+	}
+	if cfg.FundamentalsMaxAge <= 0 {
+		cfg.FundamentalsMaxAge = 26 * time.Hour
+	}
+	srv := &Server{cfg: cfg, cache: newResponseCache(cfg.CacheTTL, cfg.Now),
 		statusCache: newResponseCache(cfg.StatusCacheTTL, cfg.Now)}
+	if cfg.AnalysisCompute != nil {
+		srv.analysis = newAnalysisJobs(cfg.AnalysisCompute, cfg.AnalysisConcurrency, cfg.AnalysisTimeout, cfg.Now, cfg.Log)
+	}
+	return srv
 }
 
 // Handler returns the HTTP routes wrapped in CORS handling.
@@ -183,6 +232,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /healthz", s.handleHealth)
 	mux.HandleFunc("GET /api/v1/scanner/today", s.handleToday)
 	mux.HandleFunc("GET /api/v1/scanner/today/{symbol}", s.handleDetail)
+	mux.HandleFunc("GET /api/v1/scanner/today/{symbol}/analysis", s.handleAnalysis)
 	mux.HandleFunc("GET /api/v1/scanner/symbols/{symbol}/bars", s.handleBars)
 	mux.HandleFunc("GET /api/v1/scanner/tracked", s.handleTracked)
 	mux.HandleFunc("GET /api/v1/watchlist", s.handleWatchlistList)

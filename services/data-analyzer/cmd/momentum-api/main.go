@@ -1,8 +1,12 @@
 // Command momentum-api serves the momentum scanner's persisted output to the
 // web app: docs/MOMENTUM_SCANNER_API.md.
 //
-// Read-only. It computes nothing — no gates, no scoring, no features — and
-// never writes. Everything served is what momentum-scanner already stored.
+// It computes nothing of its own — no gates, no scoring, no features. It
+// writes in two places only: the watchlist, and the full stock analysis
+// endpoint's on-demand path, which runs the technical-analysis and
+// fundamental-analysis workers' own per-symbol code (runner.ComputeAndStore,
+// fundamental.AnalyzeSymbol) for a symbol outside their configured lists and
+// writes exactly the rows those workers would.
 //
 // Unlike the other cmd/ binaries this is a long-running server, not a one-shot
 // job.
@@ -30,9 +34,13 @@ import (
 
 	"github.com/joho/godotenv"
 
+	"github.com/konsbe/trading-agent/services/data-analyzer/internal/config"
 	"github.com/konsbe/trading-agent/services/data-analyzer/internal/db"
+	"github.com/konsbe/trading-agent/services/data-analyzer/internal/fundamental"
 	"github.com/konsbe/trading-agent/services/data-analyzer/internal/logx"
 	"github.com/konsbe/trading-agent/services/data-analyzer/internal/momentumapi"
+	"github.com/konsbe/trading-agent/services/data-analyzer/internal/technical"
+	"github.com/konsbe/trading-agent/services/data-analyzer/internal/technical/runner"
 )
 
 // maxCacheTTL is the ceiling from the spec: longer would let a stale cache hide
@@ -85,6 +93,25 @@ func main() {
 		log.Warn("momentum-api: invalid MOMENTUM_API_BUDGET_ATTENTION_PCT; using 90")
 	}
 
+	// The workers' own config, read from the same shared .env, so an on-demand
+	// computation writes exactly what the worker would.
+	taCfg, err := config.LoadTechnicalAnalysis()
+	if err != nil {
+		log.Error("momentum-api: technical-analysis config", "err", err)
+		os.Exit(1)
+	}
+	faCfg, err := config.LoadFundamentalAnalysis()
+	if err != nil {
+		log.Error("momentum-api: fundamental-analysis config", "err", err)
+		os.Exit(1)
+	}
+	analysisConcurrency := 2
+	if v, err := strconv.Atoi(env("MOMENTUM_API_ANALYSIS_CONCURRENCY", "2")); err == nil && v > 0 {
+		analysisConcurrency = v
+	} else {
+		log.Warn("momentum-api: invalid MOMENTUM_API_ANALYSIS_CONCURRENCY; using 2")
+	}
+
 	caveats, err := momentumapi.LoadCaveats(caveatsPath)
 	if err != nil {
 		log.Error("momentum-api: caveats", "err", err)
@@ -129,6 +156,27 @@ func main() {
 		MarketReportCacheTTL:   reportTTL,
 		EarningsCoveredSymbols: earningsSymbols(),
 		GPRSourceConfigured:    strings.TrimSpace(os.Getenv("GPR_CSV_URL")) != "",
+
+		AnalysisNames: technical.NamesFor(technical.Emitter{Cfg: taCfg}),
+		AnalysisCompute: func(ctx context.Context, symbol string, parts momentumapi.AnalysisParts) error {
+			var errs []error
+			if parts.Technical {
+				if _, err := runner.ComputeAndStore(ctx, pool, symbol, "equity", momentumapi.AnalysisInterval, taCfg, log); err != nil {
+					errs = append(errs, err)
+				}
+			}
+			if parts.Fundamentals {
+				if _, err := fundamental.AnalyzeSymbol(ctx, pool, symbol, faCfg, log); err != nil {
+					errs = append(errs, err)
+				}
+			}
+			return errors.Join(errs...)
+		},
+		AnalysisConcurrency:      analysisConcurrency,
+		AnalysisTimeout:          duration(log, "MOMENTUM_API_ANALYSIS_TIMEOUT", 2*time.Minute),
+		AnalysisRetryAfter:       duration(log, "MOMENTUM_API_ANALYSIS_RETRY_AFTER", 3*time.Second),
+		AnalysisFailedRetryAfter: duration(log, "MOMENTUM_API_ANALYSIS_FAILED_RETRY_AFTER", time.Minute),
+		FundamentalsMaxAge:       duration(log, "MOMENTUM_API_FUNDAMENTALS_MAX_AGE", 26*time.Hour),
 	})
 	httpServer := &http.Server{
 		Addr:              addr,

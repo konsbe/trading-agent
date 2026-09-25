@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"sync"
 	"testing"
 	"time"
 
@@ -60,9 +61,18 @@ type fakeStore struct {
 	trackedCounts store.TrackedCounts
 	trackedAsked  []string
 	trackedLatest []*time.Time
+
+	// fresh / analysis are per symbol; the analysis tests swap them between
+	// requests to model the on-demand computation writing rows.
+	mu            sync.Mutex
+	fresh         map[string]store.AnalysisFreshness
+	analysis      map[string]store.AnalysisInputs
+	analysisReads int
 }
 
 func (f *fakeStore) LatestScanDate(context.Context) (time.Time, bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	f.calls++
 	if f.queryErr != nil {
 		return time.Time{}, false, f.queryErr
@@ -76,6 +86,8 @@ func (f *fakeStore) Candidates(context.Context, time.Time) ([]store.CandidateRow
 	return f.candidates, f.queryErr
 }
 func (f *fakeStore) SymbolDetail(_ context.Context, sym string) (store.SymbolDetailRow, bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	f.detailLookup = append(f.detailLookup, sym)
 	d, ok := f.details[sym]
 	return d, ok, f.queryErr
