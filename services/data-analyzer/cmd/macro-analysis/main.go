@@ -89,6 +89,7 @@ import (
 	"github.com/joho/godotenv"
 
 	"github.com/konsbe/trading-agent/services/data-analyzer/internal/additional"
+	"github.com/konsbe/trading-agent/services/data-analyzer/internal/compute"
 	"github.com/konsbe/trading-agent/services/data-analyzer/internal/config"
 	"github.com/konsbe/trading-agent/services/data-analyzer/internal/db"
 	"github.com/konsbe/trading-agent/services/data-analyzer/internal/logx"
@@ -191,6 +192,37 @@ func (w *worker) analyzeAll(ctx context.Context) {
 	w.analyzeMarketCycles(ctx)
 	w.analyzeMacroCorrelations(ctx)
 	w.analyzeAdditionalReference(ctx)
+	w.analyzeVIXRegime(ctx)
+}
+
+// analyzeVIXRegime stores the market-wide VIX band (mc_vix_regime) for the latest
+// VIXCLS observation, with the observation date so readers can tell which print
+// was classified.
+func (w *worker) analyzeVIXRegime(ctx context.Context) {
+	vix, obs, ok := store.QueryMacroFredLatest(ctx, w.pool, "VIXCLS")
+	if !ok {
+		w.log.Warn("vix regime: no VIXCLS observation")
+		return
+	}
+	payload := map[string]any{
+		"vix": vix,
+		"regime": compute.ClassifyVIX(vix, compute.VIXThresholds{
+			Fear:        w.cfg.VIXFearThreshold,
+			Elevated:    w.cfg.VIXElevatedThreshold,
+			Complacency: w.cfg.VIXComplacencyThreshold,
+		}),
+		"obs_date":              obs.UTC().Format(time.DateOnly),
+		"fear_threshold":        w.cfg.VIXFearThreshold,
+		"elevated_threshold":    w.cfg.VIXElevatedThreshold,
+		"complacency_threshold": w.cfg.VIXComplacencyThreshold,
+		"series_id":             "VIXCLS",
+	}
+	if !macrotone.Annotate("mc_vix_regime", payload) {
+		w.log.Warn("macro tone missing for classification", "metric", "mc_vix_regime")
+	}
+	if err := store.UpsertMacroDerived(ctx, w.pool, time.Now().UTC(), "mc_vix_regime", &vix, payload); err != nil {
+		w.log.Error("upsert macro derived", "metric", "mc_vix_regime", "err", err)
+	}
 }
 
 // analyzeMonetary computes all monetary-policy signals from FRED series stored

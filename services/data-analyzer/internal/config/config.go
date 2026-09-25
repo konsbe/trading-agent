@@ -764,6 +764,12 @@ type MacroAnalysis struct {
 	Base
 	PollInterval time.Duration
 
+	// Market-wide VIX band (mc_vix_regime). Same env as technical-analysis's
+	// per-symbol vix_regime so both classify VIXCLS identically.
+	VIXFearThreshold        float64
+	VIXElevatedThreshold    float64
+	VIXComplacencyThreshold float64
+
 	// ── Yield Curve (T10Y2Y — 2s10s spread, in percentage points) ─────────────
 	// >1.0pp = steep (expansion). 0–1.0pp = normal. 0 to -0.5pp = flat/warning.
 	// <-0.5pp = inverted (recession signal, 12–18 month lag).
@@ -1191,6 +1197,10 @@ func LoadMacroAnalysis() (MacroAnalysis, error) {
 	return MacroAnalysis{
 		Base:         b,
 		PollInterval: pollFor("DATA_MACRO_ANALYSIS_POLL_INTERVAL", 6*time.Hour),
+
+		VIXFearThreshold:        floatEnv("TECHNICAL_VIX_FEAR_THRESHOLD", 35),
+		VIXElevatedThreshold:    floatEnv("TECHNICAL_VIX_ELEVATED_THRESHOLD", 20),
+		VIXComplacencyThreshold: floatEnv("TECHNICAL_VIX_COMPLACENCY_THRESHOLD", 12),
 
 		YCSteepThreshold:    floatEnv("MACRO_YC_STEEP_THRESHOLD", 1.0),
 		YCFlatThreshold:     floatEnv("MACRO_YC_FLAT_THRESHOLD", 0.0),

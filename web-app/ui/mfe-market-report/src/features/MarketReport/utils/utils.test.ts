@@ -1,7 +1,7 @@
 import { EMPTY, formatCompactNumber, formatDate, formatDateTime, formatNumber, formatPercent, formatSignedPercent, formatTime } from './format';
 import { humanizeCode, humanizeMetric, humanizePair } from './humanize';
 import { MacroSignal } from '@/api';
-import { asObject, num, signalLabel, str, strings, yieldLevels } from './payload';
+import { asObject, bool, marketCycleInputs, num, signalLabel, storedTone, str, strings, yieldLevels } from './payload';
 import { groupSignalsByTier } from './signals';
 
 describe('format', () => {
@@ -85,6 +85,32 @@ describe('payload', () => {
         expect(num(obj, 'a')).toBeNull();
         expect(strings(obj, 'f')).toEqual(['p', 'q']);
         expect(strings(obj, 'a')).toEqual([]);
+        expect(bool(asObject({ b: false, s: 'true' }), 'b')).toBe(false);
+        expect(bool(asObject({ s: 'true' }), 's')).toBeNull();
+        expect(storedTone(asObject({ t: 'stressed', u: 'bullish', n: 1 }), 't')).toBe('stressed');
+        expect(storedTone(asObject({ u: 'bullish' }), 'u')).toBeNull();
+        expect(storedTone(asObject({ n: 1 }), 'n')).toBeNull();
+        expect(storedTone(null, 't')).toBeNull();
+    });
+
+    it("reads the market cycle's blended inputs with their own stored tones, in display order", () => {
+        const payload = {
+            inputs: { gg_stance: 'benign', gc_stance: 'slowdown', mp_stance: 'restrictive', inf_stance: 'moderate' },
+            input_tones: { gc_stance: 'neutral', mp_stance: 'stressed', gg_stance: 'nonsense' },
+        };
+        expect(marketCycleInputs(payload)).toEqual([
+            { key: 'gc_stance', label: 'Growth', stance: 'slowdown', tone: 'neutral' },
+            { key: 'mp_stance', label: 'Policy', stance: 'restrictive', tone: 'stressed' },
+            { key: 'inf_stance', label: 'Inflation', stance: 'moderate', tone: null },
+            { key: 'gg_stance', label: 'Global', stance: 'benign', tone: null },
+        ]);
+        expect(marketCycleInputs({ inputs: { gc_stance: 'expansion' } }).map(i => [i.stance, i.tone])).toEqual([
+            ['expansion', null],
+            [null, null],
+            [null, null],
+            [null, null],
+        ]);
+        expect(marketCycleInputs(null).every(i => i.stance === null && i.tone === null)).toBe(true);
     });
 });
 

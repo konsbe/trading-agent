@@ -1085,15 +1085,11 @@ func (w *worker) computeVIXRegime(ctx context.Context, ts time.Time, symbol, exc
 		return
 	}
 
-	regime := "normal"
-	switch {
-	case vix > w.cfg.VIXFearThreshold:
-		regime = "extreme_fear"
-	case vix > w.cfg.VIXElevatedThreshold:
-		regime = "elevated"
-	case vix < w.cfg.VIXComplacencyThreshold:
-		regime = "complacency"
-	}
+	regime := compute.ClassifyVIX(vix, compute.VIXThresholds{
+		Fear:        w.cfg.VIXFearThreshold,
+		Elevated:    w.cfg.VIXElevatedThreshold,
+		Complacency: w.cfg.VIXComplacencyThreshold,
+	})
 
 	upsert := func(indicator string, value *float64, payload any) {
 		if err := store.UpsertIndicator(ctx, w.pool, ts, symbol, exchange, interval, indicator, value, payload); err != nil {

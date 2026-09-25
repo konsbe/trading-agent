@@ -10,7 +10,9 @@
     },
     "vix": {
       "value": 14.21,
-      "as_of": "2099-01-13"
+      "as_of": "2099-01-13",
+      "regime": "normal",
+      "tone": "constructive"
     }
   },
   "monetary_policy": {
@@ -435,11 +437,37 @@
   },
   "market_cycle_composite": {
     "score": 0.15,
-    "tone": null,
+    "tone": "neutral",
     "as_of": "2099-01-15",
     "payload": {
       "composite_phase": "late_cycle_stretched",
-      "composite_label": "Price extended vs 200DMA with tight macro (policy/inflation) — late-cycle playbook; tighten stops."
+      "composite_label": "Price extended vs 200DMA with tight macro (policy/inflation) — late-cycle playbook; tighten stops.",
+      "symbol": "SPY",
+      "interval": "1Day",
+      "bars_used": 320,
+      "price_phase": "bull_extended",
+      "drawdown_pct": -1.56,
+      "pct_vs_sma200": 6.85,
+      "sma200": 718.01,
+      "has_sma200": true,
+      "close": 767.18,
+      "crash_warning": false,
+      "days_off_peak": 29,
+      "peak_high": 779.37,
+      "peak_ts": "2099-01-02T14:30:00Z",
+      "inputs": {
+        "gc_stance": "slowdown",
+        "mp_stance": "restrictive",
+        "inf_stance": "moderate",
+        "gg_stance": "benign"
+      },
+      "input_tones": {
+        "gc_stance": "neutral",
+        "mp_stance": "stressed",
+        "inf_stance": "neutral",
+        "gg_stance": "constructive"
+      },
+      "tone": "neutral"
     }
   }
 }

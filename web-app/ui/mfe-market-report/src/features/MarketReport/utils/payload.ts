@@ -1,3 +1,5 @@
+import { Tone, TONES } from '@/api';
+
 /** Payloads are passed through as stored; read them defensively. */
 export const asObject = (value: unknown): Record<string, unknown> | null =>
     value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
@@ -7,6 +9,43 @@ export const str = (obj: Record<string, unknown> | null, key: string): string | 
 
 export const num = (obj: Record<string, unknown> | null, key: string): number | null =>
     typeof obj?.[key] === 'number' && Number.isFinite(obj[key]) ? (obj[key] as number) : null;
+
+export const bool = (obj: Record<string, unknown> | null, key: string): boolean | null =>
+    typeof obj?.[key] === 'boolean' ? (obj[key] as boolean) : null;
+
+/** A tone stored inside a payload; anything outside the vocabulary → null (no indicator). */
+export const storedTone = (obj: Record<string, unknown> | null, key: string): Tone | null => {
+    const value = obj?.[key];
+    return TONES.includes(value as Tone) ? (value as Tone) : null;
+};
+
+/** The stance inputs `mc_market_cycle` blends, in display order. */
+export const MARKET_CYCLE_INPUTS = [
+    { key: 'gc_stance', label: 'Growth' },
+    { key: 'mp_stance', label: 'Policy' },
+    { key: 'inf_stance', label: 'Inflation' },
+    { key: 'gg_stance', label: 'Global' },
+] as const;
+
+export interface MarketCycleInput {
+    key: (typeof MARKET_CYCLE_INPUTS)[number]['key'];
+    label: string;
+    /** `payload.inputs.<key>`, verbatim. */
+    stance: string | null;
+    /**
+     * `payload.input_tones.<key>` — the tone of the word this composite was built
+     * from, never the stance card's (that may come from another run). Null when
+     * absent (reports before `input_tones` was stored).
+     */
+    tone: Tone | null;
+}
+
+export const marketCycleInputs = (payload: unknown): MarketCycleInput[] => {
+    const obj = asObject(payload);
+    const inputs = asObject(obj?.inputs);
+    const tones = asObject(obj?.input_tones);
+    return MARKET_CYCLE_INPUTS.map(({ key, label }) => ({ key, label, stance: str(inputs, key), tone: storedTone(tones, key) }));
+};
 
 /** String entries of a payload array (e.g. macro-correlation `flags`). */
 export const strings = (obj: Record<string, unknown> | null, key: string): string[] =>

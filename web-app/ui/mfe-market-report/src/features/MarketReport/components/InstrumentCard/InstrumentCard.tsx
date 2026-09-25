@@ -1,6 +1,5 @@
 import { Instrument, InstrumentMarketCycle } from '@/api';
 import { EMPTY, formatDate, formatNumber, formatPercent, formatSignedPercent } from '../../utils/format';
-import { humanizeCode } from '../../utils/humanize';
 import { InstrumentCardProps } from './types';
 import '@/styles/market-report-global.css';
 import './InstrumentCard-styles.css';
@@ -37,7 +36,7 @@ const MarketCycle = ({ inst, testId }: { inst: Instrument; testId: string }) => 
             <dl className="market-report-instrument__facts" data-testid={`${testId}-cycle`}>
                 <div>
                     <dt>Market-cycle phase</dt>
-                    <dd data-testid={`${testId}-phase`}>{cycle.phase ? humanizeCode(cycle.phase) : EMPTY}</dd>
+                    <dd data-testid={`${testId}-phase`}>{cycle.phase ?? EMPTY}</dd>
                 </div>
                 <div>
                     <dt>Drawdown from peak</dt>

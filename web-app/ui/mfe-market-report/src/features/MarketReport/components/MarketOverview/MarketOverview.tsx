@@ -1,9 +1,10 @@
-import { DatedValue, GlobalSection } from '@/api';
+import { DatedValue, GlobalSection, VixValue } from '@/api';
 import { EMPTY, formatDate, formatNumber } from '../../utils/format';
-import { humanizeCode } from '../../utils/humanize';
 import { asObject, str, strings } from '../../utils/payload';
+import MarketCycleDetails from '../MarketCycleDetails';
 import ReadingCard from '../ReadingCard';
 import SignalGroups from '../SignalGroups';
+import ToneIndicator from '../ToneIndicator';
 import { MarketOverviewProps } from './types';
 import '@/styles/market-report-global.css';
 import './MarketOverview-styles.css';
@@ -14,6 +15,19 @@ const STRIP: { key: keyof GlobalSection['macro']; label: string; format: (v: num
     { key: 'eur_usd', label: 'EUR/USD', format: v => formatNumber(v, 4) },
 ];
 
+/** Only the VIX carries a stored band; it shows only when the band has a tone (i.e. is for this print). */
+const VixBand = ({ vix, testId }: { vix: VixValue; testId: string }) =>
+    vix.tone ? (
+        <span className="market-report-strip__band" data-testid={`${testId}-band`}>
+            <ToneIndicator tone={vix.tone} size={16} data-testid={`${testId}-tone`} />
+            {vix.regime && (
+                <span className="market-report-strip__regime" data-testid={`${testId}-regime`}>
+                    {vix.regime}
+                </span>
+            )}
+        </span>
+    ) : null;
+
 const STANCES: { key: 'monetary_policy' | 'growth_cycle' | 'inflation' | 'global_geopolitical'; title: string }[] = [
     { key: 'monetary_policy', title: 'Monetary Policy' },
     { key: 'growth_cycle', title: 'Growth Cycle' },
@@ -21,11 +35,26 @@ const STANCES: { key: 'monetary_policy' | 'growth_cycle' | 'inflation' | 'global
     { key: 'global_geopolitical', title: 'Global/Geopolitical Stress' },
 ];
 
-const StripValue = ({ label, value, format, testId }: { label: string; value: DatedValue | null; format: (v: number) => string; testId: string }) => (
+const StripValue = ({
+    label,
+    value,
+    format,
+    testId,
+    vix,
+}: {
+    label: string;
+    value: DatedValue | null;
+    format: (v: number) => string;
+    testId: string;
+    vix?: VixValue | null;
+}) => (
     <div className="market-report-strip__item" data-testid={testId}>
         <dt className="market-report-eyebrow">{label}</dt>
-        <dd className="market-report-strip__value market-report-mono" data-testid={`${testId}-value`}>
-            {value ? format(value.value) : EMPTY}
+        <dd className="market-report-strip__reading">
+            <span className="market-report-strip__value market-report-mono" data-testid={`${testId}-value`}>
+                {value ? format(value.value) : EMPTY}
+            </span>
+            {vix && <VixBand vix={vix} testId={testId} />}
         </dd>
         <dd className="market-report-muted market-report-small" data-testid={`${testId}-as-of`}>
             {value ? `as of ${formatDate(value.as_of)}` : 'no recent observation'}
@@ -55,7 +84,14 @@ const MarketOverview = ({ global }: MarketOverviewProps) => {
 
             <dl className="market-report-strip" data-testid="macro-strip">
                 {STRIP.map(item => (
-                    <StripValue key={item.key} label={item.label} value={global.macro[item.key]} format={item.format} testId={`strip-${item.key}`} />
+                    <StripValue
+                        key={item.key}
+                        label={item.label}
+                        value={global.macro[item.key]}
+                        format={item.format}
+                        testId={`strip-${item.key}`}
+                        vix={item.key === 'vix' ? global.macro.vix : undefined}
+                    />
                 ))}
             </dl>
 
@@ -105,18 +141,21 @@ const MarketOverview = ({ global }: MarketOverviewProps) => {
                         </>
                     ) : undefined}
                 </ReadingCard>
-            </div>
 
-            <div className="market-report-readings">
                 <ReadingCard
-                    title="Market cycle (market-wide)"
+                    title="Market Cycle (market-wide)"
+                    classified
                     unavailable={!cycle}
-                    label={cyclePhase ? humanizeCode(cyclePhase) : null}
+                    label={str(cyclePayload, 'composite_phase')}
+                    tone={cycle?.tone}
                     score={cycle?.score}
                     asOf={cycle?.as_of}
                     description={str(cyclePayload, 'composite_label')}
+                    detailsLabel="Inputs & index"
                     data-testid="market-cycle-composite"
-                />
+                >
+                    {cycle ? <MarketCycleDetails payload={cycle.payload} data-testid="market-cycle" /> : undefined}
+                </ReadingCard>
             </div>
         </section>
     );

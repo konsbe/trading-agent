@@ -92,7 +92,35 @@ var signals = map[string]map[string]Tone{
 		"recession_pipeline": s, "stagflation_risk": s, "rising_inflation_tight_policy": s,
 		"global_liquidity_stress": s, "deflation_risk": s,
 	},
+
+	// Market-wide VIX band (compute.ClassifyVIX). Complacency is stressed, not
+	// neutral: calm-but-vulnerable, like gc_consumer_sentiment's complacency band.
+	"mc_vix_regime": {"normal": c, "elevated": n, "extreme_fear": s, "complacency": s},
 }
+
+// compositePhases tones mc_market_cycle's "composite_phase"
+// (internal/marketcycle BuildComposite), read from each phase's own label.
+var compositePhases = map[string]Tone{
+	"bull_macro_aligned": c, // "classic bull alignment"
+
+	// Yellow = caveated or elevated, not yet damage — regardless of score rank.
+	"bull_overextended":    n, // "add mean-reversion awareness"
+	"late_cycle_stretched": n, // "late-cycle playbook; tighten stops"
+	"bull_fragile_global":  n, // "global stress elevated … can snap leaders"
+	"pullback_healthy":     n, // "usually healthy if macro intact"
+	"neutral_mixed":        n,
+
+	"trend_soft":           s, // "trend damage"
+	"bull_macro_divergent": s, // "bear market rally risk"
+	"correction_risk":      s, // "reduce risk / hedge"
+	"bear_structural":      s, // "capital preservation"
+	"crash_panic":          s, // "liquidity/event risk"
+
+	"insufficient_equity_data": NoData,
+}
+
+// CompositePhases returns the toned composite phases, for coverage tests.
+func CompositePhases() map[string]Tone { return compositePhases }
 
 // margin maps inf_ppi_cpi_spread's stored "margin_signal" to its tone.
 var margin = map[string]Tone{"margin_expansion": c, "neutral": n, "margin_pressure": s}
@@ -158,6 +186,9 @@ func For(metric string, payload map[string]any) (Tone, bool) {
 	if metric == "inf_ppi_cpi_spread" {
 		return lookup(margin, str(payload, "margin_signal"))
 	}
+	if metric == "mc_market_cycle" {
+		return lookup(compositePhases, str(payload, "composite_phase"))
+	}
 	if t, isStance := stances[metric]; isStance {
 		return lookup(t, str(payload, "stance"))
 	}
@@ -184,11 +215,37 @@ func Annotate(metric string, payload any) bool {
 		return false
 	}
 	m[Key] = string(t)
+	if metric == "mc_market_cycle" {
+		annotateInputs(m)
+	}
 	if p, ok := placements[metric]; ok {
 		m["tier"] = p.Tier
 		m["tier_group"] = p.Group
 	}
 	return true
+}
+
+// annotateInputs stores the tone of each blended stance input next to the
+// composite, from the stance words the composite was actually built from.
+func annotateInputs(m map[string]any) {
+	inputs, ok := m["inputs"].(map[string]any)
+	if !ok {
+		return
+	}
+	tones := map[string]any{}
+	for metric, word := range inputs {
+		table, isStance := stances[metric]
+		w, _ := word.(string)
+		if !isStance {
+			continue
+		}
+		if t, ok := lookup(table, w); ok {
+			tones[metric] = string(t)
+		} else if w == "" {
+			tones[metric] = string(NoData)
+		}
+	}
+	m["input_tones"] = tones
 }
 
 func sectionMetric(metric string) bool {
@@ -202,7 +259,7 @@ func sectionMetric(metric string) bool {
 
 // Classified reports whether metric is one this package tones.
 func Classified(metric string) bool {
-	if displayOnly[metric] || metric == "inf_ppi_cpi_spread" {
+	if displayOnly[metric] || metric == "inf_ppi_cpi_spread" || metric == "mc_market_cycle" {
 		return true
 	}
 	_, st := stances[metric]

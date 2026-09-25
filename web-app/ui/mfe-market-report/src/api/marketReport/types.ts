@@ -18,12 +18,6 @@ export interface DatedValue {
     as_of: string;
 }
 
-export interface MacroStrip {
-    vix: DatedValue | null;
-    us10y_pct: DatedValue | null;
-    eur_usd: DatedValue | null;
-}
-
 /**
  * The classification tone macro-analysis stores next to every label
  * (internal/macrotone). The UI maps it to a colour and never derives one.
@@ -31,6 +25,24 @@ export interface MacroStrip {
 export type Tone = 'constructive' | 'neutral' | 'stressed' | 'no_data' | 'display_only';
 
 export const TONES: readonly Tone[] = ['constructive', 'neutral', 'stressed', 'no_data', 'display_only'];
+
+/**
+ * The header VIX plus the stored `mc_vix_regime` band for that same print.
+ * Both are null when the stored band classified a different VIXCLS print, and
+ * absent in reports generated before the band was exposed: either way the
+ * number stands alone.
+ */
+export interface VixValue extends DatedValue {
+    /** The stored band verbatim, e.g. "normal", "elevated", "extreme_fear", "complacency". */
+    regime?: string | null;
+    tone?: Tone | null;
+}
+
+export interface MacroStrip {
+    vix: VixValue | null;
+    us10y_pct: DatedValue | null;
+    eur_usd: DatedValue | null;
+}
 
 export interface MacroSignal {
     value: number | null;
@@ -54,7 +66,11 @@ export interface StanceSection {
     signals: Record<string, MacroSignal>;
 }
 
-/** `mc_macro_correlation` / `mc_market_cycle` rows. */
+/**
+ * `mc_macro_correlation` / `mc_market_cycle` rows. The market-cycle payload also
+ * carries `inputs` (the stance words it blended) and `input_tones` (their stored
+ * tones); reports generated before `input_tones` was stored lack it.
+ */
 export interface ScoredPayload {
     score: number | null;
     tone: Tone | null;

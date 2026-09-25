@@ -20,10 +20,30 @@
     margin: 0;
 }
 
+.market-report-strip__reading {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-xs) var(--space-sm);
+}
+
 .market-report-strip__value {
     color: var(--color-on-surface);
     font-size: var(--font-size-xl);
     font-weight: var(--font-weight-bold);
+}
+
+.market-report-strip__band {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-xxs);
+}
+
+/* The stored band verbatim (e.g. `extreme_fear`), so no case transform. */
+.market-report-strip__regime {
+    color: var(--color-on-surface);
+    font-family: var(--font-family-label);
+    font-size: var(--font-size-sm);
 }
 
 .market-report-readings {
@@ -33,9 +53,9 @@
     gap: var(--space-sm);
 }
 
-/* The five classification cards: one row on a wide screen. */
+/* The five classification cards and the market-cycle composite: at most three per row (3 + 3). */
 .market-report-readings--classifications {
-    grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(max(14rem, calc((100% - 2 * var(--space-sm)) / 3)), 1fr));
 }
 
 @media (max-width: 720px) {

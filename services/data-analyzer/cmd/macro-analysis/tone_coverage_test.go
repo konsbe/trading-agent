@@ -77,6 +77,27 @@ func TestEveryEmittedLabelHasATone(t *testing.T) {
 		assertToned(t, stanceVarMetric[m[1]], "stance", m[2])
 	}
 
+	composite := readFile(t, "../../internal/marketcycle/composite.go")
+	phases := regexp.MustCompile(`Phase:\s*"([a-z_]+)"`).FindAllStringSubmatch(composite, -1)
+	if len(phases) == 0 {
+		t.Fatal("found no composite phases in composite.go; the scan pattern is stale")
+	}
+	emitted := map[string]bool{}
+	for _, m := range phases {
+		emitted[m[1]] = true
+		assertToned(t, "mc_market_cycle", "composite_phase", m[1])
+	}
+	for phase := range macrotone.CompositePhases() {
+		if !emitted[phase] {
+			t.Errorf("macrotone tones composite phase %q that composite.go never emits", phase)
+		}
+	}
+
+	vix := readFile(t, "../../internal/compute/vix.go")
+	for _, m := range regexp.MustCompile(`return "([a-z_]+)"`).FindAllStringSubmatch(vix, -1) {
+		assertToned(t, "mc_vix_regime", "regime", m[1])
+	}
+
 	corr := readFile(t, "../../internal/macrocorr/regime.go")
 	for _, m := range regexp.MustCompile(`Regime:\s*"([a-z_]+)"`).FindAllStringSubmatch(corr, -1) {
 		assertToned(t, "mc_macro_correlation", "regime", m[1])

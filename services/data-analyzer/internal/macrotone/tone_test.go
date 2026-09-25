@@ -46,7 +46,7 @@ func TestSpreadUsesStoredMarginSignal(t *testing.T) {
 
 func TestEverySignalHasATier(t *testing.T) {
 	for metric := range signals {
-		if metric == "mc_macro_correlation" {
+		if metric == "mc_macro_correlation" || metric == "mc_vix_regime" {
 			continue
 		}
 		if _, ok := PlacementFor(metric); !ok {
@@ -81,5 +81,36 @@ func TestAnnotate(t *testing.T) {
 	}
 	if !Annotate("mc_price_phase:SPY", map[string]any{"phase": "x"}) {
 		t.Error("non-section metrics are left alone")
+	}
+}
+
+func TestMarketCycleCompositeAndInputs(t *testing.T) {
+	p := map[string]any{
+		"composite_phase": "late_cycle_stretched",
+		"inputs": map[string]any{
+			"gc_stance": "expansion", "mp_stance": "neutral", "inf_stance": "hot", "gg_stance": "",
+		},
+	}
+	if !Annotate("mc_market_cycle", p) || p[Key] != "neutral" {
+		t.Fatalf("composite: %v", p)
+	}
+	want := map[string]any{"gc_stance": "constructive", "mp_stance": "neutral", "inf_stance": "stressed", "gg_stance": "no_data"}
+	got := p["input_tones"].(map[string]any)
+	for k, v := range want {
+		if got[k] != v {
+			t.Errorf("input_tones[%s] = %v, want %v", k, got[k], v)
+		}
+	}
+	if p["tier"] != nil {
+		t.Error("the composite carries no tier")
+	}
+}
+
+func TestVIXBands(t *testing.T) {
+	cases := map[string]Tone{"normal": Constructive, "elevated": Neutral, "extreme_fear": Stressed, "complacency": Stressed}
+	for regime, want := range cases {
+		if got, ok := For("mc_vix_regime", map[string]any{"regime": regime}); !ok || got != want {
+			t.Errorf("vix %s = %q, want %q", regime, got, want)
+		}
 	}
 }

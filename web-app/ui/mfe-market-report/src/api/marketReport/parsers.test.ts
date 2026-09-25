@@ -230,6 +230,66 @@ describe('parseMarketReport', () => {
             setAt(body, 'global.growth_cycle.signals.gc_lei.tone', 1);
             expect(() => parseMarketReport(body)).toThrow('at global.growth_cycle.signals.gc_lei.tone:');
         });
+
+        it('keeps the market-cycle composite tone and passes its inputs and input_tones through', () => {
+            const { global } = parseMarketReport(makeToneReportBody());
+            const payload = global.market_cycle_composite?.payload as any;
+
+            expect(global.market_cycle_composite?.tone).toBe('neutral');
+            expect(payload.inputs).toEqual({ gc_stance: 'slowdown', mp_stance: 'restrictive', inf_stance: 'moderate', gg_stance: 'benign' });
+            expect(payload.input_tones).toEqual({ gc_stance: 'neutral', mp_stance: 'stressed', inf_stance: 'neutral', gg_stance: 'constructive' });
+        });
+
+        it('accepts a market-cycle payload without input_tones (reports before it was stored)', () => {
+            const body = makeToneReportBody();
+            setAt(body, 'global.market_cycle_composite.payload.input_tones', undefined);
+            expect((parseMarketReport(body).global.market_cycle_composite?.payload as any).input_tones).toBeUndefined();
+        });
+    });
+
+    describe('VIX band', () => {
+        it('keeps the stored regime and tone of the VIX', () => {
+            expect(parseMarketReport(makeToneReportBody()).global.macro.vix).toStrictEqual({
+                value: 14.21,
+                as_of: '2099-01-13',
+                regime: 'normal',
+                tone: 'constructive',
+            });
+        });
+
+        it('keeps null regime and tone (the band is for another print)', () => {
+            const body = makeToneReportBody();
+            setAt(body, 'global.macro.vix.regime', null);
+            setAt(body, 'global.macro.vix.tone', null);
+            expect(parseMarketReport(body).global.macro.vix).toStrictEqual({ value: 14.21, as_of: '2099-01-13', regime: null, tone: null });
+        });
+
+        it('keeps regime and tone absent when the report predates them (live data today)', () => {
+            expect(live().global.macro.vix).toStrictEqual({ value: 14.21, as_of: '2026-09-22' });
+        });
+
+        it('reads an unknown VIX tone as null', () => {
+            const body = makeToneReportBody();
+            setAt(body, 'global.macro.vix.tone', 'panic');
+            expect(parseMarketReport(body).global.macro.vix?.tone).toBeNull();
+        });
+
+        it.each([
+            ['a non-string regime', 'global.macro.vix.regime', 3],
+            ['a non-string tone', 'global.macro.vix.tone', true],
+        ])('rejects %s', (_label, path, value) => {
+            const body = makeToneReportBody();
+            setAt(body, path, value);
+            expect(() => parseMarketReport(body)).toThrow(`at ${path}:`);
+        });
+
+        it('leaves 10Y and EUR/USD as plain dated values', () => {
+            const body = makeToneReportBody();
+            setAt(body, 'global.macro.us10y_pct.tone', 'stressed');
+            const { macro } = parseMarketReport(body).global;
+            expect(macro.us10y_pct).toStrictEqual({ value: 5.11, as_of: '2099-01-14' });
+            expect(macro.eur_usd).toStrictEqual({ value: 1.1464, as_of: '2099-01-12' });
+        });
     });
 
     describe('instrument invariants', () => {

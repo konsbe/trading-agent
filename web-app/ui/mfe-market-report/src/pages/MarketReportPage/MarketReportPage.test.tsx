@@ -144,7 +144,40 @@ describe('Section 1 — market overview', () => {
         expect(screen.getByTestId('strip-us10y_pct-as-of').textContent).toBe('as of Jan 14, 2099');
         expect(screen.getByTestId('strip-eur_usd-value').textContent).toBe('1.1464');
         expect(screen.getByTestId('strip-eur_usd-as-of').textContent).toBe('as of Jan 12, 2099');
-        expect(screen.getByTestId('macro-strip').querySelector('[role="img"], svg')).toBeNull();
+        ['strip-us10y_pct', 'strip-eur_usd'].forEach(id => {
+            expect(screen.getByTestId(id).querySelector('[role="img"], svg, [data-tone]')).toBeNull();
+        });
+    });
+
+    it('shows the VIX with its stored tone and regime verbatim', () => {
+        renderReport(makeToneReport());
+
+        expect(toneOf('strip-vix-tone')).toBe('constructive');
+        expect(screen.getByTestId('strip-vix-regime').textContent).toBe('normal');
+        expect(within(screen.getByTestId('strip-vix')).getByRole('img', { name: 'Status: constructive' })).toBeInTheDocument();
+    });
+
+    it('follows the stored VIX tone, not the regime word or the number', () => {
+        const body = makeToneReportBody();
+        body.global.macro.vix = { value: 42.5, as_of: '2099-01-13', regime: 'complacency', tone: 'stressed' };
+        renderReport(body);
+
+        expect(toneOf('strip-vix-tone')).toBe('stressed');
+        expect(screen.getByTestId('strip-vix-regime').textContent).toBe('complacency');
+    });
+
+    it.each([
+        ['null (the stored band is for another print)', { regime: null, tone: null }],
+        ['absent (reports before the band was exposed)', {}],
+        ['a regime without a tone', { regime: 'elevated', tone: null }],
+    ])('shows only the plain VIX number when regime/tone are %s', (_label, extra) => {
+        const body = makeToneReportBody();
+        body.global.macro.vix = { value: 14.21, as_of: '2099-01-13', ...extra };
+        renderReport(body);
+
+        expect(screen.getByTestId('strip-vix-value').textContent).toBe('14.21');
+        expect(screen.queryByTestId('strip-vix-band')).not.toBeInTheDocument();
+        expect(screen.getByTestId('macro-strip').querySelector('[role="img"], svg, [data-tone]')).toBeNull();
     });
 
     it('shows a null strip value as "—" with "no recent observation"', () => {
@@ -156,7 +189,7 @@ describe('Section 1 — market overview', () => {
         expect(screen.getByTestId('strip-eur_usd-as-of').textContent).toBe('no recent observation');
     });
 
-    it('shows the five classification cards with the stored tone, the stored label verbatim and the score', () => {
+    it('shows the five classification cards and the market cycle with the stored tone, the stored label verbatim and the score', () => {
         renderReport(makeToneReport());
         const cards = within(screen.getByTestId('classification-cards')).getAllByRole('article');
 
@@ -166,6 +199,7 @@ describe('Section 1 — market overview', () => {
             'Inflation',
             'Global/Geopolitical Stress',
             'Macro Correlations Regime',
+            'Market Cycle (market-wide)',
         ]);
         expect(screen.getByTestId('stance-monetary_policy-label').textContent).toBe('neutral');
         expect(screen.getByTestId('stance-global_geopolitical-label').textContent).toBe('elevated_stress');
@@ -321,14 +355,143 @@ describe('Section 1 — market overview', () => {
         expect(flags.querySelector('.market-report-tone, svg')).toBeNull();
     });
 
-    it('keeps the market-wide cycle composite as a plain reading', () => {
-        renderReport(makeToneReport());
-        const composite = screen.getByTestId('market-cycle-composite');
+    describe('market cycle (market-wide)', () => {
+        const openCycle = async (body: any = makeToneReportBody()) => {
+            const user = userEvent.setup();
+            renderReport(body);
+            await user.click(screen.getByTestId('market-cycle-composite-toggle'));
+            return user;
+        };
 
-        expect(screen.getByTestId('market-cycle-composite-label').textContent).toBe('late cycle stretched');
-        expect(composite).toHaveTextContent('Price extended vs 200DMA with tight macro');
-        expect(within(composite).queryByRole('button')).not.toBeInTheDocument();
-        expect(composite.querySelector('.market-report-tone')).toBeNull();
+        it('heads the card with the stored tone, composite_phase verbatim, the score, as-of and composite_label', () => {
+            renderReport(makeToneReport());
+            const composite = screen.getByTestId('market-cycle-composite');
+
+            expect(toneOf('market-cycle-composite-tone')).toBe('neutral');
+            expect(screen.getByTestId('market-cycle-composite-label').textContent).toBe('late_cycle_stretched');
+            expect(composite).toHaveTextContent('Score 0.15 · as of Jan 15, 2099');
+            expect(composite).toHaveTextContent('Price extended vs 200DMA with tight macro (policy/inflation) — late-cycle playbook; tighten stops.');
+            expect(screen.queryByTestId('market-cycle')).not.toBeInTheDocument();
+        });
+
+        it('follows the stored composite tone, and signs a negative score with U+2212', () => {
+            const body = makeToneReportBody();
+            body.global.market_cycle_composite.tone = 'stressed';
+            body.global.market_cycle_composite.score = -0.35;
+            renderReport(body);
+
+            expect(toneOf('market-cycle-composite-tone')).toBe('stressed');
+            expect(screen.getByTestId('market-cycle-composite')).toHaveTextContent('Score \u22120.35');
+        });
+
+        it('renders no composite indicator when its tone is null (live data today)', () => {
+            renderReport(makeReport());
+            expect(screen.queryByTestId('market-cycle-composite-tone')).not.toBeInTheDocument();
+            expect(screen.getByTestId('market-cycle-composite-label').textContent).toBe('late_cycle_stretched');
+        });
+
+        it('shows a null section as a gray no-data indicator and plain "no data"', () => {
+            const body = makeToneReportBody();
+            body.global.market_cycle_composite = null;
+            renderReport(body);
+
+            expect(screen.getByTestId('market-cycle-composite-unavailable').textContent).toBe('no data');
+            expect(toneOf('market-cycle-composite-tone')).toBe('no_data');
+            expect(screen.queryByTestId('market-cycle-composite-toggle')).not.toBeInTheDocument();
+        });
+
+        it('expands (click and keyboard) to the blended inputs and the index', async () => {
+            const user = userEvent.setup();
+            renderReport(makeToneReport());
+            const toggle = screen.getByTestId('market-cycle-composite-toggle');
+            expect(toggle).toHaveTextContent('Inputs & index');
+            expect(toggle).toHaveAttribute('aria-expanded', 'false');
+
+            await user.click(toggle);
+            expect(toggle).toHaveAttribute('aria-expanded', 'true');
+            const details = document.getElementById(toggle.getAttribute('aria-controls')!)!;
+            expect(within(details).getByTestId('market-cycle-inputs')).toBeInTheDocument();
+            expect(within(details).getByTestId('market-cycle-index')).toBeInTheDocument();
+
+            toggle.focus();
+            await user.keyboard('{Enter}');
+            expect(toggle).toHaveAttribute('aria-expanded', 'false');
+            await user.keyboard(' ');
+            expect(toggle).toHaveAttribute('aria-expanded', 'true');
+        });
+
+        it("tones each input from this payload's input_tones, never from the stance cards", async () => {
+            await openCycle();
+            const inputs = within(screen.getByTestId('market-cycle-inputs')).getAllByRole('listitem');
+
+            expect(inputs.map(li => li.getAttribute('data-testid'))).toEqual([
+                'market-cycle-input-gc_stance',
+                'market-cycle-input-mp_stance',
+                'market-cycle-input-inf_stance',
+                'market-cycle-input-gg_stance',
+            ]);
+            expect(inputs.map(li => li.textContent)).toEqual(['Growthslowdown', 'Policyrestrictive', 'Inflationmoderate', 'Globalbenign']);
+            // The stance cards say constructive / neutral / stressed / stressed.
+            expect(toneOf('stance-growth_cycle-tone')).toBe('constructive');
+            expect(toneOf('market-cycle-input-gc_stance-tone')).toBe('neutral');
+            expect(toneOf('stance-monetary_policy-tone')).toBe('neutral');
+            expect(toneOf('market-cycle-input-mp_stance-tone')).toBe('stressed');
+            expect(toneOf('stance-inflation-tone')).toBe('stressed');
+            expect(toneOf('market-cycle-input-inf_stance-tone')).toBe('neutral');
+            expect(toneOf('stance-global_geopolitical-tone')).toBe('stressed');
+            expect(toneOf('market-cycle-input-gg_stance-tone')).toBe('constructive');
+        });
+
+        it('shows an input without a stored tone as its word only, and tolerates a payload without input_tones', async () => {
+            const body = makeToneReportBody();
+            delete body.global.market_cycle_composite.payload.input_tones.gg_stance;
+            body.global.market_cycle_composite.payload.input_tones.inf_stance = 'display_only';
+            await openCycle(body);
+
+            expect(screen.queryByTestId('market-cycle-input-gg_stance-tone')).not.toBeInTheDocument();
+            expect(screen.getByTestId('market-cycle-input-gg_stance-stance').textContent).toBe('benign');
+            expect(screen.queryByTestId('market-cycle-input-inf_stance-tone')).not.toBeInTheDocument();
+            expect(toneOf('market-cycle-input-gc_stance-tone')).toBe('neutral');
+        });
+
+        it('renders the live payload (no input_tones yet) with plain stance words and no input indicators', async () => {
+            await openCycle(makeReportBody());
+
+            const inputs = screen.getByTestId('market-cycle-inputs');
+            expect(within(inputs).getAllByRole('listitem').map(li => li.textContent)).toEqual([
+                'Growthexpansion',
+                'Policyneutral',
+                'Inflationhot',
+                'Globalelevated_stress',
+            ]);
+            expect(inputs.querySelector('[data-tone], [role="img"]')).toBeNull();
+        });
+
+        it('shows the index as plain text, with no indicator and no price colour', async () => {
+            await openCycle();
+            const index = screen.getByTestId('market-cycle-index');
+            const value = (key: string) => screen.getByTestId(`market-cycle-index-${key}`).textContent;
+
+            expect(value('symbol')).toBe('SPY');
+            expect(value('phase')).toBe('bull_extended');
+            expect(value('drawdown')).toBe('\u22121.56%');
+            expect(value('vs-sma200')).toBe('+6.85%');
+            expect(value('sma200')).toBe('718.01');
+            expect(value('close')).toBe('767.18');
+            expect(value('crash')).toBe('no');
+            expect(index.querySelector('[data-tone], [role="img"], svg, .market-report-tone')).toBeNull();
+            index.querySelectorAll('*').forEach(el => expect(el.getAttribute('class') ?? '').not.toMatch(COLOUR_CLASS));
+        });
+
+        it('says "yes" for a crash warning and "—" for the 200DMA without one', async () => {
+            const body = makeToneReportBody();
+            Object.assign(body.global.market_cycle_composite.payload, { crash_warning: true, has_sma200: false });
+            await openCycle(body);
+
+            expect(screen.getByTestId('market-cycle-index-crash').textContent).toBe('yes');
+            expect(screen.getByTestId('market-cycle-index-sma200').textContent).toBe('—');
+            expect(screen.getByTestId('market-cycle-index-vs-sma200').textContent).toBe('—');
+        });
     });
 });
 
@@ -369,7 +532,7 @@ describe('Section 2 — instruments', () => {
         expect(screen.getByTestId('instrument-sp500-change').textContent).toBe('\u22120.08%');
         expect(screen.getByTestId('instrument-sp500-change')).toHaveClass('is-price-down');
         expect(screen.getByTestId('instrument-oil-change')).toHaveClass('is-price-up');
-        expect(screen.getByTestId('instrument-sp500-phase').textContent).toBe('bull extended');
+        expect(screen.getByTestId('instrument-sp500-phase').textContent).toBe('bull_extended');
         expect(screen.getByTestId('instrument-sp500-cycle')).toHaveTextContent('Drawdown from peak\u22121.56%');
         expect(screen.getByTestId('instrument-sp500-cycle')).toHaveTextContent('vs 200-day average+6.85%');
         expect(screen.getByTestId('instrument-sp500-basis')).toHaveTextContent('Windows: peak lookback 252 · crash 10/5 · SMA 200');
@@ -564,8 +727,8 @@ describe('guards', () => {
         const toggles = buttons.filter(b => b.classList.contains('ta-collapsible-card__toggle'));
         const disclosures = buttons.filter(b => b.classList.contains('market-report-reading__toggle'));
         expect(toggles).toHaveLength(4);
-        expect(disclosures).toHaveLength(5);
-        expect(buttons).toHaveLength(9);
+        expect(disclosures).toHaveLength(6);
+        expect(buttons).toHaveLength(10);
         expect(container.textContent).not.toMatch(/\b(buy|sell|refresh|retry)\b/i);
     });
 
@@ -577,21 +740,29 @@ describe('guards', () => {
     it('allows status colour only inside Section 1 (tone classes), and price colour only on change %', async () => {
         const { container } = await renderEverythingOpen();
         const overview = screen.getByTestId('market-overview');
+        // Inside Section 1, but plain: the index a composite read, and the untoned strip values.
+        const colourFree = ['market-cycle-index', 'strip-us10y_pct', 'strip-eur_usd'].map(id => screen.getByTestId(id));
+        const toned = (el: Element) => overview.contains(el) && !colourFree.some(zone => zone.contains(el));
         const offenders: string[] = [];
 
         container.querySelectorAll('*').forEach(el => {
             const classes = (el.getAttribute('class') ?? '').split(/\s+/).filter(c => COLOUR_CLASS.test(c));
             classes.forEach(cls => {
                 const allowed = overview.contains(el)
-                    ? SECTION1_TONE_CLASS.test(cls)
+                    ? toned(el) && SECTION1_TONE_CLASS.test(cls)
                     : PRICE_LAYOUT_CLASS.test(cls) || (PRICE_CLASS.test(cls) && el.classList.contains('market-report-instrument__change'));
                 if (!allowed) offenders.push(`${el.tagName.toLowerCase()}.${cls}`);
             });
-            if (el.hasAttribute('data-tone') && !overview.contains(el)) offenders.push(`${el.tagName.toLowerCase()}[data-tone]`);
+            if (el.hasAttribute('data-tone') && !toned(el)) offenders.push(`${el.tagName.toLowerCase()}[data-tone]`);
         });
 
         expect(offenders).toEqual([]);
         expect(overview.querySelectorAll('[data-tone]').length).toBeGreaterThan(20);
+        // The tone zones that must carry an indicator with the Section 1 fixture.
+        ['market-cycle-composite-tone', 'market-cycle-input-mp_stance-tone', 'strip-vix-tone'].forEach(id =>
+            expect(screen.getByTestId(id)).toHaveClass('market-report-tone')
+        );
+        colourFree.forEach(zone => expect(zone.querySelector('[role="img"], svg')).toBeNull());
         container.querySelectorAll('[data-testid="report-view"] > :not([data-testid="market-overview"])').forEach(section => {
             expect(section.querySelector('.market-report-tone, [data-tone], [role="img"]')).toBeNull();
         });
@@ -610,13 +781,18 @@ describe('guards', () => {
             .map(f => relative(SRC, f))
             .sort();
         expect(importers).toEqual([
+            'features/MarketReport/components/MarketCycleDetails/MarketCycleDetails.tsx',
+            'features/MarketReport/components/MarketOverview/MarketOverview.tsx',
             'features/MarketReport/components/ReadingCard/ReadingCard.tsx',
             'features/MarketReport/components/SignalGroups/SignalGroups.tsx',
         ]);
-        // ReadingCard is Section 1's card; it is rendered only by MarketOverview.
-        const readingCardUsers = sourceFiles(SRC, /\.tsx$/)
-            .filter(f => !/\.test\.tsx$/.test(f) && /from '\.\.\/ReadingCard'/.test(readFileSync(f, 'utf8')))
-            .map(f => relative(SRC, f));
-        expect(readingCardUsers).toEqual(['features/MarketReport/components/MarketOverview/MarketOverview.tsx']);
+        // ReadingCard, SignalGroups and MarketCycleDetails are Section 1's; only MarketOverview renders them.
+        const usersOf = (component: string) =>
+            sourceFiles(SRC, /\.tsx$/)
+                .filter(f => !/\.test\.tsx$/.test(f) && new RegExp(`from '\\.\\./${component}'`).test(readFileSync(f, 'utf8')))
+                .map(f => relative(SRC, f));
+        ['ReadingCard', 'SignalGroups', 'MarketCycleDetails'].forEach(component =>
+            expect(usersOf(component)).toEqual(['features/MarketReport/components/MarketOverview/MarketOverview.tsx'])
+        );
     });
 });

@@ -23,6 +23,7 @@ import {
     StanceSection,
     Tone,
     TONES,
+    VixValue,
 } from './types';
 
 type Json = Record<string, unknown>;
@@ -90,15 +91,6 @@ const datedValue: Reader<DatedValue> = (value, path) => {
     return { value: num(o.value, `${path}.value`), as_of: date(o.as_of, `${path}.as_of`) };
 };
 
-const macroStrip: Reader<MacroStrip> = (value, path) => {
-    const o = obj(value, path);
-    return {
-        vix: nullable(datedValue)(o.vix, `${path}.vix`),
-        us10y_pct: nullable(datedValue)(o.us10y_pct, `${path}.us10y_pct`),
-        eur_usd: nullable(datedValue)(o.eur_usd, `${path}.eur_usd`),
-    };
-};
-
 /**
  * The stored classification tone. Absent (reports generated before tones were
  * stored) or null → null; a string outside the known vocabulary → null too, so
@@ -106,6 +98,25 @@ const macroStrip: Reader<MacroStrip> = (value, path) => {
  */
 const tone: Reader<Tone | null> = (value, path) =>
     value === undefined || value === null ? null : TONES.includes(str(value, path) as Tone) ? (value as Tone) : null;
+
+/** Absent in reports generated before the VIX band was exposed: kept absent. */
+const vixValue: Reader<VixValue> = (value, path) => {
+    const o = obj(value, path);
+    return {
+        ...datedValue(o, path),
+        ...(o.regime === undefined ? {} : { regime: nullable(str)(o.regime, `${path}.regime`) }),
+        ...(o.tone === undefined ? {} : { tone: tone(o.tone, `${path}.tone`) }),
+    };
+};
+
+const macroStrip: Reader<MacroStrip> = (value, path) => {
+    const o = obj(value, path);
+    return {
+        vix: nullable(vixValue)(o.vix, `${path}.vix`),
+        us10y_pct: nullable(datedValue)(o.us10y_pct, `${path}.us10y_pct`),
+        eur_usd: nullable(datedValue)(o.eur_usd, `${path}.eur_usd`),
+    };
+};
 
 const macroSignal: Reader<MacroSignal> = (value, path) => {
     const o = obj(value, path);

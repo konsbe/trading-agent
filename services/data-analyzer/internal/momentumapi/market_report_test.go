@@ -198,6 +198,28 @@ func TestMarketReport_GlobalSectionsAndFreshness(t *testing.T) {
 	}
 }
 
+func TestMarketReport_VIXBandOnlyForTheSamePrint(t *testing.T) {
+	vixOf := func(in store.MarketReportInputs) map[string]any {
+		return reportBody(t, in, reportNow)["global"].(map[string]any)["macro"].(map[string]any)["vix"].(map[string]any)
+	}
+	in := reportFixture()
+	gen := in.Macro["mp_stance"].TS
+	v := 14.2
+	in.Macro["mc_vix_regime"] = store.MacroRow{Metric: "mc_vix_regime", TS: gen, Value: &v,
+		Payload: json.RawMessage(`{"vix":14.2,"regime":"normal","tone":"constructive","obs_date":"2026-09-22"}`)}
+	if got := vixOf(in); got["regime"] != "normal" || got["tone"] != "constructive" || got["value"] != 14.2 {
+		t.Errorf("same print: %v", got)
+	}
+	in.Macro["mc_vix_regime"] = store.MacroRow{Metric: "mc_vix_regime", TS: gen, Value: &v,
+		Payload: json.RawMessage(`{"vix":22.5,"regime":"elevated","tone":"neutral","obs_date":"2026-09-19"}`)}
+	if got := vixOf(in); got["regime"] != nil || got["tone"] != nil {
+		t.Errorf("a band from another VIXCLS print must not be served: %v", got)
+	}
+	if got := vixOf(reportFixture()); got["tone"] != nil || got["value"] != 14.2 {
+		t.Errorf("no stored band: %v", got)
+	}
+}
+
 func TestMarketReport_StoredTonePassesThrough(t *testing.T) {
 	g := reportBody(t, reportFixture(), reportNow)["global"].(map[string]any)
 	mp := g["monetary_policy"].(map[string]any)

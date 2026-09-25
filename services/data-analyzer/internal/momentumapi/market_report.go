@@ -61,6 +61,16 @@ type datedValue struct {
 	AsOf  string  `json:"as_of"`
 }
 
+// vixValue is the header VIX plus macro-analysis's stored band for that same
+// observation. Regime and Tone are nil when the stored band classified a
+// different VIXCLS print (or none), so a band never sits next to a number it
+// was not computed from.
+type vixValue struct {
+	datedValue
+	Regime *string `json:"regime"`
+	Tone   *string `json:"tone"`
+}
+
 type priceInfo struct {
 	Close     float64  `json:"close"`
 	ChangePct *float64 `json:"change_pct"`
@@ -192,7 +202,7 @@ func buildMarketReport(in store.MarketReportInputs, now time.Time, opts reportOp
 		return &datedValue{Value: p.Value, AsOf: p.TS.Format(time.DateOnly)}
 	}
 	global := map[string]any{
-		"macro": map[string]any{"vix": fred("VIXCLS"), "us10y_pct": fred("DGS10"), "eur_usd": fred("DEXUSEU")},
+		"macro": map[string]any{"vix": vixHeader(fred("VIXCLS"), in.Macro), "us10y_pct": fred("DGS10"), "eur_usd": fred("DEXUSEU")},
 	}
 	for _, sec := range stanceSections {
 		global[sec.key] = buildStance(in.Macro, sec.prefix, sec.stance)
@@ -320,6 +330,20 @@ func macroPayload(macro map[string]store.MacroRow, metric string) any {
 		"as_of":   row.TS.Format(time.DateOnly),
 		"payload": row.Payload,
 	}
+}
+
+func vixHeader(v *datedValue, macro map[string]store.MacroRow) any {
+	if v == nil {
+		return nil
+	}
+	out := vixValue{datedValue: *v}
+	if row, ok := macro["mc_vix_regime"]; ok {
+		if obs := payloadString(row.Payload, "obs_date"); obs != nil && *obs == v.AsOf {
+			out.Regime = payloadString(row.Payload, "regime")
+			out.Tone = payloadString(row.Payload, "tone")
+		}
+	}
+	return out
 }
 
 // payloadString returns a non-empty string field of a JSON payload, else nil.
