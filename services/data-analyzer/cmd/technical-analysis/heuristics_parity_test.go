@@ -31,7 +31,7 @@ func TestComputeAtMatchesWorkerPayloads(t *testing.T) {
 		window := heuristics.Window(bars, i, cfg.ComputeLookback)
 		got := map[string]map[string]any{}
 		vals := map[string]*float64{}
-		indicatorEmitter{cfg: cfg}.emit(window, func(name string, v *float64, payload any) {
+		technical.Emitter{Cfg: cfg}.Emit(window, func(name string, v *float64, payload any) {
 			var m map[string]any
 			if payload != nil {
 				jb, _ := json.Marshal(payload)

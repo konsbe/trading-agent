@@ -13,6 +13,7 @@ import (
 
 	"github.com/konsbe/trading-agent/services/data-analyzer/internal/compute"
 	"github.com/konsbe/trading-agent/services/data-analyzer/internal/config"
+	"github.com/konsbe/trading-agent/services/data-analyzer/internal/technical"
 )
 
 var updateGolden = flag.Bool("update", false, "rewrite testdata/indicators_golden.json from the current emitter")
@@ -96,7 +97,7 @@ func emitAll(t *testing.T, cfg config.TechnicalAnalysis, bars []compute.Bar) []e
 	var out []emitted
 	for _, n := range []int{3, 30, 61, 120, 260, 499, 500} {
 		window := bars[len(bars)-n:]
-		indicatorEmitter{cfg: cfg}.emit(window, func(indicator string, value *float64, payload any) {
+		technical.Emitter{Cfg: cfg}.Emit(window, func(indicator string, value *float64, payload any) {
 			var jb []byte
 			if payload != nil {
 				var err error
