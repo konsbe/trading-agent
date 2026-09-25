@@ -529,8 +529,8 @@ The standard CMH / Robins-Breslow-Greenland confidence interval understated
 uncertainty by roughly **1.9–4.5x** in width against the month-block
 bootstrap, across every hypothesis tested here, because it treats overlapping
 label windows and same-day episodes as independent (§5f). H2 shows the
-consequence: the naive lockbox interval excluded no effect, the
-clustering-aware one did not. **Any future hypothesis test on this dataset
+consequence: in the lockbox the naive interval ([1.090, 1.220]) excluded
+an OR of 1.0, while the clustering-aware one ([0.971, 1.379]) did not. **Any future hypothesis test on this dataset
 should use a clustering-aware interval (block bootstrap by calendar month or
 finer) as its primary uncertainty estimate from the start, and pre-register
 its bar.**
