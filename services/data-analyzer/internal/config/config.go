@@ -1101,6 +1101,21 @@ type MarketCycle struct {
 	BullExtendedSMAPct float64
 	PeakLookback       int
 	SMAPeriod          int
+
+	// Per-instrument price phase (Daily Market Report). Written as one
+	// mc_price_phase:<SYMBOL> row each, beside — never instead of — the
+	// Symbol/composite row above that the Discord report reads.
+	Instruments      []string // equity/ETF symbols, daily bars from equity_ohlcv
+	IncludeWatchlist bool     // also every symbol on any watchlist
+	// Crypto trades 24/7 with a 00:00 UTC daily candle, so its windows are in
+	// calendar days: the 200-day SMA stays 200 bars (the crypto convention),
+	// but the one-year peak is 365 bars (not 252 sessions) and the crash
+	// windows are 14/7 days (not 10/5 sessions) so each still means the same span.
+	CryptoInstruments     []string
+	CryptoInterval        string
+	CryptoPeakLookback    int
+	CryptoCrashHighWindow int
+	CryptoCrashCloseBars  int
 }
 
 // LoadMarketCycle reads MARKET_CYCLE_* env vars.
@@ -1119,7 +1134,22 @@ func LoadMarketCycle() MarketCycle {
 		BullExtendedSMAPct: floatEnv("MARKET_CYCLE_BULL_EXTENDED_SMA_PCT", 0.05),
 		PeakLookback:       intEnv("MARKET_CYCLE_PEAK_LOOKBACK", 252),
 		SMAPeriod:          intEnv("MARKET_CYCLE_SMA_PERIOD", 200),
+
+		Instruments:           csvOrDefault("MARKET_CYCLE_INSTRUMENTS", []string{"SPY", "GLD", "USO", "SHEL"}),
+		IncludeWatchlist:      boolEnv("MARKET_CYCLE_INCLUDE_WATCHLIST", true),
+		CryptoInstruments:     csvOrDefault("MARKET_CYCLE_CRYPTO_INSTRUMENTS", []string{"BTCUSDT"}),
+		CryptoInterval:        strEnvDefault("MARKET_CYCLE_CRYPTO_INTERVAL", "1d"),
+		CryptoPeakLookback:    intEnv("MARKET_CYCLE_CRYPTO_PEAK_LOOKBACK", 365),
+		CryptoCrashHighWindow: intEnv("MARKET_CYCLE_CRYPTO_CRASH_HIGH_WINDOW", 14),
+		CryptoCrashCloseBars:  intEnv("MARKET_CYCLE_CRYPTO_CRASH_CLOSE_BARS", 7),
 	}
+}
+
+func csvOrDefault(key string, def []string) []string {
+	if v := splitCSV(key); len(v) > 0 {
+		return v
+	}
+	return def
 }
 
 // MacroCorrelation enables mc_macro_correlation (cross-metric regime label after other macro passes).

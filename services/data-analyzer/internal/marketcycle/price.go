@@ -18,6 +18,10 @@ type Thresholds struct {
 	BullExtendedSMAPct float64 // close >= SMA200 × (1+x) e.g. 0.05
 	PeakLookback       int     // trading bars for peak (e.g. 252)
 	SMAPeriod          int     // e.g. 200
+	// Crash windows in bars; 0 keeps the original 10 / 5 (sessions). Crypto
+	// passes 14 / 7 so they still span two weeks / one week of calendar days.
+	CrashHighWindow int
+	CrashCloseBars  int
 }
 
 // PriceResult is derived from daily OHLCV only.
@@ -92,21 +96,28 @@ func AnalyzePrice(symbol string, bars []store.EquityOHLCVBar, t Thresholds) Pric
 	}
 
 	// Crash: violent short-term move (HTML "Market Crash" card)
+	highWin, closeBars := t.CrashHighWindow, t.CrashCloseBars
+	if highWin <= 0 {
+		highWin = 10
+	}
+	if closeBars <= 0 {
+		closeBars = 5
+	}
 	crash := false
-	if n >= 10 {
-		h10 := bars[n-10].High
-		for i := n - 9; i < n; i++ {
-			if bars[i].High > h10 {
-				h10 = bars[i].High
+	if n >= highWin {
+		hi := bars[n-highWin].High
+		for i := n - highWin + 1; i < n; i++ {
+			if bars[i].High > hi {
+				hi = bars[i].High
 			}
 		}
-		if h10 > 0 && (last.Close-h10)/h10 <= t.CrashVs10DHighPct {
+		if hi > 0 && (last.Close-hi)/hi <= t.CrashVs10DHighPct {
 			crash = true
 		}
 	}
-	if n >= 6 {
-		c5 := bars[n-6].Close
-		if c5 > 0 && (last.Close-c5)/c5 <= t.CrashVs5BarPct {
+	if n >= closeBars+1 {
+		c := bars[n-closeBars-1].Close
+		if c > 0 && (last.Close-c)/c <= t.CrashVs5BarPct {
 			crash = true
 		}
 	}

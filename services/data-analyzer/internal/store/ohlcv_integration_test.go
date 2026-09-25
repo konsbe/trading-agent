@@ -133,3 +133,71 @@ VALUES ($1, $2, '1Day', $3, $3, $3, $3, 1000000, $4)`, r.ts, sym, r.close, r.sou
 		}
 	}
 }
+
+// One row per day, the preferred source winning: a symbol with both Tiingo and
+// Yahoo daily bars used to come back twice per day.
+func TestQueryEquityOHLCVAsc_OneRowPerDayPreferredSourceWins(t *testing.T) {
+	ctx := context.Background()
+	tx := fixtureTx(t)
+	const sym = "ZZDUPE"
+	for d := 1; d <= 3; d++ {
+		ts := time.Date(2099, 8, d, 0, 0, 0, 0, time.UTC)
+		for _, row := range []struct {
+			src   string
+			close float64
+		}{{"yahoo_finance", 50}, {"tiingo", 100}} {
+			if _, err := tx.Exec(ctx, `
+INSERT INTO equity_ohlcv (ts, symbol, interval, open, high, low, close, volume, source)
+VALUES ($1, $2, '1Day', $3, $3, $3, $3, 1, $4)`, ts, sym, row.close, row.src); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	got, err := QueryEquityOHLCVAsc(ctx, tx, sym, "1Day", 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 3 {
+		t.Fatalf("got %d rows, want 3 (one per day)", len(got))
+	}
+	for i, b := range got {
+		if b.Close != 100 {
+			t.Errorf("day %d close = %v, want Tiingo's 100", i+1, b.Close)
+		}
+		if i > 0 && !b.TS.After(got[i-1].TS) {
+			t.Errorf("not oldest-first at %d", i)
+		}
+	}
+}
+
+// The still-open current-day candle is excluded; REST wins over websocket.
+func TestQueryCryptoClosedDailyAsc_ExcludesTheOpenCandle(t *testing.T) {
+	ctx := context.Background()
+	tx := fixtureTx(t)
+	now := time.Date(2099, 9, 3, 15, 0, 0, 0, time.UTC) // day 3's candle still open
+	for d := 1; d <= 3; d++ {
+		ts := time.Date(2099, 9, d, 0, 0, 0, 0, time.UTC)
+		for _, row := range []struct {
+			src   string
+			close float64
+		}{{"binance_ws", 1}, {"binance_rest", 2}} {
+			if _, err := tx.Exec(ctx, `
+INSERT INTO crypto_ohlcv (ts, exchange, symbol, interval, open, high, low, close, volume, source)
+VALUES ($1, 'binance', 'ZZBTC', '1d', $2, $2, $2, $2, 1, $3)`, ts, row.close, row.src); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	got, err := QueryCryptoClosedDailyAsc(ctx, tx, "ZZBTC", "1d", 10, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 2 || got[1].TS.Day() != 2 {
+		t.Fatalf("got %d candles (last %v), want days 1-2 only: day 3 is still open", len(got), got)
+	}
+	for _, b := range got {
+		if b.Close != 2 {
+			t.Errorf("close = %v, want the REST row", b.Close)
+		}
+	}
+}

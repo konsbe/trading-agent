@@ -1957,6 +1957,8 @@ func (w *worker) analyzeMarketCycles(ctx context.Context) {
 		"dd_pct", fmt.Sprintf("%.2f", pr.DrawdownPct*100),
 		"vs_sma200", fmt.Sprintf("%.2f", pr.PctVsSMA200),
 	)
+
+	w.analyzeInstrumentCycles(ctx, ts, th)
 }
 
 // analyzeMacroCorrelations blends latest stance/regime strings from macro_derived into one
