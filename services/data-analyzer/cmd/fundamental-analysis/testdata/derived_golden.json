@@ -181,7 +181,7 @@
   "payload": {
    "rule": "EPS growth \u003e10% with FCF yield \u003c2% = suspect earnings quality",
    "quality": "warning_eps_growing_fcf_low",
-   "fcf_yield_pct": 0.0000015319518340672151,
+   "fcf_yield_pct": 1.5319518340672151,
    "eps_growth_ttm_yoy_pct": 31.56
   }
  },
@@ -189,12 +189,12 @@
   "symbol": "ZZFAFULL",
   "metric": "fcf_yield",
   "period": "derived",
-  "value": 0.0000015319518340672151,
+  "value": 1.5319518340672151,
   "payload": {
    "tier": "avoid",
    "source": "fcf_reported ÷ market_cap × 100 (XBRL fallback)",
    "thresholds": "\u003e5% attractive, 2-5% fair, \u003c2% avoid",
-   "fcf_yield_pct": 0.0000015319518340672151
+   "fcf_yield_pct": 1.5319518340672151
   }
  },
  {
@@ -510,7 +510,7 @@
   "symbol": "ZZFAFULL",
   "metric": "t3_dcf",
   "period": "derived",
-  "value": 275492292.85672104,
+  "value": 275.49229285672106,
   "payload": {
    "note": "simplified 5-year DCF — use as directional check, not precise target",
    "tier": "downside_risk",
@@ -520,9 +520,9 @@
    "growth_years": 5,
    "growth_rate_pct": 14.57,
    "dcf_value_millions": 1329681.4811095835,
-   "market_cap_millions": 3663170000000,
+   "market_cap_millions": 3663170,
    "terminal_growth_pct": 3,
-   "market_cap_vs_dcf_pct": 275492292.85672104
+   "market_cap_vs_dcf_pct": 275.49229285672106
   }
  },
  {
@@ -569,13 +569,13 @@
   "symbol": "ZZFAFULL",
   "metric": "t3_ps_ratio",
   "period": "derived",
-  "value": 21793167.864451952,
+  "value": 21.793167864451952,
   "payload": {
    "note": "compare within sector; SaaS 5-15× is normal, industrials \u003e3× is expensive",
    "tier": "speculative",
-   "ps_ratio": 21793167.864451952,
+   "ps_ratio": 21.793167864451952,
    "thresholds": "\u003c5× value, 5-10× fair, 10-15× growth premium, \u003e15× speculative",
-   "market_cap_millions": 3663170000000,
+   "market_cap_millions": 3663170,
    "revenue_ttm_millions": 168088
   }
  },

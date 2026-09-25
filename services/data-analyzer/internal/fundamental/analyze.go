@@ -268,15 +268,15 @@ func (w *analyzer) score(ctx context.Context, symbol string, rows []store.Fundam
 		fcfYield = ptr(fy * 100) // Finnhub returns as decimal (0.05 = 5%)
 		fcfYieldSource = "fcf_yield_1y × 100"
 	} else if fcf, okF := latest["fcf_ttm"]; okF {
-		if mktCap, okM := latest["market_cap"]; okM && mktCap > 0 {
+		if mktCap, okM := marketCapMillions(latest); okM {
 			fy := fcf / mktCap * 100
 			fcfYield = ptr(fy)
 			fcfYieldSource = "fcf_ttm ÷ market_cap × 100"
 		}
 	} else if fcf, okF := latest["fcf_reported"]; okF && fcf > 0 {
 		// Fallback: use XBRL-derived FCF (operating CF − CapEx, in millions).
-		// Both fcf_reported and market_cap are in millions → ratio is unit-clean.
-		if mktCap, okM := latest["market_cap"]; okM && mktCap > 0 {
+		// fcf_reported and marketCapMillions are both in millions.
+		if mktCap, okM := marketCapMillions(latest); okM {
 			fy := fcf / mktCap * 100
 			fcfYield = ptr(fy)
 			fcfYieldSource = "fcf_reported ÷ market_cap × 100 (XBRL fallback)"
@@ -1142,7 +1142,7 @@ func (w *analyzer) scoreTier3(ctx context.Context, symbol string, rows []store.F
 	// FCF source: fcf_ttm (Finnhub TTM) or fcf_reported (XBRL operating CF − CapEx).
 	// TODO: Python — add Monte Carlo scenario ranges; CAPM-derived WACC from FRED.
 	if fcfM > 0 {
-		if mktCap, okM := latest["market_cap"]; okM && mktCap > 0 {
+		if mktCap, okM := marketCapMillions(latest); okM {
 			// Choose the most conservative FCF growth estimate available.
 			growthPct := cfg.DCFMaxGrowthPct
 			if eg5, ok := latest["eps_growth_5y"]; ok && eg5 < growthPct {
@@ -1330,11 +1330,11 @@ func (w *analyzer) scoreTier3(ctx context.Context, symbol string, rows []store.F
 
 	// ── T3.8 Price-to-Sales (P/S) Ratio (rank 19) ─────────────────────────────
 	// P/S = Market Cap ÷ TTM Revenue. Most useful for unprofitable / early-stage growth.
-	// Both market_cap and revTTM are in millions → ratio is unit-clean.
+	// marketCapMillions and revTTM are both in millions.
 	// Revenue source: revenue_ttm (Finnhub TTM) or revenue_reported (XBRL, in millions).
 	// Thresholds: FUNDAMENTAL_PS_VALUE (5×) / _FAIR (10×) / _SPECULATIVE (15×).
 	// Compare within sector — SaaS/tech commands higher P/S than industrials or retail.
-	if mktCap, okM := latest["market_cap"]; okM && mktCap > 0 {
+	if mktCap, okM := marketCapMillions(latest); okM {
 		if revTTM > 0 {
 			ps := mktCap / revTTM
 			tier := "fairly_valued"
@@ -2346,3 +2346,14 @@ func classifyNetMargin(pct, strong, avg float64) string {
 }
 
 func absFloat(f float64) float64 { return math.Abs(f) }
+
+// marketCapMillions returns market_cap in millions of USD. data-fundamental
+// stores it in USD (shared/schemas/SCHEMAS.md) while every FCF and revenue
+// figure it is divided against is in millions.
+func marketCapMillions(latest map[string]float64) (float64, bool) {
+	v, ok := latest["market_cap"]
+	if !ok || v <= 0 {
+		return 0, false
+	}
+	return v / 1e6, true
+}
