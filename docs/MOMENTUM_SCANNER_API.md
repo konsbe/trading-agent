@@ -398,6 +398,17 @@ For the detail chart. `range` ∈ `1D`, `5D`, `1M`, `6M`, `1Y`, `ALL` (required)
 - `time` is unix seconds (UTC). Cached 5 minutes per symbol + range.
 - Errors: `400 invalid_range` / `invalid_symbol`, `404 no_data_for_symbol`.
 
+### 2.7 Endpoints specified in the full-stock-analysis addendum
+
+Documented in `docs/MOMENTUM_SCANNER_FULL_STOCK_ANALYSIS_API.md`, listed here so
+this section stays the endpoint index:
+
+| Route | Where |
+|---|---|
+| `GET /api/v1/scanner/today/{symbol}/analysis` | §2.5 — any symbol with daily bars (`scanner_data` flags whether the scanner has a row); `202 computing` → `200 ready` |
+| `GET /api/v1/alerts?symbol=&since=&limit=` | §3.2 — `fired_alerts`, newest first, default limit 100 (max 500) |
+| `recent_alert` on each `/today` candidate | §4.1 — see §2.2 above |
+
 ---
 
 ## 3. Non-functional requirements

@@ -38,6 +38,7 @@ type Store interface {
 	TrackedCounts(ctx context.Context) (store.TrackedCounts, error)
 	AnalysisFreshness(ctx context.Context, symbol string) (store.AnalysisFreshness, error)
 	Analysis(ctx context.Context, symbol string) (store.AnalysisInputs, error)
+	ListAlerts(ctx context.Context, f store.AlertFilter) ([]store.AlertRow, error)
 	Ping(ctx context.Context) error
 }
 
@@ -109,6 +110,9 @@ func (s DBStore) AnalysisFreshness(ctx context.Context, sym string) (store.Analy
 }
 func (s DBStore) Analysis(ctx context.Context, sym string) (store.AnalysisInputs, error) {
 	return store.LoadAnalysis(ctx, s.Q, sym, AnalysisInterval, analysisHeadlines)
+}
+func (s DBStore) ListAlerts(ctx context.Context, f store.AlertFilter) ([]store.AlertRow, error) {
+	return store.ListAlerts(ctx, s.Q, f)
 }
 func (s DBStore) Ping(ctx context.Context) error { return s.PingFn(ctx) }
 
@@ -250,6 +254,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/backtest-lab/report", s.handleBacktestReport)
 	mux.HandleFunc("GET /api/v1/data-sources/status", s.handleDataSourcesStatus)
 	mux.HandleFunc("GET /api/v1/market-report/today", s.handleMarketReport)
+	mux.HandleFunc("GET /api/v1/alerts", s.handleAlerts)
 	return s.cors(mux)
 }
 

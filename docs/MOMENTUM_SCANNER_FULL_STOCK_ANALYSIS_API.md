@@ -455,6 +455,49 @@ Response: array of `fired_alerts` rows, each carrying `severity` (§2.3)
 and the plain message text. No recomputation — this endpoint only reads
 what the scan job already wrote.
 
+#### As built (2026-09-26)
+
+`internal/momentumapi/alerts.go`, `internal/store/alerts.go`. Read-only over
+`fired_alerts`, newest first (`fired_at DESC, id DESC`).
+
+| Parameter | Meaning |
+|---|---|
+| `symbol` | optional; case-insensitive, exact match (equity or crypto symbol, e.g. `TSM`, `BTCUSDT`) |
+| `since` | optional; `YYYY-MM-DD`, rows with `fired_at >=` that date's **00:00 UTC** |
+| `limit` | optional; default **100**, max **500** |
+
+`symbol` and `since` combine (AND). **With neither, the response is the newest
+`limit` rows** — the Alarm History feed — so every request is bounded by
+`limit`, never unbounded. `has_more: true` means more rows matched than were
+returned (narrow with `since` / `symbol` or raise `limit`); there is no cursor.
+
+```json
+{
+  "symbol": "TSM",
+  "since": "2026-09-25",
+  "limit": 100,
+  "has_more": false,
+  "alerts": [
+    {"id": 41, "symbol": "TSM", "exchange_type": "equity",
+     "alert_type": "liquidity_sweep", "interval": "1Day", "value": 4,
+     "severity": "notice", "message": "Liquidity sweep detected (4 sweeps)",
+     "fired_at": "2026-09-25T20:14:06Z"}
+  ]
+}
+```
+
+- `symbol` / `since` echo the filters applied, `null` when not given.
+  `alerts` is `[]` when nothing matches (still `200`). `value` is `null` when
+  the alert has no numeric value. `fired_at` is RFC3339 UTC. Crypto and equity
+  rows are both served (`exchange_type` tells them apart).
+- Errors: `400 invalid_symbol` / `invalid_since` (not `YYYY-MM-DD`) /
+  `invalid_limit` (not an integer in 1–500); `503 database_unavailable`;
+  `500 internal_error` for a failing query against a reachable DB. It does
+  **not** depend on a scan existing (no `no_scan_available`).
+- Same CORS and (absent) auth as the rest of momentum-api. **Not cached**: the
+  bot's scan adds rows every 5 minutes, and each query shape is bounded by its
+  index (`(symbol, fired_at DESC)` or `(fired_at DESC)`).
+
 ---
 
 ## 4. Candidates-page alert badge

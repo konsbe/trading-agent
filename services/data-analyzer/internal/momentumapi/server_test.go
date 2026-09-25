@@ -58,6 +58,9 @@ type fakeStore struct {
 	reportErr   error
 	reportCalls int
 
+	alerts       []store.AlertRow // newest first, as the query orders them
+	alertFilters []store.AlertFilter
+
 	tracked       []store.TrackedPositionRow
 	trackedCounts store.TrackedCounts
 	trackedAsked  []string
