@@ -219,7 +219,28 @@ later patched" do not blur). Findings that shape what "as live" means:
   testable number.
 - **Still open:** the binary outcome behind the MH OR (proposed: sign of
   `fwd_return_10s` in the hypothesis direction). To be confirmed in writing
-  before step 5.
+  before step 5. *(Resolved in Amendment 3.)*
+
+## 5c. Amendment 3 — hit definition, decided 2026-09-25, before step 5, blind to any outcome
+
+A **hit** is `fwd_return_10s` beyond a fixed **±3.0%** threshold in the
+hypothesis direction, not merely nonzero in that direction:
+
+| Direction | Hypotheses | Hit |
+|---|---|---|
+| negative | H1, H4, H6, H8b, H10 | `fwd_return_10s <= -3.0` |
+| positive | H2, H3, H7, H8a, H9 | `fwd_return_10s >= +3.0` |
+
+The same definition applies to the comparison group (non-signal days in the
+same stratum). This is a second layer, not a replacement: the threshold
+defines what a hit is; the MH OR ≥ 1.25 and ≥ 3.0pp within-stratum floors
+then ask whether signal episodes hit meaningfully more often than the
+comparison group. A loose hit definition would give every signal some
+apparent edge, so both are fixed here.
+
+H5 is unaffected: it makes no directional claim and keeps its ≥ 1.25x
+relative-lift floor on `fwd_abs_move_10s`. The 5- and 20-session columns
+are secondary context and use the same ±3.0% threshold.
 
 **Lockbox handling in the replay.** An episode is lockbox if its date is in
 2025-03-28..2026-03-27, or its 20-session label window reaches into it, for a
