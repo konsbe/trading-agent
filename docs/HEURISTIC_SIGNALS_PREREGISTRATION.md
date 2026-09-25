@@ -242,6 +242,43 @@ H5 is unaffected: it makes no directional claim and keeps its ≥ 1.25x
 relative-lift floor on `fwd_abs_move_10s`. The 5- and 20-session columns
 are secondary context and use the same ±3.0% threshold.
 
+## 5d. Amendment 4 — what the signals mean as implemented (2026-09-25, after the replay, before step 5)
+
+Factual record of how each signal fires in the live code the replay reproduces
+(harness v1, commits `57f5f57`, `14bd024`, `41f27ae`). Only episode counts
+existed when this was written; no label or outcome had been read.
+
+- **H6/H7:** `DetectFlag` checks only the shape of the last 15 bars (pole plus
+  contained consolidation); there is no breakout confirmation. H&S
+  "confirmed" = neckline break at t.
+- **H8a/H8b:** the detector records a sweep only when the bar already closed
+  back inside the swept level, so "close back above/below" is always true.
+  H8a = any low sweep on day t; H8b = any high sweep on day t.
+- **H9 (`buy_watch_c4`):** low sweep + closed back above + bullish order block
+  + uptrend. VIX is not a confluence point, only a veto that cannot fire when
+  the trend is up, so VIX has no effect on H9.
+- **H10 (`trim_watch_c4`):** high sweep + closed back below + bearish order
+  block + downtrend, the full 4-point version (the rule has no VIX check).
+  "3-condition variant" in §3 does not match the live rule; 4/4 per
+  Amendment 2 applies.
+- **The live rule reads the most recent sweep in the 50-bar window**, not a
+  sweep on day t. H9/H10 can therefore fire up to ~50 sessions after the
+  sweep, and restart when the order-block or trend input flips. Reproduced as
+  live, per the "test what's live" decision.
+- **"Order block nearby" has no distance test:** any non-invalidated order
+  block in the last 100 bars counts.
+- **Parameters:** as live `.env` (e.g. H&S tolerance 5.0, not the code default
+  15.0). A day is evaluated only once its window has ≥ 252 bars; windows are
+  capped at 500 bars like the worker.
+- **VIX point-in-time:** latest VIXCLS dated ≤ t. Moot for H9/H10 (above).
+
+**Denominator note for step 5.** Episode counts are large (64k–235k per
+signal over 2,482 symbols and ~10 years), but episodes are not independent:
+the 10-session label windows overlap within a symbol (5-session episode gap),
+and many episodes fire on the same market days. The purged walk-forward folds
+and within-stratum CMH are as pre-registered; results must be read with this
+dependence in mind, not as 100k+ independent trials.
+
 **Lockbox handling in the replay.** An episode is lockbox if its date is in
 2025-03-28..2026-03-27, or its 20-session label window reaches into it, for a
 symbol outside `momentum_pilot_cohort`. Lockbox episodes are written with
