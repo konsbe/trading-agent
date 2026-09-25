@@ -19,6 +19,7 @@ export const makeCandidate = (overrides: Partial<Candidate> = {}): Candidate => 
     momentum_score_100: 53,
     score_attainable: 75,
     score_status: 'unvalidated',
+    recent_alert: null,
     ...overrides,
 });
 
@@ -249,9 +250,14 @@ export const makeWatchlist = (symbols: string[] = []): WatchlistResponse => ({
 });
 
 /** Minimal `fetch` Response stand-in (jsdom has no Response). */
-export const mockResponse = (status: number, body: unknown, { raw = false } = {}): Response =>
+export const mockResponse = (
+    status: number,
+    body: unknown,
+    { raw = false, headers = {} }: { raw?: boolean; headers?: Record<string, string> } = {}
+): Response =>
     ({
         ok: status >= 200 && status < 300,
         status,
+        headers: { get: (name: string) => headers[name] ?? null },
         text: () => Promise.resolve(raw ? String(body) : body === undefined ? '' : JSON.stringify(body)),
     }) as unknown as Response;

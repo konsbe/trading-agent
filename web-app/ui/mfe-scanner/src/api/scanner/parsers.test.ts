@@ -9,6 +9,22 @@ describe('parseScannerToday', () => {
         expect(parseScannerToday(clone(body))).toEqual(body);
     });
 
+    it('parses recent_alert, and reads a missing one as null', () => {
+        const body = clone(makeTodayResponse());
+        const alert = { alert_type: 'liquidity_sweep', severity: 'notice', message: 'Liquidity sweep detected (4 sweeps)', fired_at: '2026-09-25T18:08:00Z' };
+        body.buckets.market.candidates[0].recent_alert = alert;
+        delete body.buckets.market.candidates[1].recent_alert;
+        const [alerted, quiet] = parseScannerToday(body).buckets.market.candidates;
+        expect(alerted.recent_alert).toEqual(alert);
+        expect(quiet.recent_alert).toBeNull();
+    });
+
+    it('rejects a recent_alert without a severity', () => {
+        const body = clone(makeTodayResponse());
+        body.buckets.market.candidates[0].recent_alert = { alert_type: 'rsi_overbought', message: 'm', fired_at: 't' };
+        expect(() => parseScannerToday(body)).toThrow(/recent_alert\.severity/);
+    });
+
     it('keeps both buckets even when empty', () => {
         const parsed = parseScannerToday(clone(makeTodayResponse()));
         expect(parsed.buckets.penny).toEqual({ total_candidates: 0, candidates: [] });

@@ -1,5 +1,7 @@
 /** Types for momentum-api v1 — docs/MOMENTUM_SCANNER_API.md §2. */
 
+import type { Severity } from './analysisTypes';
+
 export type Bucket = 'market' | 'penny';
 
 export const BUCKETS: readonly Bucket[] = ['market', 'penny'];
@@ -48,6 +50,16 @@ export interface Candidate {
     /** This row's practical ceiling (e.g. 75 while catalyst_tier is null); null exactly when the score is. */
     score_attainable: number | null;
     score_status: ScoreStatus;
+    /** Most recent fired alert for the symbol (addendum §4); null when none. */
+    recent_alert: RecentAlert | null;
+}
+
+/** A `fired_alerts` row as served on the candidates list; `severity` is the API's, never re-derived. */
+export interface RecentAlert {
+    alert_type: string;
+    severity: Severity;
+    message: string;
+    fired_at: string;
 }
 
 export interface BucketResult {

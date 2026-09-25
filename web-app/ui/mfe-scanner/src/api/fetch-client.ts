@@ -61,13 +61,16 @@ export type HttpMethod = 'GET' | 'PUT' | 'DELETE';
 export const getJson = <T>(path: string, parse: Parser<T>, options: RequestOptions = {}): Promise<T> =>
     requestJson('GET', path, parse, options);
 
-/** JSON request without a body (the API's PUT/DELETE take the symbol from the path). */
-export async function requestJson<T>(
-    method: HttpMethod,
-    path: string,
-    parse: Parser<T>,
-    { signal }: RequestOptions = {}
-): Promise<T> {
+/** A response whose status the caller interprets itself (e.g. 202 `computing`). */
+export interface RawJsonResponse {
+    status: number;
+    ok: boolean;
+    body: unknown;
+    header: (name: string) => string | null;
+}
+
+/** Sends the request and reads the JSON body without judging the status; only transport failures throw. */
+export async function requestRaw(method: HttpMethod, path: string, { signal }: RequestOptions = {}): Promise<RawJsonResponse> {
     const url = `${getMomentumApiBaseUrl()}${path}`;
 
     let response: Response;
@@ -81,14 +84,31 @@ export async function requestJson<T>(
     }
 
     const body = await readJson(response);
+    return {
+        status: response.status,
+        ok: response.ok,
+        body,
+        header: name => response.headers?.get?.(name) ?? null,
+    };
+}
 
-    if (!response.ok) {
-        throw new ApiError(response.status, errorCodeFrom(body, response.status));
-    }
+/** Throws the API's error code for a non-2xx response. */
+export const throwForStatus = ({ status, body }: RawJsonResponse): never => {
+    throw new ApiError(status, errorCodeFrom(body, status));
+};
 
+/** Runs `parse`, reporting a shape mismatch as `invalid_response`. */
+export const parseOrThrow = <T>(parse: Parser<T>, body: unknown, status: number): T => {
     try {
         return parse(body);
     } catch (err) {
-        throw new ApiError(response.status, CLIENT_ERROR_CODES.invalidResponse, (err as Error).message);
+        throw new ApiError(status, CLIENT_ERROR_CODES.invalidResponse, (err as Error).message);
     }
+};
+
+/** JSON request without a body (the API's PUT/DELETE take the symbol from the path). */
+export async function requestJson<T>(method: HttpMethod, path: string, parse: Parser<T>, options: RequestOptions = {}): Promise<T> {
+    const response = await requestRaw(method, path, options);
+    if (!response.ok) throwForStatus(response);
+    return parseOrThrow(parse, response.body, response.status);
 }

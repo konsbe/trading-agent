@@ -18,6 +18,7 @@ export const getMomentumApiBaseUrl = (): string => {
 export const SCANNER_ENDPOINTS = {
     today: '/api/v1/scanner/today',
     symbol: (symbol: string) => `/api/v1/scanner/today/${encodeURIComponent(symbol)}`,
+    analysis: (symbol: string) => `/api/v1/scanner/today/${encodeURIComponent(symbol)}/analysis`,
     bars: (symbol: string, range: string) =>
         `/api/v1/scanner/symbols/${encodeURIComponent(symbol)}/bars?range=${encodeURIComponent(range)}`,
     watchlist: '/api/v1/watchlist',

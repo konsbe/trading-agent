@@ -1,0 +1,152 @@
+import { AnalysisPending, StockAnalysis } from '@/api';
+
+export const HEURISTIC_CAVEAT =
+    'Classical pattern signals (head & shoulders, liquidity sweeps, order blocks, BUY/TRIM labels) were tested against this project\'s own history -- no hypothesis confirmed.';
+
+export const COMPUTING_MESSAGE = 'Computing analysis for this symbol -- first view only';
+
+export const FAILED_MESSAGE = 'Computing the analysis for this symbol failed; it will be retried on a later request.';
+
+/** A §2.1-shaped ready body (TSM example), with RSI flagged overbought and VIX elevated. */
+export const makeAnalysis = (overrides: Partial<StockAnalysis> = {}): StockAnalysis => ({
+    symbol: 'TSM',
+    status: 'ready',
+    scanner_data: true,
+    as_of: '2026-09-25',
+    fundamentals_computed_at: '2026-09-25T20:00:00Z',
+    sections: { technical: 'ready', fundamentals: 'ready' },
+    technical: {
+        rsi_14: { value: 75.1, band: 'overbought', severity: 'notice' },
+        macd: { hist: 0.588, cross: 'bullish' },
+        adx_14: { value: 25.7, band: 'strong_trend' },
+        trend: { direction: 'sideways', slope_pct: 0.04 },
+        ma_cross: 'golden_cross',
+        atr_14: 12.735,
+        bb_squeeze: { active: false, severity: null },
+        vix_regime: { value: 26.2, band: 'elevated', severity: 'warning' },
+        pivots: { pp: 335.97, r1: 345.14, s1: 329.87 },
+        smc: { fvgs_active: 2, obs_active: 7, liq_sweeps: 4 },
+    },
+    fundamentals: {
+        composite: { score: 0.7, tier: 'strong' },
+        eps_strength: 'strong',
+        revenue: 'strong',
+        pe_vs_5y: { value: 12.4, band: 'expensive' },
+        fcf_yield: { value: 3.25, tier: 'fair' },
+        gross_margin: { value: 59.89, tier: 'excellent', trend: 'improving' },
+        net_margin: { value: 45.1, tier: 'excellent', trend: null },
+        ttm_pe: 27.3,
+        market_cap: 1.2e12,
+    },
+    balance_sheet: {
+        composite: { score: 1, tier: 'healthy' },
+        roe: { value: 35.12, band: 'excellent' },
+        roa: { value: 23.35, band: 'strong' },
+        current_ratio: { value: 2.62, band: 'safe' },
+        quick_ratio: { value: 2.42, band: 'safe' },
+        debt_to_equity: { value: 0.25, band: 'low' },
+        net_debt_ebitda: { value: null, band: null },
+        roic: { value: 28.4, band: 'excellent' },
+    },
+    correlations: {
+        composite: { score: 0.25, tier: 'neutral' },
+        clusters: [
+            {
+                name: 'earnings_quality',
+                score: 0.6,
+                tier: 'healthy',
+                positives: ['Revenue and EPS growing together — genuine organic quality growth'],
+                warnings: [],
+            },
+            { name: 'leverage_liquidity', score: -0.2, tier: 'weak', positives: [], warnings: ['Debt rising faster than cash flow'] },
+        ],
+        aligned_signals: ['Revenue and EPS growing together — genuine organic quality growth'],
+        master_signals: { net_signal: 'bullish', fired: ['quality_growth'] },
+    },
+    sentiment: {
+        headlines: [
+            {
+                title: 'TSMC lifts capex guidance',
+                url: 'https://example.com/tsmc-capex',
+                source: 'Reuters',
+                published_at: '2026-09-25T12:00:00Z',
+                sentiment: 0.4,
+            },
+            { title: 'Chip stocks mixed', url: null, source: 'Bloomberg', published_at: '2026-09-24T12:00:00Z', sentiment: null },
+        ],
+    },
+    heuristic_signals: {
+        caveat: HEURISTIC_CAVEAT,
+        chart_patterns: [
+            { pattern: 'bear_flag', confirmed: true, severity: 'notice' },
+            { pattern: 'double_top', confirmed: false, severity: 'info' },
+        ],
+        action_signal: {
+            alert_type: 'liquidity_sweep',
+            action: 'BUY_WATCH',
+            confluence: { score: 3, max: 4 },
+            severity: 'notice',
+            vix_regime: 'normal',
+            reasoning: [
+                'Low sweep (6 recent): stop-hunt below swing low detected',
+                'Closed back above swept level — institutional accumulation pattern',
+            ],
+        },
+    },
+    ...overrides,
+});
+
+/** Every nullable reading null, every list empty. */
+export const makeEmptyAnalysis = (): StockAnalysis => {
+    const vb = { value: null, band: null };
+    return makeAnalysis({
+        as_of: null,
+        fundamentals_computed_at: null,
+        sections: { technical: 'no_data', fundamentals: 'no_data' },
+        technical: {
+            rsi_14: { ...vb, severity: null },
+            macd: { hist: null, cross: null },
+            adx_14: vb,
+            trend: { direction: null, slope_pct: null },
+            ma_cross: null,
+            atr_14: null,
+            bb_squeeze: { active: null, severity: null },
+            vix_regime: { ...vb, severity: null },
+            pivots: { pp: null, r1: null, s1: null },
+            smc: { fvgs_active: null, obs_active: null, liq_sweeps: null },
+        },
+        fundamentals: {
+            composite: { score: null, tier: null },
+            eps_strength: null,
+            revenue: null,
+            pe_vs_5y: vb,
+            fcf_yield: { value: null, tier: null },
+            gross_margin: { value: null, tier: null, trend: null },
+            net_margin: { value: null, tier: null, trend: null },
+            ttm_pe: null,
+            market_cap: null,
+        },
+        balance_sheet: {
+            composite: { score: null, tier: null },
+            roe: vb,
+            roa: vb,
+            current_ratio: vb,
+            quick_ratio: vb,
+            debt_to_equity: vb,
+            net_debt_ebitda: vb,
+            roic: vb,
+        },
+        correlations: { composite: { score: null, tier: null }, clusters: [], aligned_signals: [], master_signals: { net_signal: null, fired: [] } },
+        sentiment: { headlines: [] },
+        heuristic_signals: { caveat: HEURISTIC_CAVEAT, chart_patterns: [], action_signal: null },
+    });
+};
+
+export const makePending = (overrides: Partial<AnalysisPending> = {}): AnalysisPending => ({
+    symbol: 'TSM',
+    status: 'computing',
+    message: COMPUTING_MESSAGE,
+    retry_after_ms: 3000,
+    scanner_data: true,
+    ...overrides,
+});

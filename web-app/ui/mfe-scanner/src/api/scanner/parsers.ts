@@ -11,6 +11,7 @@ import {
     PenaltyRule,
     PriceBar,
     PriceBarsResponse,
+    RecentAlert,
     ScanMeta,
     ScannerSymbolResponse,
     ScannerTodayResponse,
@@ -68,6 +69,16 @@ export const parseScanMeta = (value: unknown, path = 'scan'): ScanMeta => {
     };
 };
 
+const parseRecentAlert = (value: unknown, path: string): RecentAlert => {
+    const o = obj(value, path);
+    return {
+        alert_type: str(o.alert_type, `${path}.alert_type`),
+        severity: str(o.severity, `${path}.severity`),
+        message: str(o.message, `${path}.message`),
+        fired_at: str(o.fired_at, `${path}.fired_at`),
+    };
+};
+
 export const parseCandidate = (value: unknown, path = 'candidate'): Candidate => {
     const o = obj(value, path);
     return {
@@ -89,6 +100,7 @@ export const parseCandidate = (value: unknown, path = 'candidate'): Candidate =>
         momentum_score_100: optNum(o.momentum_score_100, `${path}.momentum_score_100`),
         score_attainable: optNum(o.score_attainable, `${path}.score_attainable`),
         score_status: str(o.score_status, `${path}.score_status`),
+        recent_alert: nullable(parseRecentAlert)(o.recent_alert, `${path}.recent_alert`),
     };
 };
 
@@ -284,3 +296,5 @@ export const parseWatchlist = (value: unknown): WatchlistResponse => {
         items: array(o.items, 'items', parseWatchlistItem),
     };
 };
+
+export { array, bool, fail, nullable, num, obj, optBool, optNum, optStr, str, strArray };
