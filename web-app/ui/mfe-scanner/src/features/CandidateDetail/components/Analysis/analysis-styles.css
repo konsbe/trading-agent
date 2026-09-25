@@ -1,0 +1,50 @@
+/* Shared by the neutral analysis sections (technical … news): plain, informational text only. */
+
+.scanner-analysis__meta {
+    font-size: var(--font-size-xs);
+}
+
+.scanner-analysis__composite {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--space-xs);
+    margin: 0;
+    color: var(--color-on-surface-variant);
+    font-size: var(--font-size-sm);
+}
+
+.scanner-analysis__composite-value {
+    color: var(--color-on-surface);
+    font-family: var(--font-family-label);
+    font-weight: var(--font-weight-medium);
+}
+
+.scanner-analysis__group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+}
+
+.scanner-analysis__group-title {
+    margin: 0;
+    color: var(--color-on-surface-variant);
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-medium);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.scanner-analysis__list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xxs);
+    margin: 0;
+    padding-left: var(--space-md);
+    color: var(--color-on-surface);
+    font-size: var(--font-size-sm);
+}
+
+.scanner-analysis__note {
+    font-size: var(--font-size-sm);
+}

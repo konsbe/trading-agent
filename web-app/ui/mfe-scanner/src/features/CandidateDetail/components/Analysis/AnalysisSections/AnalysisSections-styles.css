@@ -1,0 +1,6 @@
+.scanner-analysis,
+.scanner-analysis__skeleton {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+}

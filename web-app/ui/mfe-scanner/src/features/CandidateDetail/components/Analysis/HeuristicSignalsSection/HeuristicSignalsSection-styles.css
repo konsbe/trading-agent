@@ -1,0 +1,76 @@
+/*
+ * A different kind of information from the neutral sections above: primary
+ * accent rule and outline, so it reads apart at a glance. The caveat inside
+ * keeps the tertiary caveat treatment; severity badges carry their own colour.
+ */
+.scanner-heuristic.ta-collapsible-card {
+    border: 1px solid color-mix(in srgb, var(--color-primary) 40%, transparent);
+    border-top: 3px solid var(--color-primary);
+    scroll-margin-top: var(--space-lg);
+}
+
+.scanner-heuristic.is-focused {
+    box-shadow: 0 0 0 3px var(--color-focus-ring);
+}
+
+.scanner-heuristic__kind {
+    padding: 0 var(--space-sm);
+    border: 1px solid var(--color-primary);
+    border-radius: var(--radius-full);
+    color: var(--color-primary);
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-medium);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.scanner-heuristic__items {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-size: var(--font-size-sm);
+}
+
+.scanner-heuristic__item {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-xs);
+}
+
+.scanner-heuristic__reading {
+    font-family: var(--font-family-label);
+}
+
+.scanner-heuristic__action {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+    padding: var(--space-sm) var(--space-md);
+    border: 1px solid var(--color-outline-variant);
+    border-radius: var(--radius-md);
+    background: var(--color-surface-container-low);
+}
+
+.scanner-heuristic__action-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-sm);
+    margin: 0;
+}
+
+.scanner-heuristic__action-label {
+    color: var(--color-on-surface);
+    font-family: var(--font-family-label);
+    font-size: var(--font-size-md);
+    font-weight: var(--font-weight-bold);
+}
+
+.scanner-heuristic__confluence {
+    font-family: var(--font-family-label);
+    font-size: var(--font-size-sm);
+}
