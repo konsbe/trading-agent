@@ -1,10 +1,47 @@
 .app-sidebar {
+    display: flex;
+    flex-direction: column;
     flex-shrink: 0;
     width: var(--app-sidebar-width);
-    overflow-y: auto;
-    padding: var(--space-sm);
+    min-height: 0;
     background-color: var(--color-surface-container-low);
     border-right: 1px solid var(--color-border);
+}
+
+.app-sidebar[hidden] {
+    display: none;
+}
+
+.app-sidebar__main {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: var(--space-sm);
+}
+
+/* Groups with nav_order 0: pinned below the scrolling list, one elevation step down. */
+.app-sidebar__bottom {
+    margin-top: auto;
+    flex-shrink: 0;
+    padding: var(--space-sm);
+    background-color: var(--color-surface-container-lowest);
+    border-top: 1px solid var(--color-border);
+}
+
+.app-sidebar__group + .app-sidebar__group {
+    margin-top: var(--space-md);
+}
+
+.app-sidebar__group-label {
+    margin: 0;
+    padding: var(--space-sm) var(--space-md) var(--space-xs);
+    font-family: var(--font-family);
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-bold);
+    line-height: var(--line-height);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-on-surface-variant);
 }
 
 .app-sidebar__list {
@@ -17,12 +54,26 @@
 }
 
 .app-sidebar__link {
-    display: block;
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
     padding: var(--space-sm) var(--space-md);
-    border-radius: var(--radius-sm);
-    color: var(--color-text-secondary);
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-md);
+    color: var(--color-on-surface-variant);
     text-decoration: none;
     transition: background-color var(--transition-fast), color var(--transition-fast);
+}
+
+.app-sidebar__icon {
+    flex-shrink: 0;
+}
+
+.app-sidebar__label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .app-sidebar__link:hover {
@@ -35,7 +86,8 @@
     box-shadow: 0 0 0 3px var(--color-focus-ring);
 }
 
-.app-sidebar__link--active {
+.app-sidebar__link--active,
+.app-sidebar__link--active:hover {
     background-color: var(--color-primary-container);
     color: var(--color-on-primary-container);
     font-weight: var(--font-weight-medium);

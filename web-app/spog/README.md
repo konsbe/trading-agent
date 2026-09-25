@@ -8,23 +8,29 @@ via webpack Module Federation (`shell_spog@http://localhost:3000/remoteEntry.js`
 UI primitives and theme tokens come from `@trading-agent/shared-components`
 (`../shared-components`). No third-party UI library is used.
 
-## Routes
+## Routes and sidebar
 
-| Path | Page |
-|------|------|
-| `/` | redirects to `/candidates` |
-| `/candidates` | Candidates (placeholder) |
-| `/stock-detail` | Stock Detail (placeholder) |
-| `/backtest-lab` | Backtest Lab (placeholder) |
-| `/alarm-history` | Alarm History (placeholder) |
-| `/watchlist` | Watchlist (placeholder) |
-| `/tracked-positions` | Tracked Positions (placeholder) |
-| `/data-source` | Data Source (placeholder) |
-| `/settings` | Settings (placeholder) |
-| `/404`, `/unauthorized` | error pages |
+Routes and sidebar entries are generated from `public/config.json`
+(`src/common/navigation`). Every enabled entry under `mfes` with a
+`router_path` becomes a route (`<router_path>/*` → the MFE's `module`) and a
+sidebar link:
 
-Routes are declared in `src/router/AppRouter.tsx`; sidebar entries come from
-`src/constants/routes.ts`.
+| Field | Meaning |
+|-------|---------|
+| `router_path` | Route URL, e.g. `/candidates` |
+| `nav_group` | Sidebar group label (default `Other`) |
+| `nav_order` | Group order, ascending; `0` pins the group to the sidebar bottom; missing = after numbered groups |
+| `nav_sub_order` | Item order inside the group, ascending (ties by label) |
+| `nav_icon` | Icon name, see `src/components/Sidebar/navIcons.ts`; unknown names show a fallback dot |
+
+Adding a page, group or item only needs a `config.json` edit. `/` redirects to
+the first item of the first (non-bottom) group.
+
+Not-yet-implemented pages (`/stock-detail`, `/alarm-history`,
+`/tracked-positions`, `/settings`) are text placeholders defined in
+`src/common/navigation/navigation.ts`, listed last under "Coming Soon". A
+placeholder disappears as soon as a config MFE claims its path. `/404` and
+`/unauthorized` are error pages.
 
 ## Prerequisites
 

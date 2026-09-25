@@ -14,14 +14,15 @@ import App from './app-root';
 // Mock the router from AppRouter
 jest.mock('../router/AppRouter', () => {
   const { createMemoryRouter } = require('react-router-dom');
+  const router = createMemoryRouter([
+    {
+      path: '/',
+      element: <div data-testid="app-router">App Router Component</div>,
+    },
+  ]);
   return {
     __esModule: true,
-    default: createMemoryRouter([
-      {
-        path: '/',
-        element: <div data-testid="app-router">App Router Component</div>,
-      },
-    ]),
+    getAppRouter: () => router,
   };
 });
 

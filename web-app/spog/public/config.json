@@ -29,7 +29,12 @@
       "scope": "mfe_scanner",
       "description": "Today's momentum scanner candidates and score breakdown",
       "roles": [],
-      "enabled": true
+      "enabled": true,
+      "nav_group": "Market Reports",
+      "nav_order": 1,
+      "nav_sub_order": 2,
+      "nav_icon": "mdi-view-grid-outline",
+      "router_path": "/candidates"
     },
     "mfe_watchlist": {
       "label": "Watchlist",
@@ -39,7 +44,12 @@
       "scope": "mfe_watchlist",
       "description": "Shared watchlist with current price data and symbol search",
       "roles": [],
-      "enabled": true
+      "enabled": true,
+      "nav_group": "Tracking",
+      "nav_order": 3,
+      "nav_sub_order": 1,
+      "nav_icon": "mdi-bookmark-outline",
+      "router_path": "/watchlist"
     },
     "mfe_backtest_lab": {
       "label": "Backtest Lab",
@@ -49,7 +59,12 @@
       "scope": "mfe_backtest_lab",
       "description": "Frozen Phase 2 backtest report: why the screener makes no predictive claim",
       "roles": [],
-      "enabled": true
+      "enabled": true,
+      "nav_group": "Research",
+      "nav_order": 2,
+      "nav_sub_order": 1,
+      "nav_icon": "mdi-flask-outline",
+      "router_path": "/backtest-lab"
     },
     "mfe_data_source": {
       "label": "Data Source",
@@ -59,7 +74,12 @@
       "scope": "mfe_data_source",
       "description": "Provider budgets and daily-chain health, checked on demand",
       "roles": [],
-      "enabled": true
+      "enabled": true,
+      "nav_group": "Admin",
+      "nav_order": 0,
+      "nav_sub_order": 1,
+      "nav_icon": "mdi-database-outline",
+      "router_path": "/data-source"
     },
     "mfe_market_report": {
       "label": "Daily Market Report",
@@ -69,7 +89,12 @@
       "scope": "mfe_market_report",
       "description": "Daily market report: global macro sections and per-instrument price and market cycle",
       "roles": [],
-      "enabled": true
+      "enabled": true,
+      "nav_group": "Market Reports",
+      "nav_order": 1,
+      "nav_sub_order": 1,
+      "nav_icon": "mdi-chart-box-outline",
+      "router_path": "/market-report"
     }
   },
   "iframes": {}

@@ -1,42 +1,91 @@
 import { render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import Sidebar from './Sidebar';
-import { APP_ROUTES } from '@constants/routes';
+import { NavGroups, buildNavGroups } from '@common/navigation';
+import appConfig from '../../../public/config.json';
 
-const renderSidebar = (isOpen = true, route = '/candidates', items?: typeof APP_ROUTES) =>
+const config = appConfig as AppConfig;
+
+const renderSidebar = (isOpen = true, route = '/candidates', groups?: NavGroups) =>
     render(
         <MemoryRouter initialEntries={[route]}>
-            <Sidebar isOpen={isOpen} items={items} />
+            <Sidebar isOpen={isOpen} groups={groups} />
         </MemoryRouter>
     );
 
+const linkLabels = (container: HTMLElement) =>
+    within(container).queryAllByRole('link').map(link => link.textContent);
+
 describe('Sidebar', () => {
-    it('renders a link for every app route', () => {
+    beforeEach(() => {
+        window.__APP_CONFIG__ = config;
+    });
+
+    afterEach(() => {
+        delete window.__APP_CONFIG__;
+    });
+
+    it('builds its groups from window.__APP_CONFIG__ by default', () => {
         renderSidebar();
 
-        const nav = screen.getByRole('navigation', { name: 'Main navigation' });
-        const links = within(nav).getAllByRole('link');
-        expect(links).toHaveLength(APP_ROUTES.length);
-        APP_ROUTES.forEach(({ path, label }) => {
-            expect(within(nav).getByRole('link', { name: label })).toHaveAttribute('href', path);
+        const main = screen.getByTestId('app-sidebar-main');
+        expect(linkLabels(main)).toEqual([
+            'Daily Market Report', 'Momentum Scanner', 'Backtest Lab', 'Watchlist',
+            'Stock Detail', 'Alarm History', 'Tracked Positions', 'Settings',
+        ]);
+        expect(linkLabels(screen.getByTestId('app-sidebar-bottom'))).toEqual(['Data Source']);
+        expect(screen.getByRole('link', { name: 'Momentum Scanner' })).toHaveAttribute('href', '/candidates');
+    });
+
+    it('renders each group as a labelled section in config order', () => {
+        renderSidebar();
+
+        const main = screen.getByTestId('app-sidebar-main');
+        const sections = within(main).getAllByRole('region');
+        expect(sections.map(section => section.getAttribute('aria-labelledby'))).toEqual([
+            'app-sidebar-group-market-reports',
+            'app-sidebar-group-research',
+            'app-sidebar-group-tracking',
+            'app-sidebar-group-coming-soon',
+        ]);
+        expect(screen.getByRole('region', { name: 'Research' })).toContainElement(
+            screen.getByRole('link', { name: 'Backtest Lab' })
+        );
+        expect(within(screen.getByTestId('app-sidebar-bottom')).getByRole('region', { name: 'Admin' })).toBeInTheDocument();
+    });
+
+    it('renders an icon next to every label', () => {
+        renderSidebar();
+
+        screen.getAllByRole('link').forEach(link => {
+            const svg = link.querySelector('svg');
+            expect(svg).toHaveAttribute('width', '18');
+            expect(svg).toHaveAttribute('aria-hidden', 'true');
         });
     });
 
-    it('lists Daily Market Report right after Today\'s Candidates', () => {
-        renderSidebar();
+    it('renders the fallback icon for unknown icon names', () => {
+        renderSidebar(true, '/', {
+            main: [{ id: 'g', label: 'G', items: [{ path: '/x', label: 'X', icon: 'mdi-nope', roles: [] }] }],
+            bottom: [],
+        });
 
-        const labels = within(screen.getByRole('navigation', { name: 'Main navigation' }))
-            .getAllByRole('link')
-            .map(link => link.textContent);
-        expect(labels.slice(0, 3)).toEqual(["Today's Candidates", 'Daily Market Report', 'Stock Detail']);
-        expect(screen.getByRole('link', { name: 'Daily Market Report' })).toHaveAttribute('href', '/market-report');
+        expect(screen.getByRole('link', { name: 'X' }).querySelector('svg')).toBeInTheDocument();
     });
 
     it('marks the current route as active', () => {
-        renderSidebar(true, '/watchlist');
+        renderSidebar(true, '/watchlist/VGZ');
 
         expect(screen.getByRole('link', { name: 'Watchlist' })).toHaveClass('app-sidebar__link--active');
-        expect(screen.getByRole('link', { name: APP_ROUTES[0].label })).not.toHaveClass('app-sidebar__link--active');
+        expect(screen.getByRole('link', { name: 'Momentum Scanner' })).not.toHaveClass('app-sidebar__link--active');
+    });
+
+    it('keeps the navigation landmark attributes', () => {
+        renderSidebar();
+
+        const nav = screen.getByRole('navigation', { name: 'Main navigation' });
+        expect(nav).toHaveAttribute('id', 'app-sidebar');
+        expect(nav).toHaveAttribute('data-testid', 'app-sidebar');
     });
 
     it('is hidden when closed', () => {
@@ -45,10 +94,23 @@ describe('Sidebar', () => {
         expect(screen.getByTestId('app-sidebar')).not.toBeVisible();
     });
 
-    it('accepts custom items', () => {
-        renderSidebar(true, '/', [{ path: '/custom', label: 'Custom' }]);
+    it('accepts custom groups and omits an empty bottom section', () => {
+        renderSidebar(true, '/', {
+            main: [{ id: 'custom', label: 'Custom', items: [{ path: '/custom', label: 'Custom Page', roles: [] }] }],
+            bottom: [],
+        });
 
         expect(screen.getAllByRole('link')).toHaveLength(1);
-        expect(screen.getByRole('link', { name: 'Custom' })).toHaveAttribute('href', '/custom');
+        expect(screen.getByRole('link', { name: 'Custom Page' })).toHaveAttribute('href', '/custom');
+        expect(screen.queryByTestId('app-sidebar-bottom')).not.toBeInTheDocument();
+    });
+
+    it('renders only placeholders when no config is loaded', () => {
+        delete window.__APP_CONFIG__;
+        renderSidebar();
+
+        expect(linkLabels(screen.getByTestId('app-sidebar-main'))).toEqual(
+            buildNavGroups(undefined).main[0].items.map(item => item.label)
+        );
     });
 });

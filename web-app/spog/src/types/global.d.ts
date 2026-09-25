@@ -65,6 +65,11 @@ declare global {
     enabled: boolean | string; // Support both boolean and string
     isConfigMfe?: boolean;
     scope?: string;            // Override scope name (if different from key)
+    nav_group?: string;        // Sidebar group label
+    nav_order?: number;        // Group order (ascending); 0 pins the group to the sidebar bottom
+    nav_sub_order?: number;    // Item order inside its group (ascending)
+    nav_icon?: string;         // Icon name, e.g. "mdi-chart-box-outline"
+    router_path?: string;      // Route URL, e.g. "/candidates"
   }
 
   interface MFEConfigEntryWithRoles extends Omit<MFEConfigEntry, 'roles'> {

@@ -12,5 +12,16 @@ export {
     AlertTriangleIcon,
     MinusCircleIcon,
     CircleDashedIcon,
+    GridIcon,
+    CandlestickIcon,
+    FlaskIcon,
+    BellIcon,
+    BookmarkIcon,
+    ListChecksIcon,
+    DatabaseIcon,
+    ChartBoxIcon,
+    EyeIcon,
+    SettingsIcon,
+    DotIcon,
 } from './Icons';
 export type { IconProps, IconComponent } from './Icons';

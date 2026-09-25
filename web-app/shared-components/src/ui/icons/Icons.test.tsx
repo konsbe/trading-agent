@@ -15,6 +15,17 @@ import {
     MonitorIcon,
     MoonIcon,
     SunIcon,
+    GridIcon,
+    CandlestickIcon,
+    FlaskIcon,
+    BellIcon,
+    BookmarkIcon,
+    ListChecksIcon,
+    DatabaseIcon,
+    ChartBoxIcon,
+    EyeIcon,
+    SettingsIcon,
+    DotIcon,
 } from './Icons';
 
 describe('Icons', () => {
@@ -32,6 +43,17 @@ describe('Icons', () => {
         ['AlertTriangleIcon', AlertTriangleIcon],
         ['MinusCircleIcon', MinusCircleIcon],
         ['CircleDashedIcon', CircleDashedIcon],
+        ['GridIcon', GridIcon],
+        ['CandlestickIcon', CandlestickIcon],
+        ['FlaskIcon', FlaskIcon],
+        ['BellIcon', BellIcon],
+        ['BookmarkIcon', BookmarkIcon],
+        ['ListChecksIcon', ListChecksIcon],
+        ['DatabaseIcon', DatabaseIcon],
+        ['ChartBoxIcon', ChartBoxIcon],
+        ['EyeIcon', EyeIcon],
+        ['SettingsIcon', SettingsIcon],
+        ['DotIcon', DotIcon],
     ])('%s renders a decorative 20px svg by default', (displayName, Icon) => {
         const { container } = render(<Icon />);
 

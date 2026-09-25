@@ -5,7 +5,9 @@ import Layout from "../layouts/AppLayout/Layout";
 import PageNotFound from "../pages/PageNotFound/PageNotFound";
 import SingleMfePage from "../pages/SingleMfePage";
 import UserAccessControl from "../components/UserAccessControl/UserAccessControl";
-import { DEFAULT_ROUTE } from "../constants/routes";
+import { getDefaultRoute, getMfeRoutes, getPlaceholderRoutes } from "@common/navigation";
+
+type AppRouter = ReturnType<typeof createBrowserRouter>;
 
 const PrivateRouter = ({ roles = [], component }: { roles?: string[], component: React.ReactNode }) => (
     <UserAccessControl roles={roles}>
@@ -13,127 +15,68 @@ const PrivateRouter = ({ roles = [], component }: { roles?: string[], component:
     </UserAccessControl>
 );
 
-export const routes: RouteObject[] = [
-    {
-        path: "/",
-        element: <Layout />,
-        children: [
-            {
-                index: true,
-                element: <Navigate to={DEFAULT_ROUTE} replace />,
-            },
-            {
-                path: "candidates/*",
-                element: (
-                    <PrivateRouter
-                        component={
-                            <SingleMfePage
-                                mfe_key="mfe_scanner"
-                                mfe_component="./Scanner"
-                                mfe_header_title="Today's Candidates"
-                                mfe_navigation_path="/candidates"
-                                mfe_enable_navigation={false}
-                            />
-                        }
-                    />
-                ),
-            },
-            {
-                path: "market-report/*",
-                element: (
-                    <PrivateRouter
-                        component={
-                            <SingleMfePage
-                                mfe_key="mfe_market_report"
-                                mfe_component="./MarketReport"
-                                mfe_header_title="Daily Market Report"
-                                mfe_navigation_path="/market-report"
-                                mfe_enable_navigation={false}
-                            />
-                        }
-                    />
-                ),
-            },
-            {
-                path: "stock-detail/*",
-                element: <PrivateRouter component={<>Stock Detail</>} />,
-            },
-            {
-                path: "backtest-lab/*",
-                element: (
-                    <PrivateRouter
-                        component={
-                            <SingleMfePage
-                                mfe_key="mfe_backtest_lab"
-                                mfe_component="./BacktestLab"
-                                mfe_header_title="Backtest Lab"
-                                mfe_navigation_path="/backtest-lab"
-                                mfe_enable_navigation={false}
-                            />
-                        }
-                    />
-                ),
-            },
-            {
-                path: "alarm-history/*",
-                element: <PrivateRouter component={<>Alarm History</>} />,
-            },
-            {
-                path: "watchlist/*",
-                element: (
-                    <PrivateRouter
-                        component={
-                            <SingleMfePage
-                                mfe_key="mfe_watchlist"
-                                mfe_component="./Watchlist"
-                                mfe_header_title="Watchlist"
-                                mfe_navigation_path="/watchlist"
-                                mfe_enable_navigation={false}
-                            />
-                        }
-                    />
-                ),
-            },
-            {
-                path: "tracked-positions/*",
-                element: <PrivateRouter component={<>Tracked Positions</>} />,
-            },
-            {
-                path: "data-source/*",
-                element: (
-                    <PrivateRouter
-                        component={
-                            <SingleMfePage
-                                mfe_key="mfe_data_source"
-                                mfe_component="./DataSource"
-                                mfe_header_title="Data Source"
-                                mfe_navigation_path="/data-source"
-                                mfe_enable_navigation={false}
-                            />
-                        }
-                    />
-                ),
-            },
-            {
-                path: "settings/*",
-                element: <PrivateRouter component={<>Settings</>} />,
-            },
-            {
-                path: "/404",
-                element: <PageNotFound statusCode={404} message={'Page Not Found'} />,
-            },
-            {
-                path: "/unauthorized",
-                element: <PageNotFound statusCode={401} message={'Unauthorized'} />,
-            },
-            {
-                path: "*",
-                element: <Navigate to="/404" replace />,
-            },
-        ],
-    },
-];
+const toChildPath = (path: string): string => `${path.replace(/^\/+/, "")}/*`;
 
-const router = createBrowserRouter(routes);
+/** Route tree for the shell, generated from `config.mfes` plus the code-defined placeholders. */
+export const buildRoutes = (config?: AppConfig): RouteObject[] => {
+    const mfeRoutes: RouteObject[] = getMfeRoutes(config).map(mfe => ({
+        path: toChildPath(mfe.path),
+        element: (
+            <PrivateRouter
+                roles={mfe.roles}
+                component={
+                    <SingleMfePage
+                        mfe_key={mfe.mfeKey}
+                        mfe_component={mfe.module}
+                        mfe_header_title={mfe.label}
+                        mfe_navigation_path={mfe.path}
+                        mfe_enable_navigation={false}
+                    />
+                }
+            />
+        ),
+    }));
 
-export default router;
+    const placeholderRoutes: RouteObject[] = getPlaceholderRoutes(config).map(({ path, label }) => ({
+        path: toChildPath(path),
+        element: <PrivateRouter component={<>{label}</>} />,
+    }));
+
+    return [
+        {
+            path: "/",
+            element: <Layout />,
+            children: [
+                {
+                    index: true,
+                    element: <Navigate to={getDefaultRoute(config)} replace />,
+                },
+                ...mfeRoutes,
+                ...placeholderRoutes,
+                {
+                    path: "/404",
+                    element: <PageNotFound statusCode={404} message={'Page Not Found'} />,
+                },
+                {
+                    path: "/unauthorized",
+                    element: <PageNotFound statusCode={401} message={'Unauthorized'} />,
+                },
+                {
+                    path: "*",
+                    element: <Navigate to="/404" replace />,
+                },
+            ],
+        },
+    ];
+};
+
+/** Creates a browser router from the config loaded into `window.__APP_CONFIG__` at call time. */
+export const createAppRouter = (): AppRouter => createBrowserRouter(buildRoutes(window.__APP_CONFIG__));
+
+let appRouter: AppRouter | undefined;
+
+/** The shell's single router instance, created on first use (after config.json has loaded). */
+export const getAppRouter = (): AppRouter => {
+    appRouter ??= createAppRouter();
+    return appRouter;
+};

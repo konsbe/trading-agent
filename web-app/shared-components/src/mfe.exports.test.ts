@@ -20,5 +20,7 @@ describe('mfe barrel exports', () => {
         expect(mfeExports.SplitScreen).toBeDefined();
         expect(mfeExports.Pane).toBeDefined();
         expect(mfeExports.MenuIcon).toBeDefined();
+        expect(mfeExports.GridIcon).toBeDefined();
+        expect(mfeExports.DotIcon).toBeDefined();
     });
 });

@@ -99,3 +99,78 @@ export const MonitorIcon = createIcon('MonitorIcon', (
         <path d="M8 21h8M12 17v4" />
     </>
 ));
+
+/** Four squares — a grid of results, e.g. "Today's Candidates". */
+export const GridIcon = createIcon('GridIcon', (
+    <>
+        <rect x="3" y="3" width="7" height="7" rx="1" />
+        <rect x="14" y="3" width="7" height="7" rx="1" />
+        <rect x="3" y="14" width="7" height="7" rx="1" />
+        <rect x="14" y="14" width="7" height="7" rx="1" />
+    </>
+));
+
+export const CandlestickIcon = createIcon('CandlestickIcon', (
+    <>
+        <path d="M8 3v3M8 16v5M16 3v5M16 17v4" />
+        <rect x="5" y="6" width="6" height="10" rx="1" />
+        <rect x="13" y="8" width="6" height="9" rx="1" />
+    </>
+));
+
+export const FlaskIcon = createIcon('FlaskIcon', (
+    <>
+        <path d="M9 3h6M10 3v6.5L4.6 18.4A1.7 1.7 0 0 0 6.1 21h11.8a1.7 1.7 0 0 0 1.5-2.6L14 9.5V3" />
+        <path d="M7 15h10" />
+    </>
+));
+
+export const BellIcon = createIcon('BellIcon', (
+    <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+));
+
+export const BookmarkIcon = createIcon('BookmarkIcon', (
+    <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+));
+
+export const ListChecksIcon = createIcon('ListChecksIcon', (
+    <path d="m3 7 2 2 4-4M3 17l2 2 4-4M13 6h8M13 12h8M13 18h8" />
+));
+
+export const DatabaseIcon = createIcon('DatabaseIcon', (
+    <>
+        <ellipse cx="12" cy="5" rx="8" ry="3" />
+        <path d="M4 5v14c0 1.66 3.58 3 8 3s8-1.34 8-3V5" />
+        <path d="M4 12c0 1.66 3.58 3 8 3s8-1.34 8-3" />
+    </>
+));
+
+/** Bar chart inside a box, e.g. a market report. */
+export const ChartBoxIcon = createIcon('ChartBoxIcon', (
+    <>
+        <rect x="3" y="3" width="18" height="18" rx="2" />
+        <path d="M8 17v-5M12 17V7M16 17v-3" />
+    </>
+));
+
+export const EyeIcon = createIcon('EyeIcon', (
+    <>
+        <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" />
+        <circle cx="12" cy="12" r="3" />
+    </>
+));
+
+export const SettingsIcon = createIcon('SettingsIcon', (
+    <>
+        <circle cx="12" cy="12" r="3" />
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+    </>
+));
+
+/** Generic fallback: a ring with a centre dot. */
+export const DotIcon = createIcon('DotIcon', (
+    <>
+        <circle cx="12" cy="12" r="8" />
+        <circle cx="12" cy="12" r="1.5" fill="currentColor" />
+    </>
+));

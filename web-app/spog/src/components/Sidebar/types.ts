@@ -1,6 +1,11 @@
-import { AppRoute } from "@constants/routes";
+import type { NavGroup, NavGroups } from "@common/navigation";
 
 export interface SidebarProps {
     isOpen: boolean;
-    items?: AppRoute[];
+    /** Defaults to the groups built from `window.__APP_CONFIG__`. */
+    groups?: NavGroups;
+}
+
+export interface SidebarGroupProps {
+    group: NavGroup;
 }
