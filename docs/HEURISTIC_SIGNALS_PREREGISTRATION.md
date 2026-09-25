@@ -336,6 +336,72 @@ step 6.
 
 ---
 
+## 5f. Round 1 results — step 5, 2026-09-25
+
+Run: `python3 scripts/heuristics_round1.py` (commit `8409891`, committed before
+the first run; output `.work/heuristics_round1_v1.txt`). Harness v1, 2,482
+equities, label-complete episodes, **lockbox not read**. Primary horizon 10
+sessions; hit per Amendment 3; strata per Amendment 5.
+
+| # | Signal | Effect (MH OR; H5 lift) | RBG 95% CI | Month-block 90% CI | Best tercile pp | BH q | Verdict |
+|---|---|---|---|---|---|---|---|
+| H1 | RSI overbought → down | 1.187 | [1.166, 1.208] | [1.132, 1.289] | +7.23 | 3e-78 | not confirmed (below floor) |
+| H2 | RSI oversold → up | **1.256** | [1.231, 1.282] | [1.170, 1.391] | +4.31 | 1e-107 | **CONFIRMED** |
+| H3 | MACD bull cross → up | 0.979 | [0.968, 0.989] | [0.932, 1.012] | −0.08 | 8e-05 | not confirmed (below floor) |
+| H4 | MACD bear cross → down | 0.989 | [0.978, 0.999] | [0.938, 1.032] | +0.50 | 0.043 | not confirmed (below floor) |
+| H5 | BB squeeze → bigger move | 0.966x | — | [0.900, 1.016] | — | 0.35 | not confirmed |
+| H6 | Bearish pattern → down | 0.979 | [0.968, 0.989] | [0.939, 1.016] | +0.96 | 2e-04 | not confirmed (below floor) |
+| H7 | Bullish pattern → up | 1.017 | [1.005, 1.028] | [0.972, 1.055] | +0.97 | 0.005 | not confirmed (below floor) |
+| H8a | Low sweep → up | 1.011 | [0.999, 1.022] | [0.982, 1.054] | +0.40 | 0.075 | not confirmed |
+| H8b | High sweep → down | 1.029 | [1.017, 1.041] | [1.000, 1.075] | +0.75 | 3e-06 | not confirmed (below floor) |
+| H9 | BUY_WATCH 4/4 → up | 1.045 | [1.025, 1.064] | [1.014, 1.089] | −0.45 | 1e-05 | not confirmed (below floor; not above H2's 1.256) |
+| H10 | TRIM_WATCH 4/4 → down | 1.033 | [1.014, 1.053] | [0.992, 1.092] | +0.58 | 0.001 | not confirmed (below floor; not above H1's 1.187) |
+
+**H2 detail.** ≥ 3.0pp in all three ATR terciles (+3.00, +3.10, +4.31; the
+lowest tercile sits exactly on the floor). Without 2020: OR 1.299. 5 and 20
+sessions: 1.279 and 1.260. The confirmation rests on a point estimate 0.006
+above the floor.
+
+**Post-hoc diagnostic (a description, not a criterion).** Because RSI
+extremes cluster in volatile stretches, the same test was run with the hit
+flipped to the opposite direction. H2's signal group is *less* likely to fall
+≥ 3% (OR 0.889), and H1's less likely to rise ≥ 3% (OR 0.895): the RSI
+effects are directional mean reversion, not disguised volatility. What this
+does not rule out: RSI < 30 after a sharp drop may be a restatement of the
+known short-term return-reversal effect rather than anything specific to RSI.
+
+**Clustering: a residual caveat that travels with the result.** Purging
+exists to stop training labels leaking into a test window; nothing here is
+fitted, so folds are strata and the purge has no work to do. CMH and the RBG
+CI then treat every episode as independent, which they are not (overlapping
+10-session windows within a symbol; many episodes on the same market days).
+The month-block bootstrap shows the size of that: its 90% interval is 3–4x
+wider than the RBG 95% interval for every hypothesis, and the BH q-values,
+built on the naive CMH p-values, are correspondingly overstated. For H2 the
+bootstrap lower bound (1.170) stays above 1.05 but falls below the 1.25
+floor, so the clustering-aware evidence cannot distinguish H2's effect from
+one just under the floor. This caveat must accompany any statement of H2, as
+survivorship bias accompanies the momentum backtest's numbers.
+
+**H9/H10 test the current implementation, not confluence as a concept.**
+Both composites are below floor and fail the component clause (neither beats
+the best same-direction single signal, which is RSI). Read with Amendment 4:
+the close-back condition is tautological (the detector only records
+closed-back sweeps), the VIX veto is structurally inert at 4/4, "order block
+nearby" has no distance test, and the rule reads a sweep up to ~50 sessions
+old. This is a result about *this* hand-built rule, not about multi-condition
+confluence in general — the same distinction momentum draws between "the
+entry thesis" and "this specific hand-weighted score".
+
+**Also recorded:** H5 shows squeezes are followed by slightly *smaller* moves
+than non-squeeze days (0.966x; 0.928x in the highest-ATR tercile). MACD
+crosses and chart patterns sit at or below 1.0 in the hypothesis direction.
+
+**Next:** step 6 (one-shot lockbox) applies to H2 only, pending the user's
+go-ahead.
+
+---
+
 ## 6. What this does not do
 
 - Does not change `heuristic_signals`' current live behavior. The
