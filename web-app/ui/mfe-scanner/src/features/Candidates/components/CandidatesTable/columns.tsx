@@ -15,13 +15,17 @@ import {
     marketCapText,
 } from '@/common/format/format';
 import { SortKey } from '../../utils/sortCandidates';
+import AlertBadge from '../AlertBadge';
 import { CandidateColumn } from './types';
 
 const SymbolCell = ({ candidate }: { candidate: Candidate }) => (
     <div className="scanner-table__symbol">
-        <Link className="scanner-table__ticker" to={encodeURIComponent(candidate.symbol)}>
-            {candidate.symbol}
-        </Link>
+        <span className="scanner-table__ticker-row">
+            <Link className="scanner-table__ticker" to={encodeURIComponent(candidate.symbol)}>
+                {candidate.symbol}
+            </Link>
+            {candidate.recent_alert && <AlertBadge symbol={candidate.symbol} alert={candidate.recent_alert} />}
+        </span>
         <span className="scanner-table__symbol-meta">
             <span className="scanner-table__company" title={candidate.company_name ?? undefined} data-testid="company-name">
                 {candidate.company_name ?? EMPTY_VALUE}

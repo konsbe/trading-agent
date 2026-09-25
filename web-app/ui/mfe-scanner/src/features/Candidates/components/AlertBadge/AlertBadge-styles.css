@@ -1,0 +1,15 @@
+.scanner-alert-badge {
+    display: inline-flex;
+    flex-shrink: 0;
+    border-radius: var(--radius-full);
+    text-decoration: none;
+}
+
+.scanner-alert-badge:hover .scanner-severity {
+    border-color: var(--scanner-severity);
+}
+
+.scanner-alert-badge:focus-visible {
+    outline: 2px solid var(--color-focus-ring);
+    outline-offset: 2px;
+}
