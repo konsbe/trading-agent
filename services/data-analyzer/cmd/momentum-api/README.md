@@ -3,10 +3,16 @@
 Read-only HTTP API over the momentum scanner's stored output, for the web app's
 "Today's Candidates" screen. Spec: [`docs/MOMENTUM_SCANNER_API.md`](../../../../docs/MOMENTUM_SCANNER_API.md).
 
-It computes nothing, and writes nothing except the watchlist (§2.5 of the spec). Every value is what `momentum-scanner`
+It computes nothing of its own. Every scanner value is what `momentum-scanner`
 already persisted to `momentum_features`, `momentum_scores` and
-`universe_symbols`. The read logic mirrors
-`services/analyst-bot/db/queries/momentum.py`.
+`universe_symbols`; the read logic mirrors
+`services/analyst-bot/db/queries/momentum.py`. It writes in two places only:
+the watchlist (§2.5 of the spec), and the full stock analysis endpoint, which
+for a symbol with a missing or stale analysis runs the `technical-analysis` /
+`fundamental-analysis` workers' own per-symbol code
+(`internal/technical/runner.ComputeAndStore`, `internal/fundamental.AnalyzeSymbol`)
+and writes exactly the rows those workers would
+([addendum §2.5](../../../../docs/MOMENTUM_SCANNER_FULL_STOCK_ANALYSIS_API.md)).
 
 > **⚠️ No authentication.** There is no identity provider yet to validate tokens
 > against, so none is implemented — deliberately, rather than shipping an auth
@@ -24,6 +30,7 @@ already persisted to `momentum_features`, `momentum_scores` and
 | `GET /healthz` | `200 {"status":"ok"}` when the DB answers, else `503` |
 | `GET /api/v1/scanner/today` | Latest scan: header + every gate-passing candidate, both buckets, ordered `rvol_20 DESC` |
 | `GET /api/v1/scanner/today/{symbol}` | One symbol's row for the latest scan (case-insensitive), including gate failures and the full score breakdown |
+| `GET /api/v1/scanner/today/{symbol}/analysis` | Full stock analysis: technical, fundamentals, balance sheet, correlations, qualitative, headlines, market context and `heuristic_signals` (with `HEURISTIC_TA_CAVEAT`). `200 status:"ready"`, or `202 status:"computing"` + `Retry-After` while it is computed on first view, or `500 status:"failed"`. Same 404/503 as the detail route |
 | `GET /api/v1/scanner/symbols/{symbol}/bars?range=1D\|5D\|1M\|6M\|1Y\|ALL` | Price history for the chart (5-minute bars for 1D/5D when stored, else daily with `fallback`) |
 | `GET /api/v1/scanner/tracked?status=active\|closed\|all` | Tracked Positions (read-only view of `momentum_tracked`, with a per-rule `exit_reason_note` from the shared caveats file) |
 | `GET /api/v1/watchlist` · `PUT` / `DELETE /api/v1/watchlist/{symbol}` | The watchlist — the service's only write path (table `watchlist_items`, migration 024). Unauthenticated list until auth exists |
@@ -75,6 +82,12 @@ never `0`. The detail view returns both shared caveats: `evidence_note`
 | `MOMENTUM_API_CACHE_TTL` | `5m` | Response cache TTL, capped at 5m |
 | `MOMENTUM_API_SCAN_GRACE` | `6h` | Time after the 16:00 NY close before a session's scan is expected |
 | `MOMENTUM_CAVEATS_PATH` | `../../shared/content/momentum_caveats.json` | Shared caveats file (relative to the working directory) |
+| `MOMENTUM_API_ANALYSIS_CONCURRENCY` | `2` | On-demand analyses running at once |
+| `MOMENTUM_API_ANALYSIS_TIMEOUT` | `2m` | Per analysis, queueing included; past it the analysis reports `failed` |
+| `MOMENTUM_API_ANALYSIS_RETRY_AFTER` | `3s` | Poll interval suggested with `computing` |
+| `MOMENTUM_API_ANALYSIS_FAILED_RETRY_AFTER` | `1m` | How long a failure is reported before a request retries |
+| `MOMENTUM_API_FUNDAMENTALS_MAX_AGE` | `26h` | Derived fundamentals older than this are recomputed |
+| `TECHNICAL_*`, `FUNDAMENTAL_*`, `QUAL_*` | as the workers | Read so on-demand rows equal the workers' |
 | `LOG_LEVEL` | `info` | `debug`, `info`, `warn`, `error` |
 
 ## Run, test, build

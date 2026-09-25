@@ -1,7 +1,8 @@
 # Momentum Scanner — API Service Spec, Addendum: Full Stock Analysis + Alerts
 
 **Extends:** `docs/MOMENTUM_SCANNER_API.md` / `services/data-analyzer/cmd/momentum-api`.
-**Status:** specification. Nothing described here is built yet.
+**Status:** Part A is built (2026-09-25); what shipped, and where it departs
+from §2.1–2.3, is in §2.5. Part B: see §3.1.
 **Serves:** `mfe-scanner`'s Stock Detail page (extended), and a new
 `mfe-alarm-history`.
 
@@ -233,6 +234,158 @@ misrepresent both.
 `heuristic_signals` section, every time, at the same visual prominence
 as `RESEARCH_SCORE_CAVEAT` above the score breakdown — not a tooltip,
 not collapsed by default.
+
+
+### 2.5 As built (2026-09-25) — the live state wins
+
+Implemented in `services/data-analyzer` (`internal/momentumapi/analysis.go`,
+`analysis_jobs.go`, `internal/store/analysis.go`). Where this section and
+§2.1–2.3 disagree, this section describes what runs.
+
+#### On-demand computation, one code path
+
+The workers only cover their configured symbols (§1.1), so the endpoint
+computes a missing or out-of-date analysis itself, with the workers' own
+per-symbol code — never a second implementation:
+
+- technical: `internal/technical/runner.ComputeAndStore` (the
+  `technical-analysis` worker loops it; the pure part is
+  `internal/technical.Emitter`, pinned by
+  `cmd/technical-analysis/testdata/indicators_golden.json`);
+- fundamentals: `internal/fundamental.AnalyzeSymbol` (the
+  `fundamental-analysis` worker loops it; pinned by
+  `cmd/fundamental-analysis/testdata/derived_golden.json`, an integration test
+  written before the code was moved).
+
+Both write the same rows the worker would (`technical_indicators`;
+`equity_fundamentals` `period='derived'`, `source='fundamental_analysis'`),
+with the worker's config read from the same `.env`. The stored rows are the
+cache. This makes momentum-api's second write path (after the watchlist). No
+Finnhub or other external fetch is made: outside the watchlist there are no
+`finnhub_financials_reported` / `finnhub_earnings` rows, so the fields derived
+from them stay null.
+
+#### Freshness rule
+
+- **Technical** is current when the newest `technical_indicators.ts` for
+  (symbol, `equity`, `1Day`) equals the symbol's latest bar as the worker's
+  own loader sees it (`QueryEquityBars`, one bar per session) — the ts a run
+  now would write under.
+- **Fundamentals** are current when the newest derived row is no older than
+  the newest raw fundamental row for the symbol (any other source) **and** at
+  most `MOMENTUM_API_FUNDAMENTALS_MAX_AGE` old (default 26h: the worker's 24h
+  cadence plus slack; the insider and news-sentiment passes read
+  `NOW()`-relative windows, so derived rows age without new raw rows).
+- Only the stale part is recomputed. A computation that finishes without
+  making a part current (fewer than 2 bars; fewer than
+  `FUNDAMENTAL_ANALYSIS_MIN_METRICS` raw metrics) is a success: the response is
+  `ready` with that section `no_data` and nulls, and it is not retried until
+  the latest bar or the newest raw row changes (or 26h pass).
+
+#### Statuses
+
+| Condition | Response |
+|---|---|
+| Both parts current, or a finished computation vouches for these inputs | `200`, `"status": "ready"`, full body below |
+| Missing/stale and no computation running | `202`, starts one; body below, `Retry-After` header (seconds) |
+| A computation for the symbol is running | `202`, same body; concurrent requests share the one computation |
+| The last computation for these inputs failed (error or timeout), within `MOMENTUM_API_ANALYSIS_FAILED_RETRY_AFTER` (1m) | `500`, `{"symbol", "status": "failed", "error": "analysis_failed", "message", "retry_after_ms"}` + `Retry-After`; the next request after that starts a new attempt |
+| No scan ever stored / unknown symbol / DB down | `503 no_scan_available` / `404 no_data_for_symbol` / `503 database_unavailable` — same as `/today/{symbol}` |
+
+```json
+{"symbol": "WRBY", "status": "computing",
+ "message": "Computing analysis for this symbol -- first view only",
+ "retry_after_ms": 3000}
+```
+
+Limits: `MOMENTUM_API_ANALYSIS_CONCURRENCY` (2) computations at once, each
+bounded by `MOMENTUM_API_ANALYSIS_TIMEOUT` (2m, queueing included), single
+flight per symbol. `MOMENTUM_API_ANALYSIS_RETRY_AFTER` (3s) is the suggested
+poll. Measured on the live DB: a scanner candidate outside the watchlist
+(WRBY) computed both parts in 2.9s. Only a fully current `ready` is cached (the
+5-minute response cache).
+
+#### Ready body (additions to §2.1)
+
+`status`, `as_of` (session of the technical rows), `fundamentals_computed_at`,
+`sections: {technical, fundamentals}` each `ready` / `stale` / `no_data`, and a
+`qualitative` section. Every band/tier-bearing reading is an object
+(`{value, band}` or `{score, tier}`), including `adx_14`, `fcf_yield`, `roa` and
+`quick_ratio`, which §2.1 showed as bare numbers. Arrays are `[]`, never null.
+
+#### Field mapping (doc field → stored source)
+
+| Field | Source |
+|---|---|
+| `technical.rsi_14` | `rsi_14` value; `band` = `compute.ClassifyRSI` (bot: `config.py` `bot_rsi_oversold/overbought` 30/70, strict `<`/`>`); `severity` from §2.3 when oversold/overbought |
+| `technical.macd` | `macd_12_26_9` value (histogram); `cross` = `bullish`/`bearish` from `bullish_cross_line_signal` / `bearish_cross_line_signal`, else null |
+| `technical.adx_14` | `adx_14` value; `band` = `compute.ClassifyADX`: `strong_trend` > 25 else `not_strong_trend` (the bot's only ADX threshold, `actions/rules/bb_squeeze.py`) |
+| `technical.trend` | `trend` payload `direction`, `slope_pct` |
+| `technical.ma_cross` | `ma_ribbon` payload `golden_cross` / `death_cross` → `"golden_cross"` / `"death_cross"` / null |
+| `technical.atr_14` | `atr_14` value |
+| `technical.bb_squeeze` | `bb_squeeze` payload `squeeze`; `severity` `info` when active |
+| `technical.vix_regime` | `vix_regime` value and stored payload `regime`; `severity` `warning` when VIX > 25 (the bot's `vix_elevated` alert, `bot_vix_alert_threshold`) |
+| `technical.pivots` | `pivots_prior_bar` payload `classic.PP/R1/S1` |
+| `technical.smc` | `fvg_min0.1_lb50`, `order_blocks_sw3_imp1.5` `active_count`; `liquidity_sweep_sw3` `total_sweeps` |
+| `fundamentals.composite` | `composite_score` value, payload `tier` |
+| `fundamentals.eps_strength` / `revenue` | `eps_strength` / `revenue_strength` payload `tier` |
+| `fundamentals.pe_vs_5y` | `pe_vs_5y_mean` value (% vs own 5y mean; null when no 5y mean), payload `tier` |
+| `fundamentals.fcf_yield` | `fcf_yield` value; `tier` from `fcf_yield_tier` |
+| `fundamentals.gross_margin` / `net_margin` | `gross_margin_tier` / `net_margin_tier` payload `*_pct`, `tier`; `trend` = `*_trend_8q` payload `direction` |
+| `fundamentals.ttm_pe` | `pe_vs_5y_mean` payload `pe_ratio_ttm` (the P/E the worker scored) |
+| `fundamentals.market_cap` | newest raw `market_cap` (finnhub_metric, USD) |
+| `balance_sheet.composite` | `t2_health_score` |
+| `balance_sheet.roe` / `roa` / `current_ratio` / `quick_ratio` | `t2_roe` / `t2_roa` / `t2_current_ratio` / `t2_quick_ratio` value + `tier` |
+| `balance_sheet.debt_to_equity` / `net_debt_ebitda` / `roic` (added) | `t2_leverage` / `t2_net_debt_ebitda` / `t2_roic` |
+| `correlations.composite` | `corr_summary` value, `tier` |
+| `correlations.clusters[]` | `corr_earnings_quality`, `corr_valuation_quality`, `corr_leverage_liquidity`, `corr_operational`: value, `tier`, `positives`, `warnings` |
+| `correlations.aligned_signals` | **not stored** (§1.1): served as every cluster's stored `positives`, in cluster order |
+| `correlations.master_signals` (added) | `corr_master_signals` `net_signal`, and the names whose `fired` is true |
+| `qualitative.*` (added) | `qual_moat_proxy`, `qual_insider_signal`, `qual_news_sentiment_7d/_30d`, `qual_rd_intensity`: value + `tier` |
+| `sentiment.headlines` | `news_headlines` for the symbol, newest 10: `headline`, `url`, `source`, `ts`, `sentiment` |
+| `context_vs_benchmark.benchmark_symbol`, `market_cycle_composite`, `market_cycle_tone` | `mc_market_cycle` payload `symbol`, `composite_phase`, stored `tone` |
+| `context_vs_benchmark.price_phase`, `drawdown_from_peak_pct` | `mc_price_phase:<symbol>` `price_phase`, `drawdown_pct` — only exists for the market report's instruments, else null |
+| `context_vs_benchmark.correlation_regime`, `_tone` | `mc_macro_correlation` payload `regime`, `tone` |
+| `context_vs_benchmark.relative_strength_20d_pp` | **always null**: not stored (`rs_vs_spy` is disabled, `TECHNICAL_ENABLE_RS_BENCHMARK=false`, and is a 1-bar ratio anyway) |
+| `heuristic_signals.caveat` | `heuristic_ta_caveat` in `shared/content/momentum_caveats.json` |
+| `heuristic_signals.chart_patterns[]` | `hs_pattern_sw5` (`head_shoulders` / `inv_head_shoulders`, confirmed = neckline break), `flag_pole5_len10` (`bull_flag` / `bear_flag`, detection is the signal, confirmed), `chart_pattern_hints` (`double_top` / `double_bottom`, candidates, never confirmed), `triangle_sw3` (`ascending/descending/symmetrical_triangle`, confirmed = breakout up/down). Only patterns found are listed |
+| `heuristic_signals.action_signal` | `heuristics.EvaluateSweepRule` (the parity-tested Go port of `liquidity_sweep.py`) on the stored `liquidity_sweep_sw3`, `order_blocks_sw3_imp1.5`, `trend` rows and the bot's own VIX regime (newest `VIXCLS`, `>35/>20/<12`); present exactly when the bot's scan would raise `liquidity_sweep` (stored count > 0), else null. `reasoning` = `heuristics.SweepRuleReasons`, the Python reason lines verbatim (emoji included), parity-tested. `vix_regime` (added) is the regime the rule read |
+
+Always null outside the watchlist (no reported financials / earnings rows):
+the margin trends, FCF yield when no FCF metric, ROIC, net debt/EBITDA,
+D/E, moat proxy, R&D intensity, most correlation
+checks (clusters are then `mixed_positive` with empty lists).
+
+#### Severity (§2.3) as built
+
+One table, `internal/severity`: `rsi_*` notice, `bb_squeeze` info,
+`vix_elevated` warning, `liquidity_sweep` notice, `fa_tier_flip` weak →
+warning / otherwise notice — test-checked against
+`services/analyst-bot/reports/alert_severity.py` and against the kinds
+`reports/builder.py` emits. Chart patterns: confirmed → notice, unconfirmed →
+info. Action signal: the `liquidity_sweep` notice, raised to warning for
+`TRIM_WATCH` at 4/4 confluence ("high confluence TRIM_WATCH"). A test fails if
+any alert kind or emittable pattern has no severity.
+
+#### Conflicts found (flagged, live state used)
+
+- **§2.1 `vix_regime.band` vs §2.3 "VIX elevated → warning"**: the stored
+  band is `elevated` above 20 (`TECHNICAL_VIX_ELEVATED_THRESHOLD`), but the
+  bot's `vix_elevated` alert fires above 25. `band` is the stored regime;
+  `severity` follows the alert, so VIX 20–25 reads `elevated` with no warning.
+- **The action rule's VIX regime is not the stored `vix_regime` row**: the
+  bot's engine classifies the newest `VIXCLS` with hardcoded 35/20/12, whatever
+  `TECHNICAL_VIX_*` say. `action_signal.vix_regime` shows what it read.
+- **TSM, the §2.1 example, gets 404**: it has no scanner row, and the endpoint
+  keeps `/today/{symbol}`'s 404. So do SHEL, QQQ, SPY and other watchlist ETFs
+  / foreign listings, even though their analysis is stored.
+- **§2.1 tone words** (`yellow`, `red`) are not stored; the stored macrotone
+  words (`constructive` / `neutral` / `stressed`) are served.
+- **Stored fundamentals with implausible units** (seen live, not changed here:
+  worker outputs are frozen): e.g. MSFT `t3_dcf` / `t3_ps_ratio` use
+  `market_cap_millions` = USD market cap, and `fcf_yield` ≈ 1.5e-6 %.
+- `momentum_caveats.json` keys are snake case: the constant is
+  `HEURISTIC_TA_CAVEAT`, the key `heuristic_ta_caveat`, like `evidence_caveat`.
 
 ---
 
