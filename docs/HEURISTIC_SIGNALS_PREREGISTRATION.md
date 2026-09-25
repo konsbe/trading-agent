@@ -146,6 +146,72 @@ same reason, as every other use of this lockbox.
 
 ---
 
+## 5a. Amendment 1 — verification results (2026-09-25, before any hypothesis was tested)
+
+Recorded before any label or outcome was computed. Nothing here was chosen
+after seeing a result.
+
+**Step 1 answer.** The indicator math in `internal/compute` is pure over bar
+slices, so it can be evaluated at any past bar. Everything around it was
+latest-bar only: the worker computes once on the last 500 bars, bar loaders
+take "last N" only, the BB squeeze was inline in the worker, and the
+confluence rules live in Python fed with the latest DB rows. Scope: a real
+backend project (replay entry point, rule port, loaders, tables).
+
+**Crypto excluded from this round.** `crypto_ohlcv` holds 8 symbols with
+daily history from 2025-05-13 only (~16 months), overlapping the lockbox
+window. Underpowered, same class of problem as catalyst's n=18. Equities
+only; revisit crypto once its history deepens. The asset-type stratum
+therefore has one level this round; ATR-tercile stratification within
+equities is unchanged.
+
+**Universe rule.** Equity symbols in `equity_ohlcv` (`1Day`) whose first bar
+is on or before 2016-09-30 (≈10-year history; 2,482 symbols on 2026-09-25).
+
+**H9/H10 test the live confluence as it ran on 2026-09-25**, before the MACD
+key fix (commit `fbaee0a`, kept separate so "what we tested" and "what we
+later patched" do not blur). Findings that shape what "as live" means:
+
+- Only the liquidity-sweep rule (`actions/rules/liquidity_sweep.py`) is
+  replayable. It is ported to Go with a Python↔Go parity fixture. Its
+  inputs are the sweep, order-block and trend indicators plus the VIX regime
+  from `macro_fred` VIXCLS, all available point-in-time. It does not use
+  MACD, so the MACD bug does not touch H9/H10.
+- The RSI rule (`rules/rsi.py`) also emits BUY_WATCH/TRIM_WATCH but depends
+  on the FA composite tier, which has no point-in-time history. It is not
+  replayed. As live it is also degraded beyond the MACD bug: its lookups of
+  `rsi_divergence` and `support_resistance` never match the stored names
+  (`rsi_divergence_rsi14_sw5`, `sr_levels`), so only trend and FA tier can
+  add confluence.
+- The sweep rule's confluence maxes at 4 for both directions (sweep +
+  close-back + order block + trend). "All 4 conditions" (H9) and
+  "3-condition variant" (H10) do not map one-to-one onto live output, so the
+  harness records both `buy_watch`/`trim_watch` (any confluence) and
+  `buy_watch_c4`/`trim_watch_c4` episode sets. **Open:** the user fixes H9's
+  and H10's definitions from these variants after seeing episode counts and
+  before step 5.
+
+**Other conflicts with this document.**
+
+- Flags have no "confirmed" state in the live detector (`DetectFlag` returns
+  `bull_flag`/`bear_flag` only). H6/H7 use: bear flag OR (H&S AND neckline
+  break), and bull flag OR (inverse H&S AND neckline break).
+- Liquidity-sweep live alerts fire whenever any sweep exists in the 50-bar
+  window. H8a/H8b use a sweep on the signal bar itself; H9/H10 use the rule
+  as live (on days the live alert condition holds).
+- **Open:** the MH OR floors need a binary outcome and a comparison group,
+  which §3 does not define (for example: sign of `fwd_return_10s` in the
+  hypothesis direction, signal episodes vs non-signal symbol-days in the
+  same stratum and fold). To be fixed in writing before step 5.
+
+**Lockbox handling in the replay.** An episode is lockbox if its date is in
+2025-03-28..2026-03-27, or its 20-session label window reaches into it, for a
+symbol outside `momentum_pilot_cohort`. Lockbox episodes are written with
+signal fields only; their labels are left NULL and are not computed until
+step 6.
+
+---
+
 ## 6. What this does not do
 
 - Does not change `heuristic_signals`' current live behavior. The

@@ -49,6 +49,46 @@ measured result (MH OR 0.991) that doesn't apply here.
 Report back with real answers before proceeding — same discipline as
 every prior addendum's step 1.
 
+### 1.1 Verification results (2026-09-25) — the live state wins
+
+**The data was not "already stored".** On verification `technical_indicators`
+had 0 rows and `equity_fundamentals` had 0 derived rows: the
+`technical-analysis` and `fundamental-analysis` workers had been stopped
+since 2026-04-16. Both were rebuilt and restarted on 2026-09-25 and verified
+by real rows (50 indicators for all 34 configured symbols; 562 derived
+fundamentals rows across 24 symbols with values and tiers).
+
+**Coverage is the watchlist, not the scanner universe.** Both workers run on
+`TECHNICAL_EQUITY_SYMBOLS` / `FUNDAMENTAL_SYMBOLS` (26 symbols). A scanner
+candidate outside that list has no stored analysis, so Part A would return
+nulls for most candidates until coverage is widened.
+
+**Real names** (the lexicon-style names above are not the stored ones):
+
+| Area | Table | Stored as |
+|---|---|---|
+| Technical | `technical_indicators` (`indicator`, `value`, `payload`) | `rsi_14`, `macd_12_26_9`, `adx_14`, `atr_14`, `trend` (payload `direction`), `ma_ribbon` (`golden_cross`/`death_cross`), `bb_squeeze`, `vix_regime` (payload `regime`), `pivots_prior_bar`/`pivots_weekly`/`pivots_monthly`, `fvg_min0.1_lb50`, `order_blocks_sw3_imp1.5`, `liquidity_sweep_sw3`, `hs_pattern_sw5` (not `head_shoulders`), `flag_pole5_len10` |
+| Fundamentals tiers | `equity_fundamentals`, `period='derived'`, `source='fundamental_analysis'` | `composite_score`, `eps_strength`, `revenue_strength`, `pe_vs_5y_mean`, `fcf_yield`/`fcf_yield_tier`, `gross_margin_tier`, `net_margin_tier`, `t2_*` (balance-sheet composite `t2_health_score`, `t2_roe`, `t2_current_ratio`, `t2_leverage`, `t2_ev_ebitda`, …), `t3_*` (`t3_dcf`, …). No `fa_` prefix. |
+| Qualitative | same table | `qual_moat_proxy`, `qual_insider_signal`, `qual_news_sentiment_7d`/`_30d`, `qual_rd_intensity` |
+| Correlations | same table | `corr_earnings_quality`, `corr_valuation_quality`, `corr_leverage_liquidity`, `corr_operational`, `corr_master_signals`, `corr_summary`. There is no `aligned_signals`; the nearest stored text is each cluster's `positives` list. |
+
+**Bands:** trend direction, MA crosses, BB squeeze, VIX regime, pattern
+booleans and every fundamentals tier are stored. RSI and ADX bands are not —
+they exist only in the bot, so §2.2's "port the classifier first" applies to
+them.
+
+**Pattern and confluence logic:** detection (H&S, sweeps, order blocks,
+flags) is pure Go in `internal/compute`, persisted by the worker.
+`BUY_WATCH`/`TRIM_WATCH` and confluence are pure Python functions in
+`services/analyst-bot/actions/rules/` (not inline in a command handler), so
+the Go API cannot call them directly. H&S and flags feed no action rule.
+
+**Alerts (Part B):** no table persisted fired alerts; the only state was a
+Redis cooldown flag, set at detection time before the post was attempted.
+`action_signal` and `atr_pct_elevated` are not alert kinds the scan emits;
+the real kinds are `rsi_oversold`, `rsi_overbought`, `bb_squeeze`,
+`vix_elevated`, `fa_tier_flip`, `liquidity_sweep`. Resolved in §3.1.
+
 ---
 
 ## 2. Part A — `GET /api/v1/scanner/today/{symbol}/analysis`
@@ -220,6 +260,13 @@ CREATE TABLE fired_alerts (
   posted (post-cooldown) — recording only what posted is almost
   certainly correct, since a suppressed alert wasn't really "fired" from
   a user's point of view, but confirm this explicitly rather than assume.
+- **Resolved (2026-09-25, migration 026):** only confirmed posts are
+  recorded. `send_alert` now returns whether the platform confirmed the
+  post; the cooldown flag and the `fired_alerts` row are both written at
+  that point and nowhere else. A failed send leaves no cooldown and no row,
+  so the alert is detected again next scan (previously the cooldown was set
+  at detection and a failed send burned 4 hours silently). The table adds a
+  `CHECK` on `exchange_type` and `severity` and two read indexes.
 
 ### 3.2 `GET /api/v1/alerts`
 
