@@ -69,8 +69,10 @@ this and defines no dedicated tokens, so these are aliases (decision 2026-09-24)
 page's overall indicator: a pill with a dot and an icon), never for a stock or a
 verdict, and never in place of the price aliases.
 
-**Macro classification status colours** (Daily Market Report, Section 1 only) —
-each with `-container` / `on-…-container`:
+**Macro classification status colours** (Daily Market Report, Section 1; and
+the same two macro classifications — market-cycle composite, macro correlations
+regime — in Stock Detail's "Context vs benchmark", mirroring the report's
+indicator) — each with `-container` / `on-…-container`:
 
 | Variable | Alias | Backend `tone` | Icon shape |
 |----------|-------|----------------|------------|

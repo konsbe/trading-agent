@@ -65,19 +65,25 @@ From `GET /api/v1/scanner/today/{symbol}/analysis`
 3. **Balance sheet** (`balance-sheet`) — composite line, ROE/ROA/ROIC, ratios.
 4. **Correlations** (`correlations`) — composite, cluster health, master signal, aligned/divergent sentences.
 5. **Sentiment & news** (`news`) — title + source + link only.
-6. **Classical technical signals** (`classical-signals`) — primary-accent framing;
+6. **Qualitative signals** (`mfe-scanner.detail.qualitative`) — moat proxy, insider
+   activity, news sentiment 7d/30d, R&D intensity; tiers as plain-text bands.
+7. **Context vs benchmark** (`mfe-scanner.detail.context`) — benchmark, market-cycle
+   composite and macro correlations regime (stored label verbatim plus the Daily
+   Market Report's tone icon, `--color-status-*`), price phase, drawdown from
+   peak, relative strength (always "—" today: not stored).
+8. **Classical technical signals** (`classical-signals`) — primary-accent framing;
    the heuristic caveat verbatim first, then every technical reading the API
    gave a `severity` (e.g. RSI, VIX, BB squeeze), chart patterns and the action
    signal (label as-is, confluence as "3/4" text), each with a severity badge.
 
-Sections 1–5 never show severity badges; section 6 is the one place that lists
+Sections 1–7 never show severity badges; section 8 is the one place that lists
 what is currently flagged, and only what the API flagged. Every band, tier and
 severity is the API's — nothing is re-derived client-side; null is "—".
 
 States: `computing` (202) shows the API's message verbatim and polls after
 `retry_after_ms` / `Retry-After` until `ready`; `failed` (500) shows its
 message with Retry; `404` (no daily bars) is a plain note. `#classical-signals`
-in the URL opens section 6 expanded, scrolled to and highlighted.
+in the URL opens section 8 expanded, scrolled to and highlighted.
 
 Severity badges (`src/components/SeverityBadge`) use the
 `--color-severity-info|notice|warning` aliases from shared-components.
