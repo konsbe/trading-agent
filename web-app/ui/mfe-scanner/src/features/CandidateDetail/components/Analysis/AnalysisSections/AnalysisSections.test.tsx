@@ -1,7 +1,7 @@
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ApiError } from '@/api';
-import { StockAnalysisResource } from '@/hooks/scanner/useStockAnalysis';
+import { StockAnalysisResource, StockAnalysisState } from '@/hooks/scanner/useStockAnalysis';
 import { COMPUTING_MESSAGE, FAILED_MESSAGE, makeAnalysis, makePending } from '@/test-utils/analysisFixtures';
 import AnalysisSections from './AnalysisSections';
 
@@ -9,7 +9,7 @@ const retry = jest.fn();
 
 beforeEach(() => window.sessionStorage.clear());
 
-const renderWith = (state: Omit<StockAnalysisResource, 'retry'>) =>
+const renderWith = (state: StockAnalysisState) =>
     render(<AnalysisSections analysis={{ ...state, retry } as StockAnalysisResource} />);
 
 describe('AnalysisSections', () => {
