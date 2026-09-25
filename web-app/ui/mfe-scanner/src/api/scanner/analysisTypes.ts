@@ -89,6 +89,34 @@ export interface CorrelationsAnalysis {
     master_signals: { net_signal: string | null; fired: string[] };
 }
 
+export interface QualitativeAnalysis {
+    moat_proxy: ValueTier;
+    insider_signal: ValueTier;
+    news_sentiment_7d: ValueTier;
+    news_sentiment_30d: ValueTier;
+    /** R&D expense as % of revenue. */
+    rd_intensity: ValueTier;
+}
+
+/**
+ * Stored macro tone (`constructive` / `neutral` / `stressed`, or `no_data`);
+ * other strings pass through and get no indicator.
+ */
+export type MacroTone = 'constructive' | 'neutral' | 'stressed' | 'no_data' | (string & {});
+
+export interface ContextVsBenchmark {
+    benchmark_symbol: string | null;
+    market_cycle_composite: string | null;
+    market_cycle_tone: MacroTone | null;
+    /** Only stored for the market report's instruments; else null. */
+    price_phase: string | null;
+    drawdown_from_peak_pct: number | null;
+    correlation_regime: string | null;
+    correlation_regime_tone: MacroTone | null;
+    /** Always null today (not stored). */
+    relative_strength_20d_pp: number | null;
+}
+
 export interface Headline {
     title: string;
     url: string | null;
@@ -134,7 +162,9 @@ export interface StockAnalysis {
     fundamentals: FundamentalsAnalysis;
     balance_sheet: BalanceSheetAnalysis;
     correlations: CorrelationsAnalysis;
+    qualitative: QualitativeAnalysis;
     sentiment: { headlines: Headline[] };
+    context_vs_benchmark: ContextVsBenchmark;
     heuristic_signals: HeuristicSignals;
 }
 

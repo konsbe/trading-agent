@@ -63,6 +63,23 @@ export const makeAnalysis = (overrides: Partial<StockAnalysis> = {}): StockAnaly
         aligned_signals: ['Revenue and EPS growing together — genuine organic quality growth'],
         master_signals: { net_signal: 'bullish', fired: ['quality_growth'] },
     },
+    qualitative: {
+        moat_proxy: { value: 0.82, tier: 'wide' },
+        insider_signal: { value: -0.25, tier: 'net_selling' },
+        news_sentiment_7d: { value: 0.31, tier: 'positive' },
+        news_sentiment_30d: { value: 0.12, tier: 'neutral' },
+        rd_intensity: { value: 7.9, tier: 'moderate' },
+    },
+    context_vs_benchmark: {
+        benchmark_symbol: 'SPY',
+        market_cycle_composite: 'pullback_healthy',
+        market_cycle_tone: 'neutral',
+        price_phase: 'pullback',
+        drawdown_from_peak_pct: -5.58,
+        correlation_regime: 'stagflation_risk',
+        correlation_regime_tone: 'stressed',
+        relative_strength_20d_pp: null,
+    },
     sentiment: {
         headlines: [
             {
@@ -137,6 +154,23 @@ export const makeEmptyAnalysis = (): StockAnalysis => {
             roic: vb,
         },
         correlations: { composite: { score: null, tier: null }, clusters: [], aligned_signals: [], master_signals: { net_signal: null, fired: [] } },
+        qualitative: {
+            moat_proxy: { value: null, tier: null },
+            insider_signal: { value: null, tier: null },
+            news_sentiment_7d: { value: null, tier: null },
+            news_sentiment_30d: { value: null, tier: null },
+            rd_intensity: { value: null, tier: null },
+        },
+        context_vs_benchmark: {
+            benchmark_symbol: null,
+            market_cycle_composite: null,
+            market_cycle_tone: null,
+            price_phase: null,
+            drawdown_from_peak_pct: null,
+            correlation_regime: null,
+            correlation_regime_tone: null,
+            relative_strength_20d_pp: null,
+        },
         sentiment: { headlines: [] },
         heuristic_signals: { caveat: HEURISTIC_CAVEAT, chart_patterns: [], action_signal: null },
     });

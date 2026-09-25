@@ -3,6 +3,7 @@ import {
     AnalysisPending,
     BalanceSheetAnalysis,
     ChartPattern,
+    ContextVsBenchmark,
     CorrelationCluster,
     CorrelationsAnalysis,
     FlaggedValueBand,
@@ -10,6 +11,7 @@ import {
     Headline,
     HeuristicSignals,
     MarginReading,
+    QualitativeAnalysis,
     ScoreTier,
     StockAnalysis,
     TechnicalAnalysis,
@@ -139,6 +141,34 @@ const parseCorrelations = (value: unknown, path = 'correlations'): CorrelationsA
     };
 };
 
+const parseQualitative = (value: unknown, path = 'qualitative'): QualitativeAnalysis => {
+    const o = section(value, path);
+    const vt = (key: string) => valueTier(o[key], `${path}.${key}`);
+    return {
+        moat_proxy: vt('moat_proxy'),
+        insider_signal: vt('insider_signal'),
+        news_sentiment_7d: vt('news_sentiment_7d'),
+        news_sentiment_30d: vt('news_sentiment_30d'),
+        rd_intensity: vt('rd_intensity'),
+    };
+};
+
+const parseContext = (value: unknown, path = 'context_vs_benchmark'): ContextVsBenchmark => {
+    const o = section(value, path);
+    const s = (key: string) => optStr(o[key], `${path}.${key}`);
+    const n = (key: string) => optNum(o[key], `${path}.${key}`);
+    return {
+        benchmark_symbol: s('benchmark_symbol'),
+        market_cycle_composite: s('market_cycle_composite'),
+        market_cycle_tone: s('market_cycle_tone'),
+        price_phase: s('price_phase'),
+        drawdown_from_peak_pct: n('drawdown_from_peak_pct'),
+        correlation_regime: s('correlation_regime'),
+        correlation_regime_tone: s('correlation_regime_tone'),
+        relative_strength_20d_pp: n('relative_strength_20d_pp'),
+    };
+};
+
 const parseHeadline = (value: unknown, path: string): Headline => {
     const o = obj(value, path);
     return {
@@ -202,7 +232,9 @@ export const parseStockAnalysis = (value: unknown): StockAnalysis => {
         fundamentals: parseFundamentals(o.fundamentals),
         balance_sheet: parseBalanceSheet(o.balance_sheet),
         correlations: parseCorrelations(o.correlations),
+        qualitative: parseQualitative(o.qualitative),
         sentiment: { headlines: array(sentiment.headlines ?? [], 'sentiment.headlines', parseHeadline) },
+        context_vs_benchmark: parseContext(o.context_vs_benchmark),
         heuristic_signals: parseHeuristics(o.heuristic_signals),
     };
 };
