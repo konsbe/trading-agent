@@ -204,6 +204,23 @@ later patched" do not blur). Findings that shape what "as live" means:
   hypothesis direction, signal episodes vs non-signal symbol-days in the
   same stratum and fold). To be fixed in writing before step 5.
 
+## 5b. Amendment 2 — decided 2026-09-25, before step 5, blind to any outcome
+
+- **Comparison group (every hypothesis):** signal episodes vs non-signal
+  days in the same stratum. Non-signal days come from a deterministic sample
+  of equity symbol-days (every 5th session per symbol) on which that signal
+  did not fire, with the same labels, lockbox rule and stratification
+  variables. H5's baseline is the same sample with no active BB squeeze.
+- **H9/H10 are pinned to 4/4 confluence only** (`buy_watch_c4`,
+  `trim_watch_c4`: sweep + close back + order block + trend), matching the
+  product's own "actionable" framing. The any-confluence variants from
+  Amendment 1 are dropped and are not computed. If 4/4 is underpowered,
+  that is reported as the finding; the definition is not loosened to get a
+  testable number.
+- **Still open:** the binary outcome behind the MH OR (proposed: sign of
+  `fwd_return_10s` in the hypothesis direction). To be confirmed in writing
+  before step 5.
+
 **Lockbox handling in the replay.** An episode is lockbox if its date is in
 2025-03-28..2026-03-27, or its 20-session label window reaches into it, for a
 symbol outside `momentum_pilot_cohort`. Lockbox episodes are written with
