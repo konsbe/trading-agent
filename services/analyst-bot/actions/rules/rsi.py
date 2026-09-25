@@ -8,6 +8,8 @@ from __future__ import annotations
 
 from typing import Optional
 
+from actions.rules import _indicators
+
 
 def evaluate(
     symbol: str,
@@ -30,9 +32,7 @@ def evaluate(
     trend_dir = trend_payload.get("direction") or ""
 
     # MACD histogram
-    macd_payload = (indicators.get("macd") or {}).get("payload") or {}
-    macd_hist: Optional[float] = macd_payload.get("histogram")
-    macd_bullish_cross: bool = macd_payload.get("bullish_cross", False)
+    macd_hist, macd_bullish_cross, _ = _indicators.macd(indicators)
 
     # RSI divergence
     rsi_div_payload = (indicators.get("rsi_divergence") or {}).get("payload") or {}

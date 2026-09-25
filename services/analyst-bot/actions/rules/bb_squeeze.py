@@ -8,6 +8,8 @@ from __future__ import annotations
 
 from typing import Optional
 
+from actions.rules import _indicators
+
 
 def evaluate(
     symbol: str,
@@ -26,10 +28,7 @@ def evaluate(
     trend_dir = trend_payload.get("direction") or ""
 
     # MACD
-    macd_payload = (indicators.get("macd") or {}).get("payload") or {}
-    macd_hist: Optional[float] = macd_payload.get("histogram")
-    macd_bullish_cross: bool = macd_payload.get("bullish_cross", False)
-    macd_bearish_cross: bool = macd_payload.get("bearish_cross", False)
+    macd_hist, macd_bullish_cross, macd_bearish_cross = _indicators.macd(indicators)
 
     # ADX — squeeze inside a strong trend is more reliable
     adx_val: Optional[float] = (indicators.get("adx_14") or {}).get("value")
