@@ -28,11 +28,12 @@ and writes exactly the rows those workers would
 | Route | Returns |
 |-------|---------|
 | `GET /healthz` | `200 {"status":"ok"}` when the DB answers, else `503` |
-| `GET /api/v1/scanner/today` | Latest scan: header + every gate-passing candidate, both buckets, ordered `rvol_20 DESC` |
+| `GET /api/v1/scanner/today` | Latest scan: header + every gate-passing candidate, both buckets, ordered `rvol_20 DESC`; each candidate carries `recent_alert` (newest equity `fired_alerts` row in the last 24h, or `null`) |
 | `GET /api/v1/scanner/today/{symbol}` | One symbol's row for the latest scan (case-insensitive), including gate failures and the full score breakdown |
-| `GET /api/v1/scanner/today/{symbol}/analysis` | Full stock analysis: technical, fundamentals, balance sheet, correlations, qualitative, headlines, market context and `heuristic_signals` (with `HEURISTIC_TA_CAVEAT`). `200 status:"ready"`, or `202 status:"computing"` + `Retry-After` while it is computed on first view, or `500 status:"failed"`. Same 404/503 as the detail route |
+| `GET /api/v1/scanner/today/{symbol}/analysis` | Full stock analysis: technical, fundamentals, balance sheet, correlations, qualitative, headlines, market context and `heuristic_signals` (with `HEURISTIC_TA_CAVEAT`). `200 status:"ready"`, or `202 status:"computing"` + `Retry-After` while it is computed on first view, or `500 status:"failed"`. Served for any symbol with daily bars (`scanner_data` says whether the scanner has a row); `404` only without daily bars; same 503s as the detail route |
 | `GET /api/v1/scanner/symbols/{symbol}/bars?range=1D\|5D\|1M\|6M\|1Y\|ALL` | Price history for the chart (5-minute bars for 1D/5D when stored, else daily with `fallback`) |
 | `GET /api/v1/scanner/tracked?status=active\|closed\|all` | Tracked Positions (read-only view of `momentum_tracked`, with a per-rule `exit_reason_note` from the shared caveats file) |
+| `GET /api/v1/alerts?symbol=&since=YYYY-MM-DD&limit=` | Fired alerts (`fired_alerts`, migration 026), newest first; filters optional and combinable, default limit 100 (max 500), `has_more` when truncated |
 | `GET /api/v1/watchlist` · `PUT` / `DELETE /api/v1/watchlist/{symbol}` | The watchlist — the service's only write path (table `watchlist_items`, migration 024). Unauthenticated list until auth exists |
 
 | Condition | Response |
