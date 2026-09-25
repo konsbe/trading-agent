@@ -1,6 +1,7 @@
 # Pre-registration — Classical TA Heuristic Signals
 
-**Status:** committed before any hypothesis is tested. No result exists yet.
+**Status:** committed before any hypothesis was tested. Round 1 CLOSED
+2026-09-25, no hypothesis confirmed — see §7.
 **Scope:** validates the signals in `docs/MOMENTUM_SCANNER_API_STOCK_ANALYSIS.md`
 §2.4 (`heuristic_signals`) — RSI bands, MACD crosses, BB squeeze, chart
 patterns, liquidity-sweep conditions, and the `BUY_WATCH`/`TRIM_WATCH`
@@ -492,3 +493,58 @@ future harness should drop rows whose forward window spans a calendar gap.
   set by momentum's own closure: "these heuristics show no demonstrated
   edge on daily bars" is as valid and complete an outcome as any
   confirmation would be.
+
+---
+
+## 7. RULING — Round 1 closed. 2026-09-25
+
+**Status: Round 1 CLOSED. No hypothesis confirmed.**
+
+> **Of the 11 pre-registered hypotheses covering the heuristic signals live
+> in this product, one (RSI oversold predicting short-term upward drift) held
+> in-sample but did not survive the out-of-sample lockbox evaluation; none of
+> the remaining ten showed a meaningful effect.**
+
+Equities, 2,482 symbols, ~10 years of daily bars; hit = `fwd_return_10s`
+beyond ±3.0% in the hypothesis direction; floor MH OR ≥ 1.25 (H5: 1.25x
+lift). Figures from §5f and §5h.
+
+| # | Claim | Verdict | Why |
+|---|---|---|---|
+| H1 | RSI overbought → down | not confirmed | MH OR 1.187, below the 1.25 floor |
+| H2 | RSI oversold → up | **not confirmed** | in-sample 1.256 cleared; lockbox 1.153, bootstrap 90% [0.971, 1.379] |
+| H3 | MACD bull cross → up | not confirmed | 0.979, no effect in the claimed direction |
+| H4 | MACD bear cross → down | not confirmed | 0.989, no effect in the claimed direction |
+| H5 | BB squeeze → bigger move | not confirmed | lift 0.966x; squeezes were followed by slightly smaller moves |
+| H6 | Bearish pattern → down | not confirmed | 0.979, no effect in the claimed direction |
+| H7 | Bullish pattern → up | not confirmed | 1.017, below floor |
+| H8a | Low sweep → up | not confirmed | 1.011, below floor and not significant after BH |
+| H8b | High sweep → down | not confirmed | 1.029, below floor |
+| H9 | BUY_WATCH 4/4 → up | not confirmed | 1.045, below floor; does not exceed the best single signal (H2, 1.256) |
+| H10 | TRIM_WATCH 4/4 → down | not confirmed | 1.033, below floor; does not exceed the best single signal (H1, 1.187) |
+
+#### The finding that outlives this round
+
+The standard CMH / Robins-Breslow-Greenland confidence interval understated
+uncertainty by roughly **1.9–4.5x** in width against the month-block
+bootstrap, across every hypothesis tested here, because it treats overlapping
+label windows and same-day episodes as independent (§5f). H2 shows the
+consequence: the naive lockbox interval excluded no effect, the
+clustering-aware one did not. **Any future hypothesis test on this dataset
+should use a clustering-aware interval (block bootstrap by calendar month or
+finer) as its primary uncertainty estimate from the start, and pre-register
+its bar.**
+
+#### What this does and does not change
+
+- No signal is removed from the product. Every heuristic keeps rendering
+  exactly as built, under `HEURISTIC_TA_CAVEAT`, which now cites this
+  round's null result.
+- The §4 stopping rule applies: **no round 2 for any signal type without a
+  new written justification from the user.**
+- H9/H10 tested the **current** rule implementation — tautological
+  close-back condition, structurally inert VIX veto, undefined order-block
+  proximity, and a sweep read up to ~50 sessions old (Amendment 4) — not
+  multi-condition confluence as a concept. A better-built composite remains
+  an open, distinct question for a future round; this result does not
+  foreclose it.
