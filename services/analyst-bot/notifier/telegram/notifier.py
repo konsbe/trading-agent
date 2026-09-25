@@ -33,5 +33,6 @@ class TelegramNotifier(BaseNotifier):
     async def send_symbol_report(self, report: SymbolReport) -> None:
         log.info("TelegramNotifier.send_symbol_report — not implemented yet")
 
-    async def send_alert(self, alert: AlertEvent) -> None:
+    async def send_alert(self, alert: AlertEvent) -> bool:
         log.info("TelegramNotifier.send_alert — not implemented yet")
+        return False

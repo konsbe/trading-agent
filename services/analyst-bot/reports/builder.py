@@ -42,6 +42,9 @@ from reports.models import (
 
 log = logging.getLogger(__name__)
 
+# How long the last-seen FA composite tier is remembered for flip detection.
+FA_TIER_MEMORY_SECS = 86400
+
 # Dashboard strip: (label, kind, ref, hint) — kind is "fred" or "eq"
 _DASHBOARD_ITEMS: tuple[tuple[str, str, str, str], ...] = (
     ("DXY", "fred", "DTWEXBGS", "FRED broad USD index (not ICE DXY)"),
@@ -293,9 +296,23 @@ class ReportBuilder:
         rsi_oversold: float = 30.0,
         rsi_overbought: float = 70.0,
         vix_alert_threshold: float = 25.0,
-        alert_cooldown_secs: int = 14400,
     ) -> list[AlertEvent]:
+        """Alerts detected now and not in cooldown.
+
+        Detection only: the cooldown flag is set by the alert scan job after a
+        notifier confirms the post, so a failed send does not burn it.
+        """
         alerts: list[AlertEvent] = []
+        # A market-wide key (vix_elevated) is detected once per symbol; without
+        # the early cooldown flag, only this set keeps it to one alert per scan.
+        seen: set[str] = set()
+
+        async def _emit(event: AlertEvent) -> bool:
+            if event.cache_key in seen or await _cache.exists(event.cache_key):
+                return False
+            seen.add(event.cache_key)
+            alerts.append(event)
+            return True
 
         async def _check(symbol: str, asset_type: str) -> None:
             exchange = "equity" if asset_type == "equity" else "binance"
@@ -309,38 +326,32 @@ class ReportBuilder:
                 if rsi_val is not None:
                     if rsi_val < rsi_oversold:
                         ck = f"alert:rsi_oversold:{symbol}:{interval}"
-                        if not await _cache.exists(ck):
-                            alerts.append(AlertEvent(
-                                kind="rsi_oversold",
-                                symbol=symbol, exchange=exchange, interval=interval,
-                                message=f"RSI {rsi_val:.1f} — oversold (<{rsi_oversold})",
-                                severity="warning", value=rsi_val, cache_key=ck,
-                            ))
-                            await _cache.set_flag(ck, alert_cooldown_secs)
+                        await _emit(AlertEvent(
+                            kind="rsi_oversold",
+                            symbol=symbol, exchange=exchange, interval=interval,
+                            message=f"RSI {rsi_val:.1f} — oversold (<{rsi_oversold})",
+                            severity="warning", value=rsi_val, cache_key=ck,
+                        ))
                     elif rsi_val > rsi_overbought:
                         ck = f"alert:rsi_overbought:{symbol}:{interval}"
-                        if not await _cache.exists(ck):
-                            alerts.append(AlertEvent(
-                                kind="rsi_overbought",
-                                symbol=symbol, exchange=exchange, interval=interval,
-                                message=f"RSI {rsi_val:.1f} — overbought (>{rsi_overbought})",
-                                severity="warning", value=rsi_val, cache_key=ck,
-                            ))
-                            await _cache.set_flag(ck, alert_cooldown_secs)
+                        await _emit(AlertEvent(
+                            kind="rsi_overbought",
+                            symbol=symbol, exchange=exchange, interval=interval,
+                            message=f"RSI {rsi_val:.1f} — overbought (>{rsi_overbought})",
+                            severity="warning", value=rsi_val, cache_key=ck,
+                        ))
 
             # ── Bollinger Squeeze ─────────────────────────────────────────────
             if "bb_squeeze" in indicators:
                 sq = indicators["bb_squeeze"]["value"]
                 if sq and sq >= 1.0:
                     ck = f"alert:bb_squeeze:{symbol}:{interval}"
-                    if not await _cache.exists(ck):
-                        alerts.append(AlertEvent(
-                            kind="bb_squeeze",
-                            symbol=symbol, exchange=exchange, interval=interval,
-                            message="Bollinger Squeeze active — low-volatility coil, breakout expected",
-                            severity="info", value=sq, cache_key=ck,
-                        ))
-                        await _cache.set_flag(ck, alert_cooldown_secs)
+                    await _emit(AlertEvent(
+                        kind="bb_squeeze",
+                        symbol=symbol, exchange=exchange, interval=interval,
+                        message="Bollinger Squeeze active — low-volatility coil, breakout expected",
+                        severity="info", value=sq, cache_key=ck,
+                    ))
 
             # ── VIX regime change ─────────────────────────────────────────────
             if "vix_regime" in indicators and asset_type == "equity":
@@ -348,14 +359,12 @@ class ReportBuilder:
                 vix_val = indicators["vix_regime"]["value"]
                 if vix_val and vix_val > vix_alert_threshold:
                     ck = f"alert:vix_elevated:{interval}"
-                    if not await _cache.exists(ck):
-                        alerts.append(AlertEvent(
-                            kind="vix_elevated",
-                            symbol=symbol, exchange=exchange, interval=interval,
-                            message=f"VIX {vix_val:.1f} — regime: {regime}",
-                            severity="warning", value=vix_val, cache_key=ck,
-                        ))
-                        await _cache.set_flag(ck, alert_cooldown_secs)
+                    await _emit(AlertEvent(
+                        kind="vix_elevated",
+                        symbol=symbol, exchange=exchange, interval=interval,
+                        message=f"VIX {vix_val:.1f} — regime: {regime}",
+                        severity="warning", value=vix_val, cache_key=ck,
+                    ))
 
             # ── FA composite tier flip (equity only) ──────────────────────────
             if asset_type == "equity":
@@ -364,20 +373,21 @@ class ReportBuilder:
                     tier = (derived["composite_score"]["payload"] or {}).get("tier")
                     prev_tier_key = f"fa_tier:{symbol}"
                     prev_tier = await _cache.get_json(prev_tier_key)
+                    flip_emitted = False
                     if prev_tier and prev_tier != tier and tier in ("strong", "weak"):
                         ck = f"alert:fa_tier_flip:{symbol}"
-                        if not await _cache.exists(ck):
-                            alerts.append(AlertEvent(
-                                kind="fa_tier_flip",
-                                symbol=symbol, exchange=exchange, interval=interval,
-                                message=f"FA composite tier changed: {prev_tier} → {tier}",
-                                severity="warning" if tier == "weak" else "info",
-                                cache_key=ck,
-                                payload={"prev_tier": prev_tier, "new_tier": tier},
-                            ))
-                            await _cache.set_flag(ck, alert_cooldown_secs)
-                    if tier:
-                        await _cache.set(prev_tier_key, tier, 86400)
+                        flip_emitted = await _emit(AlertEvent(
+                            kind="fa_tier_flip",
+                            symbol=symbol, exchange=exchange, interval=interval,
+                            message=f"FA composite tier changed: {prev_tier} → {tier}",
+                            severity="warning" if tier == "weak" else "info",
+                            cache_key=ck,
+                            payload={"prev_tier": prev_tier, "new_tier": tier},
+                        ))
+                    # An emitted flip keeps the old tier until the job confirms
+                    # the post, so a failed send is retried rather than lost.
+                    if tier and not flip_emitted:
+                        await _cache.set(prev_tier_key, tier, FA_TIER_MEMORY_SECS)
 
             # ── Liquidity sweep ───────────────────────────────────────────────
             liq_key = next((k for k in indicators if k.startswith("liquidity_sweep")), None)
@@ -385,14 +395,12 @@ class ReportBuilder:
                 count = indicators[liq_key]["value"]
                 if count and count > 0:
                     ck = f"alert:liq_sweep:{symbol}:{interval}"
-                    if not await _cache.exists(ck):
-                        alerts.append(AlertEvent(
-                            kind="liquidity_sweep",
-                            symbol=symbol, exchange=exchange, interval=interval,
-                            message=f"Liquidity sweep detected ({int(count)} sweeps)",
-                            severity="info", value=count, cache_key=ck,
-                        ))
-                        await _cache.set_flag(ck, alert_cooldown_secs)
+                    await _emit(AlertEvent(
+                        kind="liquidity_sweep",
+                        symbol=symbol, exchange=exchange, interval=interval,
+                        message=f"Liquidity sweep detected ({int(count)} sweeps)",
+                        severity="info", value=count, cache_key=ck,
+                    ))
 
         for sym in equity_symbols:
             try:

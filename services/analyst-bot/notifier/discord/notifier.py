@@ -99,17 +99,19 @@ class DiscordNotifier(BaseNotifier):
             "use formatter.symbol_report_embeds() directly in the command handler."
         )
 
-    async def send_alert(self, alert: AlertEvent) -> None:
+    async def send_alert(self, alert: AlertEvent) -> bool:
         channel = self._get_channel(self._alerts_channel_id)
         if not channel:
             log.debug("alerts_channel_id not set — alert not sent: %s", alert.kind)
-            return
+            return False
         try:
             embed = formatter.alert_embed(alert)
             await channel.send(embed=embed)
             log.info("alert sent kind=%s symbol=%s", alert.kind, alert.symbol)
+            return True
         except Exception as exc:
             log.error("failed to send alert to Discord: %s", exc)
+            return False
 
     async def send_action(self, channel_id: Optional[int], embed: discord.Embed) -> None:
         """Send an action embed to the #actions channel."""

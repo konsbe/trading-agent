@@ -38,8 +38,12 @@ class BaseNotifier(ABC):
         ...
 
     @abstractmethod
-    async def send_alert(self, alert: AlertEvent) -> None:
-        """Post a single threshold-breach alert."""
+    async def send_alert(self, alert: AlertEvent) -> bool:
+        """Post a single threshold-breach alert.
+
+        Returns True only when the platform confirmed the post. The alert scan
+        sets the cooldown and records the alert in fired_alerts on True only.
+        """
         ...
 
     @property
