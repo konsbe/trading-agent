@@ -1,0 +1,5471 @@
+[
+ {
+  "bars": 3,
+  "indicator": "sr_levels",
+  "value": 23.488502106953195,
+  "payload": {
+   "current_price": 23.488502106953195,
+   "resistance": [],
+   "resistance_touches": [],
+   "support": [],
+   "support_touches": []
+  }
+ },
+ {
+  "bars": 3,
+  "indicator": "candle_patterns",
+  "value": 0,
+  "payload": {
+   "bar": {
+    "close": 23.488502106953195,
+    "high": 24.039887430311655,
+    "low": 23.04703764969796,
+    "open": 23.87887698539284,
+    "volume": 167864.19999999998
+   },
+   "patterns": []
+  }
+ },
+ {
+  "bars": 3,
+  "indicator": "obv",
+  "value": -296274,
+  "payload": {
+   "last_bar_delta": -167864.19999999998,
+   "obv": -296274
+  }
+ },
+ {
+  "bars": 3,
+  "indicator": "rsi_divergence_rsi14_sw5",
+  "value": 0,
+  "payload": {
+   "bearish_regular": {
+    "pattern": false,
+    "price_hi_1": 0,
+    "price_hi_2": 0,
+    "rsi_hi_1": 0,
+    "rsi_hi_2": 0,
+    "selected": false
+   },
+   "bullish_regular": {
+    "pattern": false,
+    "price_lo_1": 0,
+    "price_lo_2": 0,
+    "rsi_lo_1": 0,
+    "rsi_lo_2": 0,
+    "selected": false
+   },
+   "kind": "none"
+  }
+ },
+ {
+  "bars": 3,
+  "indicator": "rsi_hidden_rsi14_sw5",
+  "value": 0,
+  "payload": {
+   "bearish_hidden": {
+    "pattern": false,
+    "price_hi_1": 0,
+    "price_hi_2": 0,
+    "rsi_hi_1": 0,
+    "rsi_hi_2": 0,
+    "selected": false
+   },
+   "bullish_hidden": {
+    "pattern": false,
+    "price_lo_1": 0,
+    "price_lo_2": 0,
+    "rsi_lo_1": 0,
+    "rsi_lo_2": 0,
+    "selected": false
+   },
+   "kind": "none",
+   "min_pivot_sep": 3,
+   "require_trend_gate": true
+  }
+ },
+ {
+  "bars": 3,
+  "indicator": "vol_profile_proxy_b48_typical_price",
+  "value": 24.084771320456756,
+  "payload": {
+   "bar_count": 3,
+   "bins": [
+    {
+     "price_high": 23.078014774198223,
+     "price_low": 23.04703764969796,
+     "volume": 0
+    },
+    {
+     "price_high": 23.108991898698484,
+     "price_low": 23.078014774198223,
+     "volume": 0
+    },
+    {
+     "price_high": 23.139969023198745,
+     "price_low": 23.108991898698484,
+     "volume": 0
+    },
+    {
+     "price_high": 23.17094614769901,
+     "price_low": 23.139969023198745,
+     "volume": 0
+    },
+    {
+     "price_high": 23.201923272199274,
+     "price_low": 23.17094614769901,
+     "volume": 0
+    },
+    {
+     "price_high": 23.232900396699534,
+     "price_low": 23.201923272199274,
+     "volume": 0
+    },
+    {
+     "price_high": 23.263877521199795,
+     "price_low": 23.232900396699534,
+     "volume": 0
+    },
+    {
+     "price_high": 23.29485464570006,
+     "price_low": 23.263877521199795,
+     "volume": 0
+    },
+    {
+     "price_high": 23.325831770200324,
+     "price_low": 23.29485464570006,
+     "volume": 0
+    },
+    {
+     "price_high": 23.356808894700585,
+     "price_low": 23.325831770200324,
+     "volume": 0
+    },
+    {
+     "price_high": 23.387786019200846,
+     "price_low": 23.356808894700585,
+     "volume": 0
+    },
+    {
+     "price_high": 23.41876314370111,
+     "price_low": 23.387786019200846,
+     "volume": 0
+    },
+    {
+     "price_high": 23.449740268201374,
+     "price_low": 23.41876314370111,
+     "volume": 0
+    },
+    {
+     "price_high": 23.480717392701635,
+     "price_low": 23.449740268201374,
+     "volume": 0
+    },
+    {
+     "price_high": 23.511694517201896,
+     "price_low": 23.480717392701635,
+     "volume": 0
+    },
+    {
+     "price_high": 23.54267164170216,
+     "price_low": 23.511694517201896,
+     "volume": 167864.19999999998
+    },
+    {
+     "price_high": 23.573648766202425,
+     "price_low": 23.54267164170216,
+     "volume": 0
+    },
+    {
+     "price_high": 23.604625890702685,
+     "price_low": 23.573648766202425,
+     "volume": 0
+    },
+    {
+     "price_high": 23.635603015202946,
+     "price_low": 23.604625890702685,
+     "volume": 0
+    },
+    {
+     "price_high": 23.66658013970321,
+     "price_low": 23.635603015202946,
+     "volume": 0
+    },
+    {
+     "price_high": 23.697557264203475,
+     "price_low": 23.66658013970321,
+     "volume": 0
+    },
+    {
+     "price_high": 23.728534388703736,
+     "price_low": 23.697557264203475,
+     "volume": 0
+    },
+    {
+     "price_high": 23.759511513203996,
+     "price_low": 23.728534388703736,
+     "volume": 0
+    },
+    {
+     "price_high": 23.79048863770426,
+     "price_low": 23.759511513203996,
+     "volume": 0
+    },
+    {
+     "price_high": 23.821465762204525,
+     "price_low": 23.79048863770426,
+     "volume": 0
+    },
+    {
+     "price_high": 23.852442886704786,
+     "price_low": 23.821465762204525,
+     "volume": 0
+    },
+    {
+     "price_high": 23.883420011205047,
+     "price_low": 23.852442886704786,
+     "volume": 0
+    },
+    {
+     "price_high": 23.91439713570531,
+     "price_low": 23.883420011205047,
+     "volume": 0
+    },
+    {
+     "price_high": 23.945374260205575,
+     "price_low": 23.91439713570531,
+     "volume": 0
+    },
+    {
+     "price_high": 23.976351384705836,
+     "price_low": 23.945374260205575,
+     "volume": 128409.8
+    },
+    {
+     "price_high": 24.007328509206097,
+     "price_low": 23.976351384705836,
+     "volume": 0
+    },
+    {
+     "price_high": 24.03830563370636,
+     "price_low": 24.007328509206097,
+     "volume": 0
+    },
+    {
+     "price_high": 24.069282758206626,
+     "price_low": 24.03830563370636,
+     "volume": 0
+    },
+    {
+     "price_high": 24.100259882706887,
+     "price_low": 24.069282758206626,
+     "volume": 195734.80000000002
+    },
+    {
+     "price_high": 24.131237007207147,
+     "price_low": 24.100259882706887,
+     "volume": 0
+    },
+    {
+     "price_high": 24.16221413170741,
+     "price_low": 24.131237007207147,
+     "volume": 0
+    },
+    {
+     "price_high": 24.193191256207676,
+     "price_low": 24.16221413170741,
+     "volume": 0
+    },
+    {
+     "price_high": 24.224168380707937,
+     "price_low": 24.193191256207676,
+     "volume": 0
+    },
+    {
+     "price_high": 24.255145505208198,
+     "price_low": 24.224168380707937,
+     "volume": 0
+    },
+    {
+     "price_high": 24.286122629708462,
+     "price_low": 24.255145505208198,
+     "volume": 0
+    },
+    {
+     "price_high": 24.317099754208726,
+     "price_low": 24.286122629708462,
+     "volume": 0
+    },
+    {
+     "price_high": 24.348076878708987,
+     "price_low": 24.317099754208726,
+     "volume": 0
+    },
+    {
+     "price_high": 24.379054003209248,
+     "price_low": 24.348076878708987,
+     "volume": 0
+    },
+    {
+     "price_high": 24.410031127709512,
+     "price_low": 24.379054003209248,
+     "volume": 0
+    },
+    {
+     "price_high": 24.441008252209777,
+     "price_low": 24.410031127709512,
+     "volume": 0
+    },
+    {
+     "price_high": 24.471985376710037,
+     "price_low": 24.441008252209777,
+     "volume": 0
+    },
+    {
+     "price_high": 24.5029625012103,
+     "price_low": 24.471985376710037,
+     "volume": 0
+    },
+    {
+     "price_high": 24.533939625710563,
+     "price_low": 24.5029625012103,
+     "volume": 0
+    }
+   ],
+   "disclaimer": "Each bar's volume assigned to one bin via typical price or close; not true volume-at-price.",
+   "histogram_total_volume": 492008.80000000005,
+   "method": "typical_price",
+   "poc_bin": 33,
+   "poc_price": 24.084771320456756,
+   "value_area_high": 24.533939625710563,
+   "value_area_low": 23.511694517201896,
+   "value_area_pct_target": 0.7,
+   "value_area_volume": 492008.80000000005
+  }
+ },
+ {
+  "bars": 3,
+  "indicator": "ad_line",
+  "value": -78970.82770449089,
+  "payload": {
+   "cumulative": -78970.82770449089
+  }
+ },
+ {
+  "bars": 3,
+  "indicator": "pivots_prior_bar",
+  "value": 23.955520487102362,
+  "payload": {
+   "camarilla": {
+    "R1": 23.937943291365297,
+    "R2": 23.997009597337755,
+    "R3": 24.056075903310212,
+    "R4": 24.23327482122759,
+    "S1": 23.81981067942038,
+    "S2": 23.760744373447924,
+    "S3": 23.701678067475466,
+    "S4": 23.52447914955809
+   },
+   "classic": {
+    "PP": 23.955520487102362,
+    "R1": 24.23937858700646,
+    "R2": 24.599880188620087,
+    "R3": 24.883738288524185,
+    "S1": 23.595018885488734,
+    "S2": 23.311160785584637,
+    "S3": 22.95065918397101
+   },
+   "reference_ts": "2021-08-22T00:00:00Z",
+   "woodie": {
+    "PP": 23.93635961167498,
+    "R1": 24.201056836151697,
+    "R2": 24.580719313192706,
+    "S1": 23.55669713463397,
+    "S2": 23.291999910157255
+   }
+  }
+ },
+ {
+  "bars": 3,
+  "indicator": "chart_pattern_hints",
+  "value": 0,
+  "payload": {
+   "cluster_pct": 0.5,
+   "double_bottom_candidate": false,
+   "double_top_candidate": false,
+   "high1": 0,
+   "high2": 0,
+   "low1": 0,
+   "low2": 0
+  }
+ },
+ {
+  "bars": 3,
+  "indicator": "parabolic_sar_s0.02_m0.2",
+  "value": 24.515822735059512,
+  "payload": {
+   "bullish": false,
+   "sar": 24.515822735059512,
+   "trend": -1
+  }
+ },
+ {
+  "bars": 3,
+  "indicator": "fvg_min0.1_lb50",
+  "value": 0,
+  "payload": {
+   "active_count": 0,
+   "last_bearish": null,
+   "last_bullish": null,
+   "lookback_bars": 50,
+   "min_gap_pct": 0.1,
+   "total_count": 0
+  }
+ },
+ {
+  "bars": 3,
+  "indicator": "order_blocks_sw3_imp1.5",
+  "value": 0,
+  "payload": {
+   "active_count": 0,
+   "impulse_min_pct": 1.5,
+   "last_bearish_ob": null,
+   "last_bullish_ob": null,
+   "lookback_bars": 100,
+   "swing_strength": 3,
+   "total_count": 0
+  }
+ },
+ {
+  "bars": 3,
+  "indicator": "liquidity_sweep_sw3",
+  "value": 0,
+  "payload": {
+   "high_sweeps": 0,
+   "last_sweep": null,
+   "lookback_bars": 50,
+   "low_sweeps": 0,
+   "swing_strength": 3,
+   "total_sweeps": 0
+  }
+ },
+ {
+  "bars": 3,
+  "indicator": "hs_pattern_sw5",
+  "value": 0,
+  "payload": {
+   "hs_found": false,
+   "hs_head": 0,
+   "hs_left_shoulder": 0,
+   "hs_neckline": 0,
+   "hs_neckline_break": false,
+   "hs_right_shoulder": 0,
+   "hs_symmetry_pct": 0,
+   "inv_hs_found": false,
+   "inv_hs_head": 0,
+   "inv_hs_left_shoulder": 0,
+   "inv_hs_neckline": 0,
+   "inv_hs_neckline_break": false,
+   "inv_hs_right_shoulder": 0,
+   "inv_hs_symmetry_pct": 0,
+   "shoulder_tolerance_pct": 5,
+   "swing_strength": 5
+  }
+ },
+ {
+  "bars": 3,
+  "indicator": "triangle_sw3",
+  "value": 0,
+  "payload": {
+   "apex_bars_away": 0,
+   "breakout": "",
+   "flat_thresh_pct": 0.05,
+   "high_slope_pct": 0,
+   "kind": "none",
+   "low_slope_pct": 0,
+   "min_pivots": 3,
+   "swing_strength": 3
+  }
+ },
+ {
+  "bars": 3,
+  "indicator": "flag_pole5_len10",
+  "value": 0,
+  "payload": {
+   "bear_flag": false,
+   "bull_flag": false,
+   "flag_len_bars": 10,
+   "max_retracement_pct": 50,
+   "pole_len_bars": 5,
+   "pole_min_pct": 5,
+   "pole_pct": 0
+  }
+ },
+ {
+  "bars": 30,
+  "indicator": "sma_20",
+  "value": 24.68205166049264,
+  "payload": null
+ },
+ {
+  "bars": 30,
+  "indicator": "ema_9",
+  "value": 24.054724264748526,
+  "payload": null
+ },
+ {
+  "bars": 30,
+  "indicator": "ema_21",
+  "value": 24.71936652880134,
+  "payload": null
+ },
+ {
+  "bars": 30,
+  "indicator": "rsi_14",
+  "value": 19.766532711430017,
+  "payload": null
+ },
+ {
+  "bars": 30,
+  "indicator": "vol_sma_20",
+  "value": 147273.51,
+  "payload": null
+ },
+ {
+  "bars": 30,
+  "indicator": "rel_vol",
+  "value": 1.1362422283815456,
+  "payload": null
+ },
+ {
+  "bars": 30,
+  "indicator": "sr_levels",
+  "value": 23.488502106953195,
+  "payload": {
+   "current_price": 23.488502106953195,
+   "resistance": [],
+   "resistance_touches": [],
+   "support": [],
+   "support_touches": []
+  }
+ },
+ {
+  "bars": 30,
+  "indicator": "trend",
+  "value": -0.44864253069983023,
+  "payload": {
+   "direction": "down",
+   "higher_highs": false,
+   "higher_lows": false,
+   "r2": 0.9561093819931955,
+   "slope_pct": -0.44864253069983023
+  }
+ },
+ {
+  "bars": 30,
+  "indicator": "candle_patterns",
+  "value": 0,
+  "payload": {
+   "bar": {
+    "close": 23.488502106953195,
+    "high": 24.039887430311655,
+    "low": 23.04703764969796,
+    "open": 23.87887698539284,
+    "volume": 167864.19999999998
+   },
+   "patterns": []
+  }
+ },
+ {
+  "bars": 30,
+  "indicator": "obv",
+  "value": -2250103.2,
+  "payload": {
+   "last_bar_delta": -167864.19999999998,
+   "obv": -2250103.2
+  }
+ },
+ {
+  "bars": 30,
+  "indicator": "bb_20_2",
+  "value": 0.07785065030897168,
+  "payload": {
+   "bandwidth": 0.1145494670912481,
+   "close": 23.488502106953195,
+   "lower": 23.268393728278596,
+   "middle": 24.68205166049264,
+   "pct_b": 0.07785065030897168,
+   "period": 20,
+   "std_mult": 2,
+   "upper": 26.095709592706683
+  }
+ },
+ {
+  "bars": 30,
+  "indicator": "rsi_divergence_rsi14_sw5",
+  "value": 0,
+  "payload": {
+   "bearish_regular": {
+    "pattern": false,
+    "price_hi_1": 0,
+    "price_hi_2": 0,
+    "rsi_hi_1": 0,
+    "rsi_hi_2": 0,
+    "selected": false
+   },
+   "bullish_regular": {
+    "pattern": false,
+    "price_lo_1": 0,
+    "price_lo_2": 0,
+    "rsi_lo_1": 0,
+    "rsi_lo_2": 0,
+    "selected": false
+   },
+   "kind": "none"
+  }
+ },
+ {
+  "bars": 30,
+  "indicator": "rsi_hidden_rsi14_sw5",
+  "value": 0,
+  "payload": {
+   "bearish_hidden": {
+    "pattern": false,
+    "price_hi_1": 0,
+    "price_hi_2": 0,
+    "rsi_hi_1": 0,
+    "rsi_hi_2": 0,
+    "selected": false
+   },
+   "bullish_hidden": {
+    "pattern": false,
+    "price_lo_1": 0,
+    "price_lo_2": 0,
+    "rsi_lo_1": 0,
+    "rsi_lo_2": 0,
+    "selected": false
+   },
+   "kind": "none",
+   "min_pivot_sep": 3,
+   "require_trend_gate": true
+  }
+ },
+ {
+  "bars": 30,
+  "indicator": "vol_profile_proxy_b48_typical_price",
+  "value": 26.71743106948241,
+  "payload": {
+   "bar_count": 30,
+   "bins": [
+    {
+     "price_high": 23.131414509922887,
+     "price_low": 23.04703764969796,
+     "volume": 0
+    },
+    {
+     "price_high": 23.21579137014782,
+     "price_low": 23.131414509922887,
+     "volume": 0
+    },
+    {
+     "price_high": 23.300168230372748,
+     "price_low": 23.21579137014782,
+     "volume": 0
+    },
+    {
+     "price_high": 23.38454509059768,
+     "price_low": 23.300168230372748,
+     "volume": 0
+    },
+    {
+     "price_high": 23.468921950822608,
+     "price_low": 23.38454509059768,
+     "volume": 0
+    },
+    {
+     "price_high": 23.55329881104754,
+     "price_low": 23.468921950822608,
+     "volume": 167864.19999999998
+    },
+    {
+     "price_high": 23.63767567127247,
+     "price_low": 23.55329881104754,
+     "volume": 0
+    },
+    {
+     "price_high": 23.722052531497397,
+     "price_low": 23.63767567127247,
+     "volume": 0
+    },
+    {
+     "price_high": 23.80642939172233,
+     "price_low": 23.722052531497397,
+     "volume": 0
+    },
+    {
+     "price_high": 23.890806251947257,
+     "price_low": 23.80642939172233,
+     "volume": 150202.4
+    },
+    {
+     "price_high": 23.97518311217219,
+     "price_low": 23.890806251947257,
+     "volume": 261668
+    },
+    {
+     "price_high": 24.059559972397118,
+     "price_low": 23.97518311217219,
+     "volume": 161788
+    },
+    {
+     "price_high": 24.143936832622046,
+     "price_low": 24.059559972397118,
+     "volume": 352335
+    },
+    {
+     "price_high": 24.228313692846978,
+     "price_low": 24.143936832622046,
+     "volume": 173198
+    },
+    {
+     "price_high": 24.312690553071906,
+     "price_low": 24.228313692846978,
+     "volume": 0
+    },
+    {
+     "price_high": 24.39706741329684,
+     "price_low": 24.312690553071906,
+     "volume": 0
+    },
+    {
+     "price_high": 24.481444273521767,
+     "price_low": 24.39706741329684,
+     "volume": 115602
+    },
+    {
+     "price_high": 24.565821133746695,
+     "price_low": 24.481444273521767,
+     "volume": 0
+    },
+    {
+     "price_high": 24.650197993971627,
+     "price_low": 24.565821133746695,
+     "volume": 0
+    },
+    {
+     "price_high": 24.734574854196556,
+     "price_low": 24.650197993971627,
+     "volume": 125491.60000000002
+    },
+    {
+     "price_high": 24.818951714421488,
+     "price_low": 24.734574854196556,
+     "volume": 0
+    },
+    {
+     "price_high": 24.903328574646416,
+     "price_low": 24.818951714421488,
+     "volume": 0
+    },
+    {
+     "price_high": 24.987705434871348,
+     "price_low": 24.903328574646416,
+     "volume": 0
+    },
+    {
+     "price_high": 25.072082295096276,
+     "price_low": 24.987705434871348,
+     "volume": 269696.8
+    },
+    {
+     "price_high": 25.15645915532121,
+     "price_low": 25.072082295096276,
+     "volume": 0
+    },
+    {
+     "price_high": 25.240836015546137,
+     "price_low": 25.15645915532121,
+     "volume": 152454
+    },
+    {
+     "price_high": 25.325212875771065,
+     "price_low": 25.240836015546137,
+     "volume": 0
+    },
+    {
+     "price_high": 25.409589735995997,
+     "price_low": 25.325212875771065,
+     "volume": 173631.2
+    },
+    {
+     "price_high": 25.493966596220925,
+     "price_low": 25.409589735995997,
+     "volume": 225116.8
+    },
+    {
+     "price_high": 25.578343456445857,
+     "price_low": 25.493966596220925,
+     "volume": 300371
+    },
+    {
+     "price_high": 25.662720316670786,
+     "price_low": 25.578343456445857,
+     "volume": 316051.2
+    },
+    {
+     "price_high": 25.747097176895714,
+     "price_low": 25.662720316670786,
+     "volume": 0
+    },
+    {
+     "price_high": 25.831474037120646,
+     "price_low": 25.747097176895714,
+     "volume": 177119.6
+    },
+    {
+     "price_high": 25.915850897345575,
+     "price_low": 25.831474037120646,
+     "volume": 0
+    },
+    {
+     "price_high": 26.000227757570507,
+     "price_low": 25.915850897345575,
+     "volume": 139262
+    },
+    {
+     "price_high": 26.084604617795435,
+     "price_low": 26.000227757570507,
+     "volume": 0
+    },
+    {
+     "price_high": 26.168981478020363,
+     "price_low": 26.084604617795435,
+     "volume": 134523.59999999998
+    },
+    {
+     "price_high": 26.253358338245295,
+     "price_low": 26.168981478020363,
+     "volume": 0
+    },
+    {
+     "price_high": 26.337735198470224,
+     "price_low": 26.253358338245295,
+     "volume": 144124.80000000002
+    },
+    {
+     "price_high": 26.422112058695156,
+     "price_low": 26.337735198470224,
+     "volume": 0
+    },
+    {
+     "price_high": 26.506488918920084,
+     "price_low": 26.422112058695156,
+     "volume": 255735
+    },
+    {
+     "price_high": 26.590865779145012,
+     "price_low": 26.506488918920084,
+     "volume": 0
+    },
+    {
+     "price_high": 26.675242639369944,
+     "price_low": 26.590865779145012,
+     "volume": 193459.2
+    },
+    {
+     "price_high": 26.759619499594873,
+     "price_low": 26.675242639369944,
+     "volume": 447572
+    },
+    {
+     "price_high": 26.843996359819805,
+     "price_low": 26.759619499594873,
+     "volume": 0
+    },
+    {
+     "price_high": 26.928373220044733,
+     "price_low": 26.843996359819805,
+     "volume": 0
+    },
+    {
+     "price_high": 27.012750080269665,
+     "price_low": 26.928373220044733,
+     "volume": 0
+    },
+    {
+     "price_high": 27.097126940494594,
+     "price_low": 27.012750080269665,
+     "volume": 0
+    }
+   ],
+   "disclaimer": "Each bar's volume assigned to one bin via typical price or close; not true volume-at-price.",
+   "histogram_total_volume": 4437266.4,
+   "method": "typical_price",
+   "poc_bin": 43,
+   "poc_price": 26.71743106948241,
+   "value_area_high": 27.097126940494594,
+   "value_area_low": 24.39706741329684,
+   "value_area_pct_target": 0.7,
+   "value_area_volume": 3170210.8000000003
+  }
+ },
+ {
+  "bars": 30,
+  "indicator": "stoch_slow_14_3_3",
+  "value": 19.238714643126645,
+  "payload": {
+   "d": 21.5054676242074,
+   "k": 19.238714643126645,
+   "raw_k": 17.2425461025966
+  }
+ },
+ {
+  "bars": 30,
+  "indicator": "atr_14",
+  "value": 0.6137437624704442,
+  "payload": null
+ },
+ {
+  "bars": 30,
+  "indicator": "ad_line",
+  "value": -808381.5507495207,
+  "payload": {
+   "cumulative": -808381.5507495207
+  }
+ },
+ {
+  "bars": 30,
+  "indicator": "adx_14",
+  "value": 86.70612032946553,
+  "payload": {
+   "adx": 86.70612032946553,
+   "dx": 76.00357222222799,
+   "minus_di": 28.174186842723355,
+   "plus_di": 3.841284760488977
+  }
+ },
+ {
+  "bars": 30,
+  "indicator": "pivots_prior_bar",
+  "value": 23.955520487102362,
+  "payload": {
+   "camarilla": {
+    "R1": 23.937943291365297,
+    "R2": 23.997009597337755,
+    "R3": 24.056075903310212,
+    "R4": 24.23327482122759,
+    "S1": 23.81981067942038,
+    "S2": 23.760744373447924,
+    "S3": 23.701678067475466,
+    "S4": 23.52447914955809
+   },
+   "classic": {
+    "PP": 23.955520487102362,
+    "R1": 24.23937858700646,
+    "R2": 24.599880188620087,
+    "R3": 24.883738288524185,
+    "S1": 23.595018885488734,
+    "S2": 23.311160785584637,
+    "S3": 22.95065918397101
+   },
+   "reference_ts": "2021-08-22T00:00:00Z",
+   "woodie": {
+    "PP": 23.93635961167498,
+    "R1": 24.201056836151697,
+    "R2": 24.580719313192706,
+    "S1": 23.55669713463397,
+    "S2": 23.291999910157255
+   }
+  }
+ },
+ {
+  "bars": 30,
+  "indicator": "williams_r_14",
+  "value": -82.7574538974034,
+  "payload": null
+ },
+ {
+  "bars": 30,
+  "indicator": "vwap_rolling_20",
+  "value": 24.700842625230912,
+  "payload": {
+   "bars": 20,
+   "mode": "rolling",
+   "vwap": 24.700842625230912
+  }
+ },
+ {
+  "bars": 30,
+  "indicator": "chart_pattern_hints",
+  "value": 0,
+  "payload": {
+   "cluster_pct": 0.5,
+   "double_bottom_candidate": false,
+   "double_top_candidate": false,
+   "high1": 0,
+   "high2": 0,
+   "low1": 0,
+   "low2": 0
+  }
+ },
+ {
+  "bars": 30,
+  "indicator": "cmf_21",
+  "value": -0.22263511101519493,
+  "payload": null
+ },
+ {
+  "bars": 30,
+  "indicator": "keltner_e20_a10_m2",
+  "value": 24.662243565817512,
+  "payload": {
+   "close": 23.488502106953195,
+   "lower": 23.383746394091965,
+   "middle": 24.662243565817512,
+   "outside_lower": false,
+   "outside_upper": false,
+   "upper": 25.94074073754306
+  }
+ },
+ {
+  "bars": 30,
+  "indicator": "bb_squeeze",
+  "value": 0,
+  "payload": {
+   "bb_lower": 23.268393728278596,
+   "bb_upper": 26.095709592706683,
+   "explanation": "BB inside Keltner = low-volatility coil. Watch for expansion breakout.",
+   "keltner_lower": 23.383746394091965,
+   "keltner_upper": 25.94074073754306,
+   "squeeze": false
+  }
+ },
+ {
+  "bars": 30,
+  "indicator": "donchian_20",
+  "value": 24.472464836273552,
+  "payload": {
+   "close": 23.488502106953195,
+   "lower": 23.04703764969796,
+   "middle": 24.472464836273552,
+   "upper": 25.897892022849145
+  }
+ },
+ {
+  "bars": 30,
+  "indicator": "cci_20",
+  "value": -123.02068006174561,
+  "payload": null
+ },
+ {
+  "bars": 30,
+  "indicator": "roc_12",
+  "value": -6.113463265732051,
+  "payload": null
+ },
+ {
+  "bars": 30,
+  "indicator": "parabolic_sar_s0.02_m0.2",
+  "value": 24.533939625710563,
+  "payload": {
+   "bullish": false,
+   "sar": 24.533939625710563,
+   "trend": -1
+  }
+ },
+ {
+  "bars": 30,
+  "indicator": "mfi_14",
+  "value": 37.444371313299456,
+  "payload": null
+ },
+ {
+  "bars": 30,
+  "indicator": "elliott_context_hint",
+  "value": 0,
+  "payload": {
+   "leg_estimate": 0,
+   "note": "Not Elliott wave labels; pivot-count hint only. Human discretion required for wave degree.",
+   "swing_highs": 0,
+   "swing_lows": 0
+  }
+ },
+ {
+  "bars": 30,
+  "indicator": "fvg_min0.1_lb50",
+  "value": 1,
+  "payload": {
+   "active_count": 1,
+   "last_bearish": {
+    "bar_index": 7,
+    "gap_high": 26.369443115633878,
+    "gap_low": 26.32043858964669,
+    "gap_pct": 0.1860111444595446
+   },
+   "last_bullish": null,
+   "lookback_bars": 50,
+   "min_gap_pct": 0.1,
+   "total_count": 1
+  }
+ },
+ {
+  "bars": 30,
+  "indicator": "order_blocks_sw3_imp1.5",
+  "value": 1,
+  "payload": {
+   "active_count": 1,
+   "impulse_min_pct": 1.5,
+   "last_bearish_ob": {
+    "bar_index": 4,
+    "close": 26.779198213514423,
+    "high": 26.82446629010448,
+    "low": 26.596827557538845,
+    "open": 26.663983559206823
+   },
+   "last_bullish_ob": null,
+   "lookback_bars": 100,
+   "swing_strength": 3,
+   "total_count": 1
+  }
+ },
+ {
+  "bars": 30,
+  "indicator": "liquidity_sweep_sw3",
+  "value": 0,
+  "payload": {
+   "high_sweeps": 0,
+   "last_sweep": null,
+   "lookback_bars": 50,
+   "low_sweeps": 0,
+   "swing_strength": 3,
+   "total_sweeps": 0
+  }
+ },
+ {
+  "bars": 30,
+  "indicator": "hs_pattern_sw5",
+  "value": 0,
+  "payload": {
+   "hs_found": false,
+   "hs_head": 0,
+   "hs_left_shoulder": 0,
+   "hs_neckline": 0,
+   "hs_neckline_break": false,
+   "hs_right_shoulder": 0,
+   "hs_symmetry_pct": 0,
+   "inv_hs_found": false,
+   "inv_hs_head": 0,
+   "inv_hs_left_shoulder": 0,
+   "inv_hs_neckline": 0,
+   "inv_hs_neckline_break": false,
+   "inv_hs_right_shoulder": 0,
+   "inv_hs_symmetry_pct": 0,
+   "shoulder_tolerance_pct": 5,
+   "swing_strength": 5
+  }
+ },
+ {
+  "bars": 30,
+  "indicator": "triangle_sw3",
+  "value": 0,
+  "payload": {
+   "apex_bars_away": 0,
+   "breakout": "",
+   "flat_thresh_pct": 0.05,
+   "high_slope_pct": 0,
+   "kind": "none",
+   "low_slope_pct": 0,
+   "min_pivots": 3,
+   "swing_strength": 3
+  }
+ },
+ {
+  "bars": 30,
+  "indicator": "flag_pole5_len10",
+  "value": 0,
+  "payload": {
+   "bear_flag": false,
+   "bull_flag": false,
+   "flag_len_bars": 10,
+   "max_retracement_pct": 50,
+   "pole_len_bars": 5,
+   "pole_min_pct": 5,
+   "pole_pct": 0
+  }
+ },
+ {
+  "bars": 61,
+  "indicator": "sma_20",
+  "value": 24.68205166049264,
+  "payload": null
+ },
+ {
+  "bars": 61,
+  "indicator": "sma_50",
+  "value": 26.153292596706574,
+  "payload": null
+ },
+ {
+  "bars": 61,
+  "indicator": "ema_9",
+  "value": 24.054013661038727,
+  "payload": null
+ },
+ {
+  "bars": 61,
+  "indicator": "ema_21",
+  "value": 24.68713496468283,
+  "payload": null
+ },
+ {
+  "bars": 61,
+  "indicator": "ema_50",
+  "value": 26.102802070003186,
+  "payload": null
+ },
+ {
+  "bars": 61,
+  "indicator": "rsi_14",
+  "value": 22.476798109731178,
+  "payload": null
+ },
+ {
+  "bars": 61,
+  "indicator": "vol_sma_20",
+  "value": 147273.51,
+  "payload": null
+ },
+ {
+  "bars": 61,
+  "indicator": "rel_vol",
+  "value": 1.1362422283815456,
+  "payload": null
+ },
+ {
+  "bars": 61,
+  "indicator": "sr_levels",
+  "value": 23.488502106953195,
+  "payload": {
+   "current_price": 23.488502106953195,
+   "resistance": [
+    25.8641677232148,
+    27.097126940494594,
+    27.990174717009285
+   ],
+   "resistance_touches": [
+    1,
+    1,
+    1
+   ],
+   "support": [],
+   "support_touches": []
+  }
+ },
+ {
+  "bars": 61,
+  "indicator": "trend",
+  "value": -0.367413106194974,
+  "payload": {
+   "direction": "down",
+   "higher_highs": false,
+   "higher_lows": false,
+   "r2": 0.9551856222634213,
+   "slope_pct": -0.367413106194974
+  }
+ },
+ {
+  "bars": 61,
+  "indicator": "candle_patterns",
+  "value": 0,
+  "payload": {
+   "bar": {
+    "close": 23.488502106953195,
+    "high": 24.039887430311655,
+    "low": 23.04703764969796,
+    "open": 23.87887698539284,
+    "volume": 167864.19999999998
+   },
+   "patterns": []
+  }
+ },
+ {
+  "bars": 61,
+  "indicator": "macd_12_26_9",
+  "value": -0.011070515397713088,
+  "payload": {
+   "bearish_cross_line_signal": true,
+   "bullish_cross_line_signal": false,
+   "fast": 12,
+   "hist_bear_zero_cross": true,
+   "hist_bull_zero_cross": false,
+   "histogram": -0.011070515397713088,
+   "macd_line": -0.7291003474960185,
+   "prev_histogram": 0.0018376461991642667,
+   "prev_macd_line": -0.7134245570497129,
+   "prev_signal_line": -0.7152622032488771,
+   "signal": 9,
+   "signal_line": -0.7180298320983054,
+   "slow": 26,
+   "start_idx": 25
+  }
+ },
+ {
+  "bars": 61,
+  "indicator": "obv",
+  "value": -2328498.2,
+  "payload": {
+   "last_bar_delta": -167864.19999999998,
+   "obv": -2328498.2
+  }
+ },
+ {
+  "bars": 61,
+  "indicator": "bb_20_2",
+  "value": 0.07785065030897168,
+  "payload": {
+   "bandwidth": 0.1145494670912481,
+   "close": 23.488502106953195,
+   "lower": 23.268393728278596,
+   "middle": 24.68205166049264,
+   "pct_b": 0.07785065030897168,
+   "period": 20,
+   "std_mult": 2,
+   "upper": 26.095709592706683
+  }
+ },
+ {
+  "bars": 61,
+  "indicator": "fib_retrace_sw5",
+  "value": 192.67998348744197,
+  "payload": {
+   "current_close": 23.488502106953195,
+   "direction": "up_impulse",
+   "dist_pct_to_near": 192.67998348744197,
+   "extensions": {
+    "1.272": 27.432491847594697,
+    "1.618": 27.859095736773508
+   },
+   "impulse_high": 27.097126940494594,
+   "impulse_low": 25.8641677232148,
+   "leg_size": 1.2329592172797952,
+   "levels": {
+    "0": 27.097126940494594,
+    "0.236": 26.806148565216564,
+    "0.382": 26.626136519493713,
+    "0.5": 26.480647331854698,
+    "0.618": 26.33515814421568,
+    "0.786": 26.128020995712674,
+    "1": 25.8641677232148
+   },
+   "nearest_level": "1",
+   "nearest_price": 25.8641677232148,
+   "rule": "last_swing_high_vs_last_swing_low",
+   "swing_strength": 5
+  }
+ },
+ {
+  "bars": 61,
+  "indicator": "rsi_divergence_rsi14_sw5",
+  "value": 0,
+  "payload": {
+   "bearish_regular": {
+    "pattern": false,
+    "price_hi_1": 29.612414218579655,
+    "price_hi_2": 27.097126940494594,
+    "rsi_hi_1": 46.98808215237851,
+    "rsi_hi_2": 40.2508437846073,
+    "selected": false
+   },
+   "bullish_regular": {
+    "pattern": false,
+    "price_lo_1": 0,
+    "price_lo_2": 0,
+    "rsi_lo_1": 0,
+    "rsi_lo_2": 0,
+    "selected": false
+   },
+   "kind": "none"
+  }
+ },
+ {
+  "bars": 61,
+  "indicator": "rsi_hidden_rsi14_sw5",
+  "value": 0,
+  "payload": {
+   "bearish_hidden": {
+    "pattern": false,
+    "price_hi_1": 29.612414218579655,
+    "price_hi_2": 27.097126940494594,
+    "rsi_hi_1": 46.98808215237851,
+    "rsi_hi_2": 40.2508437846073,
+    "selected": false
+   },
+   "bullish_hidden": {
+    "pattern": false,
+    "price_lo_1": 0,
+    "price_lo_2": 0,
+    "rsi_lo_1": 0,
+    "rsi_lo_2": 0,
+    "selected": false
+   },
+   "kind": "none",
+   "min_pivot_sep": 3,
+   "require_trend_gate": true
+  }
+ },
+ {
+  "bars": 61,
+  "indicator": "vol_profile_proxy_b48_typical_price",
+  "value": 25.57293104418001,
+  "payload": {
+   "bar_count": 61,
+   "bins": [
+    {
+     "price_high": 23.200122097848386,
+     "price_low": 23.04703764969796,
+     "volume": 0
+    },
+    {
+     "price_high": 23.353206545998813,
+     "price_low": 23.200122097848386,
+     "volume": 0
+    },
+    {
+     "price_high": 23.50629099414924,
+     "price_low": 23.353206545998813,
+     "volume": 0
+    },
+    {
+     "price_high": 23.65937544229967,
+     "price_low": 23.50629099414924,
+     "volume": 167864.19999999998
+    },
+    {
+     "price_high": 23.812459890450096,
+     "price_low": 23.65937544229967,
+     "volume": 0
+    },
+    {
+     "price_high": 23.965544338600523,
+     "price_low": 23.812459890450096,
+     "volume": 411870.39999999997
+    },
+    {
+     "price_high": 24.11862878675095,
+     "price_low": 23.965544338600523,
+     "volume": 514123
+    },
+    {
+     "price_high": 24.271713234901377,
+     "price_low": 24.11862878675095,
+     "volume": 173198
+    },
+    {
+     "price_high": 24.424797683051803,
+     "price_low": 24.271713234901377,
+     "volume": 115602
+    },
+    {
+     "price_high": 24.57788213120223,
+     "price_low": 24.424797683051803,
+     "volume": 0
+    },
+    {
+     "price_high": 24.730966579352657,
+     "price_low": 24.57788213120223,
+     "volume": 125491.60000000002
+    },
+    {
+     "price_high": 24.884051027503084,
+     "price_low": 24.730966579352657,
+     "volume": 0
+    },
+    {
+     "price_high": 25.037135475653514,
+     "price_low": 24.884051027503084,
+     "volume": 269696.8
+    },
+    {
+     "price_high": 25.19021992380394,
+     "price_low": 25.037135475653514,
+     "volume": 152454
+    },
+    {
+     "price_high": 25.343304371954368,
+     "price_low": 25.19021992380394,
+     "volume": 0
+    },
+    {
+     "price_high": 25.496388820104794,
+     "price_low": 25.343304371954368,
+     "volume": 398748
+    },
+    {
+     "price_high": 25.64947326825522,
+     "price_low": 25.496388820104794,
+     "volume": 616422.2000000001
+    },
+    {
+     "price_high": 25.802557716405648,
+     "price_low": 25.64947326825522,
+     "volume": 177119.6
+    },
+    {
+     "price_high": 25.955642164556075,
+     "price_low": 25.802557716405648,
+     "volume": 139262
+    },
+    {
+     "price_high": 26.108726612706505,
+     "price_low": 25.955642164556075,
+     "volume": 0
+    },
+    {
+     "price_high": 26.26181106085693,
+     "price_low": 26.108726612706505,
+     "volume": 134523.59999999998
+    },
+    {
+     "price_high": 26.41489550900736,
+     "price_low": 26.26181106085693,
+     "volume": 586019.4
+    },
+    {
+     "price_high": 26.567979957157785,
+     "price_low": 26.41489550900736,
+     "volume": 589087.2
+    },
+    {
+     "price_high": 26.721064405308212,
+     "price_low": 26.567979957157785,
+     "volume": 498973.8
+    },
+    {
+     "price_high": 26.87414885345864,
+     "price_low": 26.721064405308212,
+     "volume": 428044.20000000007
+    },
+    {
+     "price_high": 27.027233301609066,
+     "price_low": 26.87414885345864,
+     "volume": 0
+    },
+    {
+     "price_high": 27.180317749759496,
+     "price_low": 27.027233301609066,
+     "volume": 150936.4
+    },
+    {
+     "price_high": 27.33340219790992,
+     "price_low": 27.180317749759496,
+     "volume": 0
+    },
+    {
+     "price_high": 27.48648664606035,
+     "price_low": 27.33340219790992,
+     "volume": 194272.2
+    },
+    {
+     "price_high": 27.639571094210776,
+     "price_low": 27.48648664606035,
+     "volume": 128115.20000000001
+    },
+    {
+     "price_high": 27.792655542361203,
+     "price_low": 27.639571094210776,
+     "volume": 307055.6
+    },
+    {
+     "price_high": 27.94573999051163,
+     "price_low": 27.792655542361203,
+     "volume": 345466.2
+    },
+    {
+     "price_high": 28.098824438662056,
+     "price_low": 27.94573999051163,
+     "volume": 0
+    },
+    {
+     "price_high": 28.251908886812483,
+     "price_low": 28.098824438662056,
+     "volume": 132443.6
+    },
+    {
+     "price_high": 28.40499333496291,
+     "price_low": 28.251908886812483,
+     "volume": 0
+    },
+    {
+     "price_high": 28.55807778311334,
+     "price_low": 28.40499333496291,
+     "volume": 183850.6
+    },
+    {
+     "price_high": 28.711162231263764,
+     "price_low": 28.55807778311334,
+     "volume": 500852.19999999995
+    },
+    {
+     "price_high": 28.864246679414194,
+     "price_low": 28.711162231263764,
+     "volume": 368315.6
+    },
+    {
+     "price_high": 29.01733112756462,
+     "price_low": 28.864246679414194,
+     "volume": 517470.19999999995
+    },
+    {
+     "price_high": 29.170415575715047,
+     "price_low": 29.01733112756462,
+     "volume": 197078.8
+    },
+    {
+     "price_high": 29.323500023865474,
+     "price_low": 29.170415575715047,
+     "volume": 291290.39999999997
+    },
+    {
+     "price_high": 29.4765844720159,
+     "price_low": 29.323500023865474,
+     "volume": 313131.6
+    },
+    {
+     "price_high": 29.62966892016633,
+     "price_low": 29.4765844720159,
+     "volume": 0
+    },
+    {
+     "price_high": 29.782753368316754,
+     "price_low": 29.62966892016633,
+     "volume": 0
+    },
+    {
+     "price_high": 29.935837816467185,
+     "price_low": 29.782753368316754,
+     "volume": 0
+    },
+    {
+     "price_high": 30.08892226461761,
+     "price_low": 29.935837816467185,
+     "volume": 0
+    },
+    {
+     "price_high": 30.24200671276804,
+     "price_low": 30.08892226461761,
+     "volume": 0
+    },
+    {
+     "price_high": 30.395091160918465,
+     "price_low": 30.24200671276804,
+     "volume": 0
+    }
+   ],
+   "disclaimer": "Each bar's volume assigned to one bin via typical price or close; not true volume-at-price.",
+   "histogram_total_volume": 9128778.6,
+   "method": "typical_price",
+   "poc_bin": 16,
+   "poc_price": 25.57293104418001,
+   "value_area_high": 27.94573999051163,
+   "value_area_low": 23.200122097848386,
+   "value_area_pct_target": 0.7,
+   "value_area_volume": 6624345.6000000015
+  }
+ },
+ {
+  "bars": 61,
+  "indicator": "stoch_slow_14_3_3",
+  "value": 19.238714643126645,
+  "payload": {
+   "d": 21.5054676242074,
+   "k": 19.238714643126645,
+   "raw_k": 17.2425461025966
+  }
+ },
+ {
+  "bars": 61,
+  "indicator": "atr_14",
+  "value": 0.6425670864144148,
+  "payload": null
+ },
+ {
+  "bars": 61,
+  "indicator": "ad_line",
+  "value": -1074147.22721267,
+  "payload": {
+   "cumulative": -1074147.22721267
+  }
+ },
+ {
+  "bars": 61,
+  "indicator": "adx_14",
+  "value": 54.066388056007504,
+  "payload": {
+   "adx": 54.066388056007504,
+   "dx": 65.49574417966015,
+   "minus_di": 26.41861046037663,
+   "plus_di": 5.50802377584507
+  }
+ },
+ {
+  "bars": 61,
+  "indicator": "pivots_prior_bar",
+  "value": 23.955520487102362,
+  "payload": {
+   "camarilla": {
+    "R1": 23.937943291365297,
+    "R2": 23.997009597337755,
+    "R3": 24.056075903310212,
+    "R4": 24.23327482122759,
+    "S1": 23.81981067942038,
+    "S2": 23.760744373447924,
+    "S3": 23.701678067475466,
+    "S4": 23.52447914955809
+   },
+   "classic": {
+    "PP": 23.955520487102362,
+    "R1": 24.23937858700646,
+    "R2": 24.599880188620087,
+    "R3": 24.883738288524185,
+    "S1": 23.595018885488734,
+    "S2": 23.311160785584637,
+    "S3": 22.95065918397101
+   },
+   "reference_ts": "2021-08-22T00:00:00Z",
+   "woodie": {
+    "PP": 23.93635961167498,
+    "R1": 24.201056836151697,
+    "R2": 24.580719313192706,
+    "S1": 23.55669713463397,
+    "S2": 23.291999910157255
+   }
+  }
+ },
+ {
+  "bars": 61,
+  "indicator": "williams_r_14",
+  "value": -82.7574538974034,
+  "payload": null
+ },
+ {
+  "bars": 61,
+  "indicator": "vwap_rolling_20",
+  "value": 24.700842625230912,
+  "payload": {
+   "bars": 20,
+   "mode": "rolling",
+   "vwap": 24.700842625230912
+  }
+ },
+ {
+  "bars": 61,
+  "indicator": "chart_pattern_hints",
+  "value": 0,
+  "payload": {
+   "cluster_pct": 0.5,
+   "double_bottom_candidate": false,
+   "double_top_candidate": false,
+   "high1": 0,
+   "high2": 0,
+   "low1": 0,
+   "low2": 0
+  }
+ },
+ {
+  "bars": 61,
+  "indicator": "cmf_21",
+  "value": -0.22263511101519493,
+  "payload": null
+ },
+ {
+  "bars": 61,
+  "indicator": "keltner_e20_a10_m2",
+  "value": 24.635858742324896,
+  "payload": {
+   "close": 23.488502106953195,
+   "lower": 23.340377603466443,
+   "middle": 24.635858742324896,
+   "outside_lower": false,
+   "outside_upper": false,
+   "upper": 25.931339881183348
+  }
+ },
+ {
+  "bars": 61,
+  "indicator": "bb_squeeze",
+  "value": 0,
+  "payload": {
+   "bb_lower": 23.268393728278596,
+   "bb_upper": 26.095709592706683,
+   "explanation": "BB inside Keltner = low-volatility coil. Watch for expansion breakout.",
+   "keltner_lower": 23.340377603466443,
+   "keltner_upper": 25.931339881183348,
+   "squeeze": false
+  }
+ },
+ {
+  "bars": 61,
+  "indicator": "donchian_20",
+  "value": 24.472464836273552,
+  "payload": {
+   "close": 23.488502106953195,
+   "lower": 23.04703764969796,
+   "middle": 24.472464836273552,
+   "upper": 25.897892022849145
+  }
+ },
+ {
+  "bars": 61,
+  "indicator": "cci_20",
+  "value": -123.02068006174561,
+  "payload": null
+ },
+ {
+  "bars": 61,
+  "indicator": "roc_12",
+  "value": -6.113463265732051,
+  "payload": null
+ },
+ {
+  "bars": 61,
+  "indicator": "parabolic_sar_s0.02_m0.2",
+  "value": 24.533939625710563,
+  "payload": {
+   "bullish": false,
+   "sar": 24.533939625710563,
+   "trend": -1
+  }
+ },
+ {
+  "bars": 61,
+  "indicator": "mfi_14",
+  "value": 37.444371313299456,
+  "payload": null
+ },
+ {
+  "bars": 61,
+  "indicator": "market_structure_sw5",
+  "value": 0,
+  "payload": {
+   "bearish_bos": false,
+   "bullish_bos": false,
+   "choch_down": false,
+   "choch_up": false,
+   "last_swing_high": 27.097126940494594,
+   "last_swing_low": 25.8641677232148,
+   "prior_swing_high": 29.612414218579655,
+   "prior_swing_low": 27.990174717009285
+  }
+ },
+ {
+  "bars": 61,
+  "indicator": "elliott_context_hint",
+  "value": 4,
+  "payload": {
+   "leg_estimate": 4,
+   "note": "Not Elliott wave labels; pivot-count hint only. Human discretion required for wave degree.",
+   "swing_highs": 2,
+   "swing_lows": 2
+  }
+ },
+ {
+  "bars": 61,
+  "indicator": "gann_regression_lb60",
+  "value": -5.587233885059998,
+  "payload": {
+   "disclaimer": "Price/time scaling not applied; geometric angle is illustrative only.",
+   "one_to_one_delta": -5.77172865216806,
+   "slope_degrees": -5.587233885059998,
+   "slope_per_bar": -0.09782590935878069
+  }
+ },
+ {
+  "bars": 61,
+  "indicator": "fvg_min0.1_lb50",
+  "value": 1,
+  "payload": {
+   "active_count": 1,
+   "last_bearish": {
+    "bar_index": 38,
+    "gap_high": 26.369443115633878,
+    "gap_low": 26.32043858964669,
+    "gap_pct": 0.1860111444595446
+   },
+   "last_bullish": null,
+   "lookback_bars": 50,
+   "min_gap_pct": 0.1,
+   "total_count": 1
+  }
+ },
+ {
+  "bars": 61,
+  "indicator": "order_blocks_sw3_imp1.5",
+  "value": 4,
+  "payload": {
+   "active_count": 4,
+   "impulse_min_pct": 1.5,
+   "last_bearish_ob": {
+    "bar_index": 35,
+    "close": 26.779198213514423,
+    "high": 26.82446629010448,
+    "low": 26.596827557538845,
+    "open": 26.663983559206823
+   },
+   "last_bullish_ob": null,
+   "lookback_bars": 100,
+   "swing_strength": 3,
+   "total_count": 8
+  }
+ },
+ {
+  "bars": 61,
+  "indicator": "liquidity_sweep_sw3",
+  "value": 3,
+  "payload": {
+   "high_sweeps": 0,
+   "last_sweep": {
+    "bar_close": 25.926208286654802,
+    "bar_high": 26.18646344775303,
+    "bar_index": 39,
+    "bar_low": 25.657260030967443,
+    "kind": "low_sweep",
+    "swept_level": 25.8641677232148
+   },
+   "lookback_bars": 50,
+   "low_sweeps": 3,
+   "swing_strength": 3,
+   "total_sweeps": 3
+  }
+ },
+ {
+  "bars": 61,
+  "indicator": "hs_pattern_sw5",
+  "value": 0,
+  "payload": {
+   "hs_found": false,
+   "hs_head": 0,
+   "hs_left_shoulder": 0,
+   "hs_neckline": 0,
+   "hs_neckline_break": false,
+   "hs_right_shoulder": 0,
+   "hs_symmetry_pct": 0,
+   "inv_hs_found": false,
+   "inv_hs_head": 0,
+   "inv_hs_left_shoulder": 0,
+   "inv_hs_neckline": 0,
+   "inv_hs_neckline_break": false,
+   "inv_hs_right_shoulder": 0,
+   "inv_hs_symmetry_pct": 0,
+   "shoulder_tolerance_pct": 5,
+   "swing_strength": 5
+  }
+ },
+ {
+  "bars": 61,
+  "indicator": "triangle_sw3",
+  "value": 0,
+  "payload": {
+   "apex_bars_away": 0,
+   "breakout": "",
+   "flat_thresh_pct": 0.05,
+   "high_slope_pct": 0,
+   "kind": "none",
+   "low_slope_pct": 0,
+   "min_pivots": 3,
+   "swing_strength": 3
+  }
+ },
+ {
+  "bars": 61,
+  "indicator": "flag_pole5_len10",
+  "value": 0,
+  "payload": {
+   "bear_flag": false,
+   "bull_flag": false,
+   "flag_len_bars": 10,
+   "max_retracement_pct": 50,
+   "pole_len_bars": 5,
+   "pole_min_pct": 5,
+   "pole_pct": 0
+  }
+ },
+ {
+  "bars": 120,
+  "indicator": "sma_20",
+  "value": 24.68205166049264,
+  "payload": null
+ },
+ {
+  "bars": 120,
+  "indicator": "sma_50",
+  "value": 26.153292596706574,
+  "payload": null
+ },
+ {
+  "bars": 120,
+  "indicator": "sma_100",
+  "value": 27.30817262526544,
+  "payload": null
+ },
+ {
+  "bars": 120,
+  "indicator": "ema_9",
+  "value": 24.05401191544613,
+  "payload": null
+ },
+ {
+  "bars": 120,
+  "indicator": "ema_21",
+  "value": 24.680621382781247,
+  "payload": null
+ },
+ {
+  "bars": 120,
+  "indicator": "ema_50",
+  "value": 25.78198850925767,
+  "payload": null
+ },
+ {
+  "bars": 120,
+  "indicator": "rsi_14",
+  "value": 22.65510893032304,
+  "payload": null
+ },
+ {
+  "bars": 120,
+  "indicator": "vol_sma_20",
+  "value": 147273.51,
+  "payload": null
+ },
+ {
+  "bars": 120,
+  "indicator": "rel_vol",
+  "value": 1.1362422283815456,
+  "payload": null
+ },
+ {
+  "bars": 120,
+  "indicator": "sr_levels",
+  "value": 23.488502106953195,
+  "payload": {
+   "current_price": 23.488502106953195,
+   "resistance": [
+    25.8641677232148,
+    26.725968279842924,
+    26.884076405980643
+   ],
+   "resistance_touches": [
+    1,
+    2,
+    2
+   ],
+   "support": [],
+   "support_touches": []
+  }
+ },
+ {
+  "bars": 120,
+  "indicator": "trend",
+  "value": -0.367413106194974,
+  "payload": {
+   "direction": "down",
+   "higher_highs": false,
+   "higher_lows": false,
+   "r2": 0.9551856222634213,
+   "slope_pct": -0.367413106194974
+  }
+ },
+ {
+  "bars": 120,
+  "indicator": "candle_patterns",
+  "value": 0,
+  "payload": {
+   "bar": {
+    "close": 23.488502106953195,
+    "high": 24.039887430311655,
+    "low": 23.04703764969796,
+    "open": 23.87887698539284,
+    "volume": 167864.19999999998
+   },
+   "patterns": []
+  }
+ },
+ {
+  "bars": 120,
+  "indicator": "macd_12_26_9",
+  "value": -0.02413129957794724,
+  "payload": {
+   "bearish_cross_line_signal": false,
+   "bullish_cross_line_signal": false,
+   "fast": 12,
+   "hist_bear_zero_cross": false,
+   "hist_bull_zero_cross": false,
+   "histogram": -0.02413129957794724,
+   "macd_line": -0.7012293853995146,
+   "prev_histogram": -0.012264929768185162,
+   "prev_macd_line": -0.6833301906952656,
+   "prev_signal_line": -0.6710652609270804,
+   "signal": 9,
+   "signal_line": -0.6770980858215674,
+   "slow": 26,
+   "start_idx": 25
+  }
+ },
+ {
+  "bars": 120,
+  "indicator": "obv",
+  "value": -2183044.4000000004,
+  "payload": {
+   "last_bar_delta": -167864.19999999998,
+   "obv": -2183044.4000000004
+  }
+ },
+ {
+  "bars": 120,
+  "indicator": "bb_20_2",
+  "value": 0.07785065030897168,
+  "payload": {
+   "bandwidth": 0.1145494670912481,
+   "close": 23.488502106953195,
+   "lower": 23.268393728278596,
+   "middle": 24.68205166049264,
+   "pct_b": 0.07785065030897168,
+   "period": 20,
+   "std_mult": 2,
+   "upper": 26.095709592706683
+  }
+ },
+ {
+  "bars": 120,
+  "indicator": "fib_retrace_sw5",
+  "value": 192.67998348744197,
+  "payload": {
+   "current_close": 23.488502106953195,
+   "direction": "up_impulse",
+   "dist_pct_to_near": 192.67998348744197,
+   "extensions": {
+    "1.272": 27.432491847594697,
+    "1.618": 27.859095736773508
+   },
+   "impulse_high": 27.097126940494594,
+   "impulse_low": 25.8641677232148,
+   "leg_size": 1.2329592172797952,
+   "levels": {
+    "0": 27.097126940494594,
+    "0.236": 26.806148565216564,
+    "0.382": 26.626136519493713,
+    "0.5": 26.480647331854698,
+    "0.618": 26.33515814421568,
+    "0.786": 26.128020995712674,
+    "1": 25.8641677232148
+   },
+   "nearest_level": "1",
+   "nearest_price": 25.8641677232148,
+   "rule": "last_swing_high_vs_last_swing_low",
+   "swing_strength": 5
+  }
+ },
+ {
+  "bars": 120,
+  "indicator": "rsi_divergence_rsi14_sw5",
+  "value": 0,
+  "payload": {
+   "bearish_regular": {
+    "pattern": false,
+    "price_hi_1": 29.612414218579655,
+    "price_hi_2": 27.097126940494594,
+    "rsi_hi_1": 49.872173098280925,
+    "rsi_hi_2": 41.34200337087073,
+    "selected": false
+   },
+   "bullish_regular": {
+    "pattern": false,
+    "price_lo_1": 27.990174717009285,
+    "price_lo_2": 25.8641677232148,
+    "rsi_lo_1": 56.5880899394064,
+    "rsi_lo_2": 37.431578993189774,
+    "selected": false
+   },
+   "kind": "none"
+  }
+ },
+ {
+  "bars": 120,
+  "indicator": "rsi_hidden_rsi14_sw5",
+  "value": 0,
+  "payload": {
+   "bearish_hidden": {
+    "pattern": false,
+    "price_hi_1": 29.612414218579655,
+    "price_hi_2": 27.097126940494594,
+    "rsi_hi_1": 49.872173098280925,
+    "rsi_hi_2": 41.34200337087073,
+    "selected": false
+   },
+   "bullish_hidden": {
+    "pattern": false,
+    "price_lo_1": 27.990174717009285,
+    "price_lo_2": 25.8641677232148,
+    "rsi_lo_1": 56.5880899394064,
+    "rsi_lo_2": 37.431578993189774,
+    "selected": false
+   },
+   "kind": "none",
+   "min_pivot_sep": 3,
+   "require_trend_gate": true
+  }
+ },
+ {
+  "bars": 120,
+  "indicator": "vol_profile_proxy_b48_typical_price",
+  "value": 27.79476051861775,
+  "payload": {
+   "bar_count": 120,
+   "bins": [
+    {
+     "price_high": 23.202700694580574,
+     "price_low": 23.04703764969796,
+     "volume": 0
+    },
+    {
+     "price_high": 23.35836373946319,
+     "price_low": 23.202700694580574,
+     "volume": 0
+    },
+    {
+     "price_high": 23.51402678434581,
+     "price_low": 23.35836373946319,
+     "volume": 0
+    },
+    {
+     "price_high": 23.669689829228425,
+     "price_low": 23.51402678434581,
+     "volume": 167864.19999999998
+    },
+    {
+     "price_high": 23.82535287411104,
+     "price_low": 23.669689829228425,
+     "volume": 0
+    },
+    {
+     "price_high": 23.981015918993656,
+     "price_low": 23.82535287411104,
+     "volume": 411870.39999999997
+    },
+    {
+     "price_high": 24.13667896387627,
+     "price_low": 23.981015918993656,
+     "volume": 514123
+    },
+    {
+     "price_high": 24.292342008758887,
+     "price_low": 24.13667896387627,
+     "volume": 173198
+    },
+    {
+     "price_high": 24.448005053641502,
+     "price_low": 24.292342008758887,
+     "volume": 115602
+    },
+    {
+     "price_high": 24.60366809852412,
+     "price_low": 24.448005053641502,
+     "volume": 0
+    },
+    {
+     "price_high": 24.759331143406737,
+     "price_low": 24.60366809852412,
+     "volume": 125491.60000000002
+    },
+    {
+     "price_high": 24.914994188289352,
+     "price_low": 24.759331143406737,
+     "volume": 0
+    },
+    {
+     "price_high": 25.070657233171968,
+     "price_low": 24.914994188289352,
+     "volume": 269696.8
+    },
+    {
+     "price_high": 25.226320278054583,
+     "price_low": 25.070657233171968,
+     "volume": 152454
+    },
+    {
+     "price_high": 25.381983322937202,
+     "price_low": 25.226320278054583,
+     "volume": 173631.2
+    },
+    {
+     "price_high": 25.537646367819818,
+     "price_low": 25.381983322937202,
+     "volume": 525487.8
+    },
+    {
+     "price_high": 25.693309412702433,
+     "price_low": 25.537646367819818,
+     "volume": 316051.2
+    },
+    {
+     "price_high": 25.84897245758505,
+     "price_low": 25.693309412702433,
+     "volume": 177119.6
+    },
+    {
+     "price_high": 26.004635502467664,
+     "price_low": 25.84897245758505,
+     "volume": 139262
+    },
+    {
+     "price_high": 26.16029854735028,
+     "price_low": 26.004635502467664,
+     "volume": 0
+    },
+    {
+     "price_high": 26.315961592232895,
+     "price_low": 26.16029854735028,
+     "volume": 407242.8
+    },
+    {
+     "price_high": 26.471624637115514,
+     "price_low": 26.315961592232895,
+     "volume": 458289.6
+    },
+    {
+     "price_high": 26.62728768199813,
+     "price_low": 26.471624637115514,
+     "volume": 637557
+    },
+    {
+     "price_high": 26.782950726880745,
+     "price_low": 26.62728768199813,
+     "volume": 733558.8
+    },
+    {
+     "price_high": 26.93861377176336,
+     "price_low": 26.782950726880745,
+     "volume": 311904.60000000003
+    },
+    {
+     "price_high": 27.094276816645976,
+     "price_low": 26.93861377176336,
+     "volume": 125572.40000000001
+    },
+    {
+     "price_high": 27.249939861528595,
+     "price_low": 27.094276816645976,
+     "volume": 298248.19999999995
+    },
+    {
+     "price_high": 27.40560290641121,
+     "price_low": 27.249939861528595,
+     "volume": 651970.2
+    },
+    {
+     "price_high": 27.561265951293827,
+     "price_low": 27.40560290641121,
+     "volume": 976438.2
+    },
+    {
+     "price_high": 27.716928996176442,
+     "price_low": 27.561265951293827,
+     "volume": 187477.6
+    },
+    {
+     "price_high": 27.872592041059058,
+     "price_low": 27.716928996176442,
+     "volume": 1575666.8
+    },
+    {
+     "price_high": 28.028255085941673,
+     "price_low": 27.872592041059058,
+     "volume": 1210282
+    },
+    {
+     "price_high": 28.18391813082429,
+     "price_low": 28.028255085941673,
+     "volume": 823063.2
+    },
+    {
+     "price_high": 28.339581175706904,
+     "price_low": 28.18391813082429,
+     "volume": 578990.8
+    },
+    {
+     "price_high": 28.495244220589523,
+     "price_low": 28.339581175706904,
+     "volume": 339208.8
+    },
+    {
+     "price_high": 28.65090726547214,
+     "price_low": 28.495244220589523,
+     "volume": 861737.6
+    },
+    {
+     "price_high": 28.806570310354754,
+     "price_low": 28.65090726547214,
+     "volume": 1121597.2
+    },
+    {
+     "price_high": 28.96223335523737,
+     "price_low": 28.806570310354754,
+     "volume": 1013659.2
+    },
+    {
+     "price_high": 29.11789640011999,
+     "price_low": 28.96223335523737,
+     "volume": 667657
+    },
+    {
+     "price_high": 29.273559445002604,
+     "price_low": 29.11789640011999,
+     "volume": 462128.8
+    },
+    {
+     "price_high": 29.42922248988522,
+     "price_low": 29.273559445002604,
+     "volume": 756053.0000000001
+    },
+    {
+     "price_high": 29.584885534767835,
+     "price_low": 29.42922248988522,
+     "volume": 180773.6
+    },
+    {
+     "price_high": 29.74054857965045,
+     "price_low": 29.584885534767835,
+     "volume": 0
+    },
+    {
+     "price_high": 29.896211624533066,
+     "price_low": 29.74054857965045,
+     "volume": 0
+    },
+    {
+     "price_high": 30.05187466941568,
+     "price_low": 29.896211624533066,
+     "volume": 0
+    },
+    {
+     "price_high": 30.207537714298297,
+     "price_low": 30.05187466941568,
+     "volume": 0
+    },
+    {
+     "price_high": 30.363200759180916,
+     "price_low": 30.207537714298297,
+     "volume": 0
+    },
+    {
+     "price_high": 30.518863804063532,
+     "price_low": 30.363200759180916,
+     "volume": 0
+    }
+   ],
+   "disclaimer": "Each bar's volume assigned to one bin via typical price or close; not true volume-at-price.",
+   "histogram_total_volume": 17640929.200000003,
+   "method": "typical_price",
+   "poc_bin": 30,
+   "poc_price": 27.79476051861775,
+   "value_area_high": 29.11789640011999,
+   "value_area_low": 26.315961592232895,
+   "value_area_pct_target": 0.7,
+   "value_area_volume": 12572879.2
+  }
+ },
+ {
+  "bars": 120,
+  "indicator": "stoch_slow_14_3_3",
+  "value": 19.238714643126645,
+  "payload": {
+   "d": 21.5054676242074,
+   "k": 19.238714643126645,
+   "raw_k": 17.2425461025966
+  }
+ },
+ {
+  "bars": 120,
+  "indicator": "atr_14",
+  "value": 0.6440529528524552,
+  "payload": null
+ },
+ {
+  "bars": 120,
+  "indicator": "ichimoku_9_26_52",
+  "value": 23.488502106953195,
+  "payload": {
+   "chikou_close": 23.488502106953195,
+   "close_vs_cloud": {
+    "above_cloud": false,
+    "below_cloud": true,
+    "in_cloud": false
+   },
+   "cloud_bottom": 27.10946915137596,
+   "cloud_top": 28.12962944206663,
+   "displace": 26,
+   "kijun": 24.972520178106123,
+   "senkou_a": 27.10946915137596,
+   "senkou_b": 28.12962944206663,
+   "tenkan": 23.95716235831815
+  }
+ },
+ {
+  "bars": 120,
+  "indicator": "ad_line",
+  "value": -209066.69035041024,
+  "payload": {
+   "cumulative": -209066.69035041024
+  }
+ },
+ {
+  "bars": 120,
+  "indicator": "adx_14",
+  "value": 55.536126765086074,
+  "payload": {
+   "adx": 55.536126765086074,
+   "dx": 65.98704323230314,
+   "minus_di": 26.358228383553822,
+   "plus_di": 5.401152192512953
+  }
+ },
+ {
+  "bars": 120,
+  "indicator": "pivots_prior_bar",
+  "value": 23.955520487102362,
+  "payload": {
+   "camarilla": {
+    "R1": 23.937943291365297,
+    "R2": 23.997009597337755,
+    "R3": 24.056075903310212,
+    "R4": 24.23327482122759,
+    "S1": 23.81981067942038,
+    "S2": 23.760744373447924,
+    "S3": 23.701678067475466,
+    "S4": 23.52447914955809
+   },
+   "classic": {
+    "PP": 23.955520487102362,
+    "R1": 24.23937858700646,
+    "R2": 24.599880188620087,
+    "R3": 24.883738288524185,
+    "S1": 23.595018885488734,
+    "S2": 23.311160785584637,
+    "S3": 22.95065918397101
+   },
+   "reference_ts": "2021-08-22T00:00:00Z",
+   "woodie": {
+    "PP": 23.93635961167498,
+    "R1": 24.201056836151697,
+    "R2": 24.580719313192706,
+    "S1": 23.55669713463397,
+    "S2": 23.291999910157255
+   }
+  }
+ },
+ {
+  "bars": 120,
+  "indicator": "williams_r_14",
+  "value": -82.7574538974034,
+  "payload": null
+ },
+ {
+  "bars": 120,
+  "indicator": "vwap_rolling_20",
+  "value": 24.700842625230912,
+  "payload": {
+   "bars": 20,
+   "mode": "rolling",
+   "vwap": 24.700842625230912
+  }
+ },
+ {
+  "bars": 120,
+  "indicator": "chart_pattern_hints",
+  "value": 0,
+  "payload": {
+   "cluster_pct": 0.5,
+   "double_bottom_candidate": false,
+   "double_top_candidate": false,
+   "high1": 0,
+   "high2": 0,
+   "low1": 0,
+   "low2": 0
+  }
+ },
+ {
+  "bars": 120,
+  "indicator": "cmf_21",
+  "value": -0.22263511101519493,
+  "payload": null
+ },
+ {
+  "bars": 120,
+  "indicator": "keltner_e20_a10_m2",
+  "value": 24.631281148834088,
+  "payload": {
+   "close": 23.488502106953195,
+   "lower": 23.335389030460473,
+   "middle": 24.631281148834088,
+   "outside_lower": false,
+   "outside_upper": false,
+   "upper": 25.927173267207703
+  }
+ },
+ {
+  "bars": 120,
+  "indicator": "bb_squeeze",
+  "value": 0,
+  "payload": {
+   "bb_lower": 23.268393728278596,
+   "bb_upper": 26.095709592706683,
+   "explanation": "BB inside Keltner = low-volatility coil. Watch for expansion breakout.",
+   "keltner_lower": 23.335389030460473,
+   "keltner_upper": 25.927173267207703,
+   "squeeze": false
+  }
+ },
+ {
+  "bars": 120,
+  "indicator": "donchian_20",
+  "value": 24.472464836273552,
+  "payload": {
+   "close": 23.488502106953195,
+   "lower": 23.04703764969796,
+   "middle": 24.472464836273552,
+   "upper": 25.897892022849145
+  }
+ },
+ {
+  "bars": 120,
+  "indicator": "trendline_break_sw5_p3",
+  "value": 0,
+  "payload": {
+   "high_line_at_end": 23.631960025998325,
+   "low_line_at_end": 25.102642179044135,
+   "prev_high_line": 23.756642735552155,
+   "prev_low_line": 25.13817517902199,
+   "resistance_break": false,
+   "support_break": false
+  }
+ },
+ {
+  "bars": 120,
+  "indicator": "cci_20",
+  "value": -123.02068006174561,
+  "payload": null
+ },
+ {
+  "bars": 120,
+  "indicator": "roc_12",
+  "value": -6.113463265732051,
+  "payload": null
+ },
+ {
+  "bars": 120,
+  "indicator": "parabolic_sar_s0.02_m0.2",
+  "value": 24.533939625710563,
+  "payload": {
+   "bullish": false,
+   "sar": 24.533939625710563,
+   "trend": -1
+  }
+ },
+ {
+  "bars": 120,
+  "indicator": "mfi_14",
+  "value": 37.444371313299456,
+  "payload": null
+ },
+ {
+  "bars": 120,
+  "indicator": "market_structure_sw5",
+  "value": 0,
+  "payload": {
+   "bearish_bos": false,
+   "bullish_bos": false,
+   "choch_down": false,
+   "choch_up": false,
+   "last_swing_high": 27.097126940494594,
+   "last_swing_low": 25.8641677232148,
+   "prior_swing_high": 29.612414218579655,
+   "prior_swing_low": 27.990174717009285
+  }
+ },
+ {
+  "bars": 120,
+  "indicator": "elliott_context_hint",
+  "value": 13,
+  "payload": {
+   "leg_estimate": 13,
+   "note": "Not Elliott wave labels; pivot-count hint only. Human discretion required for wave degree.",
+   "swing_highs": 7,
+   "swing_lows": 6
+  }
+ },
+ {
+  "bars": 120,
+  "indicator": "gann_regression_lb60",
+  "value": -5.587233885059998,
+  "payload": {
+   "disclaimer": "Price/time scaling not applied; geometric angle is illustrative only.",
+   "one_to_one_delta": -5.77172865216806,
+   "slope_degrees": -5.587233885059998,
+   "slope_per_bar": -0.09782590935878069
+  }
+ },
+ {
+  "bars": 120,
+  "indicator": "fvg_min0.1_lb50",
+  "value": 1,
+  "payload": {
+   "active_count": 1,
+   "last_bearish": {
+    "bar_index": 97,
+    "gap_high": 26.369443115633878,
+    "gap_low": 26.32043858964669,
+    "gap_pct": 0.1860111444595446
+   },
+   "last_bullish": null,
+   "lookback_bars": 50,
+   "min_gap_pct": 0.1,
+   "total_count": 1
+  }
+ },
+ {
+  "bars": 120,
+  "indicator": "order_blocks_sw3_imp1.5",
+  "value": 5,
+  "payload": {
+   "active_count": 5,
+   "impulse_min_pct": 1.5,
+   "last_bearish_ob": {
+    "bar_index": 94,
+    "close": 26.779198213514423,
+    "high": 26.82446629010448,
+    "low": 26.596827557538845,
+    "open": 26.663983559206823
+   },
+   "last_bullish_ob": null,
+   "lookback_bars": 100,
+   "swing_strength": 3,
+   "total_count": 16
+  }
+ },
+ {
+  "bars": 120,
+  "indicator": "liquidity_sweep_sw3",
+  "value": 3,
+  "payload": {
+   "high_sweeps": 0,
+   "last_sweep": {
+    "bar_close": 25.926208286654802,
+    "bar_high": 26.18646344775303,
+    "bar_index": 98,
+    "bar_low": 25.657260030967443,
+    "kind": "low_sweep",
+    "swept_level": 25.8641677232148
+   },
+   "lookback_bars": 50,
+   "low_sweeps": 3,
+   "swing_strength": 3,
+   "total_sweeps": 3
+  }
+ },
+ {
+  "bars": 120,
+  "indicator": "hs_pattern_sw5",
+  "value": -1,
+  "payload": {
+   "hs_found": true,
+   "hs_head": 30.395091160918465,
+   "hs_left_shoulder": 29.861977651778854,
+   "hs_neckline": 27.1941166935656,
+   "hs_neckline_break": true,
+   "hs_right_shoulder": 29.612414218579655,
+   "hs_symmetry_pct": 0.835723059300907,
+   "inv_hs_found": true,
+   "inv_hs_head": 26.748001093608337,
+   "inv_hs_left_shoulder": 26.84417427007918,
+   "inv_hs_neckline": 30.395091160918465,
+   "inv_hs_neckline_break": false,
+   "inv_hs_right_shoulder": 27.990174717009285,
+   "inv_hs_symmetry_pct": 4.269084365941743,
+   "shoulder_tolerance_pct": 5,
+   "swing_strength": 5
+  }
+ },
+ {
+  "bars": 120,
+  "indicator": "triangle_sw3",
+  "value": -1,
+  "payload": {
+   "apex_bars_away": 7,
+   "breakout": "down",
+   "flat_thresh_pct": 0.05,
+   "high_slope_pct": -0.16824459088801985,
+   "kind": "descending",
+   "low_slope_pct": -0.02251591896168043,
+   "min_pivots": 3,
+   "swing_strength": 3
+  }
+ },
+ {
+  "bars": 120,
+  "indicator": "flag_pole5_len10",
+  "value": 0,
+  "payload": {
+   "bear_flag": false,
+   "bull_flag": false,
+   "flag_len_bars": 10,
+   "max_retracement_pct": 50,
+   "pole_len_bars": 5,
+   "pole_min_pct": 5,
+   "pole_pct": 0
+  }
+ },
+ {
+  "bars": 260,
+  "indicator": "sma_20",
+  "value": 24.68205166049264,
+  "payload": null
+ },
+ {
+  "bars": 260,
+  "indicator": "sma_50",
+  "value": 26.153292596706574,
+  "payload": null
+ },
+ {
+  "bars": 260,
+  "indicator": "sma_100",
+  "value": 27.30817262526544,
+  "payload": null
+ },
+ {
+  "bars": 260,
+  "indicator": "sma_200",
+  "value": 26.42164495523553,
+  "payload": null
+ },
+ {
+  "bars": 260,
+  "indicator": "ema_9",
+  "value": 24.05401191544739,
+  "payload": null
+ },
+ {
+  "bars": 260,
+  "indicator": "ema_21",
+  "value": 24.680625772756247,
+  "payload": null
+ },
+ {
+  "bars": 260,
+  "indicator": "ema_50",
+  "value": 25.769016021811147,
+  "payload": null
+ },
+ {
+  "bars": 260,
+  "indicator": "ema_200",
+  "value": 25.968437172177083,
+  "payload": null
+ },
+ {
+  "bars": 260,
+  "indicator": "rsi_14",
+  "value": 22.65142032702093,
+  "payload": null
+ },
+ {
+  "bars": 260,
+  "indicator": "vol_sma_20",
+  "value": 147273.51,
+  "payload": null
+ },
+ {
+  "bars": 260,
+  "indicator": "rel_vol",
+  "value": 1.1362422283815456,
+  "payload": null
+ },
+ {
+  "bars": 260,
+  "indicator": "sr_levels",
+  "value": 23.488502106953195,
+  "payload": {
+   "current_price": 23.488502106953195,
+   "resistance": [
+    23.65163290879505,
+    24.271932347044782,
+    24.99825084102876
+   ],
+   "resistance_touches": [
+    1,
+    2,
+    2
+   ],
+   "support": [
+    23.261109588850744,
+    23.100489044198667,
+    22.70269466256343
+   ],
+   "support_touches": [
+    1,
+    1,
+    1
+   ]
+  }
+ },
+ {
+  "bars": 260,
+  "indicator": "trend",
+  "value": -0.367413106194974,
+  "payload": {
+   "direction": "down",
+   "higher_highs": false,
+   "higher_lows": false,
+   "r2": 0.9551856222634213,
+   "slope_pct": -0.367413106194974
+  }
+ },
+ {
+  "bars": 260,
+  "indicator": "candle_patterns",
+  "value": 0,
+  "payload": {
+   "bar": {
+    "close": 23.488502106953195,
+    "high": 24.039887430311655,
+    "low": 23.04703764969796,
+    "open": 23.87887698539284,
+    "volume": 167864.19999999998
+   },
+   "patterns": []
+  }
+ },
+ {
+  "bars": 260,
+  "indicator": "macd_12_26_9",
+  "value": -0.02416733511637359,
+  "payload": {
+   "bearish_cross_line_signal": false,
+   "bullish_cross_line_signal": false,
+   "fast": 12,
+   "hist_bear_zero_cross": false,
+   "hist_bull_zero_cross": false,
+   "histogram": -0.02416733511637359,
+   "macd_line": -0.7011528057701071,
+   "prev_histogram": -0.012303847920012156,
+   "prev_macd_line": -0.6832474847946521,
+   "prev_signal_line": -0.67094363687464,
+   "signal": 9,
+   "signal_line": -0.6769854706537335,
+   "slow": 26,
+   "start_idx": 25
+  }
+ },
+ {
+  "bars": 260,
+  "indicator": "obv",
+  "value": -1783403.0000000002,
+  "payload": {
+   "last_bar_delta": -167864.19999999998,
+   "obv": -1783403.0000000002
+  }
+ },
+ {
+  "bars": 260,
+  "indicator": "bb_20_2",
+  "value": 0.07785065030897168,
+  "payload": {
+   "bandwidth": 0.1145494670912481,
+   "close": 23.488502106953195,
+   "lower": 23.268393728278596,
+   "middle": 24.68205166049264,
+   "pct_b": 0.07785065030897168,
+   "period": 20,
+   "std_mult": 2,
+   "upper": 26.095709592706683
+  }
+ },
+ {
+  "bars": 260,
+  "indicator": "fib_retrace_sw5",
+  "value": 192.67998348744197,
+  "payload": {
+   "current_close": 23.488502106953195,
+   "direction": "up_impulse",
+   "dist_pct_to_near": 192.67998348744197,
+   "extensions": {
+    "1.272": 27.432491847594697,
+    "1.618": 27.859095736773508
+   },
+   "impulse_high": 27.097126940494594,
+   "impulse_low": 25.8641677232148,
+   "leg_size": 1.2329592172797952,
+   "levels": {
+    "0": 27.097126940494594,
+    "0.236": 26.806148565216564,
+    "0.382": 26.626136519493713,
+    "0.5": 26.480647331854698,
+    "0.618": 26.33515814421568,
+    "0.786": 26.128020995712674,
+    "1": 25.8641677232148
+   },
+   "nearest_level": "1",
+   "nearest_price": 25.8641677232148,
+   "rule": "last_swing_high_vs_last_swing_low",
+   "swing_strength": 5
+  }
+ },
+ {
+  "bars": 260,
+  "indicator": "rsi_divergence_rsi14_sw5",
+  "value": 0,
+  "payload": {
+   "bearish_regular": {
+    "pattern": false,
+    "price_hi_1": 29.612414218579655,
+    "price_hi_2": 27.097126940494594,
+    "rsi_hi_1": 49.846449358659065,
+    "rsi_hi_2": 41.32853554146463,
+    "selected": false
+   },
+   "bullish_regular": {
+    "pattern": false,
+    "price_lo_1": 27.990174717009285,
+    "price_lo_2": 25.8641677232148,
+    "rsi_lo_1": 56.5558042733574,
+    "rsi_lo_2": 37.41549684337194,
+    "selected": false
+   },
+   "kind": "none"
+  }
+ },
+ {
+  "bars": 260,
+  "indicator": "rsi_hidden_rsi14_sw5",
+  "value": 0,
+  "payload": {
+   "bearish_hidden": {
+    "pattern": false,
+    "price_hi_1": 29.612414218579655,
+    "price_hi_2": 27.097126940494594,
+    "rsi_hi_1": 49.846449358659065,
+    "rsi_hi_2": 41.32853554146463,
+    "selected": false
+   },
+   "bullish_hidden": {
+    "pattern": false,
+    "price_lo_1": 27.990174717009285,
+    "price_lo_2": 25.8641677232148,
+    "rsi_lo_1": 56.5558042733574,
+    "rsi_lo_2": 37.41549684337194,
+    "selected": false
+   },
+   "kind": "none",
+   "min_pivot_sep": 3,
+   "require_trend_gate": true
+  }
+ },
+ {
+  "bars": 260,
+  "indicator": "vol_profile_proxy_b48_typical_price",
+  "value": 24.140993703740556,
+  "payload": {
+   "bar_count": 260,
+   "bins": [
+    {
+     "price_high": 22.074923107861284,
+     "price_low": 21.89526479517613,
+     "volume": 0
+    },
+    {
+     "price_high": 22.254581420546437,
+     "price_low": 22.074923107861284,
+     "volume": 0
+    },
+    {
+     "price_high": 22.434239733231593,
+     "price_low": 22.254581420546437,
+     "volume": 0
+    },
+    {
+     "price_high": 22.613898045916745,
+     "price_low": 22.434239733231593,
+     "volume": 160264.19999999998
+    },
+    {
+     "price_high": 22.7935563586019,
+     "price_low": 22.613898045916745,
+     "volume": 0
+    },
+    {
+     "price_high": 22.973214671287053,
+     "price_low": 22.7935563586019,
+     "volume": 253477
+    },
+    {
+     "price_high": 23.15287298397221,
+     "price_low": 22.973214671287053,
+     "volume": 287748.6
+    },
+    {
+     "price_high": 23.33253129665736,
+     "price_low": 23.15287298397221,
+     "volume": 863178.2
+    },
+    {
+     "price_high": 23.512189609342517,
+     "price_low": 23.33253129665736,
+     "volume": 1133518.4000000001
+    },
+    {
+     "price_high": 23.69184792202767,
+     "price_low": 23.512189609342517,
+     "volume": 880384.7999999999
+    },
+    {
+     "price_high": 23.871506234712825,
+     "price_low": 23.69184792202767,
+     "volume": 1680009.7999999998
+    },
+    {
+     "price_high": 24.05116454739798,
+     "price_low": 23.871506234712825,
+     "volume": 2746854.4
+    },
+    {
+     "price_high": 24.230822860083133,
+     "price_low": 24.05116454739798,
+     "volume": 3289130.4000000004
+    },
+    {
+     "price_high": 24.410481172768286,
+     "price_low": 24.230822860083133,
+     "volume": 1183229.6
+    },
+    {
+     "price_high": 24.59013948545344,
+     "price_low": 24.410481172768286,
+     "volume": 1699830
+    },
+    {
+     "price_high": 24.769797798138597,
+     "price_low": 24.59013948545344,
+     "volume": 1721515.6000000003
+    },
+    {
+     "price_high": 24.94945611082375,
+     "price_low": 24.769797798138597,
+     "volume": 312112.19999999995
+    },
+    {
+     "price_high": 25.129114423508906,
+     "price_low": 24.94945611082375,
+     "volume": 956177.4
+    },
+    {
+     "price_high": 25.308772736194058,
+     "price_low": 25.129114423508906,
+     "volume": 772054
+    },
+    {
+     "price_high": 25.488431048879214,
+     "price_low": 25.308772736194058,
+     "volume": 615265
+    },
+    {
+     "price_high": 25.668089361564366,
+     "price_low": 25.488431048879214,
+     "volume": 1182423.9999999998
+    },
+    {
+     "price_high": 25.847747674249522,
+     "price_low": 25.668089361564366,
+     "volume": 752666.6
+    },
+    {
+     "price_high": 26.027405986934674,
+     "price_low": 25.847747674249522,
+     "volume": 722057
+    },
+    {
+     "price_high": 26.20706429961983,
+     "price_low": 26.027405986934674,
+     "volume": 831124.2
+    },
+    {
+     "price_high": 26.386722612304986,
+     "price_low": 26.20706429961983,
+     "volume": 1109206.2
+    },
+    {
+     "price_high": 26.56638092499014,
+     "price_low": 26.386722612304986,
+     "volume": 860935.2000000001
+    },
+    {
+     "price_high": 26.74603923767529,
+     "price_low": 26.56638092499014,
+     "volume": 1108486.4000000001
+    },
+    {
+     "price_high": 26.925697550360447,
+     "price_low": 26.74603923767529,
+     "volume": 733167.8
+    },
+    {
+     "price_high": 27.105355863045602,
+     "price_low": 26.925697550360447,
+     "volume": 515695
+    },
+    {
+     "price_high": 27.285014175730755,
+     "price_low": 27.105355863045602,
+     "volume": 570194.6
+    },
+    {
+     "price_high": 27.46467248841591,
+     "price_low": 27.285014175730755,
+     "volume": 938644.2
+    },
+    {
+     "price_high": 27.644330801101063,
+     "price_low": 27.46467248841591,
+     "volume": 689764.2
+    },
+    {
+     "price_high": 27.82398911378622,
+     "price_low": 27.644330801101063,
+     "volume": 1104371.8
+    },
+    {
+     "price_high": 28.00364742647137,
+     "price_low": 27.82398911378622,
+     "volume": 1869054.5999999996
+    },
+    {
+     "price_high": 28.183305739156527,
+     "price_low": 28.00364742647137,
+     "volume": 823063.2
+    },
+    {
+     "price_high": 28.36296405184168,
+     "price_low": 28.183305739156527,
+     "volume": 735896.2
+    },
+    {
+     "price_high": 28.542622364526835,
+     "price_low": 28.36296405184168,
+     "volume": 499498.19999999995
+    },
+    {
+     "price_high": 28.72228067721199,
+     "price_low": 28.542622364526835,
+     "volume": 1171496.4000000001
+    },
+    {
+     "price_high": 28.901938989897143,
+     "price_low": 28.72228067721199,
+     "volume": 1228370.2
+    },
+    {
+     "price_high": 29.081597302582296,
+     "price_low": 28.901938989897143,
+     "volume": 761179.2
+    },
+    {
+     "price_high": 29.26125561526745,
+     "price_low": 29.081597302582296,
+     "volume": 648539.2
+    },
+    {
+     "price_high": 29.440913927952607,
+     "price_low": 29.26125561526745,
+     "volume": 756053.0000000001
+    },
+    {
+     "price_high": 29.62057224063776,
+     "price_low": 29.440913927952607,
+     "volume": 180773.6
+    },
+    {
+     "price_high": 29.800230553322915,
+     "price_low": 29.62057224063776,
+     "volume": 0
+    },
+    {
+     "price_high": 29.979888866008068,
+     "price_low": 29.800230553322915,
+     "volume": 0
+    },
+    {
+     "price_high": 30.159547178693224,
+     "price_low": 29.979888866008068,
+     "volume": 0
+    },
+    {
+     "price_high": 30.33920549137838,
+     "price_low": 30.159547178693224,
+     "volume": 0
+    },
+    {
+     "price_high": 30.518863804063532,
+     "price_low": 30.33920549137838,
+     "volume": 0
+    }
+   ],
+   "disclaimer": "Each bar's volume assigned to one bin via typical price or close; not true volume-at-price.",
+   "histogram_total_volume": 38347410.60000001,
+   "method": "typical_price",
+   "poc_bin": 12,
+   "poc_price": 24.140993703740556,
+   "value_area_high": 27.285014175730755,
+   "value_area_low": 21.89526479517613,
+   "value_area_pct_target": 0.7,
+   "value_area_volume": 26940706.599999998
+  }
+ },
+ {
+  "bars": 260,
+  "indicator": "stoch_slow_14_3_3",
+  "value": 19.238714643126645,
+  "payload": {
+   "d": 21.5054676242074,
+   "k": 19.238714643126645,
+   "raw_k": 17.2425461025966
+  }
+ },
+ {
+  "bars": 260,
+  "indicator": "atr_14",
+  "value": 0.6440268141037727,
+  "payload": null
+ },
+ {
+  "bars": 260,
+  "indicator": "ichimoku_9_26_52",
+  "value": 23.488502106953195,
+  "payload": {
+   "chikou_close": 23.488502106953195,
+   "close_vs_cloud": {
+    "above_cloud": false,
+    "below_cloud": true,
+    "in_cloud": false
+   },
+   "cloud_bottom": 27.10946915137596,
+   "cloud_top": 28.12962944206663,
+   "displace": 26,
+   "kijun": 24.972520178106123,
+   "senkou_a": 27.10946915137596,
+   "senkou_b": 28.12962944206663,
+   "tenkan": 23.95716235831815
+  }
+ },
+ {
+  "bars": 260,
+  "indicator": "ad_line",
+  "value": 390672.90323080897,
+  "payload": {
+   "cumulative": 390672.90323080897
+  }
+ },
+ {
+  "bars": 260,
+  "indicator": "adx_14",
+  "value": 55.55938111108294,
+  "payload": {
+   "adx": 55.55938111108294,
+   "dx": 65.99368501291887,
+   "minus_di": 26.358139747984318,
+   "plus_di": 5.39986326994125
+  }
+ },
+ {
+  "bars": 260,
+  "indicator": "pivots_prior_bar",
+  "value": 23.955520487102362,
+  "payload": {
+   "camarilla": {
+    "R1": 23.937943291365297,
+    "R2": 23.997009597337755,
+    "R3": 24.056075903310212,
+    "R4": 24.23327482122759,
+    "S1": 23.81981067942038,
+    "S2": 23.760744373447924,
+    "S3": 23.701678067475466,
+    "S4": 23.52447914955809
+   },
+   "classic": {
+    "PP": 23.955520487102362,
+    "R1": 24.23937858700646,
+    "R2": 24.599880188620087,
+    "R3": 24.883738288524185,
+    "S1": 23.595018885488734,
+    "S2": 23.311160785584637,
+    "S3": 22.95065918397101
+   },
+   "reference_ts": "2021-08-22T00:00:00Z",
+   "woodie": {
+    "PP": 23.93635961167498,
+    "R1": 24.201056836151697,
+    "R2": 24.580719313192706,
+    "S1": 23.55669713463397,
+    "S2": 23.291999910157255
+   }
+  }
+ },
+ {
+  "bars": 260,
+  "indicator": "williams_r_14",
+  "value": -82.7574538974034,
+  "payload": null
+ },
+ {
+  "bars": 260,
+  "indicator": "vwap_rolling_20",
+  "value": 24.700842625230912,
+  "payload": {
+   "bars": 20,
+   "mode": "rolling",
+   "vwap": 24.700842625230912
+  }
+ },
+ {
+  "bars": 260,
+  "indicator": "ma_ribbon",
+  "value": 0.09435156290697211,
+  "payload": {
+   "bear_stack": true,
+   "bull_stack": false,
+   "compression": 0.09435156290697211,
+   "cross_fast": 50,
+   "cross_slow": 200,
+   "death_cross": false,
+   "golden_cross": false,
+   "periods": [
+    10,
+    20,
+    50,
+    200
+   ],
+   "smas": [
+    24.03244094491001,
+    24.68205166049264,
+    26.153292596706574,
+    26.42164495523553
+   ]
+  }
+ },
+ {
+  "bars": 260,
+  "indicator": "chart_pattern_hints",
+  "value": 0,
+  "payload": {
+   "cluster_pct": 0.5,
+   "double_bottom_candidate": false,
+   "double_top_candidate": false,
+   "high1": 0,
+   "high2": 0,
+   "low1": 0,
+   "low2": 0
+  }
+ },
+ {
+  "bars": 260,
+  "indicator": "cmf_21",
+  "value": -0.22263511101519493,
+  "payload": null
+ },
+ {
+  "bars": 260,
+  "indicator": "keltner_e20_a10_m2",
+  "value": 24.63128456797455,
+  "payload": {
+   "close": 23.488502106953195,
+   "lower": 23.335393503442212,
+   "middle": 24.63128456797455,
+   "outside_lower": false,
+   "outside_upper": false,
+   "upper": 25.927175632506888
+  }
+ },
+ {
+  "bars": 260,
+  "indicator": "bb_squeeze",
+  "value": 0,
+  "payload": {
+   "bb_lower": 23.268393728278596,
+   "bb_upper": 26.095709592706683,
+   "explanation": "BB inside Keltner = low-volatility coil. Watch for expansion breakout.",
+   "keltner_lower": 23.335393503442212,
+   "keltner_upper": 25.927175632506888,
+   "squeeze": false
+  }
+ },
+ {
+  "bars": 260,
+  "indicator": "donchian_20",
+  "value": 24.472464836273552,
+  "payload": {
+   "close": 23.488502106953195,
+   "lower": 23.04703764969796,
+   "middle": 24.472464836273552,
+   "upper": 25.897892022849145
+  }
+ },
+ {
+  "bars": 260,
+  "indicator": "trendline_break_sw5_p3",
+  "value": 0,
+  "payload": {
+   "high_line_at_end": 23.631960025998183,
+   "low_line_at_end": 25.102642179044228,
+   "prev_high_line": 23.75664273555202,
+   "prev_low_line": 25.138175179022078,
+   "resistance_break": false,
+   "support_break": false
+  }
+ },
+ {
+  "bars": 260,
+  "indicator": "cci_20",
+  "value": -123.02068006174561,
+  "payload": null
+ },
+ {
+  "bars": 260,
+  "indicator": "roc_12",
+  "value": -6.113463265732051,
+  "payload": null
+ },
+ {
+  "bars": 260,
+  "indicator": "parabolic_sar_s0.02_m0.2",
+  "value": 24.533939625710563,
+  "payload": {
+   "bullish": false,
+   "sar": 24.533939625710563,
+   "trend": -1
+  }
+ },
+ {
+  "bars": 260,
+  "indicator": "mfi_14",
+  "value": 37.444371313299456,
+  "payload": null
+ },
+ {
+  "bars": 260,
+  "indicator": "market_structure_sw5",
+  "value": 0,
+  "payload": {
+   "bearish_bos": false,
+   "bullish_bos": false,
+   "choch_down": false,
+   "choch_up": false,
+   "last_swing_high": 27.097126940494594,
+   "last_swing_low": 25.8641677232148,
+   "prior_swing_high": 29.612414218579655,
+   "prior_swing_low": 27.990174717009285
+  }
+ },
+ {
+  "bars": 260,
+  "indicator": "elliott_context_hint",
+  "value": 28,
+  "payload": {
+   "leg_estimate": 28,
+   "note": "Not Elliott wave labels; pivot-count hint only. Human discretion required for wave degree.",
+   "swing_highs": 15,
+   "swing_lows": 13
+  }
+ },
+ {
+  "bars": 260,
+  "indicator": "gann_regression_lb60",
+  "value": -5.587233885059998,
+  "payload": {
+   "disclaimer": "Price/time scaling not applied; geometric angle is illustrative only.",
+   "one_to_one_delta": -5.77172865216806,
+   "slope_degrees": -5.587233885059998,
+   "slope_per_bar": -0.09782590935878069
+  }
+ },
+ {
+  "bars": 260,
+  "indicator": "fvg_min0.1_lb50",
+  "value": 1,
+  "payload": {
+   "active_count": 1,
+   "last_bearish": {
+    "bar_index": 237,
+    "gap_high": 26.369443115633878,
+    "gap_low": 26.32043858964669,
+    "gap_pct": 0.1860111444595446
+   },
+   "last_bullish": null,
+   "lookback_bars": 50,
+   "min_gap_pct": 0.1,
+   "total_count": 1
+  }
+ },
+ {
+  "bars": 260,
+  "indicator": "order_blocks_sw3_imp1.5",
+  "value": 5,
+  "payload": {
+   "active_count": 5,
+   "impulse_min_pct": 1.5,
+   "last_bearish_ob": {
+    "bar_index": 234,
+    "close": 26.779198213514423,
+    "high": 26.82446629010448,
+    "low": 26.596827557538845,
+    "open": 26.663983559206823
+   },
+   "last_bullish_ob": null,
+   "lookback_bars": 100,
+   "swing_strength": 3,
+   "total_count": 16
+  }
+ },
+ {
+  "bars": 260,
+  "indicator": "liquidity_sweep_sw3",
+  "value": 3,
+  "payload": {
+   "high_sweeps": 0,
+   "last_sweep": {
+    "bar_close": 25.926208286654802,
+    "bar_high": 26.18646344775303,
+    "bar_index": 238,
+    "bar_low": 25.657260030967443,
+    "kind": "low_sweep",
+    "swept_level": 25.8641677232148
+   },
+   "lookback_bars": 50,
+   "low_sweeps": 3,
+   "swing_strength": 3,
+   "total_sweeps": 3
+  }
+ },
+ {
+  "bars": 260,
+  "indicator": "hs_pattern_sw5",
+  "value": -1,
+  "payload": {
+   "hs_found": true,
+   "hs_head": 30.395091160918465,
+   "hs_left_shoulder": 29.861977651778854,
+   "hs_neckline": 27.1941166935656,
+   "hs_neckline_break": true,
+   "hs_right_shoulder": 29.612414218579655,
+   "hs_symmetry_pct": 0.835723059300907,
+   "inv_hs_found": true,
+   "inv_hs_head": 26.748001093608337,
+   "inv_hs_left_shoulder": 26.84417427007918,
+   "inv_hs_neckline": 30.395091160918465,
+   "inv_hs_neckline_break": false,
+   "inv_hs_right_shoulder": 27.990174717009285,
+   "inv_hs_symmetry_pct": 4.269084365941743,
+   "shoulder_tolerance_pct": 5,
+   "swing_strength": 5
+  }
+ },
+ {
+  "bars": 260,
+  "indicator": "triangle_sw3",
+  "value": -1,
+  "payload": {
+   "apex_bars_away": 7,
+   "breakout": "down",
+   "flat_thresh_pct": 0.05,
+   "high_slope_pct": -0.16824459088802152,
+   "kind": "descending",
+   "low_slope_pct": -0.02251591896168277,
+   "min_pivots": 3,
+   "swing_strength": 3
+  }
+ },
+ {
+  "bars": 260,
+  "indicator": "flag_pole5_len10",
+  "value": 0,
+  "payload": {
+   "bear_flag": false,
+   "bull_flag": false,
+   "flag_len_bars": 10,
+   "max_retracement_pct": 50,
+   "pole_len_bars": 5,
+   "pole_min_pct": 5,
+   "pole_pct": 0
+  }
+ },
+ {
+  "bars": 499,
+  "indicator": "sma_20",
+  "value": 24.68205166049264,
+  "payload": null
+ },
+ {
+  "bars": 499,
+  "indicator": "sma_50",
+  "value": 26.153292596706574,
+  "payload": null
+ },
+ {
+  "bars": 499,
+  "indicator": "sma_100",
+  "value": 27.30817262526544,
+  "payload": null
+ },
+ {
+  "bars": 499,
+  "indicator": "sma_200",
+  "value": 26.42164495523553,
+  "payload": null
+ },
+ {
+  "bars": 499,
+  "indicator": "ema_9",
+  "value": 24.05401191544739,
+  "payload": null
+ },
+ {
+  "bars": 499,
+  "indicator": "ema_21",
+  "value": 24.68062577276446,
+  "payload": null
+ },
+ {
+  "bars": 499,
+  "indicator": "ema_50",
+  "value": 25.768990943285864,
+  "payload": null
+ },
+ {
+  "bars": 499,
+  "indicator": "ema_200",
+  "value": 26.83375756166868,
+  "payload": null
+ },
+ {
+  "bars": 499,
+  "indicator": "rsi_14",
+  "value": 22.65142023898929,
+  "payload": null
+ },
+ {
+  "bars": 499,
+  "indicator": "vol_sma_20",
+  "value": 147273.51,
+  "payload": null
+ },
+ {
+  "bars": 499,
+  "indicator": "rel_vol",
+  "value": 1.1362422283815456,
+  "payload": null
+ },
+ {
+  "bars": 499,
+  "indicator": "sr_levels",
+  "value": 23.488502106953195,
+  "payload": {
+   "current_price": 23.488502106953195,
+   "resistance": [
+    23.65163290879505,
+    23.9517908549762,
+    24.117641284529025
+   ],
+   "resistance_touches": [
+    1,
+    1,
+    1
+   ],
+   "support": [
+    23.261109588850744,
+    23.05025897142481,
+    22.860686860830775
+   ],
+   "support_touches": [
+    1,
+    2,
+    2
+   ]
+  }
+ },
+ {
+  "bars": 499,
+  "indicator": "trend",
+  "value": -0.367413106194974,
+  "payload": {
+   "direction": "down",
+   "higher_highs": false,
+   "higher_lows": false,
+   "r2": 0.9551856222634213,
+   "slope_pct": -0.367413106194974
+  }
+ },
+ {
+  "bars": 499,
+  "indicator": "candle_patterns",
+  "value": 0,
+  "payload": {
+   "bar": {
+    "close": 23.488502106953195,
+    "high": 24.039887430311655,
+    "low": 23.04703764969796,
+    "open": 23.87887698539284,
+    "volume": 167864.19999999998
+   },
+   "patterns": []
+  }
+ },
+ {
+  "bars": 499,
+  "indicator": "macd_12_26_9",
+  "value": -0.02416733473908972,
+  "payload": {
+   "bearish_cross_line_signal": false,
+   "bullish_cross_line_signal": false,
+   "fast": 12,
+   "hist_bear_zero_cross": false,
+   "hist_bull_zero_cross": false,
+   "histogram": -0.02416733473908972,
+   "macd_line": -0.7011528065718231,
+   "prev_histogram": -0.012303847512547872,
+   "prev_macd_line": -0.6832474856605089,
+   "prev_signal_line": -0.670943638147961,
+   "signal": 9,
+   "signal_line": -0.6769854718327334,
+   "slow": 26,
+   "start_idx": 25
+  }
+ },
+ {
+  "bars": 499,
+  "indicator": "obv",
+  "value": -7557088.600000001,
+  "payload": {
+   "last_bar_delta": -167864.19999999998,
+   "obv": -7557088.600000001
+  }
+ },
+ {
+  "bars": 499,
+  "indicator": "bb_20_2",
+  "value": 0.07785065030897168,
+  "payload": {
+   "bandwidth": 0.1145494670912481,
+   "close": 23.488502106953195,
+   "lower": 23.268393728278596,
+   "middle": 24.68205166049264,
+   "pct_b": 0.07785065030897168,
+   "period": 20,
+   "std_mult": 2,
+   "upper": 26.095709592706683
+  }
+ },
+ {
+  "bars": 499,
+  "indicator": "fib_retrace_sw5",
+  "value": 192.67998348744197,
+  "payload": {
+   "current_close": 23.488502106953195,
+   "direction": "up_impulse",
+   "dist_pct_to_near": 192.67998348744197,
+   "extensions": {
+    "1.272": 27.432491847594697,
+    "1.618": 27.859095736773508
+   },
+   "impulse_high": 27.097126940494594,
+   "impulse_low": 25.8641677232148,
+   "leg_size": 1.2329592172797952,
+   "levels": {
+    "0": 27.097126940494594,
+    "0.236": 26.806148565216564,
+    "0.382": 26.626136519493713,
+    "0.5": 26.480647331854698,
+    "0.618": 26.33515814421568,
+    "0.786": 26.128020995712674,
+    "1": 25.8641677232148
+   },
+   "nearest_level": "1",
+   "nearest_price": 25.8641677232148,
+   "rule": "last_swing_high_vs_last_swing_low",
+   "swing_strength": 5
+  }
+ },
+ {
+  "bars": 499,
+  "indicator": "rsi_divergence_rsi14_sw5",
+  "value": 0,
+  "payload": {
+   "bearish_regular": {
+    "pattern": false,
+    "price_hi_1": 29.612414218579655,
+    "price_hi_2": 27.097126940494594,
+    "rsi_hi_1": 49.846447526084944,
+    "rsi_hi_2": 41.328534896087106,
+    "selected": false
+   },
+   "bullish_regular": {
+    "pattern": false,
+    "price_lo_1": 27.990174717009285,
+    "price_lo_2": 25.8641677232148,
+    "rsi_lo_1": 56.55580086366878,
+    "rsi_lo_2": 37.41549618634532,
+    "selected": false
+   },
+   "kind": "none"
+  }
+ },
+ {
+  "bars": 499,
+  "indicator": "rsi_hidden_rsi14_sw5",
+  "value": 0,
+  "payload": {
+   "bearish_hidden": {
+    "pattern": false,
+    "price_hi_1": 29.612414218579655,
+    "price_hi_2": 27.097126940494594,
+    "rsi_hi_1": 49.846447526084944,
+    "rsi_hi_2": 41.328534896087106,
+    "selected": false
+   },
+   "bullish_hidden": {
+    "pattern": false,
+    "price_lo_1": 27.990174717009285,
+    "price_lo_2": 25.8641677232148,
+    "rsi_lo_1": 56.55580086366878,
+    "rsi_lo_2": 37.41549618634532,
+    "selected": false
+   },
+   "kind": "none",
+   "min_pivot_sep": 3,
+   "require_trend_gate": true
+  }
+ },
+ {
+  "bars": 499,
+  "indicator": "vol_profile_proxy_b48_typical_price",
+  "value": 23.69646729696791,
+  "payload": {
+   "bar_count": 499,
+   "bins": [
+    {
+     "price_high": 22.18730603308437,
+     "price_low": 21.583641527530954,
+     "volume": 185005.2
+    },
+    {
+     "price_high": 22.790970538637787,
+     "price_low": 22.18730603308437,
+     "volume": 1589997.2
+    },
+    {
+     "price_high": 23.3946350441912,
+     "price_low": 22.790970538637787,
+     "volume": 4597818.600000001
+    },
+    {
+     "price_high": 23.998299549744615,
+     "price_low": 23.3946350441912,
+     "volume": 9553359.400000004
+    },
+    {
+     "price_high": 24.60196405529803,
+     "price_low": 23.998299549744615,
+     "volume": 8869615.2
+    },
+    {
+     "price_high": 25.205628560851448,
+     "price_low": 24.60196405529803,
+     "volume": 4004312.2
+    },
+    {
+     "price_high": 25.809293066404862,
+     "price_low": 25.205628560851448,
+     "volume": 2751785.2
+    },
+    {
+     "price_high": 26.412957571958277,
+     "price_low": 25.809293066404862,
+     "volume": 3394486.1999999997
+    },
+    {
+     "price_high": 27.01662207751169,
+     "price_low": 26.412957571958277,
+     "volume": 4790736.399999999
+    },
+    {
+     "price_high": 27.62028658306511,
+     "price_low": 27.01662207751169,
+     "volume": 5785054.2
+    },
+    {
+     "price_high": 28.223951088618524,
+     "price_low": 27.62028658306511,
+     "volume": 4872804.6
+    },
+    {
+     "price_high": 28.827615594171938,
+     "price_low": 28.223951088618524,
+     "volume": 3322939.6
+    },
+    {
+     "price_high": 29.431280099725356,
+     "price_low": 28.827615594171938,
+     "volume": 3278633.199999999
+    },
+    {
+     "price_high": 30.03494460527877,
+     "price_low": 29.431280099725356,
+     "volume": 530229.2
+    },
+    {
+     "price_high": 30.638609110832185,
+     "price_low": 30.03494460527877,
+     "volume": 252669
+    },
+    {
+     "price_high": 31.242273616385603,
+     "price_low": 30.638609110832185,
+     "volume": 183921.4
+    },
+    {
+     "price_high": 31.845938121939017,
+     "price_low": 31.242273616385603,
+     "volume": 141254.19999999998
+    },
+    {
+     "price_high": 32.44960262749243,
+     "price_low": 31.845938121939017,
+     "volume": 693086.7999999999
+    },
+    {
+     "price_high": 33.05326713304585,
+     "price_low": 32.44960262749243,
+     "volume": 1213276.0000000002
+    },
+    {
+     "price_high": 33.65693163859926,
+     "price_low": 33.05326713304585,
+     "volume": 1267233.5999999999
+    },
+    {
+     "price_high": 34.26059614415268,
+     "price_low": 33.65693163859926,
+     "volume": 684447.4
+    },
+    {
+     "price_high": 34.8642606497061,
+     "price_low": 34.26059614415268,
+     "volume": 282710.4
+    },
+    {
+     "price_high": 35.46792515525951,
+     "price_low": 34.8642606497061,
+     "volume": 0
+    },
+    {
+     "price_high": 36.071589660812926,
+     "price_low": 35.46792515525951,
+     "volume": 191979.80000000002
+    },
+    {
+     "price_high": 36.675254166366344,
+     "price_low": 36.071589660812926,
+     "volume": 302455.6
+    },
+    {
+     "price_high": 37.278918671919755,
+     "price_low": 36.675254166366344,
+     "volume": 0
+    },
+    {
+     "price_high": 37.88258317747317,
+     "price_low": 37.278918671919755,
+     "volume": 284209.6
+    },
+    {
+     "price_high": 38.48624768302659,
+     "price_low": 37.88258317747317,
+     "volume": 628708.6
+    },
+    {
+     "price_high": 39.08991218858,
+     "price_low": 38.48624768302659,
+     "volume": 950276.7999999998
+    },
+    {
+     "price_high": 39.69357669413341,
+     "price_low": 39.08991218858,
+     "volume": 838337.8
+    },
+    {
+     "price_high": 40.29724119968684,
+     "price_low": 39.69357669413341,
+     "volume": 336909
+    },
+    {
+     "price_high": 40.90090570524025,
+     "price_low": 40.29724119968684,
+     "volume": 145846
+    },
+    {
+     "price_high": 41.50457021079366,
+     "price_low": 40.90090570524025,
+     "volume": 0
+    },
+    {
+     "price_high": 42.108234716347084,
+     "price_low": 41.50457021079366,
+     "volume": 172047.4
+    },
+    {
+     "price_high": 42.711899221900495,
+     "price_low": 42.108234716347084,
+     "volume": 176118.4
+    },
+    {
+     "price_high": 43.315563727453906,
+     "price_low": 42.711899221900495,
+     "volume": 179122.2
+    },
+    {
+     "price_high": 43.919228233007324,
+     "price_low": 43.315563727453906,
+     "volume": 561284
+    },
+    {
+     "price_high": 44.52289273856074,
+     "price_low": 43.919228233007324,
+     "volume": 569726.6
+    },
+    {
+     "price_high": 45.12655724411415,
+     "price_low": 44.52289273856074,
+     "volume": 301398
+    },
+    {
+     "price_high": 45.73022174966757,
+     "price_low": 45.12655724411415,
+     "volume": 804382.6000000001
+    },
+    {
+     "price_high": 46.33388625522099,
+     "price_low": 45.73022174966757,
+     "volume": 142099.8
+    },
+    {
+     "price_high": 46.9375507607744,
+     "price_low": 46.33388625522099,
+     "volume": 156255
+    },
+    {
+     "price_high": 47.54121526632782,
+     "price_low": 46.9375507607744,
+     "volume": 240069
+    },
+    {
+     "price_high": 48.144879771881236,
+     "price_low": 47.54121526632782,
+     "volume": 1420989.9999999998
+    },
+    {
+     "price_high": 48.74854427743465,
+     "price_low": 48.144879771881236,
+     "volume": 2822026.6
+    },
+    {
+     "price_high": 49.352208782988065,
+     "price_low": 48.74854427743465,
+     "volume": 728632
+    },
+    {
+     "price_high": 49.95587328854148,
+     "price_low": 49.352208782988065,
+     "volume": 738838.8
+    },
+    {
+     "price_high": 50.559537794094894,
+     "price_low": 49.95587328854148,
+     "volume": 0
+    }
+   ],
+   "disclaimer": "Each bar's volume assigned to one bin via typical price or close; not true volume-at-price.",
+   "histogram_total_volume": 74937088.79999998,
+   "method": "typical_price",
+   "poc_bin": 3,
+   "poc_price": 23.69646729696791,
+   "value_area_high": 28.827615594171938,
+   "value_area_low": 21.583641527530954,
+   "value_area_pct_target": 0.7,
+   "value_area_volume": 53717914.00000001
+  }
+ },
+ {
+  "bars": 499,
+  "indicator": "stoch_slow_14_3_3",
+  "value": 19.238714643126645,
+  "payload": {
+   "d": 21.5054676242074,
+   "k": 19.238714643126645,
+   "raw_k": 17.2425461025966
+  }
+ },
+ {
+  "bars": 499,
+  "indicator": "atr_14",
+  "value": 0.6440268152545008,
+  "payload": null
+ },
+ {
+  "bars": 499,
+  "indicator": "ichimoku_9_26_52",
+  "value": 23.488502106953195,
+  "payload": {
+   "chikou_close": 23.488502106953195,
+   "close_vs_cloud": {
+    "above_cloud": false,
+    "below_cloud": true,
+    "in_cloud": false
+   },
+   "cloud_bottom": 27.10946915137596,
+   "cloud_top": 28.12962944206663,
+   "displace": 26,
+   "kijun": 24.972520178106123,
+   "senkou_a": 27.10946915137596,
+   "senkou_b": 28.12962944206663,
+   "tenkan": 23.95716235831815
+  }
+ },
+ {
+  "bars": 499,
+  "indicator": "ad_line",
+  "value": -2077473.0261053324,
+  "payload": {
+   "cumulative": -2077473.0261053324
+  }
+ },
+ {
+  "bars": 499,
+  "indicator": "adx_14",
+  "value": 55.55937912191167,
+  "payload": {
+   "adx": 55.55937912191167,
+   "dx": 65.99368514800817,
+   "minus_di": 26.35813976882485,
+   "plus_di": 5.3998632483653894
+  }
+ },
+ {
+  "bars": 499,
+  "indicator": "pivots_prior_bar",
+  "value": 23.955520487102362,
+  "payload": {
+   "camarilla": {
+    "R1": 23.937943291365297,
+    "R2": 23.997009597337755,
+    "R3": 24.056075903310212,
+    "R4": 24.23327482122759,
+    "S1": 23.81981067942038,
+    "S2": 23.760744373447924,
+    "S3": 23.701678067475466,
+    "S4": 23.52447914955809
+   },
+   "classic": {
+    "PP": 23.955520487102362,
+    "R1": 24.23937858700646,
+    "R2": 24.599880188620087,
+    "R3": 24.883738288524185,
+    "S1": 23.595018885488734,
+    "S2": 23.311160785584637,
+    "S3": 22.95065918397101
+   },
+   "reference_ts": "2021-08-22T00:00:00Z",
+   "woodie": {
+    "PP": 23.93635961167498,
+    "R1": 24.201056836151697,
+    "R2": 24.580719313192706,
+    "S1": 23.55669713463397,
+    "S2": 23.291999910157255
+   }
+  }
+ },
+ {
+  "bars": 499,
+  "indicator": "williams_r_14",
+  "value": -82.7574538974034,
+  "payload": null
+ },
+ {
+  "bars": 499,
+  "indicator": "vwap_rolling_20",
+  "value": 24.700842625230912,
+  "payload": {
+   "bars": 20,
+   "mode": "rolling",
+   "vwap": 24.700842625230912
+  }
+ },
+ {
+  "bars": 499,
+  "indicator": "ma_ribbon",
+  "value": 0.09435156290697211,
+  "payload": {
+   "bear_stack": true,
+   "bull_stack": false,
+   "compression": 0.09435156290697211,
+   "cross_fast": 50,
+   "cross_slow": 200,
+   "death_cross": false,
+   "golden_cross": false,
+   "periods": [
+    10,
+    20,
+    50,
+    200
+   ],
+   "smas": [
+    24.03244094491001,
+    24.68205166049264,
+    26.153292596706574,
+    26.42164495523553
+   ]
+  }
+ },
+ {
+  "bars": 499,
+  "indicator": "chart_pattern_hints",
+  "value": 0,
+  "payload": {
+   "cluster_pct": 0.5,
+   "double_bottom_candidate": false,
+   "double_top_candidate": false,
+   "high1": 0,
+   "high2": 0,
+   "low1": 0,
+   "low2": 0
+  }
+ },
+ {
+  "bars": 499,
+  "indicator": "cmf_21",
+  "value": -0.22263511101519493,
+  "payload": null
+ },
+ {
+  "bars": 499,
+  "indicator": "keltner_e20_a10_m2",
+  "value": 24.63128456797621,
+  "payload": {
+   "close": 23.488502106953195,
+   "lower": 23.335393503443353,
+   "middle": 24.63128456797621,
+   "outside_lower": false,
+   "outside_upper": false,
+   "upper": 25.927175632509066
+  }
+ },
+ {
+  "bars": 499,
+  "indicator": "bb_squeeze",
+  "value": 0,
+  "payload": {
+   "bb_lower": 23.268393728278596,
+   "bb_upper": 26.095709592706683,
+   "explanation": "BB inside Keltner = low-volatility coil. Watch for expansion breakout.",
+   "keltner_lower": 23.335393503443353,
+   "keltner_upper": 25.927175632509066,
+   "squeeze": false
+  }
+ },
+ {
+  "bars": 499,
+  "indicator": "donchian_20",
+  "value": 24.472464836273552,
+  "payload": {
+   "close": 23.488502106953195,
+   "lower": 23.04703764969796,
+   "middle": 24.472464836273552,
+   "upper": 25.897892022849145
+  }
+ },
+ {
+  "bars": 499,
+  "indicator": "trendline_break_sw5_p3",
+  "value": 0,
+  "payload": {
+   "high_line_at_end": 23.631960025998183,
+   "low_line_at_end": 25.10264217904385,
+   "prev_high_line": 23.75664273555202,
+   "prev_low_line": 25.138175179021708,
+   "resistance_break": false,
+   "support_break": false
+  }
+ },
+ {
+  "bars": 499,
+  "indicator": "cci_20",
+  "value": -123.02068006174561,
+  "payload": null
+ },
+ {
+  "bars": 499,
+  "indicator": "roc_12",
+  "value": -6.113463265732051,
+  "payload": null
+ },
+ {
+  "bars": 499,
+  "indicator": "parabolic_sar_s0.02_m0.2",
+  "value": 24.533939625710563,
+  "payload": {
+   "bullish": false,
+   "sar": 24.533939625710563,
+   "trend": -1
+  }
+ },
+ {
+  "bars": 499,
+  "indicator": "mfi_14",
+  "value": 37.444371313299456,
+  "payload": null
+ },
+ {
+  "bars": 499,
+  "indicator": "market_structure_sw5",
+  "value": 0,
+  "payload": {
+   "bearish_bos": false,
+   "bullish_bos": false,
+   "choch_down": false,
+   "choch_up": false,
+   "last_swing_high": 27.097126940494594,
+   "last_swing_low": 25.8641677232148,
+   "prior_swing_high": 29.612414218579655,
+   "prior_swing_low": 27.990174717009285
+  }
+ },
+ {
+  "bars": 499,
+  "indicator": "elliott_context_hint",
+  "value": 59,
+  "payload": {
+   "leg_estimate": 59,
+   "note": "Not Elliott wave labels; pivot-count hint only. Human discretion required for wave degree.",
+   "swing_highs": 29,
+   "swing_lows": 30
+  }
+ },
+ {
+  "bars": 499,
+  "indicator": "gann_regression_lb60",
+  "value": -5.587233885059998,
+  "payload": {
+   "disclaimer": "Price/time scaling not applied; geometric angle is illustrative only.",
+   "one_to_one_delta": -5.77172865216806,
+   "slope_degrees": -5.587233885059998,
+   "slope_per_bar": -0.09782590935878069
+  }
+ },
+ {
+  "bars": 499,
+  "indicator": "fvg_min0.1_lb50",
+  "value": 1,
+  "payload": {
+   "active_count": 1,
+   "last_bearish": {
+    "bar_index": 476,
+    "gap_high": 26.369443115633878,
+    "gap_low": 26.32043858964669,
+    "gap_pct": 0.1860111444595446
+   },
+   "last_bullish": null,
+   "lookback_bars": 50,
+   "min_gap_pct": 0.1,
+   "total_count": 1
+  }
+ },
+ {
+  "bars": 499,
+  "indicator": "order_blocks_sw3_imp1.5",
+  "value": 5,
+  "payload": {
+   "active_count": 5,
+   "impulse_min_pct": 1.5,
+   "last_bearish_ob": {
+    "bar_index": 473,
+    "close": 26.779198213514423,
+    "high": 26.82446629010448,
+    "low": 26.596827557538845,
+    "open": 26.663983559206823
+   },
+   "last_bullish_ob": null,
+   "lookback_bars": 100,
+   "swing_strength": 3,
+   "total_count": 16
+  }
+ },
+ {
+  "bars": 499,
+  "indicator": "liquidity_sweep_sw3",
+  "value": 3,
+  "payload": {
+   "high_sweeps": 0,
+   "last_sweep": {
+    "bar_close": 25.926208286654802,
+    "bar_high": 26.18646344775303,
+    "bar_index": 477,
+    "bar_low": 25.657260030967443,
+    "kind": "low_sweep",
+    "swept_level": 25.8641677232148
+   },
+   "lookback_bars": 50,
+   "low_sweeps": 3,
+   "swing_strength": 3,
+   "total_sweeps": 3
+  }
+ },
+ {
+  "bars": 499,
+  "indicator": "hs_pattern_sw5",
+  "value": -1,
+  "payload": {
+   "hs_found": true,
+   "hs_head": 30.395091160918465,
+   "hs_left_shoulder": 29.861977651778854,
+   "hs_neckline": 27.1941166935656,
+   "hs_neckline_break": true,
+   "hs_right_shoulder": 29.612414218579655,
+   "hs_symmetry_pct": 0.835723059300907,
+   "inv_hs_found": true,
+   "inv_hs_head": 26.748001093608337,
+   "inv_hs_left_shoulder": 26.84417427007918,
+   "inv_hs_neckline": 30.395091160918465,
+   "inv_hs_neckline_break": false,
+   "inv_hs_right_shoulder": 27.990174717009285,
+   "inv_hs_symmetry_pct": 4.269084365941743,
+   "shoulder_tolerance_pct": 5,
+   "swing_strength": 5
+  }
+ },
+ {
+  "bars": 499,
+  "indicator": "triangle_sw3",
+  "value": -1,
+  "payload": {
+   "apex_bars_away": 7,
+   "breakout": "down",
+   "flat_thresh_pct": 0.05,
+   "high_slope_pct": -0.16824459088802152,
+   "kind": "descending",
+   "low_slope_pct": -0.022515918961673397,
+   "min_pivots": 3,
+   "swing_strength": 3
+  }
+ },
+ {
+  "bars": 499,
+  "indicator": "flag_pole5_len10",
+  "value": 0,
+  "payload": {
+   "bear_flag": false,
+   "bull_flag": false,
+   "flag_len_bars": 10,
+   "max_retracement_pct": 50,
+   "pole_len_bars": 5,
+   "pole_min_pct": 5,
+   "pole_pct": 0
+  }
+ },
+ {
+  "bars": 500,
+  "indicator": "sma_20",
+  "value": 24.68205166049264,
+  "payload": null
+ },
+ {
+  "bars": 500,
+  "indicator": "sma_50",
+  "value": 26.153292596706574,
+  "payload": null
+ },
+ {
+  "bars": 500,
+  "indicator": "sma_100",
+  "value": 27.30817262526544,
+  "payload": null
+ },
+ {
+  "bars": 500,
+  "indicator": "sma_200",
+  "value": 26.42164495523553,
+  "payload": null
+ },
+ {
+  "bars": 500,
+  "indicator": "ema_9",
+  "value": 24.05401191544739,
+  "payload": null
+ },
+ {
+  "bars": 500,
+  "indicator": "ema_21",
+  "value": 24.68062577276446,
+  "payload": null
+ },
+ {
+  "bars": 500,
+  "indicator": "ema_50",
+  "value": 25.768990941557938,
+  "payload": null
+ },
+ {
+  "bars": 500,
+  "indicator": "ema_200",
+  "value": 26.833484136236493,
+  "payload": null
+ },
+ {
+  "bars": 500,
+  "indicator": "rsi_14",
+  "value": 22.65142023898929,
+  "payload": null
+ },
+ {
+  "bars": 500,
+  "indicator": "vol_sma_20",
+  "value": 147273.51,
+  "payload": null
+ },
+ {
+  "bars": 500,
+  "indicator": "rel_vol",
+  "value": 1.1362422283815456,
+  "payload": null
+ },
+ {
+  "bars": 500,
+  "indicator": "sr_levels",
+  "value": 23.488502106953195,
+  "payload": {
+   "current_price": 23.488502106953195,
+   "resistance": [
+    23.65163290879505,
+    23.9517908549762,
+    24.117641284529025
+   ],
+   "resistance_touches": [
+    1,
+    1,
+    1
+   ],
+   "support": [
+    23.261109588850744,
+    23.05025897142481,
+    22.860686860830775
+   ],
+   "support_touches": [
+    1,
+    2,
+    2
+   ]
+  }
+ },
+ {
+  "bars": 500,
+  "indicator": "trend",
+  "value": -0.367413106194974,
+  "payload": {
+   "direction": "down",
+   "higher_highs": false,
+   "higher_lows": false,
+   "r2": 0.9551856222634213,
+   "slope_pct": -0.367413106194974
+  }
+ },
+ {
+  "bars": 500,
+  "indicator": "candle_patterns",
+  "value": 0,
+  "payload": {
+   "bar": {
+    "close": 23.488502106953195,
+    "high": 24.039887430311655,
+    "low": 23.04703764969796,
+    "open": 23.87887698539284,
+    "volume": 167864.19999999998
+   },
+   "patterns": []
+  }
+ },
+ {
+  "bars": 500,
+  "indicator": "macd_12_26_9",
+  "value": -0.02416733473908972,
+  "payload": {
+   "bearish_cross_line_signal": false,
+   "bullish_cross_line_signal": false,
+   "fast": 12,
+   "hist_bear_zero_cross": false,
+   "hist_bull_zero_cross": false,
+   "histogram": -0.02416733473908972,
+   "macd_line": -0.7011528065718231,
+   "prev_histogram": -0.012303847512547872,
+   "prev_macd_line": -0.6832474856605089,
+   "prev_signal_line": -0.670943638147961,
+   "signal": 9,
+   "signal_line": -0.6769854718327334,
+   "slow": 26,
+   "start_idx": 25
+  }
+ },
+ {
+  "bars": 500,
+  "indicator": "obv",
+  "value": -7400833.600000001,
+  "payload": {
+   "last_bar_delta": -167864.19999999998,
+   "obv": -7400833.600000001
+  }
+ },
+ {
+  "bars": 500,
+  "indicator": "bb_20_2",
+  "value": 0.07785065030897168,
+  "payload": {
+   "bandwidth": 0.1145494670912481,
+   "close": 23.488502106953195,
+   "lower": 23.268393728278596,
+   "middle": 24.68205166049264,
+   "pct_b": 0.07785065030897168,
+   "period": 20,
+   "std_mult": 2,
+   "upper": 26.095709592706683
+  }
+ },
+ {
+  "bars": 500,
+  "indicator": "fib_retrace_sw5",
+  "value": 192.67998348744197,
+  "payload": {
+   "current_close": 23.488502106953195,
+   "direction": "up_impulse",
+   "dist_pct_to_near": 192.67998348744197,
+   "extensions": {
+    "1.272": 27.432491847594697,
+    "1.618": 27.859095736773508
+   },
+   "impulse_high": 27.097126940494594,
+   "impulse_low": 25.8641677232148,
+   "leg_size": 1.2329592172797952,
+   "levels": {
+    "0": 27.097126940494594,
+    "0.236": 26.806148565216564,
+    "0.382": 26.626136519493713,
+    "0.5": 26.480647331854698,
+    "0.618": 26.33515814421568,
+    "0.786": 26.128020995712674,
+    "1": 25.8641677232148
+   },
+   "nearest_level": "1",
+   "nearest_price": 25.8641677232148,
+   "rule": "last_swing_high_vs_last_swing_low",
+   "swing_strength": 5
+  }
+ },
+ {
+  "bars": 500,
+  "indicator": "rsi_divergence_rsi14_sw5",
+  "value": 0,
+  "payload": {
+   "bearish_regular": {
+    "pattern": false,
+    "price_hi_1": 29.612414218579655,
+    "price_hi_2": 27.097126940494594,
+    "rsi_hi_1": 49.84644752608496,
+    "rsi_hi_2": 41.328534896087106,
+    "selected": false
+   },
+   "bullish_regular": {
+    "pattern": false,
+    "price_lo_1": 27.990174717009285,
+    "price_lo_2": 25.8641677232148,
+    "rsi_lo_1": 56.55580086366879,
+    "rsi_lo_2": 37.41549618634532,
+    "selected": false
+   },
+   "kind": "none"
+  }
+ },
+ {
+  "bars": 500,
+  "indicator": "rsi_hidden_rsi14_sw5",
+  "value": 0,
+  "payload": {
+   "bearish_hidden": {
+    "pattern": false,
+    "price_hi_1": 29.612414218579655,
+    "price_hi_2": 27.097126940494594,
+    "rsi_hi_1": 49.84644752608496,
+    "rsi_hi_2": 41.328534896087106,
+    "selected": false
+   },
+   "bullish_hidden": {
+    "pattern": false,
+    "price_lo_1": 27.990174717009285,
+    "price_lo_2": 25.8641677232148,
+    "rsi_lo_1": 56.55580086366879,
+    "rsi_lo_2": 37.41549618634532,
+    "selected": false
+   },
+   "kind": "none",
+   "min_pivot_sep": 3,
+   "require_trend_gate": true
+  }
+ },
+ {
+  "bars": 500,
+  "indicator": "vol_profile_proxy_b48_typical_price",
+  "value": 23.69646729696791,
+  "payload": {
+   "bar_count": 500,
+   "bins": [
+    {
+     "price_high": 22.18730603308437,
+     "price_low": 21.583641527530954,
+     "volume": 185005.2
+    },
+    {
+     "price_high": 22.790970538637787,
+     "price_low": 22.18730603308437,
+     "volume": 1589997.2
+    },
+    {
+     "price_high": 23.3946350441912,
+     "price_low": 22.790970538637787,
+     "volume": 4597818.600000001
+    },
+    {
+     "price_high": 23.998299549744615,
+     "price_low": 23.3946350441912,
+     "volume": 9553359.400000004
+    },
+    {
+     "price_high": 24.60196405529803,
+     "price_low": 23.998299549744615,
+     "volume": 8869615.2
+    },
+    {
+     "price_high": 25.205628560851448,
+     "price_low": 24.60196405529803,
+     "volume": 4004312.2
+    },
+    {
+     "price_high": 25.809293066404862,
+     "price_low": 25.205628560851448,
+     "volume": 2751785.2
+    },
+    {
+     "price_high": 26.412957571958277,
+     "price_low": 25.809293066404862,
+     "volume": 3394486.1999999997
+    },
+    {
+     "price_high": 27.01662207751169,
+     "price_low": 26.412957571958277,
+     "volume": 4790736.399999999
+    },
+    {
+     "price_high": 27.62028658306511,
+     "price_low": 27.01662207751169,
+     "volume": 5785054.2
+    },
+    {
+     "price_high": 28.223951088618524,
+     "price_low": 27.62028658306511,
+     "volume": 4872804.6
+    },
+    {
+     "price_high": 28.827615594171938,
+     "price_low": 28.223951088618524,
+     "volume": 3322939.6
+    },
+    {
+     "price_high": 29.431280099725356,
+     "price_low": 28.827615594171938,
+     "volume": 3278633.199999999
+    },
+    {
+     "price_high": 30.03494460527877,
+     "price_low": 29.431280099725356,
+     "volume": 530229.2
+    },
+    {
+     "price_high": 30.638609110832185,
+     "price_low": 30.03494460527877,
+     "volume": 252669
+    },
+    {
+     "price_high": 31.242273616385603,
+     "price_low": 30.638609110832185,
+     "volume": 183921.4
+    },
+    {
+     "price_high": 31.845938121939017,
+     "price_low": 31.242273616385603,
+     "volume": 141254.19999999998
+    },
+    {
+     "price_high": 32.44960262749243,
+     "price_low": 31.845938121939017,
+     "volume": 693086.7999999999
+    },
+    {
+     "price_high": 33.05326713304585,
+     "price_low": 32.44960262749243,
+     "volume": 1213276.0000000002
+    },
+    {
+     "price_high": 33.65693163859926,
+     "price_low": 33.05326713304585,
+     "volume": 1267233.5999999999
+    },
+    {
+     "price_high": 34.26059614415268,
+     "price_low": 33.65693163859926,
+     "volume": 684447.4
+    },
+    {
+     "price_high": 34.8642606497061,
+     "price_low": 34.26059614415268,
+     "volume": 282710.4
+    },
+    {
+     "price_high": 35.46792515525951,
+     "price_low": 34.8642606497061,
+     "volume": 0
+    },
+    {
+     "price_high": 36.071589660812926,
+     "price_low": 35.46792515525951,
+     "volume": 191979.80000000002
+    },
+    {
+     "price_high": 36.675254166366344,
+     "price_low": 36.071589660812926,
+     "volume": 302455.6
+    },
+    {
+     "price_high": 37.278918671919755,
+     "price_low": 36.675254166366344,
+     "volume": 0
+    },
+    {
+     "price_high": 37.88258317747317,
+     "price_low": 37.278918671919755,
+     "volume": 284209.6
+    },
+    {
+     "price_high": 38.48624768302659,
+     "price_low": 37.88258317747317,
+     "volume": 628708.6
+    },
+    {
+     "price_high": 39.08991218858,
+     "price_low": 38.48624768302659,
+     "volume": 950276.7999999998
+    },
+    {
+     "price_high": 39.69357669413341,
+     "price_low": 39.08991218858,
+     "volume": 838337.8
+    },
+    {
+     "price_high": 40.29724119968684,
+     "price_low": 39.69357669413341,
+     "volume": 336909
+    },
+    {
+     "price_high": 40.90090570524025,
+     "price_low": 40.29724119968684,
+     "volume": 145846
+    },
+    {
+     "price_high": 41.50457021079366,
+     "price_low": 40.90090570524025,
+     "volume": 0
+    },
+    {
+     "price_high": 42.108234716347084,
+     "price_low": 41.50457021079366,
+     "volume": 172047.4
+    },
+    {
+     "price_high": 42.711899221900495,
+     "price_low": 42.108234716347084,
+     "volume": 176118.4
+    },
+    {
+     "price_high": 43.315563727453906,
+     "price_low": 42.711899221900495,
+     "volume": 179122.2
+    },
+    {
+     "price_high": 43.919228233007324,
+     "price_low": 43.315563727453906,
+     "volume": 561284
+    },
+    {
+     "price_high": 44.52289273856074,
+     "price_low": 43.919228233007324,
+     "volume": 569726.6
+    },
+    {
+     "price_high": 45.12655724411415,
+     "price_low": 44.52289273856074,
+     "volume": 301398
+    },
+    {
+     "price_high": 45.73022174966757,
+     "price_low": 45.12655724411415,
+     "volume": 804382.6000000001
+    },
+    {
+     "price_high": 46.33388625522099,
+     "price_low": 45.73022174966757,
+     "volume": 257847.8
+    },
+    {
+     "price_high": 46.9375507607744,
+     "price_low": 46.33388625522099,
+     "volume": 156255
+    },
+    {
+     "price_high": 47.54121526632782,
+     "price_low": 46.9375507607744,
+     "volume": 240069
+    },
+    {
+     "price_high": 48.144879771881236,
+     "price_low": 47.54121526632782,
+     "volume": 1420989.9999999998
+    },
+    {
+     "price_high": 48.74854427743465,
+     "price_low": 48.144879771881236,
+     "volume": 2822026.6
+    },
+    {
+     "price_high": 49.352208782988065,
+     "price_low": 48.74854427743465,
+     "volume": 728632
+    },
+    {
+     "price_high": 49.95587328854148,
+     "price_low": 49.352208782988065,
+     "volume": 738838.8
+    },
+    {
+     "price_high": 50.559537794094894,
+     "price_low": 49.95587328854148,
+     "volume": 0
+    }
+   ],
+   "disclaimer": "Each bar's volume assigned to one bin via typical price or close; not true volume-at-price.",
+   "histogram_total_volume": 75052836.79999998,
+   "method": "typical_price",
+   "poc_bin": 3,
+   "poc_price": 23.69646729696791,
+   "value_area_high": 28.827615594171938,
+   "value_area_low": 21.583641527530954,
+   "value_area_pct_target": 0.7,
+   "value_area_volume": 53717914.00000001
+  }
+ },
+ {
+  "bars": 500,
+  "indicator": "stoch_slow_14_3_3",
+  "value": 19.238714643126645,
+  "payload": {
+   "d": 21.5054676242074,
+   "k": 19.238714643126645,
+   "raw_k": 17.2425461025966
+  }
+ },
+ {
+  "bars": 500,
+  "indicator": "atr_14",
+  "value": 0.6440268152545008,
+  "payload": null
+ },
+ {
+  "bars": 500,
+  "indicator": "ichimoku_9_26_52",
+  "value": 23.488502106953195,
+  "payload": {
+   "chikou_close": 23.488502106953195,
+   "close_vs_cloud": {
+    "above_cloud": false,
+    "below_cloud": true,
+    "in_cloud": false
+   },
+   "cloud_bottom": 27.10946915137596,
+   "cloud_top": 28.12962944206663,
+   "displace": 26,
+   "kijun": 24.972520178106123,
+   "senkou_a": 27.10946915137596,
+   "senkou_b": 28.12962944206663,
+   "tenkan": 23.95716235831815
+  }
+ },
+ {
+  "bars": 500,
+  "indicator": "ad_line",
+  "value": -2023525.437931392,
+  "payload": {
+   "cumulative": -2023525.437931392
+  }
+ },
+ {
+  "bars": 500,
+  "indicator": "adx_14",
+  "value": 55.559379121911725,
+  "payload": {
+   "adx": 55.559379121911725,
+   "dx": 65.99368514800818,
+   "minus_di": 26.35813976882485,
+   "plus_di": 5.399863248365386
+  }
+ },
+ {
+  "bars": 500,
+  "indicator": "pivots_prior_bar",
+  "value": 23.955520487102362,
+  "payload": {
+   "camarilla": {
+    "R1": 23.937943291365297,
+    "R2": 23.997009597337755,
+    "R3": 24.056075903310212,
+    "R4": 24.23327482122759,
+    "S1": 23.81981067942038,
+    "S2": 23.760744373447924,
+    "S3": 23.701678067475466,
+    "S4": 23.52447914955809
+   },
+   "classic": {
+    "PP": 23.955520487102362,
+    "R1": 24.23937858700646,
+    "R2": 24.599880188620087,
+    "R3": 24.883738288524185,
+    "S1": 23.595018885488734,
+    "S2": 23.311160785584637,
+    "S3": 22.95065918397101
+   },
+   "reference_ts": "2021-08-22T00:00:00Z",
+   "woodie": {
+    "PP": 23.93635961167498,
+    "R1": 24.201056836151697,
+    "R2": 24.580719313192706,
+    "S1": 23.55669713463397,
+    "S2": 23.291999910157255
+   }
+  }
+ },
+ {
+  "bars": 500,
+  "indicator": "williams_r_14",
+  "value": -82.7574538974034,
+  "payload": null
+ },
+ {
+  "bars": 500,
+  "indicator": "vwap_rolling_20",
+  "value": 24.700842625230912,
+  "payload": {
+   "bars": 20,
+   "mode": "rolling",
+   "vwap": 24.700842625230912
+  }
+ },
+ {
+  "bars": 500,
+  "indicator": "ma_ribbon",
+  "value": 0.09435156290697211,
+  "payload": {
+   "bear_stack": true,
+   "bull_stack": false,
+   "compression": 0.09435156290697211,
+   "cross_fast": 50,
+   "cross_slow": 200,
+   "death_cross": false,
+   "golden_cross": false,
+   "periods": [
+    10,
+    20,
+    50,
+    200
+   ],
+   "smas": [
+    24.03244094491001,
+    24.68205166049264,
+    26.153292596706574,
+    26.42164495523553
+   ]
+  }
+ },
+ {
+  "bars": 500,
+  "indicator": "chart_pattern_hints",
+  "value": 0,
+  "payload": {
+   "cluster_pct": 0.5,
+   "double_bottom_candidate": false,
+   "double_top_candidate": false,
+   "high1": 0,
+   "high2": 0,
+   "low1": 0,
+   "low2": 0
+  }
+ },
+ {
+  "bars": 500,
+  "indicator": "cmf_21",
+  "value": -0.22263511101519493,
+  "payload": null
+ },
+ {
+  "bars": 500,
+  "indicator": "keltner_e20_a10_m2",
+  "value": 24.63128456797621,
+  "payload": {
+   "close": 23.488502106953195,
+   "lower": 23.335393503443353,
+   "middle": 24.63128456797621,
+   "outside_lower": false,
+   "outside_upper": false,
+   "upper": 25.927175632509066
+  }
+ },
+ {
+  "bars": 500,
+  "indicator": "bb_squeeze",
+  "value": 0,
+  "payload": {
+   "bb_lower": 23.268393728278596,
+   "bb_upper": 26.095709592706683,
+   "explanation": "BB inside Keltner = low-volatility coil. Watch for expansion breakout.",
+   "keltner_lower": 23.335393503443353,
+   "keltner_upper": 25.927175632509066,
+   "squeeze": false
+  }
+ },
+ {
+  "bars": 500,
+  "indicator": "donchian_20",
+  "value": 24.472464836273552,
+  "payload": {
+   "close": 23.488502106953195,
+   "lower": 23.04703764969796,
+   "middle": 24.472464836273552,
+   "upper": 25.897892022849145
+  }
+ },
+ {
+  "bars": 500,
+  "indicator": "trendline_break_sw5_p3",
+  "value": 0,
+  "payload": {
+   "high_line_at_end": 23.631960025997607,
+   "low_line_at_end": 25.102642179044228,
+   "prev_high_line": 23.756642735551452,
+   "prev_low_line": 25.138175179022078,
+   "resistance_break": false,
+   "support_break": false
+  }
+ },
+ {
+  "bars": 500,
+  "indicator": "cci_20",
+  "value": -123.02068006174561,
+  "payload": null
+ },
+ {
+  "bars": 500,
+  "indicator": "roc_12",
+  "value": -6.113463265732051,
+  "payload": null
+ },
+ {
+  "bars": 500,
+  "indicator": "parabolic_sar_s0.02_m0.2",
+  "value": 24.533939625710563,
+  "payload": {
+   "bullish": false,
+   "sar": 24.533939625710563,
+   "trend": -1
+  }
+ },
+ {
+  "bars": 500,
+  "indicator": "mfi_14",
+  "value": 37.444371313299456,
+  "payload": null
+ },
+ {
+  "bars": 500,
+  "indicator": "market_structure_sw5",
+  "value": 0,
+  "payload": {
+   "bearish_bos": false,
+   "bullish_bos": false,
+   "choch_down": false,
+   "choch_up": false,
+   "last_swing_high": 27.097126940494594,
+   "last_swing_low": 25.8641677232148,
+   "prior_swing_high": 29.612414218579655,
+   "prior_swing_low": 27.990174717009285
+  }
+ },
+ {
+  "bars": 500,
+  "indicator": "elliott_context_hint",
+  "value": 59,
+  "payload": {
+   "leg_estimate": 59,
+   "note": "Not Elliott wave labels; pivot-count hint only. Human discretion required for wave degree.",
+   "swing_highs": 29,
+   "swing_lows": 30
+  }
+ },
+ {
+  "bars": 500,
+  "indicator": "gann_regression_lb60",
+  "value": -5.587233885059998,
+  "payload": {
+   "disclaimer": "Price/time scaling not applied; geometric angle is illustrative only.",
+   "one_to_one_delta": -5.77172865216806,
+   "slope_degrees": -5.587233885059998,
+   "slope_per_bar": -0.09782590935878069
+  }
+ },
+ {
+  "bars": 500,
+  "indicator": "fvg_min0.1_lb50",
+  "value": 1,
+  "payload": {
+   "active_count": 1,
+   "last_bearish": {
+    "bar_index": 477,
+    "gap_high": 26.369443115633878,
+    "gap_low": 26.32043858964669,
+    "gap_pct": 0.1860111444595446
+   },
+   "last_bullish": null,
+   "lookback_bars": 50,
+   "min_gap_pct": 0.1,
+   "total_count": 1
+  }
+ },
+ {
+  "bars": 500,
+  "indicator": "order_blocks_sw3_imp1.5",
+  "value": 5,
+  "payload": {
+   "active_count": 5,
+   "impulse_min_pct": 1.5,
+   "last_bearish_ob": {
+    "bar_index": 474,
+    "close": 26.779198213514423,
+    "high": 26.82446629010448,
+    "low": 26.596827557538845,
+    "open": 26.663983559206823
+   },
+   "last_bullish_ob": null,
+   "lookback_bars": 100,
+   "swing_strength": 3,
+   "total_count": 16
+  }
+ },
+ {
+  "bars": 500,
+  "indicator": "liquidity_sweep_sw3",
+  "value": 3,
+  "payload": {
+   "high_sweeps": 0,
+   "last_sweep": {
+    "bar_close": 25.926208286654802,
+    "bar_high": 26.18646344775303,
+    "bar_index": 478,
+    "bar_low": 25.657260030967443,
+    "kind": "low_sweep",
+    "swept_level": 25.8641677232148
+   },
+   "lookback_bars": 50,
+   "low_sweeps": 3,
+   "swing_strength": 3,
+   "total_sweeps": 3
+  }
+ },
+ {
+  "bars": 500,
+  "indicator": "hs_pattern_sw5",
+  "value": -1,
+  "payload": {
+   "hs_found": true,
+   "hs_head": 30.395091160918465,
+   "hs_left_shoulder": 29.861977651778854,
+   "hs_neckline": 27.1941166935656,
+   "hs_neckline_break": true,
+   "hs_right_shoulder": 29.612414218579655,
+   "hs_symmetry_pct": 0.835723059300907,
+   "inv_hs_found": true,
+   "inv_hs_head": 26.748001093608337,
+   "inv_hs_left_shoulder": 26.84417427007918,
+   "inv_hs_neckline": 30.395091160918465,
+   "inv_hs_neckline_break": false,
+   "inv_hs_right_shoulder": 27.990174717009285,
+   "inv_hs_symmetry_pct": 4.269084365941743,
+   "shoulder_tolerance_pct": 5,
+   "swing_strength": 5
+  }
+ },
+ {
+  "bars": 500,
+  "indicator": "triangle_sw3",
+  "value": -1,
+  "payload": {
+   "apex_bars_away": 7,
+   "breakout": "down",
+   "flat_thresh_pct": 0.05,
+   "high_slope_pct": -0.16824459088802152,
+   "kind": "descending",
+   "low_slope_pct": -0.02251591896169215,
+   "min_pivots": 3,
+   "swing_strength": 3
+  }
+ },
+ {
+  "bars": 500,
+  "indicator": "flag_pole5_len10",
+  "value": 0,
+  "payload": {
+   "bear_flag": false,
+   "bull_flag": false,
+   "flag_len_bars": 10,
+   "max_retracement_pct": 50,
+   "pole_len_bars": 5,
+   "pole_min_pct": 5,
+   "pole_pct": 0
+  }
+ }
+]

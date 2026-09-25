@@ -136,17 +136,38 @@ func (w *worker) computeAll(ctx context.Context) {
 func (w *worker) computeAndStore(ctx context.Context, bars []compute.Bar, symbol, exchange, interval string) {
 	ts := bars[len(bars)-1].TS
 
+	indicatorEmitter{cfg: w.cfg}.emit(bars, func(indicator string, value *float64, payload any) {
+		if err := store.UpsertIndicator(ctx, w.pool, ts, symbol, exchange, interval, indicator, value, payload); err != nil {
+			w.log.Error("upsert indicator", "indicator", indicator, "symbol", symbol, "err", err)
+		}
+	})
+
+	w.computeRSBenchmark(ctx, ts, symbol, exchange, interval, bars)
+	w.computeMTFConfluence(ctx, ts, symbol, exchange, interval, bars)
+	w.computeVIXRegime(ctx, ts, symbol, exchange, interval)
+	w.computeMultiTFPivots(ctx, ts, symbol, exchange, interval)
+
+	w.log.Info("indicators computed",
+		"symbol", symbol,
+		"exchange", exchange,
+		"interval", interval,
+		"ts", ts.Format("2006-01-02"),
+	)
+}
+
+// indicatorEmitter computes every enabled single-series indicator on bars and
+// hands each (name, value, payload) to upsert. Pure: no DB, no clock.
+type indicatorEmitter struct {
+	cfg config.TechnicalAnalysis
+}
+
+func (w indicatorEmitter) emit(bars []compute.Bar, upsert func(indicator string, value *float64, payload any)) {
 	closes := compute.Closes(bars)
 	highs := compute.Highs(bars)
 	lows := compute.Lows(bars)
 	volumes := compute.Volumes(bars)
 	currentPrice := closes[len(closes)-1]
 
-	upsert := func(indicator string, value *float64, payload any) {
-		if err := store.UpsertIndicator(ctx, w.pool, ts, symbol, exchange, interval, indicator, value, payload); err != nil {
-			w.log.Error("upsert indicator", "indicator", indicator, "symbol", symbol, "err", err)
-		}
-	}
 	ptr := func(v float64) *float64 { return &v }
 
 	// ── Moving Averages ──────────────────────────────────────────────────────
@@ -904,18 +925,6 @@ func (w *worker) computeAndStore(ctx context.Context, bars []compute.Bar, symbol
 			"flag_len_bars":       w.cfg.FlagLen,
 		})
 	}
-
-	w.computeRSBenchmark(ctx, ts, symbol, exchange, interval, bars)
-	w.computeMTFConfluence(ctx, ts, symbol, exchange, interval, bars)
-	w.computeVIXRegime(ctx, ts, symbol, exchange, interval)
-	w.computeMultiTFPivots(ctx, ts, symbol, exchange, interval)
-
-	w.log.Info("indicators computed",
-		"symbol", symbol,
-		"exchange", exchange,
-		"interval", interval,
-		"ts", ts.Format("2006-01-02"),
-	)
 }
 
 func (w *worker) computeRSBenchmark(ctx context.Context, ts time.Time, symbol, exchange, interval string, assetBars []compute.Bar) {
