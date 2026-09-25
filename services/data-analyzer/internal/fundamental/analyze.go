@@ -1528,7 +1528,20 @@ func (w *analyzer) scoreQualitative(ctx context.Context, symbol string, rows []s
 	// Cluster buying (3+ distinct insiders in 90 days) is a high-conviction signal.
 	// Only open-market purchases (code='P') are counted as bullish.
 	// Sales are informational only — insiders sell for many reasons.
-	{
+	//
+	// "neutral" is only claimed when the symbol has Form 4 coverage at all: with
+	// no insider_transactions row for it ever (the table is empty until the
+	// Form 4 ingestion exists), zero buyers and sellers is missing data, not a
+	// classification.
+	var insiderCoverage int
+	if err := w.pool.QueryRow(ctx, `SELECT COUNT(*) FROM insider_transactions WHERE symbol = $1`,
+		symbol).Scan(&insiderCoverage); err != nil || insiderCoverage == 0 {
+		upsert("qual_insider_signal", nil, map[string]any{
+			"tier":        "insufficient_data",
+			"window_days": cfg.InsiderClusterWindowDays,
+			"note":        "No insider_transactions (SEC Form 4) rows for this symbol; insider activity cannot be classified.",
+		})
+	} else {
 		var buyerCount, sellerCount int
 		_ = w.pool.QueryRow(ctx, `
 			SELECT COUNT(DISTINCT insider_name)

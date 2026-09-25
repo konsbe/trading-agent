@@ -60,8 +60,8 @@ func TestMarketCapIsReadInMillions(t *testing.T) {
 	w := &analyzer{cfg: cfg, pool: db, log: slog.New(slog.NewTextHandler(io.Discard, nil))}
 	rows := []store.FundamentalRow{
 		raw("market_cap", 3_663_170_000_000), // USD
-		raw("fcf_reported", 56_118),         // millions
-		raw("revenue_ttm", 168_090),         // millions
+		raw("fcf_reported", 56_118),          // millions
+		raw("revenue_ttm", 168_090),          // millions
 		raw("eps_growth_5y", 14.57),
 		raw("revenue_growth_5y", 15),
 	}
@@ -91,6 +91,66 @@ func TestMarketCapMillionsRejectsMissingOrNonPositive(t *testing.T) {
 		if _, ok := marketCapMillions(m); ok {
 			t.Errorf("marketCapMillions(%v) ok = true", m)
 		}
+	}
+}
+
+// countRow answers every QueryRow with one integer (the insider coverage and
+// buyer/seller counts all read as n).
+type countRow struct{ n int }
+
+func (c countRow) Scan(dest ...any) error {
+	for _, d := range dest {
+		if p, ok := d.(*int); ok {
+			*p = c.n
+		}
+	}
+	return nil
+}
+
+type countingRowsDB struct {
+	recordingDB
+	row pgx.Row
+}
+
+func (c *countingRowsDB) QueryRow(context.Context, string, ...any) pgx.Row { return c.row }
+
+func insiderSignal(t *testing.T, row pgx.Row) (*float64, map[string]any) {
+	t.Helper()
+	cfg, err := config.LoadFundamentalAnalysis()
+	if err != nil {
+		t.Fatal(err)
+	}
+	db := &countingRowsDB{recordingDB: recordingDB{values: map[string]*float64{}, payloads: map[string]map[string]any{}}, row: row}
+	w := &analyzer{cfg: cfg, pool: db, log: slog.New(slog.NewTextHandler(io.Discard, nil))}
+	w.scoreQualitative(context.Background(), "MSFT", []store.FundamentalRow{raw("roe_ttm", 30)})
+	if _, ok := db.payloads["qual_insider_signal"]; !ok {
+		t.Fatal("qual_insider_signal not written")
+	}
+	return db.values["qual_insider_signal"], db.payloads["qual_insider_signal"]
+}
+
+// With no Form 4 rows for the symbol, insider activity is missing data, not
+// "neutral" (Stock Detail showed "0.00 (neutral)" while the table was empty).
+func TestInsiderSignal_NoCoverageIsInsufficientData(t *testing.T) {
+	v, p := insiderSignal(t, countRow{n: 0})
+	if v != nil || p["tier"] != "insufficient_data" {
+		t.Errorf("no coverage: value %v tier %v, want nil / insufficient_data", deref(v), p["tier"])
+	}
+}
+
+func TestInsiderSignal_QueryFailureIsInsufficientData(t *testing.T) {
+	v, p := insiderSignal(t, errRow{})
+	if v != nil || p["tier"] != "insufficient_data" {
+		t.Errorf("query error: value %v tier %v, want nil / insufficient_data", deref(v), p["tier"])
+	}
+}
+
+// A symbol with coverage is classified as before. The fake answers every count
+// with 1 (one row of coverage, one buyer), so the tier is a real one.
+func TestInsiderSignal_CoveredSymbolIsClassified(t *testing.T) {
+	v, p := insiderSignal(t, countRow{n: 1})
+	if v == nil || p["tier"] == "insufficient_data" {
+		t.Errorf("covered symbol: value %v tier %v, want a computed classification", deref(v), p["tier"])
 	}
 }
 

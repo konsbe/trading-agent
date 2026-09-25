@@ -774,14 +774,11 @@
   "symbol": "ZZFATHIN",
   "metric": "qual_insider_signal",
   "period": "derived",
-  "value": 0,
+  "value": null,
   "payload": {
-   "note": "cluster_buy = 3+ distinct insiders purchasing within 90 days (SEC Form 4)",
-   "tier": "neutral",
-   "min_buyers": 3,
-   "buyer_count": 0,
-   "window_days": 90,
-   "seller_count": 0
+   "note": "No insider_transactions (SEC Form 4) rows for this symbol; insider activity cannot be classified.",
+   "tier": "insufficient_data",
+   "window_days": 90
   }
  },
  {
