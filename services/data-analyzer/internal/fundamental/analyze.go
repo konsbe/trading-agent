@@ -1,11 +1,17 @@
-// fundamental-analysis reads raw fundamental metrics stored by data-ingestion/data-fundamental
-// and derives Tier 1 FA signals that the analyst-bot can consume directly.
+// Package fundamental derives the FA signals (Tier 1–3, qualitative,
+// correlations) from the raw fundamental metrics data-fundamental stores, and
+// writes them back to equity_fundamentals (source = "fundamental_analysis").
+//
+// AnalyzeSymbol is the single per-symbol code path: the fundamental-analysis
+// worker loops it over FUNDAMENTAL_SYMBOLS, and momentum-api runs it on demand
+// for a symbol outside that list. The worker's derived output is pinned by
+// cmd/fundamental-analysis/testdata/derived_golden.json.
 //
 // Data flow:
 //
 //	data-fundamental (data-ingestion)
 //	  → equity_fundamentals (TimescaleDB, source = finnhub_*)
-//	  → fundamental-analysis (this binary, data-analyzer)
+//	  → AnalyzeSymbol (fundamental-analysis worker, momentum-api on demand)
 //	  → equity_fundamentals (TimescaleDB, source = "fundamental_analysis")
 //
 // Tier 1 signals derived (period = "derived"):
@@ -23,7 +29,7 @@
 //
 // TODO: migrate this worker to Python (analyst-bot or a dedicated service).
 // pandas + psycopg3 makes the pivoting and ratio math far simpler.
-package main
+package fundamental
 
 import (
 	"context"
@@ -31,95 +37,73 @@ import (
 	"fmt"
 	"log/slog"
 	"math"
-	"os"
-	"os/signal"
-	"strconv"
-	"strings"
-	"syscall"
 	"time"
 
-	"github.com/joho/godotenv"
+	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/konsbe/trading-agent/services/data-analyzer/internal/config"
-	"github.com/konsbe/trading-agent/services/data-analyzer/internal/db"
-	"github.com/konsbe/trading-agent/services/data-analyzer/internal/logx"
 	"github.com/konsbe/trading-agent/services/data-analyzer/internal/store"
 )
 
-func main() {
-	_ = godotenv.Load()
-	cfg, err := config.LoadFundamentalAnalysis()
-	if err != nil {
-		slog.Error("config", "err", err)
-		os.Exit(1)
-	}
-	log := logx.New(cfg.LogLevel)
-
-	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-	defer stop()
-
-	pool, err := db.Connect(ctx, cfg.DatabaseURL)
-	if err != nil {
-		log.Error("db", "err", err)
-		os.Exit(1)
-	}
-	defer pool.Close()
-
-	w := &worker{cfg: cfg, pool: pool, log: log}
-
-	// Allow data-fundamental time to complete its initial ingestion pass before
-	// the first scoring run. Controlled by FUNDAMENTAL_STARTUP_DELAY_SECS
-	// (default 30). Set to 0 when running against a pre-populated database.
-	if delaySecs := fundamentalStartupDelay(); delaySecs > 0 {
-		log.Info("waiting for data-fundamental backfill", "delay_secs", delaySecs)
-		select {
-		case <-ctx.Done():
-			return
-		case <-time.After(time.Duration(delaySecs) * time.Second):
-		}
-	}
-
-	log.Info("running initial fundamental analysis")
-	w.analyzeAll(ctx)
-
-	ticker := time.NewTicker(cfg.PollInterval)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			log.Info("shutdown")
-			return
-		case <-ticker.C:
-			w.analyzeAll(ctx)
-		}
-	}
+// Result says what AnalyzeSymbol did for one symbol.
+type Result struct {
+	// RawMetrics is how many (metric, period) raw rows the symbol has.
+	RawMetrics int
+	// Scored is false when RawMetrics < FUNDAMENTAL_ANALYSIS_MIN_METRICS: no
+	// derived row is written, which is a valid outcome, not an error.
+	Scored bool
 }
 
-type worker struct {
+// AnalyzeSymbol runs every scoring pass for one symbol and upserts the derived
+// rows. A failed write does not stop the remaining passes (the worker has
+// always logged and continued); it is reported in the returned error.
+func AnalyzeSymbol(ctx context.Context, db store.ReadWriter, symbol string, cfg config.FundamentalAnalysis, log *slog.Logger) (Result, error) {
+	rows, err := store.QueryLatestMetrics(ctx, db, symbol)
+	if err != nil {
+		return Result{}, fmt.Errorf("query metrics %s: %w", symbol, err)
+	}
+	res := Result{RawMetrics: len(rows)}
+	if len(rows) < cfg.MinMetrics {
+		return res, nil
+	}
+	cdb := &countingDB{ReadWriter: db}
+	w := &analyzer{cfg: cfg, pool: cdb, log: log}
+	w.score(ctx, symbol, rows)
+	w.analyzeMarginTrend(ctx, symbol)
+	w.scoreTier2(ctx, symbol, rows)
+	w.scoreTier3(ctx, symbol, rows)
+	w.scoreQualitative(ctx, symbol, rows)
+	w.scoreCorrelations(ctx, symbol, rows)
+	res.Scored = true
+	if cdb.failed > 0 {
+		return res, fmt.Errorf("fundamental analysis %s: %d of %d writes failed, first: %w", symbol, cdb.failed, cdb.writes, cdb.first)
+	}
+	return res, nil
+}
+
+// countingDB records write failures, which the scoring passes log and skip.
+type countingDB struct {
+	store.ReadWriter
+	writes, failed int
+	first          error
+}
+
+func (c *countingDB) Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error) {
+	tag, err := c.ReadWriter.Exec(ctx, sql, args...)
+	c.writes++
+	if err != nil {
+		c.failed++
+		if c.first == nil {
+			c.first = err
+		}
+	}
+	return tag, err
+}
+
+type analyzer struct {
 	cfg  config.FundamentalAnalysis
 	pool store.ReadWriter
 	log  *slog.Logger
-}
-
-func (w *worker) analyzeAll(ctx context.Context) {
-	for _, sym := range w.cfg.Symbols {
-		rows, err := store.QueryLatestMetrics(ctx, w.pool, sym)
-		if err != nil {
-			w.log.Error("query metrics", "symbol", sym, "err", err)
-			continue
-		}
-		if len(rows) < w.cfg.MinMetrics {
-			w.log.Debug("not enough metrics to score", "symbol", sym, "have", len(rows))
-			continue
-		}
-		w.score(ctx, sym, rows)
-		w.analyzeMarginTrend(ctx, sym)
-		w.scoreTier2(ctx, sym, rows)
-		w.scoreTier3(ctx, sym, rows)
-		w.scoreQualitative(ctx, sym, rows)
-		w.scoreCorrelations(ctx, sym, rows)
-	}
 }
 
 // score derives all Tier 1 FA signals from the raw rows fetched by data-fundamental.
@@ -131,7 +115,7 @@ func (w *worker) analyzeAll(ctx context.Context) {
 // TODO: replace with Python pandas logic when migrating to analyst-bot:
 //
 //	df = pd.DataFrame(rows).pivot(index='period', columns='metric', values='value')
-func (w *worker) score(ctx context.Context, symbol string, rows []store.FundamentalRow) {
+func (w *analyzer) score(ctx context.Context, symbol string, rows []store.FundamentalRow) {
 	// ── Build lookup maps ────────────────────────────────────────────────────
 	// latest: one value per metric name (most recent across all periods).
 	// surprises: all eps_surprise_pct values across quarters for rolling avg.
@@ -530,7 +514,7 @@ func (w *worker) score(ctx context.Context, symbol string, rows []store.Fundamen
 //
 // TODO: Python — use pandas rolling().mean() and scipy linregress() for
 // a proper slope-based trend test with p-value confidence.
-func (w *worker) analyzeMarginTrend(ctx context.Context, symbol string) {
+func (w *analyzer) analyzeMarginTrend(ctx context.Context, symbol string) {
 	// Quarter window: FUNDAMENTAL_MARGIN_TREND_QUARTERS.
 	nQuarters := w.cfg.MarginTrendQuarters
 
@@ -639,7 +623,7 @@ func (w *worker) analyzeMarginTrend(ctx context.Context, symbol string) {
 //
 // TODO: migrate to Python pandas — quarterly series joins and ratio math are
 // simpler with DataFrame.resample() and vectorised pct_change().
-func (w *worker) scoreTier2(ctx context.Context, symbol string, rows []store.FundamentalRow) {
+func (w *analyzer) scoreTier2(ctx context.Context, symbol string, rows []store.FundamentalRow) {
 	latest := make(map[string]float64, len(rows))
 	for _, r := range rows {
 		if r.Value == nil {
@@ -1055,7 +1039,7 @@ func (w *worker) scoreTier2(ctx context.Context, symbol string, rows []store.Fun
 //
 // TODO: Python migration — pandas rolling join for share count series;
 // scenario-range DCF with Monte Carlo; Finviz/Seeking Alpha revision trend.
-func (w *worker) scoreTier3(ctx context.Context, symbol string, rows []store.FundamentalRow) {
+func (w *analyzer) scoreTier3(ctx context.Context, symbol string, rows []store.FundamentalRow) {
 	latest := make(map[string]float64, len(rows))
 	for _, r := range rows {
 		if r.Value == nil {
@@ -1442,7 +1426,7 @@ func (w *worker) scoreTier3(ctx context.Context, symbol string, rows []store.Fun
 //   - qual_earnings_call_tone from transcript sentiment
 //   - qual_risk_factor_change year-over-year diff of 10-K Item 1A
 
-func (w *worker) scoreQualitative(ctx context.Context, symbol string, rows []store.FundamentalRow) {
+func (w *analyzer) scoreQualitative(ctx context.Context, symbol string, rows []store.FundamentalRow) {
 	ts := time.Now().UTC()
 	cfg := w.cfg
 
@@ -1690,7 +1674,7 @@ func (w *worker) scoreQualitative(ctx context.Context, symbol string, rows []sto
 //	corr_summary            — cross-cluster aggregate score
 //
 // TODO: migrate to Python — pandas makes pairwise delta computation trivial.
-func (w *worker) scoreCorrelations(ctx context.Context, symbol string, rows []store.FundamentalRow) {
+func (w *analyzer) scoreCorrelations(ctx context.Context, symbol string, rows []store.FundamentalRow) {
 	ts := time.Now().UTC()
 	cfg := w.cfg
 
@@ -2362,19 +2346,3 @@ func classifyNetMargin(pct, strong, avg float64) string {
 }
 
 func absFloat(f float64) float64 { return math.Abs(f) }
-
-// fundamentalStartupDelay reads FUNDAMENTAL_STARTUP_DELAY_SECS from the
-// environment. Defaults to 30 seconds — enough for data-fundamental to finish
-// its first metrics + financials pass before the scoring worker runs.
-// Set to 0 to skip the delay (useful when the DB is already populated).
-func fundamentalStartupDelay() int {
-	s := strings.TrimSpace(os.Getenv("FUNDAMENTAL_STARTUP_DELAY_SECS"))
-	if s == "" {
-		return 30
-	}
-	v, err := strconv.Atoi(s)
-	if err != nil || v < 0 {
-		return 30
-	}
-	return v
-}
