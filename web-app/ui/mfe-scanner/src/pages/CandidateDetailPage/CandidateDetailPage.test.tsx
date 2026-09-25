@@ -4,25 +4,34 @@ import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { ApiError } from '@/api';
 import usePriceBars from '@/hooks/scanner/usePriceBars';
 import useScannerSymbol from '@/hooks/scanner/useScannerSymbol';
+import useStockAnalysis, { StockAnalysisState } from '@/hooks/scanner/useStockAnalysis';
 import useWatchlist from '@/hooks/watchlist/useWatchlist';
 import { HostModeProvider } from '@/providers/HostModeContext';
 import { findAsciiMinus } from '@/test-utils/asciiMinus';
+import { COMPUTING_MESSAGE, HEURISTIC_CAVEAT, makeAnalysis, makePending } from '@/test-utils/analysisFixtures';
 import { makeCatlResponse, makeFacts, makePriceBars, makeSymbolResponse } from '@/test-utils/fixtures';
 import CandidateDetailPage from './CandidateDetailPage';
 
 jest.mock('@/hooks/scanner/useScannerSymbol', () => ({ __esModule: true, default: jest.fn() }));
 jest.mock('@/hooks/scanner/usePriceBars', () => ({ __esModule: true, default: jest.fn() }));
 jest.mock('@/hooks/watchlist/useWatchlist', () => ({ __esModule: true, default: jest.fn() }));
+jest.mock('@/hooks/scanner/useStockAnalysis', () => ({ __esModule: true, default: jest.fn() }));
 
 const useScannerSymbolMock = useScannerSymbol as jest.MockedFunction<typeof useScannerSymbol>;
 const usePriceBarsMock = usePriceBars as jest.MockedFunction<typeof usePriceBars>;
 const useWatchlistMock = useWatchlist as jest.MockedFunction<typeof useWatchlist>;
+const useStockAnalysisMock = useStockAnalysis as jest.MockedFunction<typeof useStockAnalysis>;
 const reload = jest.fn();
+const retryAnalysis = jest.fn();
+
+const mockAnalysis = (state: StockAnalysisState) => useStockAnalysisMock.mockReturnValue({ ...state, retry: retryAnalysis } as ReturnType<typeof useStockAnalysis>);
 
 const mockHook = (state: Partial<ReturnType<typeof useScannerSymbol>>) =>
     useScannerSymbolMock.mockReturnValue({ data: null, error: null, isLoading: false, reload, ...state });
 
 beforeEach(() => {
+    window.sessionStorage.clear();
+    mockAnalysis({ status: 'idle' });
     usePriceBarsMock.mockReturnValue({ data: makePriceBars(), error: null, isLoading: false, reload: jest.fn() });
     useWatchlistMock.mockReturnValue({
         items: [],
@@ -359,7 +368,7 @@ describe('CandidateDetailPage', () => {
         renderAt('/candidates/zzzz');
 
         const notice = screen.getByTestId('no-data-state');
-        expect(notice).toHaveTextContent('No scanner data for ZZZZ');
+        expect(notice).toHaveTextContent('No scanner data for this symbol');
         expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
         expect(screen.queryByTestId('price-chart')).not.toBeInTheDocument();
 
@@ -377,5 +386,75 @@ describe('CandidateDetailPage', () => {
 
         await userEvent.click(within(screen.getByTestId('api-error-state')).getByRole('button', { name: 'Retry' }));
         expect(reload).toHaveBeenCalledTimes(1);
+    });
+
+    describe('full analysis', () => {
+        it('renders the analysis sections below gates / facts / score, before the watchlist', () => {
+            mockHook({ data: makeSymbolResponse() });
+            mockAnalysis({ status: 'ready', data: makeAnalysis({ symbol: 'VGZ' }) });
+            renderAt();
+
+            const order = ['score-breakdown', 'analysis-technical', 'analysis-heuristic', 'watchlist'].map(id => screen.getByTestId(id));
+            order.slice(1).forEach((el, i) => {
+                // eslint-disable-next-line no-bitwise
+                expect(order[i].compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+            });
+            expect(useStockAnalysisMock).toHaveBeenCalledWith('VGZ');
+        });
+
+        it('shows the computing message in place of the analysis only; gates / facts / score still render', () => {
+            mockHook({ data: makeSymbolResponse() });
+            mockAnalysis({ status: 'computing', pending: makePending() });
+            renderAt();
+
+            expect(screen.getByTestId('analysis-computing')).toHaveTextContent(COMPUTING_MESSAGE);
+            expect(screen.getByTestId('gates-panel')).toBeInTheDocument();
+            expect(screen.getByTestId('facts-matrix')).toBeInTheDocument();
+            expect(screen.getByTestId('score-breakdown')).toBeInTheDocument();
+        });
+
+        it('a 404 from the detail shows the plain note and still renders the ready analysis', () => {
+            mockHook({ error: new ApiError(404, 'no_data_for_symbol') });
+            mockAnalysis({ status: 'ready', data: makeAnalysis({ scanner_data: false }) });
+            renderAt('/candidates/TSM');
+
+            expect(screen.getByTestId('no-data-state')).toHaveTextContent('No scanner data for this symbol');
+            expect(screen.queryByTestId('gates-panel')).not.toBeInTheDocument();
+            expect(screen.queryByTestId('facts-matrix')).not.toBeInTheDocument();
+            expect(screen.queryByTestId('score-breakdown')).not.toBeInTheDocument();
+            expect(screen.queryByTestId('api-error-state')).not.toBeInTheDocument();
+            expect(screen.getByTestId('analysis-technical')).toBeInTheDocument();
+            expect(screen.getByTestId('heuristic-caveat')).toHaveTextContent(HEURISTIC_CAVEAT);
+        });
+
+        it('scanner_data: false shows the note without waiting for the detail request', () => {
+            mockHook({ isLoading: true });
+            mockAnalysis({ status: 'computing', pending: makePending({ scanner_data: false }) });
+            renderAt('/candidates/SPY');
+
+            expect(screen.getByTestId('no-data-state')).toBeInTheDocument();
+            expect(screen.queryByRole('status', { name: 'Loading SPY' })).not.toBeInTheDocument();
+            expect(screen.getByTestId('analysis-computing')).toBeInTheDocument();
+        });
+
+        it('#classical-signals opens the Classical technical signals section expanded and highlighted', () => {
+            window.sessionStorage.setItem('ta-collapsible:scanner.detail.classical-signals', 'false');
+            mockHook({ data: makeSymbolResponse() });
+            mockAnalysis({ status: 'ready', data: makeAnalysis() });
+            renderAt('/candidates/VGZ#classical-signals');
+
+            expect(screen.getByRole('button', { name: 'Classical technical signals' })).toHaveAttribute('aria-expanded', 'true');
+            expect(screen.getByTestId('analysis-heuristic')).toHaveClass('is-focused');
+        });
+
+        it('without the hash, the section keeps its persisted state', () => {
+            window.sessionStorage.setItem('ta-collapsible:scanner.detail.classical-signals', 'false');
+            mockHook({ data: makeSymbolResponse() });
+            mockAnalysis({ status: 'ready', data: makeAnalysis() });
+            renderAt();
+
+            expect(screen.getByRole('button', { name: 'Classical technical signals' })).toHaveAttribute('aria-expanded', 'false');
+            expect(screen.getByTestId('analysis-heuristic')).not.toHaveClass('is-focused');
+        });
     });
 });

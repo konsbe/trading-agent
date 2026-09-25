@@ -1,9 +1,10 @@
-import { Link, useParams } from 'react-router-dom';
+import { Link, useLocation, useParams } from 'react-router-dom';
 import { Skeleton } from '@trading-agent/shared-components';
 import ApiErrorState from '@/components/ApiErrorState';
 import PageLayout from '@/components/PageLayout';
 import StatusNotice from '@/components/StatusNotice';
 import { formatTradingDay } from '@/common/format/format';
+import AnalysisSections from '@/features/CandidateDetail/components/Analysis/AnalysisSections';
 import CandidacyNotice from '@/features/CandidateDetail/components/CandidacyNotice';
 import { DetailMeta, DetailTitle } from '@/features/CandidateDetail/components/DetailHeader';
 import EvidenceNote from '@/features/CandidateDetail/components/EvidenceNote';
@@ -13,6 +14,8 @@ import PriceChart from '@/features/CandidateDetail/components/PriceChart';
 import ScoreBreakdown from '@/features/CandidateDetail/components/ScoreBreakdown';
 import WatchlistButton from '@/features/CandidateDetail/components/WatchlistButton';
 import useScannerSymbol from '@/hooks/scanner/useScannerSymbol';
+import useStockAnalysis from '@/hooks/scanner/useStockAnalysis';
+import { CLASSICAL_SIGNALS_ID } from '@/types/constants';
 import './CandidateDetailPage-styles.css';
 
 const DetailSkeleton = ({ symbol }: { symbol: string }) => (
@@ -26,14 +29,24 @@ const DetailSkeleton = ({ symbol }: { symbol: string }) => (
 
 /**
  * Per-symbol view, in the Stitch "Stock Detail & Score Breakdown" order:
- * gates, evidence note, facts matrix, price chart, score breakdown, watchlist.
- * Serves any symbol with a stored row, from its own newest row (`as_of`), so
- * dates come from the payload, never "today"; a non-candidate gets a note.
+ * gates, evidence note, facts matrix, price chart, score breakdown, then the
+ * full analysis (technical … classical signals), watchlist.
+ * Scanner detail and analysis load independently: a symbol the scanner never
+ * stored (404, or `scanner_data: false`) gets a plain note where the gates /
+ * facts / score would be, and its analysis still renders below.
+ * `#classical-signals` opens the Classical technical signals section.
  */
 const CandidateDetailPage = () => {
     const { symbol: routeSymbol = '' } = useParams<{ symbol: string }>();
+    const { hash } = useLocation();
     const { data, error, isLoading, reload } = useScannerSymbol(routeSymbol);
+    const analysis = useStockAnalysis(routeSymbol);
     const symbol = data?.symbol ?? routeSymbol.toUpperCase();
+
+    const analysisSaysUnscanned =
+        (analysis.status === 'ready' && !analysis.data.scanner_data) ||
+        ((analysis.status === 'computing' || analysis.status === 'failed') && analysis.pending.scanner_data === false);
+    const noScannerData = !data && (error?.code === 'no_data_for_symbol' || analysisSaysUnscanned);
 
     return (
         <PageLayout
@@ -45,11 +58,13 @@ const CandidateDetailPage = () => {
                 </Link>
             }
         >
-            {isLoading && !data && <DetailSkeleton symbol={symbol} />}
+            {isLoading && !data && !noScannerData && <DetailSkeleton symbol={symbol} />}
 
-            {error?.code === 'no_data_for_symbol' && (
-                <StatusNotice title={`No scanner data for ${symbol}`} data-testid="no-data-state">
-                    <p className="scanner-detail__no-data-text">The scanner has never stored a row for this symbol.</p>
+            {noScannerData && (
+                <StatusNotice title="No scanner data for this symbol" data-testid="no-data-state">
+                    <p className="scanner-detail__no-data-text">
+                        The scanner has never stored a row for {symbol}, so there are no gates, facts or score.
+                    </p>
                     <Link className="scanner-link" to="..">
                         Back to candidates
                     </Link>
@@ -72,13 +87,18 @@ const CandidateDetailPage = () => {
                             No score — {symbol} did not pass the gates on {formatTradingDay(data.as_of, 'none')}.
                         </p>
                     )}
-                    <WatchlistButton symbol={data.symbol} />
-                    <nav className="scanner-detail__footer-nav" aria-label="Return">
-                        <Link className="scanner-link" to="..">
-                            ← Return to candidates
-                        </Link>
-                    </nav>
                 </>
+            )}
+
+            <AnalysisSections analysis={analysis} focusSignals={hash === `#${CLASSICAL_SIGNALS_ID}`} />
+
+            {data && <WatchlistButton symbol={data.symbol} />}
+            {(data || noScannerData) && (
+                <nav className="scanner-detail__footer-nav" aria-label="Return">
+                    <Link className="scanner-link" to="..">
+                        ← Return to candidates
+                    </Link>
+                </nav>
             )}
         </PageLayout>
     );
