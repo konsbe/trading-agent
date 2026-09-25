@@ -272,6 +272,51 @@ existed when this was written; no label or outcome had been read.
   capped at 500 bars like the worker.
 - **VIX point-in-time:** latest VIXCLS dated ≤ t. Moot for H9/H10 (above).
 
+## 5e. Amendment 5 — step 5 mechanics (2026-09-25, committed before any label was read)
+
+The protocol text leaves these unstated. They are fixed here, before the
+first outcome is computed, following momentum's round 1
+(`scripts/research_round1.py`) wherever it has a precedent.
+
+- **Rows.** Signal group: that signal's episodes. Comparison group:
+  `heuristic_comparison_days` rows on which that signal did not fire. Both
+  restricted to `label_complete` and not `in_lockbox`.
+- **Strata.** Walk-forward fold (contiguous 126-session windows over the
+  sessions present, momentum §4.1 size) × ATR tercile (cut points from the
+  comparison days' `atr_pct`, which uses no outcome). H8a, H8b, H9 and H10
+  add `uptrend` (true/false) as a stratum, per §3; rows with NULL `uptrend`
+  are dropped for those four. Asset type has one level (equities).
+- **Why folds are strata, not a train/test split.** Nothing is fitted, so
+  there is no training set to purge from; each fold being its own stratum
+  enforces "works across time periods", as in momentum round 1.
+- **Directional tests (all but H5).** 2×2 per stratum (signal vs comparison
+  × hit vs miss, hit per Amendment 3). Cochran-Mantel-Haenszel with the
+  Robins-Breslow-Greenland 95% CI, `cmh()` from `research_round1.py`.
+- **"≥ 3.0pp within stratum".** Crude hit-rate difference (signal minus
+  comparison) within each ATR tercile. Confirmed requires MH OR ≥ 1.25 **and**
+  ≥ 3.0pp in at least one tercile; a confirmation holds only for the terciles
+  that clear (momentum's "ships for that bucket only").
+- **H5.** Lift = mean `fwd_abs_move_10s` of squeeze episodes ÷ mean of
+  non-squeeze comparison days, computed per stratum and combined weighting
+  each stratum by its squeeze-episode count. Floor ≥ 1.25x. p-value from the
+  month-block bootstrap below (two-sided, on log lift).
+- **H9/H10 extra clause.** "Must exceed the best single component's OR from
+  H1–H8" is read strictly: H9 must exceed the highest MH OR among the
+  positive-direction H1–H8 (H2, H3, H7, H8a); H10 the highest among the
+  negative-direction ones (H1, H4, H6, H8b). The comparison against its own
+  sweep input alone (H8a / H8b) is also reported.
+- **Clustering sensitivity (reported, not a new floor).** CMH and RBG treat
+  episodes as independent. A month-block bootstrap (1,000 resamples of
+  calendar months with replacement, strata summed within each resample)
+  gives a 90% CI for every MH OR and lift. The verdict follows the written
+  floor; whether the bootstrap 90% lower bound exceeds 1.05 (momentum
+  Rule 2's CI bar) is reported beside it.
+- **Multiplicity.** Benjamini-Hochberg across the 11 hypotheses (H8a and H8b
+  separately), on the CMH p-values (H5: bootstrap p). Raw and adjusted both
+  reported.
+- **Context, not verdicts:** the same tests at 5 and 20 sessions (same ±3.0%
+  hit), and each primary test without 2020.
+
 **Denominator note for step 5.** Episode counts are large (64k–235k per
 signal over 2,482 symbols and ~10 years), but episodes are not independent:
 the 10-session label windows overlap within a symbol (5-session episode gap),
