@@ -18,6 +18,11 @@ type Caveats struct {
 	Evidence string `json:"evidence_caveat"`
 	// ResearchScore accompanies the score wherever it is shown.
 	ResearchScore string `json:"research_score_caveat"`
+	// HeuristicTA heads every heuristic_signals section (HEURISTIC_TA_CAVEAT,
+	// full-stock-analysis addendum §2.4). It cites the heuristic-signals round-1
+	// null result (docs/HEURISTIC_SIGNALS_PREREGISTRATION.md), not momentum's
+	// MH OR 0.991, which is why it stays separate from RESEARCH_SCORE_CAVEAT.
+	HeuristicTA string `json:"heuristic_ta_caveat"`
 	// ExitReasonNotes holds one note per §5 exit reason, served with every
 	// tracked row that carries that reason. Specific per rule, never a blanket
 	// warning (Tracked Positions addendum §1).
@@ -39,8 +44,8 @@ func LoadCaveats(path string) (Caveats, error) {
 	if err := json.Unmarshal(raw, &c); err != nil {
 		return Caveats{}, fmt.Errorf("parse momentum caveats %s: %w", path, err)
 	}
-	if c.Evidence == "" || c.ResearchScore == "" {
-		return Caveats{}, fmt.Errorf("momentum caveats %s: evidence_caveat and research_score_caveat are both required", path)
+	if c.Evidence == "" || c.ResearchScore == "" || c.HeuristicTA == "" {
+		return Caveats{}, fmt.Errorf("momentum caveats %s: evidence_caveat, research_score_caveat and heuristic_ta_caveat are all required", path)
 	}
 	for _, r := range exitReasons {
 		if c.ExitReasonNotes[r] == "" {
