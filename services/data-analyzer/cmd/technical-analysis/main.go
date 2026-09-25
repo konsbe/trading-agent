@@ -33,6 +33,7 @@ import (
 	"github.com/konsbe/trading-agent/services/data-analyzer/internal/db"
 	"github.com/konsbe/trading-agent/services/data-analyzer/internal/logx"
 	"github.com/konsbe/trading-agent/services/data-analyzer/internal/store"
+	"github.com/konsbe/trading-agent/services/data-analyzer/internal/technical"
 )
 
 func main() {
@@ -167,6 +168,7 @@ func (w indicatorEmitter) emit(bars []compute.Bar, upsert func(indicator string,
 	lows := compute.Lows(bars)
 	volumes := compute.Volumes(bars)
 	currentPrice := closes[len(closes)-1]
+	tp := technical.ParamsFrom(w.cfg)
 
 	ptr := func(v float64) *float64 { return &v }
 
@@ -186,7 +188,7 @@ func (w indicatorEmitter) emit(bars []compute.Bar, upsert func(indicator string,
 
 	// ── RSI ──────────────────────────────────────────────────────────────────
 	if w.cfg.EnableRSI {
-		if v, ok := compute.RSI(closes, w.cfg.RSIPeriod); ok {
+		if v, ok := technical.RSI(closes, tp); ok {
 			upsert(fmt.Sprintf("rsi_%d", w.cfg.RSIPeriod), ptr(v), nil)
 		}
 	}
@@ -229,7 +231,7 @@ func (w indicatorEmitter) emit(bars []compute.Bar, upsert func(indicator string,
 
 	// ── Trend ────────────────────────────────────────────────────────────────
 	if w.cfg.EnableTrend {
-		if t, ok := compute.AnalyzeTrend(closes, highs, lows, w.cfg.TrendLookback); ok {
+		if t, ok := technical.Trend(closes, highs, lows, tp); ok {
 			upsert("trend", ptr(t.SlopePct), map[string]any{
 				"direction":    t.Direction,
 				"slope_pct":    t.SlopePct,
@@ -267,7 +269,7 @@ func (w indicatorEmitter) emit(bars []compute.Bar, upsert func(indicator string,
 
 	// ── MACD ─────────────────────────────────────────────────────────────────
 	if w.cfg.EnableMACD {
-		if snap, ok := compute.MACDSnapshotWithPrev(closes, w.cfg.MACDFast, w.cfg.MACDSlow, w.cfg.MACDSignal); ok {
+		if snap, ok := technical.MACD(closes, tp); ok {
 			name := fmt.Sprintf("macd_%d_%d_%d", w.cfg.MACDFast, w.cfg.MACDSlow, w.cfg.MACDSignal)
 			payload := map[string]any{
 				"macd_line":                 snap.Cur.Line,
@@ -302,12 +304,12 @@ func (w indicatorEmitter) emit(bars []compute.Bar, upsert func(indicator string,
 	}
 
 	// ── Bollinger Bands ──────────────────────────────────────────────────────
-	// bbLower/bbUpper are captured for the Bollinger Squeeze check below.
-	var bbLower, bbUpper float64
+	// bbBands is captured for the Bollinger Squeeze check below.
+	var bbBands compute.BollingerResult
 	var bbCaptured bool
 	if w.cfg.EnableBollinger {
-		if bb, ok := compute.BollingerLast(closes, w.cfg.BBPeriod, w.cfg.BBStd); ok {
-			bbLower, bbUpper = bb.Lower, bb.Upper
+		if bb, ok := technical.Bollinger(closes, tp); ok {
+			bbBands = bb
 			bbCaptured = true
 			bname := fmt.Sprintf("bb_%d_%s", w.cfg.BBPeriod, formatFloatKey(w.cfg.BBStd))
 			upsert(bname, ptr(bb.PctB), map[string]any{
@@ -450,7 +452,7 @@ func (w indicatorEmitter) emit(bars []compute.Bar, upsert func(indicator string,
 
 	// ── ATR ───────────────────────────────────────────────────────────────────
 	if w.cfg.EnableATR {
-		if v, ok := compute.ATRWilder(highs, lows, closes, w.cfg.ATRPeriod); ok {
+		if v, ok := technical.ATR(highs, lows, closes, tp); ok {
 			upsert(fmt.Sprintf("atr_%d", w.cfg.ATRPeriod), ptr(v), nil)
 		}
 	}
@@ -587,18 +589,18 @@ func (w indicatorEmitter) emit(bars []compute.Bar, upsert func(indicator string,
 	}
 
 	// ── Keltner channels ─────────────────────────────────────────────────────
-	// keltnerLower/keltnerUpper captured for the Bollinger Squeeze check below.
-	var keltnerLower, keltnerUpper float64
+	// kc is captured for the Bollinger Squeeze check below.
+	var kc technical.Keltner
 	var keltnerCaptured bool
 	if w.cfg.EnableKeltner {
-		if mid, up, lo, ok := compute.KeltnerLast(highs, lows, closes, w.cfg.KeltnerEMAPeriod, w.cfg.KeltnerATRPeriod, w.cfg.KeltnerMult); ok {
-			keltnerLower, keltnerUpper = lo, up
+		if k, ok := technical.KeltnerChannel(highs, lows, closes, tp); ok {
+			kc = k
 			keltnerCaptured = true
-			upsert(fmt.Sprintf("keltner_e%d_a%d_m%s", w.cfg.KeltnerEMAPeriod, w.cfg.KeltnerATRPeriod, formatFloatKey(w.cfg.KeltnerMult)), ptr(mid), map[string]any{
-				"middle": mid, "upper": up, "lower": lo,
+			upsert(fmt.Sprintf("keltner_e%d_a%d_m%s", w.cfg.KeltnerEMAPeriod, w.cfg.KeltnerATRPeriod, formatFloatKey(w.cfg.KeltnerMult)), ptr(k.Middle), map[string]any{
+				"middle": k.Middle, "upper": k.Upper, "lower": k.Lower,
 				"close":         currentPrice,
-				"outside_upper": currentPrice > up,
-				"outside_lower": currentPrice < lo,
+				"outside_upper": currentPrice > k.Upper,
+				"outside_lower": currentPrice < k.Lower,
 			})
 		}
 	}
@@ -607,17 +609,17 @@ func (w indicatorEmitter) emit(bars []compute.Bar, upsert func(indicator string,
 	// Squeeze = BB bands are entirely inside Keltner channels → low volatility
 	// coil. A breakout expansion typically follows.
 	if w.cfg.EnableBBSqueeze && bbCaptured && keltnerCaptured {
-		squeeze := bbLower > keltnerLower && bbUpper < keltnerUpper
+		squeeze := technical.Squeeze(bbBands, kc)
 		sq := 0.0
 		if squeeze {
 			sq = 1.0
 		}
 		upsert("bb_squeeze", ptr(sq), map[string]any{
 			"squeeze":       squeeze,
-			"bb_lower":      bbLower,
-			"bb_upper":      bbUpper,
-			"keltner_lower": keltnerLower,
-			"keltner_upper": keltnerUpper,
+			"bb_lower":      bbBands.Lower,
+			"bb_upper":      bbBands.Upper,
+			"keltner_lower": kc.Lower,
+			"keltner_upper": kc.Upper,
 			"explanation":   "BB inside Keltner = low-volatility coil. Watch for expansion breakout.",
 		})
 	}
@@ -774,13 +776,8 @@ func (w indicatorEmitter) emit(bars []compute.Bar, upsert func(indicator string,
 
 	// ── Order Blocks (SMC) ────────────────────────────────────────────────────
 	if w.cfg.EnableOrderBlocks {
-		ob := compute.DetectOrderBlocks(bars, w.cfg.OBSwingStrength, w.cfg.OBImpulseMinPct, w.cfg.OBLookback)
-		active := 0
-		for _, o := range ob.All {
-			if !o.Invalidated {
-				active++
-			}
-		}
+		ob := technical.DetectOrderBlocks(bars, tp)
+		active := ob.Active
 		var lastBullOBPL, lastBearOBPL map[string]any
 		if ob.LastBullish != nil {
 			lastBullOBPL = map[string]any{
@@ -814,18 +811,10 @@ func (w indicatorEmitter) emit(bars []compute.Bar, upsert func(indicator string,
 
 	// ── Liquidity Sweeps (SMC) ────────────────────────────────────────────────
 	if w.cfg.EnableLiquiditySweep {
-		sweeps := compute.DetectLiquiditySweeps(bars, w.cfg.LiquiditySwingStrength, w.cfg.LiquidityLookback)
-		highSweeps, lowSweeps := 0, 0
+		sw := technical.DetectSweeps(bars, tp)
+		sweeps, highSweeps, lowSweeps := sw.All, sw.High, sw.Low
 		var lastSweepPL map[string]any
-		for _, sv := range sweeps {
-			if sv.Kind == compute.SweepHigh {
-				highSweeps++
-			} else {
-				lowSweeps++
-			}
-		}
-		if len(sweeps) > 0 {
-			last := sweeps[len(sweeps)-1]
+		if last := sw.Last(); last != nil {
 			lastSweepPL = map[string]any{
 				"kind":        string(last.Kind),
 				"swept_level": last.SweptLevel,
@@ -848,7 +837,7 @@ func (w indicatorEmitter) emit(bars []compute.Bar, upsert func(indicator string,
 
 	// ── Head & Shoulders ──────────────────────────────────────────────────────
 	if w.cfg.EnableHSPattern {
-		hs := compute.DetectHSPattern(bars, w.cfg.HSSwingStrength, w.cfg.HSTolerancePct, w.cfg.HSLookback)
+		hs := technical.HeadAndShoulders(bars, tp)
 		score := 0.0
 		if hs.HSFound {
 			score -= 1
@@ -907,7 +896,7 @@ func (w indicatorEmitter) emit(bars []compute.Bar, upsert func(indicator string,
 
 	// ── Flag / Pennant ────────────────────────────────────────────────────────
 	if w.cfg.EnableFlag {
-		flag := compute.DetectFlag(bars, w.cfg.FlagPolePct, w.cfg.FlagMaxRetracePct, w.cfg.FlagPoleLen, w.cfg.FlagLen)
+		flag := technical.Flag(bars, tp)
 		flagScore := 0.0
 		if flag.BullFlag {
 			flagScore = 1
