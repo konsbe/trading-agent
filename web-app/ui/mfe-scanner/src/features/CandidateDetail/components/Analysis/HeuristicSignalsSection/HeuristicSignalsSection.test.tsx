@@ -61,6 +61,18 @@ describe('HeuristicSignalsSection', () => {
         expect(screen.getByTestId('pattern-double_top')).toHaveTextContent('Double top· unconfirmedinfo');
     });
 
+    it('renders head & shoulders pattern names with the ampersand', () => {
+        const analysis = makeAnalysis();
+        analysis.heuristic_signals.chart_patterns = [
+            { pattern: 'head_shoulders', confirmed: true, severity: 'notice' },
+            { pattern: 'inv_head_shoulders', confirmed: false, severity: 'info' },
+        ];
+        renderSection(analysis);
+
+        expect(screen.getByTestId('pattern-head_shoulders')).toHaveTextContent('Head & shoulders· confirmednotice');
+        expect(screen.getByTestId('pattern-inv_head_shoulders')).toHaveTextContent('Inverse head & shoulders· unconfirmedinfo');
+    });
+
     it('renders the action signal: label as-is, badge, "3/4" as text (no progress bar), reasoning verbatim', () => {
         renderSection();
 

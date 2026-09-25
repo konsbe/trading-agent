@@ -3,7 +3,7 @@ import { COLLAPSIBLE_STORAGE_PREFIX, CollapsibleCard } from '@trading-agent/shar
 import { ActionSignal } from '@/api';
 import SeverityBadge from '@/components/SeverityBadge';
 import { CLASSICAL_SIGNALS_ID } from '@/types/constants';
-import { labelText, sentenceCaseCode } from '../../../utils/analysisFormat';
+import { chartPatternLabel, labelText, sentenceCaseCode } from '../../../utils/analysisFormat';
 import { flaggedReadings } from './flaggedReadings';
 import { HeuristicSignalsSectionProps } from './types';
 import '@/styles/scanner-global.css';
@@ -114,7 +114,7 @@ const HeuristicSignalsSection = ({ signals, technical, focused = false }: Heuris
                     <ul className="scanner-heuristic__items" data-testid="chart-patterns">
                         {signals.chart_patterns.map((p, i) => (
                             <li key={`${p.pattern}-${i}`} className="scanner-heuristic__item" data-testid={`pattern-${p.pattern}`}>
-                                <span>{sentenceCaseCode(p.pattern)}</span>
+                                <span>{chartPatternLabel(p.pattern)}</span>
                                 <span className="scanner-muted">· {p.confirmed ? 'confirmed' : 'unconfirmed'}</span>
                                 <SeverityBadge severity={p.severity} />
                             </li>

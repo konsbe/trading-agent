@@ -23,6 +23,22 @@ export const titleCaseCode = (code: string): string =>
 /** `bear_flag` → "Bear flag". */
 export const sentenceCaseCode = (code: string): string => capitalizeFirst(bandLabel(code) ?? code);
 
+/** Display names for the chart patterns the API emits (§2.5); keys are the API's `pattern` values. */
+export const CHART_PATTERN_LABELS: Record<string, string> = {
+    head_shoulders: 'Head & shoulders',
+    inv_head_shoulders: 'Inverse head & shoulders',
+    bull_flag: 'Bull flag',
+    bear_flag: 'Bear flag',
+    double_top: 'Double top',
+    double_bottom: 'Double bottom',
+    ascending_triangle: 'Ascending triangle',
+    descending_triangle: 'Descending triangle',
+    symmetrical_triangle: 'Symmetrical triangle',
+};
+
+/** Known pattern key → its label; an unknown key is humanized ("new_pattern" → "New pattern"). */
+export const chartPatternLabel = (pattern: string): string => CHART_PATTERN_LABELS[pattern] ?? sentenceCaseCode(pattern);
+
 /** A bare tier / band / label: "Strong", or "—". */
 export const labelText = (value: string | null | undefined): string => {
     const label = bandLabel(value);

@@ -1,4 +1,4 @@
-import { bandLabel, clusterLine, compositeText, labelText, sentenceCaseCode, titleCaseCode, withBand } from './analysisFormat';
+import { bandLabel, CHART_PATTERN_LABELS, chartPatternLabel, clusterLine, compositeText, labelText, sentenceCaseCode, titleCaseCode, withBand } from './analysisFormat';
 
 describe('analysisFormat', () => {
     it('bandLabel replaces underscores and keeps null', () => {
@@ -10,6 +10,18 @@ describe('analysisFormat', () => {
     it('title- and sentence-cases codes', () => {
         expect(titleCaseCode('earnings_quality')).toBe('Earnings Quality');
         expect(sentenceCaseCode('bear_flag')).toBe('Bear flag');
+    });
+
+    it('chartPatternLabel keeps the ampersand for head & shoulders patterns', () => {
+        expect(chartPatternLabel('head_shoulders')).toBe('Head & shoulders');
+        expect(chartPatternLabel('inv_head_shoulders')).toBe('Inverse head & shoulders');
+    });
+
+    it('chartPatternLabel labels every known pattern key and humanizes unknown ones', () => {
+        expect(chartPatternLabel('bear_flag')).toBe('Bear flag');
+        expect(chartPatternLabel('symmetrical_triangle')).toBe('Symmetrical triangle');
+        Object.entries(CHART_PATTERN_LABELS).forEach(([key, label]) => expect(chartPatternLabel(key)).toBe(label));
+        expect(chartPatternLabel('rising_wedge')).toBe('Rising wedge');
     });
 
     it('labelText capitalises a tier, "—" for null', () => {
