@@ -13,7 +13,7 @@ const renderWith = (state: StockAnalysisState) =>
     render(<AnalysisSections analysis={{ ...state, retry } as StockAnalysisResource} />);
 
 describe('AnalysisSections', () => {
-    it('renders the six sections in order when ready', () => {
+    it('renders the eight sections in order when ready, Classical technical signals last', () => {
         renderWith({ status: 'ready', data: makeAnalysis() });
 
         const ids = within(screen.getByTestId('analysis-sections'))
@@ -25,6 +25,8 @@ describe('AnalysisSections', () => {
             'analysis-balance-sheet',
             'analysis-correlations',
             'analysis-news',
+            'analysis-qualitative',
+            'analysis-context',
             'analysis-heuristic',
         ]);
     });
@@ -32,7 +34,15 @@ describe('AnalysisSections', () => {
     it('puts severity badges only in Classical technical signals', () => {
         renderWith({ status: 'ready', data: makeAnalysis() });
 
-        ['analysis-technical', 'analysis-fundamentals', 'analysis-balance-sheet', 'analysis-correlations', 'analysis-news'].forEach(id =>
+        [
+            'analysis-technical',
+            'analysis-fundamentals',
+            'analysis-balance-sheet',
+            'analysis-correlations',
+            'analysis-news',
+            'analysis-qualitative',
+            'analysis-context',
+        ].forEach(id =>
             expect(within(screen.getByTestId(id)).queryAllByTestId(/severity/)).toHaveLength(0)
         );
         expect(within(screen.getByTestId('analysis-heuristic')).getAllByTestId(/severity/).length).toBeGreaterThan(0);

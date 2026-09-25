@@ -2,10 +2,12 @@ import { Button, Skeleton } from '@trading-agent/shared-components';
 import ApiErrorState from '@/components/ApiErrorState';
 import StatusNotice from '@/components/StatusNotice';
 import BalanceSheetSection from '../BalanceSheetSection';
+import ContextSection from '../ContextSection';
 import CorrelationsSection from '../CorrelationsSection';
 import FundamentalsSection from '../FundamentalsSection';
 import HeuristicSignalsSection from '../HeuristicSignalsSection';
 import NewsSection from '../NewsSection';
+import QualitativeSection from '../QualitativeSection';
 import TechnicalSection from '../TechnicalSection';
 import { AnalysisSectionsProps } from './types';
 import './AnalysisSections-styles.css';
@@ -78,6 +80,8 @@ const AnalysisSections = ({ analysis, focusSignals = false }: AnalysisSectionsPr
                     <BalanceSheetSection balanceSheet={data.balance_sheet} />
                     <CorrelationsSection correlations={data.correlations} />
                     <NewsSection headlines={data.sentiment.headlines} />
+                    <QualitativeSection qualitative={data.qualitative} />
+                    <ContextSection context={data.context_vs_benchmark} />
                     <HeuristicSignalsSection signals={data.heuristic_signals} technical={data.technical} focused={focusSignals} />
                 </div>
             );

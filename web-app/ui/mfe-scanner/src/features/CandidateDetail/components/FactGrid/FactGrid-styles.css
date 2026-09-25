@@ -42,6 +42,13 @@
     margin: 0;
 }
 
+.scanner-facts__reading {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    min-width: 0;
+}
+
 .scanner-facts__value {
     color: var(--color-on-surface);
     font-family: var(--font-family-label);

@@ -1,3 +1,5 @@
+import { ReactNode } from 'react';
+
 export interface FactCell {
     key: string;
     label: string;
@@ -9,6 +11,8 @@ export interface FactCell {
     wide?: boolean;
     /** Body font instead of the numeric label font. */
     plain?: boolean;
+    /** Shown before the value, e.g. a macro tone indicator. */
+    indicator?: ReactNode;
 }
 
 export interface FactGridProps {

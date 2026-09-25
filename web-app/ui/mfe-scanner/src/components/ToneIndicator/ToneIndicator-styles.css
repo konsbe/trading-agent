@@ -1,0 +1,27 @@
+/*
+ * Macro classification tones only (Stock Detail's Context vs benchmark), same
+ * tokens as the Daily Market Report. One class per stored tone, one token per class.
+ */
+.scanner-tone {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    line-height: 0;
+}
+
+.scanner-tone--constructive {
+    color: var(--color-status-constructive);
+}
+
+.scanner-tone--neutral {
+    color: var(--color-status-neutral);
+}
+
+.scanner-tone--stressed {
+    color: var(--color-status-stressed);
+}
+
+.scanner-tone--nodata {
+    color: var(--color-status-nodata);
+}

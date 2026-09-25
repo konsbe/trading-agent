@@ -8,11 +8,14 @@ const FactGrid = ({ cells, testIdPrefix = 'fact' }: FactGridProps) => (
             <div key={cell.key} className={`scanner-facts__cell${cell.wide ? ' is-wide' : ''}`} data-testid={`${testIdPrefix}-${cell.key}`}>
                 <dt className="scanner-facts__label">{cell.label}</dt>
                 <dd className="scanner-facts__value-wrap">
-                    <span
-                        className={`scanner-facts__value${cell.plain ? ' is-plain' : ''}${cell.tone ? ` is-${cell.tone}` : ''}`}
-                        data-testid={`${testIdPrefix}-${cell.key}-value`}
-                    >
-                        {cell.value}
+                    <span className="scanner-facts__reading">
+                        {cell.indicator}
+                        <span
+                            className={`scanner-facts__value${cell.plain ? ' is-plain' : ''}${cell.tone ? ` is-${cell.tone}` : ''}`}
+                            data-testid={`${testIdPrefix}-${cell.key}-value`}
+                        >
+                            {cell.value}
+                        </span>
                     </span>
                     {cell.sub && <span className="scanner-facts__sub">{cell.sub}</span>}
                 </dd>
