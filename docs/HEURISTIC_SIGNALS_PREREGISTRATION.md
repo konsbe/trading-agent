@@ -443,6 +443,40 @@ and was not chosen after seeing H2's interval. In-sample H2 clears both (1.256;
   reported with the result, not used to change the bar.
 - Whatever the outcome, it is reported and the lockbox is spent.
 
+## 5h. Step 6 result — H2 NOT CONFIRMED in the lockbox (2026-09-25)
+
+Run once: `heuristics-lockbox -hypothesis H2` (guard row `complete`, commit
+`fb13332`, 122,047 rows labelled, 0 missing bars), then
+`scripts/heuristics_lockbox_h2.py` (output `.work/heuristics_lockbox_h2.txt`).
+5,469 signal episodes vs 116,578 comparison days.
+
+| | MH OR (10s) | RBG 95% | Month-block 90% | Tercile pp (low / mid / high) | Verdict |
+|---|---|---|---|---|---|
+| In-sample | 1.256 | [1.231, 1.282] | [1.170, 1.391] | +3.00 / +3.10 / +4.31 | confirmed |
+| **Lockbox** | **1.153** | [1.090, 1.220] | **[0.971, 1.379]** | +3.80 / +2.89 / +3.28 | **not confirmed** (OR below 1.25; bootstrap lower ≤ 1.05) |
+
+Context horizons in the lockbox: 5s 1.196, 20s 1.239.
+
+**Reading.** The direction held — oversold names hit +3% more often than
+comparison days in every tercile — but the effect shrank out of sample
+(1.256 → 1.153), below the floor, and the clustering-aware interval includes
+no effect at all. The naive RBG interval ([1.090, 1.220]) would again have
+excluded 1.0; the bootstrap does not. **H2 is reported as not confirmed.**
+
+**Round 1 is closed: no hypothesis confirmed.** Per §4, no signal type gets
+a round 2 without a new written justification from the user. Per §4 and §6,
+nothing is removed from the product: every heuristic keeps rendering under
+`HEURISTIC_TA_CAVEAT`, which can now state that these heuristics were tested
+on this project's data and showed no demonstrated edge on daily bars (a
+wording change for the user to approve; §2.4's text is untouched).
+
+**Data-quality note.** 26 lockbox comparison rows (0.02%, two symbols, no
+signal episodes) were dated 2019–2021: their symbols' bar histories have
+multi-year gaps, so "20 sessions later" landed inside the region. The same
+gap effect can affect in-sample forward labels (a "10-session" return that
+spans a missing stretch). It is too small to move either verdict here, but a
+future harness should drop rows whose forward window spans a calendar gap.
+
 ---
 
 ## 6. What this does not do
