@@ -52,6 +52,10 @@ type fakeStore struct {
 	coverage    map[string]float64
 	statusCalls int
 
+	report      store.MarketReportInputs
+	reportErr   error
+	reportCalls int
+
 	tracked       []store.TrackedPositionRow
 	trackedCounts store.TrackedCounts
 	trackedAsked  []string
@@ -130,6 +134,10 @@ func (f *fakeStore) AddToWatchlist(_ context.Context, owner *string, sym string)
 	}
 	f.watchlist = append([]store.WatchlistItem{{Symbol: sym, AddedAt: scanDay}}, f.watchlist...)
 	return true, f.queryErr
+}
+func (f *fakeStore) MarketReport(context.Context, []store.InstrumentRef, []string, []string, time.Time) (store.MarketReportInputs, error) {
+	f.reportCalls++
+	return f.report, f.reportErr
 }
 func (f *fakeStore) ProviderBudgets(context.Context, []string) ([]store.ProviderBudget, error) {
 	f.statusCalls++

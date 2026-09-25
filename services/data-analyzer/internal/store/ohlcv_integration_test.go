@@ -3,6 +3,8 @@
 package store
 
 import (
+	"github.com/jackc/pgx/v5/pgconn"
+
 	"github.com/konsbe/trading-agent/services/data-analyzer/internal/testdb"
 
 	"context"
@@ -140,19 +142,7 @@ func TestQueryEquityOHLCVAsc_OneRowPerDayPreferredSourceWins(t *testing.T) {
 	ctx := context.Background()
 	tx := fixtureTx(t)
 	const sym = "ZZDUPE"
-	for d := 1; d <= 3; d++ {
-		ts := time.Date(2099, 8, d, 0, 0, 0, 0, time.UTC)
-		for _, row := range []struct {
-			src   string
-			close float64
-		}{{"yahoo_finance", 50}, {"tiingo", 100}} {
-			if _, err := tx.Exec(ctx, `
-INSERT INTO equity_ohlcv (ts, symbol, interval, open, high, low, close, volume, source)
-VALUES ($1, $2, '1Day', $3, $3, $3, $3, 1, $4)`, ts, sym, row.close, row.src); err != nil {
-				t.Fatal(err)
-			}
-		}
-	}
+	seedBothSources(t, ctx, tx, sym, 3)
 	got, err := QueryEquityOHLCVAsc(ctx, tx, sym, "1Day", 10)
 	if err != nil {
 		t.Fatal(err)
@@ -199,5 +189,73 @@ VALUES ($1, 'binance', 'ZZBTC', '1d', $2, $2, $2, $2, 1, $3)`, ts, row.close, ro
 		if b.Close != 2 {
 			t.Errorf("close = %v, want the REST row", b.Close)
 		}
+	}
+}
+
+// seedBothSources writes n sessions for sym from both daily sources with the
+// timestamps they really use: Tiingo 00:00 UTC, Yahoo 13:30 UTC (US open).
+// Same-ts fixtures hid that a per-ts dedupe keeps both rows of a session.
+func seedBothSources(t *testing.T, ctx context.Context, tx interface {
+	Exec(context.Context, string, ...any) (pgconn.CommandTag, error)
+}, sym string, n int) {
+	t.Helper()
+	for d := 1; d <= n; d++ {
+		day := time.Date(2099, 8, d, 0, 0, 0, 0, time.UTC)
+		for _, row := range []struct {
+			src   string
+			ts    time.Time
+			close float64
+		}{{"yahoo_finance", day.Add(13*time.Hour + 30*time.Minute), 50}, {"tiingo", day, 100}} {
+			if _, err := tx.Exec(ctx, `
+INSERT INTO equity_ohlcv (ts, symbol, interval, open, high, low, close, volume, source)
+VALUES ($1, $2, '1Day', $3, $3, $3, $3, 1, $4)`, row.ts, sym, row.close, row.src); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+}
+
+// Every daily reader returns one bar per session, Tiingo's, under the real
+// per-source timestamps.
+func TestDailyReaders_OneBarPerSessionUnderRealTimestamps(t *testing.T) {
+	ctx := context.Background()
+	tx := fixtureTx(t)
+	const sym = "ZZSESS"
+	seedBothSources(t, ctx, tx, sym, 3)
+
+	bars, err := QueryEquityBars(ctx, tx, sym, "1Day", 10)
+	if err != nil || len(bars) != 3 {
+		t.Fatalf("QueryEquityBars: %d bars err %v; want 3", len(bars), err)
+	}
+	for _, b := range bars {
+		if b.Close != 100 {
+			t.Errorf("QueryEquityBars close %v, want Tiingo's 100", b.Close)
+		}
+	}
+	chart, err := DailyBars(ctx, tx, sym, time.Date(2099, 1, 1, 0, 0, 0, 0, time.UTC))
+	if err != nil || len(chart) != 3 {
+		t.Fatalf("DailyBars: %d bars err %v; want 3 (the chart drew each session twice)", len(chart), err)
+	}
+	closes, err := InstrumentCloses(ctx, tx, sym, "equity", time.Date(2099, 8, 10, 0, 0, 0, 0, time.UTC))
+	if err != nil || len(closes) != 2 || closes[0].TS.Day() != 2 || closes[1].TS.Day() != 3 {
+		t.Fatalf("InstrumentCloses: %v err %v; want sessions 2 and 3, not two rows of session 3", closes, err)
+	}
+}
+
+// Intraday bars share a date and must NOT be merged by the session key.
+func TestQueryEquityBars_IntradayKeepsEveryBar(t *testing.T) {
+	ctx := context.Background()
+	tx := fixtureTx(t)
+	day := time.Date(2099, 8, 1, 13, 30, 0, 0, time.UTC)
+	for i := 0; i < 4; i++ {
+		if _, err := tx.Exec(ctx, `
+INSERT INTO equity_ohlcv (ts, symbol, interval, open, high, low, close, volume, source)
+VALUES ($1, 'ZZINTRA', '1Hour', 1, 1, 1, 1, 1, 'alpaca_data')`, day.Add(time.Duration(i)*time.Hour)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	bars, err := QueryEquityBars(ctx, tx, "ZZINTRA", "1Hour", 10)
+	if err != nil || len(bars) != 4 {
+		t.Fatalf("got %d hourly bars err %v; want all 4", len(bars), err)
 	}
 }

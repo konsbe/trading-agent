@@ -17,16 +17,18 @@ type EquityOHLCVBar struct {
 
 // QueryEquityOHLCVAsc returns the last `limit` bars for symbol×interval in ascending time order.
 func QueryEquityOHLCVAsc(ctx context.Context, pool Querier, symbol, interval string, limit int) ([]EquityOHLCVBar, error) {
-	// One row per timestamp, the preferred source (bar_source_rank, migration
-	// 015) winning. Without this, a symbol with both Tiingo and Yahoo daily
-	// bars came back twice per day and a "200-bar" SMA covered ~100 days.
+	// One row per SESSION, the preferred source (bar_source_rank, migration
+	// 015) winning. Keyed on the UTC calendar date, not ts: the sources stamp
+	// the same session differently (Tiingo 00:00 UTC, Yahoo 13:30 UTC for US
+	// listings), so DISTINCT ON (ts) kept both and a "200-bar" SMA covered ~100
+	// sessions. The UTC date is the session date for every source here.
 	rows, err := pool.Query(ctx,
 		`SELECT ts, open, high, low, close, volume FROM (
-		     SELECT DISTINCT ON (ts) ts, open, high, low, close, volume
+		     SELECT DISTINCT ON ((ts AT TIME ZONE 'UTC')::date) ts, open, high, low, close, volume
 		     FROM equity_ohlcv
 		     WHERE symbol = $1 AND interval = $2
-		     ORDER BY ts DESC, bar_source_rank(source) DESC
-		 ) one_per_ts
+		     ORDER BY (ts AT TIME ZONE 'UTC')::date DESC, bar_source_rank(source) DESC
+		 ) one_per_session
 		 ORDER BY ts DESC
 		 LIMIT $3`,
 		symbol, interval, limit)
@@ -61,10 +63,10 @@ func QueryEquityOHLCVAsc(ctx context.Context, pool Querier, symbol, interval str
 func QueryCryptoClosedDailyAsc(ctx context.Context, q Querier, symbol, interval string, limit int, closedAsOf time.Time) ([]EquityOHLCVBar, error) {
 	rows, err := q.Query(ctx,
 		`SELECT ts, open, high, low, close, volume FROM (
-		     SELECT DISTINCT ON (ts) ts, open, high, low, close, volume
+		     SELECT DISTINCT ON ((ts AT TIME ZONE 'UTC')::date) ts, open, high, low, close, volume
 		     FROM crypto_ohlcv
 		     WHERE symbol = $1 AND interval = $2 AND ts + interval '1 day' <= $4
-		     ORDER BY ts DESC, (source = 'binance_rest') DESC
+		     ORDER BY (ts AT TIME ZONE 'UTC')::date DESC, (source = 'binance_rest') DESC
 		 ) one_per_ts
 		 ORDER BY ts DESC
 		 LIMIT $3`,

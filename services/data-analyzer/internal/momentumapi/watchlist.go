@@ -57,6 +57,7 @@ func (s *Server) handleWatchlistAdd(w http.ResponseWriter, r *http.Request) {
 		s.storeError(w, r, err)
 		return
 	}
+	s.cache.drop(marketReportCacheKey) // its instrument list includes the watchlist
 	status := http.StatusOK
 	if added {
 		status = http.StatusCreated
@@ -74,6 +75,7 @@ func (s *Server) handleWatchlistRemove(w http.ResponseWriter, r *http.Request) {
 		s.storeError(w, r, err)
 		return
 	}
+	s.cache.drop(marketReportCacheKey)
 	s.writeWatchlist(w, r, http.StatusOK)
 }
 

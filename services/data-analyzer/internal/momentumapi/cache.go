@@ -55,3 +55,21 @@ func (c *responseCache) set(key string, body []byte) {
 	}
 	c.entries[key] = cacheEntry{body: body, expires: now.Add(c.ttl)}
 }
+
+// setFor stores body with its own TTL, for responses whose freshness cadence
+// differs from the default (the once-per-6h market report). ttl <= 0 disables.
+func (c *responseCache) setFor(key string, body []byte, ttl time.Duration) {
+	if ttl <= 0 {
+		return
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.entries[key] = cacheEntry{body: body, expires: c.now().Add(ttl)}
+}
+
+// drop removes one entry, e.g. the market report when the watchlist changes.
+func (c *responseCache) drop(key string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	delete(c.entries, key)
+}

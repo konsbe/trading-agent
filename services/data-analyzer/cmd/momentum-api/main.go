@@ -71,6 +71,11 @@ func main() {
 		log.Warn("momentum-api: status cache TTL capped", "requested", statusTTL, "cap", maxStatusCacheTTL)
 		statusTTL = maxStatusCacheTTL
 	}
+	reportTTL := duration(log, "MOMENTUM_API_REPORT_CACHE_TTL", time.Hour)
+	if reportTTL > 6*time.Hour {
+		log.Warn("momentum-api: market report cache TTL capped at macro-analysis's 6h cadence", "requested", reportTTL)
+		reportTTL = 6 * time.Hour
+	}
 	// Same variable momentum-daily reads, so "pending" ends exactly when it gives up.
 	giveUpAfter := duration(log, "MOMENTUM_DAILY_GIVE_UP_AFTER", 14*time.Hour)
 	attentionPct := 90.0
@@ -120,6 +125,8 @@ func main() {
 		BudgetAttentionPct: attentionPct,
 		SessionsShown:      7,
 		BarSource:          env("MOMENTUM_DAILY_BAR_SOURCE", "tiingo"),
+
+		MarketReportCacheTTL: reportTTL,
 	})
 	httpServer := &http.Server{
 		Addr:              addr,

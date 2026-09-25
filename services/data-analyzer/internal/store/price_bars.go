@@ -27,10 +27,12 @@ type PriceBar struct {
 // features row's as-traded close after a later dividend.
 func DailyBars(ctx context.Context, q Querier, symbol string, from time.Time) ([]PriceBar, error) {
 	rows, err := q.Query(ctx, `
-SELECT DISTINCT ON (ts) ts, open, high, low, close, volume
+SELECT DISTINCT ON ((ts AT TIME ZONE 'UTC')::date) ts, open, high, low, close, volume
 FROM equity_ohlcv
 WHERE symbol = upper($1) AND interval = '1Day' AND ts >= $2 AND close > 0
-ORDER BY ts, bar_source_rank(source) DESC`, symbol, from)
+-- One candle per session: Tiingo stamps a session 00:00 UTC, Yahoo 13:30 UTC,
+-- so a per-ts key drew every session twice once both sources had it.
+ORDER BY (ts AT TIME ZONE 'UTC')::date, bar_source_rank(source) DESC`, symbol, from)
 	if err != nil {
 		return nil, fmt.Errorf("daily bars %s: %w", symbol, err)
 	}

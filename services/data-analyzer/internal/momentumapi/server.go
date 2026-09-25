@@ -32,6 +32,7 @@ type Store interface {
 	ChainRunsBetween(ctx context.Context, from, to time.Time) (map[string]store.ChainRun, time.Time, bool, error)
 	LastCleanSession(ctx context.Context) (*time.Time, error)
 	SessionCoverage(ctx context.Context, sessions []time.Time, source string) (map[string]float64, error)
+	MarketReport(ctx context.Context, fixed []store.InstrumentRef, earningsSymbols, fredSeries []string, now time.Time) (store.MarketReportInputs, error)
 	TrackedPositions(ctx context.Context, status store.TrackedStatusFilter, latestScan *time.Time) ([]store.TrackedPositionRow, error)
 	TrackedCounts(ctx context.Context) (store.TrackedCounts, error)
 	Ping(ctx context.Context) error
@@ -82,6 +83,9 @@ func (s DBStore) ChainRunsBetween(ctx context.Context, from, to time.Time) (map[
 func (s DBStore) LastCleanSession(ctx context.Context) (*time.Time, error) {
 	return store.LastCleanSession(ctx, s.Q)
 }
+func (s DBStore) MarketReport(ctx context.Context, fixed []store.InstrumentRef, earningsSymbols, fredSeries []string, now time.Time) (store.MarketReportInputs, error) {
+	return store.LoadMarketReport(ctx, s.Q, fixed, earningsSymbols, fredSeries, now)
+}
 func (s DBStore) SessionCoverage(ctx context.Context, sessions []time.Time, source string) (map[string]float64, error) {
 	return store.SessionCoverage(ctx, s.Q, sessions, source)
 }
@@ -126,6 +130,10 @@ type Config struct {
 	SessionsShown      int
 	BarSource          string
 
+	// MarketReportCacheTTL: the report is regenerated every 6h, so it is not
+	// held to the 5-minute data TTL; watchlist writes drop it early.
+	MarketReportCacheTTL time.Duration
+
 	// Now is injectable for tests; defaults to time.Now.
 	Now func() time.Time
 }
@@ -155,6 +163,9 @@ func NewServer(cfg Config) *Server {
 	if cfg.BarSource == "" {
 		cfg.BarSource = "tiingo"
 	}
+	if cfg.MarketReportCacheTTL <= 0 {
+		cfg.MarketReportCacheTTL = time.Hour
+	}
 	return &Server{cfg: cfg, cache: newResponseCache(cfg.CacheTTL, cfg.Now),
 		statusCache: newResponseCache(cfg.StatusCacheTTL, cfg.Now)}
 }
@@ -173,6 +184,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/symbols", s.handleSymbolSearch)
 	mux.HandleFunc("GET /api/v1/backtest-lab/report", s.handleBacktestReport)
 	mux.HandleFunc("GET /api/v1/data-sources/status", s.handleDataSourcesStatus)
+	mux.HandleFunc("GET /api/v1/market-report/today", s.handleMarketReport)
 	return s.cors(mux)
 }
 

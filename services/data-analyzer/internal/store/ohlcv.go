@@ -13,8 +13,10 @@ import (
 // QueryEquityBars returns up to limit equity OHLCV bars for the given symbol
 // and interval, ordered oldest-first (chronological).
 //
-// DISTINCT ON (ts) ensures each timestamp appears only once even when multiple
-// sources have rows for the same bar.
+// One bar per period even when several sources wrote it. For daily-or-longer
+// intervals the key is the UTC calendar date, not ts: the sources stamp the
+// same session differently (Tiingo 00:00 UTC, Yahoo 13:30 UTC for US
+// listings), so a per-ts key kept both. Intraday intervals keep the exact ts.
 //
 // PREFERENCE ORDER IS A CORRECTNESS CONCERN, NOT A TIE-BREAK. The sources do not
 // agree on what their prices mean:
@@ -38,14 +40,19 @@ import (
 func QueryEquityBars(ctx context.Context, pool Querier, symbol, interval string, limit int) ([]compute.Bar, error) {
 	rows, err := pool.Query(ctx, `
 		SELECT ts, open, high, low, close, volume FROM (
-			SELECT DISTINCT ON (ts) ts, open, high, low, close, volume
-			FROM equity_ohlcv
-			WHERE symbol=$1 AND interval=$2
+			SELECT DISTINCT ON (period) ts, open, high, low, close, volume
+			FROM (
+				SELECT *, CASE WHEN $2 IN ('1Day', '1Week', '1Month')
+				               THEN date_trunc('day', ts AT TIME ZONE 'UTC')
+				               ELSE ts AT TIME ZONE 'UTC' END AS period
+				FROM equity_ohlcv
+				WHERE symbol=$1 AND interval=$2
+			) keyed
 			-- This was the ONE latest-row query in the repo that broke the
 			-- source tie explicitly, and it was right. Migration 015 promotes
 			-- the same ranking to a shared function so the other callers
 			-- inherit it instead of each remembering.
-			ORDER BY ts, bar_source_rank(source) DESC
+			ORDER BY period, bar_source_rank(source) DESC
 		) deduped
 		ORDER BY ts DESC
 		LIMIT $3`,
