@@ -3,6 +3,7 @@ package finnhub
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -10,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/konsbe/trading-agent/services/data-ingestion/internal/fetch/barsource"
 	"github.com/konsbe/trading-agent/services/data-ingestion/internal/httpclient"
 	"github.com/konsbe/trading-agent/services/data-ingestion/internal/store"
 	"golang.org/x/time/rate"
@@ -75,6 +77,18 @@ func (c *Client) HasToken() bool {
 	return c.Token != ""
 }
 
+// do sends req authenticated by the X-Finnhub-Token header. The token is never
+// put in the URL: net/http errors embed the full request URL, and those errors
+// are logged, which is how the token reached the worker logs.
+func (c *Client) do(req *http.Request) (*http.Response, error) {
+	req.Header.Set("X-Finnhub-Token", c.Token)
+	resp, err := c.HTTP.Do(req)
+	if err != nil {
+		return nil, errors.New(barsource.RedactSecrets(err.Error()))
+	}
+	return resp, nil
+}
+
 // Quote returns latest OHLC-style snapshot fields when available.
 func (c *Client) Quote(ctx context.Context, symbol string) (map[string]any, error) {
 	if !c.HasToken() {
@@ -85,13 +99,12 @@ func (c *Client) Quote(ctx context.Context, symbol string) (map[string]any, erro
 	}
 	q := url.Values{}
 	q.Set("symbol", symbol)
-	q.Set("token", c.Token)
 	u := base + "/quote?" + q.Encode()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	if err != nil {
 		return nil, err
 	}
-	resp, err := c.HTTP.Do(req)
+	resp, err := c.do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -121,13 +134,12 @@ func (c *Client) CompanyNews(ctx context.Context, symbol string) ([]map[string]a
 	q.Set("symbol", symbol)
 	q.Set("from", now.AddDate(0, 0, -30).Format("2006-01-02"))
 	q.Set("to", now.Format("2006-01-02"))
-	q.Set("token", c.Token)
 	u := base + "/company-news?" + q.Encode()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	if err != nil {
 		return nil, err
 	}
-	resp, err := c.HTTP.Do(req)
+	resp, err := c.do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -164,12 +176,11 @@ func (c *Client) CompanyNewsRange(ctx context.Context, symbol string, from, to t
 	q.Set("symbol", symbol)
 	q.Set("from", from.UTC().Format("2006-01-02"))
 	q.Set("to", to.UTC().Format("2006-01-02"))
-	q.Set("token", c.Token)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, base+"/company-news?"+q.Encode(), nil)
 	if err != nil {
 		return nil, err
 	}
-	resp, err := c.HTTP.Do(req)
+	resp, err := c.do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -195,13 +206,12 @@ func (c *Client) CryptoNews(ctx context.Context) ([]map[string]any, error) {
 	}
 	q := url.Values{}
 	q.Set("category", "crypto")
-	q.Set("token", c.Token)
 	u := base + "/news?" + q.Encode()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	if err != nil {
 		return nil, err
 	}
-	resp, err := c.HTTP.Do(req)
+	resp, err := c.do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -231,12 +241,11 @@ func (c *Client) Metrics(ctx context.Context, symbol string) (map[string]any, er
 	q := url.Values{}
 	q.Set("symbol", symbol)
 	q.Set("metric", "all")
-	q.Set("token", c.Token)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, base+"/stock/metric?"+q.Encode(), nil)
 	if err != nil {
 		return nil, err
 	}
-	resp, err := c.HTTP.Do(req)
+	resp, err := c.do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -273,12 +282,11 @@ func (c *Client) Profile2(ctx context.Context, symbol string) (map[string]any, e
 	}
 	q := url.Values{}
 	q.Set("symbol", symbol)
-	q.Set("token", c.Token)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, base+"/stock/profile2?"+q.Encode(), nil)
 	if err != nil {
 		return nil, err
 	}
-	resp, err := c.HTTP.Do(req)
+	resp, err := c.do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -306,12 +314,11 @@ func (c *Client) FinancialsReported(ctx context.Context, symbol, freq string) (m
 	q := url.Values{}
 	q.Set("symbol", symbol)
 	q.Set("freq", freq)
-	q.Set("token", c.Token)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, base+"/stock/financials-reported?"+q.Encode(), nil)
 	if err != nil {
 		return nil, err
 	}
-	resp, err := c.HTTP.Do(req)
+	resp, err := c.do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -337,12 +344,11 @@ func (c *Client) Earnings(ctx context.Context, symbol string) ([]map[string]any,
 	}
 	q := url.Values{}
 	q.Set("symbol", symbol)
-	q.Set("token", c.Token)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, base+"/stock/earnings?"+q.Encode(), nil)
 	if err != nil {
 		return nil, err
 	}
-	resp, err := c.HTTP.Do(req)
+	resp, err := c.do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -370,12 +376,11 @@ func (c *Client) Recommendation(ctx context.Context, symbol string) ([]map[strin
 	}
 	q := url.Values{}
 	q.Set("symbol", symbol)
-	q.Set("token", c.Token)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, base+"/stock/recommendation?"+q.Encode(), nil)
 	if err != nil {
 		return nil, err
 	}
-	resp, err := c.HTTP.Do(req)
+	resp, err := c.do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -406,12 +411,11 @@ func (c *Client) InsiderTransactions(ctx context.Context, symbol string) ([]map[
 	}
 	q := url.Values{}
 	q.Set("symbol", symbol)
-	q.Set("token", c.Token)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, base+"/stock/insider-transactions?"+q.Encode(), nil)
 	if err != nil {
 		return nil, err
 	}
-	resp, err := c.HTTP.Do(req)
+	resp, err := c.do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -446,12 +450,11 @@ func (c *Client) InvestorOwnership(ctx context.Context, symbol string, limit int
 	q := url.Values{}
 	q.Set("symbol", symbol)
 	q.Set("limit", fmt.Sprintf("%d", limit))
-	q.Set("token", c.Token)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, base+"/stock/investor-ownership?"+q.Encode(), nil)
 	if err != nil {
 		return nil, err
 	}
-	resp, err := c.HTTP.Do(req)
+	resp, err := c.do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -515,12 +518,11 @@ func (c *Client) CalendarEconomic(ctx context.Context, from, to string) ([]map[s
 	q := url.Values{}
 	q.Set("from", from)
 	q.Set("to", to)
-	q.Set("token", c.Token)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, base+"/calendar/economic?"+q.Encode(), nil)
 	if err != nil {
 		return nil, err
 	}
-	resp, err := c.HTTP.Do(req)
+	resp, err := c.do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -550,12 +552,11 @@ func (c *Client) CalendarEarnings(ctx context.Context, from, to, symbol string) 
 	if symbol != "" {
 		q.Set("symbol", symbol)
 	}
-	q.Set("token", c.Token)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, base+"/calendar/earnings?"+q.Encode(), nil)
 	if err != nil {
 		return nil, err
 	}
-	resp, err := c.HTTP.Do(req)
+	resp, err := c.do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -621,12 +622,11 @@ func (c *Client) MarketNews(ctx context.Context, category string) ([]map[string]
 	}
 	q := url.Values{}
 	q.Set("category", category)
-	q.Set("token", c.Token)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, base+"/news?"+q.Encode(), nil)
 	if err != nil {
 		return nil, err
 	}
-	resp, err := c.HTTP.Do(req)
+	resp, err := c.do(req)
 	if err != nil {
 		return nil, err
 	}

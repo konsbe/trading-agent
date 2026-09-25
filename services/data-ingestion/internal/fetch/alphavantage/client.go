@@ -11,11 +11,13 @@ package alphavantage
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
 	"time"
 
+	"github.com/konsbe/trading-agent/services/data-ingestion/internal/fetch/barsource"
 	"github.com/konsbe/trading-agent/services/data-ingestion/internal/httpclient"
 	"golang.org/x/time/rate"
 )
@@ -66,7 +68,9 @@ func (c *Client) Overview(ctx context.Context, symbol string) (map[string]string
 	}
 	resp, err := c.HTTP.Do(req)
 	if err != nil {
-		return nil, err
+		// The key is a query parameter (Alpha Vantage has no header auth) and
+		// net/http errors embed the URL, so redact before the error is logged.
+		return nil, errors.New(barsource.RedactSecrets(err.Error()))
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
@@ -122,7 +126,9 @@ func (c *Client) NewsSentiment(ctx context.Context, ticker string) ([]NewsSentim
 	}
 	resp, err := c.HTTP.Do(req)
 	if err != nil {
-		return nil, err
+		// The key is a query parameter (Alpha Vantage has no header auth) and
+		// net/http errors embed the URL, so redact before the error is logged.
+		return nil, errors.New(barsource.RedactSecrets(err.Error()))
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {

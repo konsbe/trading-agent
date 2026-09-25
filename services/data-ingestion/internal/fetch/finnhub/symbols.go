@@ -51,12 +51,11 @@ func (c *Client) StockSymbols(ctx context.Context, exchange string) ([]StockSymb
 	}
 	q := url.Values{}
 	q.Set("exchange", exchange)
-	q.Set("token", c.Token)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, base+"/stock/symbol?"+q.Encode(), nil)
 	if err != nil {
 		return nil, err
 	}
-	resp, err := c.HTTP.Do(req)
+	resp, err := c.do(req)
 	if err != nil {
 		return nil, err
 	}
