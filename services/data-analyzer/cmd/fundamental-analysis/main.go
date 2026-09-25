@@ -40,7 +40,6 @@ import (
 
 	"github.com/joho/godotenv"
 
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/konsbe/trading-agent/services/data-analyzer/internal/config"
 	"github.com/konsbe/trading-agent/services/data-analyzer/internal/db"
 	"github.com/konsbe/trading-agent/services/data-analyzer/internal/logx"
@@ -99,7 +98,7 @@ func main() {
 
 type worker struct {
 	cfg  config.FundamentalAnalysis
-	pool *pgxpool.Pool
+	pool store.ReadWriter
 	log  *slog.Logger
 }
 

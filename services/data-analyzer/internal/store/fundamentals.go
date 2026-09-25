@@ -6,8 +6,6 @@ import (
 	"context"
 	"encoding/json"
 	"time"
-
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // FundamentalRow is a single metric read from the equity_fundamentals table.
@@ -31,7 +29,7 @@ ON CONFLICT (symbol, period, metric, source, ts) DO UPDATE SET
 // source is always set to "fundamental_analysis" to distinguish from raw Finnhub rows.
 func UpsertFundamentalDerived(
 	ctx context.Context,
-	pool *pgxpool.Pool,
+	pool Execer,
 	ts time.Time,
 	symbol, period, metric string,
 	value *float64,
@@ -51,7 +49,7 @@ func UpsertFundamentalDerived(
 
 // QueryLatestMetrics returns the most recent value for each (metric, period) pair
 // of a given symbol, across all raw source rows.
-func QueryLatestMetrics(ctx context.Context, pool *pgxpool.Pool, symbol string) ([]FundamentalRow, error) {
+func QueryLatestMetrics(ctx context.Context, pool Querier, symbol string) ([]FundamentalRow, error) {
 	rows, err := pool.Query(ctx, `
 		SELECT DISTINCT ON (metric, period) ts, period, metric, value, payload, source
 		FROM equity_fundamentals
@@ -84,7 +82,7 @@ func QueryLatestMetrics(ctx context.Context, pool *pgxpool.Pool, symbol string) 
 // metric (source = 'fundamental_analysis') for a symbol. This is used by
 // scoreCorrelations to read prior-pass outputs (Tier 1–3, qualitative) without
 // re-computing them.
-func QueryLatestDerived(ctx context.Context, pool *pgxpool.Pool, symbol string) ([]FundamentalRow, error) {
+func QueryLatestDerived(ctx context.Context, pool Querier, symbol string) ([]FundamentalRow, error) {
 	rows, err := pool.Query(ctx, `
 		SELECT DISTINCT ON (metric) ts, period, metric, value, payload, source
 		FROM equity_fundamentals
@@ -118,7 +116,7 @@ func QueryLatestDerived(ctx context.Context, pool *pgxpool.Pool, symbol string) 
 // Use this for 8-quarter trend analysis: pass limit=8, metric="gross_profit_reported".
 // Only rows from finnhub_financials_reported are returned so we don't mix TTM
 // and quarterly figures.
-func QueryMetricSeries(ctx context.Context, pool *pgxpool.Pool, symbol, metric string, limit int) ([]FundamentalRow, error) {
+func QueryMetricSeries(ctx context.Context, pool Querier, symbol, metric string, limit int) ([]FundamentalRow, error) {
 	rows, err := pool.Query(ctx, `
 		SELECT DISTINCT ON (period) period, ts, metric, value, payload, source
 		FROM equity_fundamentals

@@ -1,0 +1,881 @@
+[
+ {
+  "symbol": "ZZFAFULL",
+  "metric": "composite_score",
+  "period": "derived",
+  "value": 0.4166666666666667,
+  "payload": {
+   "tier": "neutral",
+   "score": 0.4166666666666667,
+   "method": "tier1_weighted_v3",
+   "components": [
+    "eps_strength",
+    "revenue_strength",
+    "pe_vs_5y",
+    "fcf_yield_tier",
+    "gross_margin_tier",
+    "net_margin_tier",
+    "peg_tier"
+   ],
+   "max_points": 6,
+   "score_points": 2.5
+  }
+ },
+ {
+  "symbol": "ZZFAFULL",
+  "metric": "corr_earnings_quality",
+  "period": "derived",
+  "value": 1,
+  "payload": {
+   "note": "EPS/FCF alignment, revenue/EPS coherence, gross vs net margin trends",
+   "tier": "healthy",
+   "warnings": null,
+   "positives": [
+    "Revenue and EPS growing together — genuine organic quality growth"
+   ],
+   "checks_run": 1
+  }
+ },
+ {
+  "symbol": "ZZFAFULL",
+  "metric": "corr_leverage_liquidity",
+  "period": "derived",
+  "value": 0.3333333333333333,
+  "payload": {
+   "note": "Net Debt/EBITDA vs coverage, current ratio vs FCF conversion, D/E vs net margin, goodwill vs conversion",
+   "tier": "mixed_positive",
+   "warnings": null,
+   "positives": [
+    "Low leverage + strong net margins — excellent financial resilience across market cycles"
+   ],
+   "checks_run": 3
+  }
+ },
+ {
+  "symbol": "ZZFAFULL",
+  "metric": "corr_master_signals",
+  "period": "derived",
+  "value": 0,
+  "payload": {
+   "net_signal": "neutral",
+   "value_trap": {
+    "fired": false,
+    "score": 0,
+    "conditions_met": null
+   },
+   "hidden_value": {
+    "fired": false,
+    "score": 0,
+    "conditions_met": null
+   },
+   "bearish_count": 1,
+   "bullish_count": 1,
+   "bullish_convergence": {
+    "fired": true,
+    "score": 3,
+    "conditions_met": [
+     "high_roic (moat_quality)",
+     "conservative_leverage",
+     "insider_buying"
+    ]
+   },
+   "deterioration_warning": {
+    "fired": true,
+    "score": 2,
+    "conditions_met": [
+     "eps_strong",
+     "receivables_growing_faster_than_revenue (AR 0.76× vs Rev 0.28×)"
+    ]
+   },
+   "leverage_cycle_warning": {
+    "fired": false,
+    "score": 0,
+    "conditions_met": null
+   }
+  }
+ },
+ {
+  "symbol": "ZZFAFULL",
+  "metric": "corr_operational",
+  "period": "derived",
+  "value": 0,
+  "payload": {
+   "note": "ROIC vs revenue growth (dilution check), gross margin trend, CapEx vs FCF yield (harvest vs grow)",
+   "tier": "mixed_positive",
+   "warnings": [
+    "High CapEx intensity + weak FCF yield — heavy reinvestment absorbing all cash, limited shareholder returns"
+   ],
+   "positives": [
+    "High ROIC + strong revenue growth — compounding machine, every reinvested dollar earns above cost of capital"
+   ],
+   "checks_run": 2
+  }
+ },
+ {
+  "symbol": "ZZFAFULL",
+  "metric": "corr_summary",
+  "period": "derived",
+  "value": 0.33,
+  "payload": {
+   "tier": "mixed_positive",
+   "clusters": {
+    "operational": "mixed_positive",
+    "earnings_quality": "healthy",
+    "valuation_quality": "mixed_positive",
+    "leverage_liquidity": "mixed_positive"
+   },
+   "master_fired": {
+    "value_trap": false,
+    "hidden_value": false,
+    "bullish_convergence": true,
+    "deterioration_warning": true,
+    "leverage_cycle_warning": false
+   },
+   "overall_score": 0.33,
+   "warnings_count": 1,
+   "positives_count": 3,
+   "master_net_signal": "neutral"
+  }
+ },
+ {
+  "symbol": "ZZFAFULL",
+  "metric": "corr_valuation_quality",
+  "period": "derived",
+  "value": 0,
+  "payload": {
+   "note": "P/E vs growth/ROIC, FCF vs dividend coverage, P/B vs ROE",
+   "tier": "mixed_positive",
+   "warnings": null,
+   "positives": null,
+   "checks_run": 2
+  }
+ },
+ {
+  "symbol": "ZZFAFULL",
+  "metric": "earnings_surprise_avg",
+  "period": "derived",
+  "value": 6.416090851861039,
+  "payload": {
+   "note": "positive = beats consensus; \u003e2% sustained = strong earnings momentum",
+   "tier": "beat",
+   "avg_surprise_pct": 6.416090851861039,
+   "quarters_sampled": 4
+  }
+ },
+ {
+  "symbol": "ZZFAFULL",
+  "metric": "eps_strength",
+  "period": "derived",
+  "value": 1,
+  "payload": {
+   "tier": "strong",
+   "thresholds": "strong \u003e15%, neutral 5-15%, weak \u003c5%",
+   "eps_growth_ttm_yoy_pct": 31.56
+  }
+ },
+ {
+  "symbol": "ZZFAFULL",
+  "metric": "fcf_eps_divergence",
+  "period": "derived",
+  "value": -1,
+  "payload": {
+   "rule": "EPS growth \u003e10% with FCF yield \u003c2% = suspect earnings quality",
+   "quality": "warning_eps_growing_fcf_low",
+   "fcf_yield_pct": 0.0000015319518340672151,
+   "eps_growth_ttm_yoy_pct": 31.56
+  }
+ },
+ {
+  "symbol": "ZZFAFULL",
+  "metric": "fcf_yield",
+  "period": "derived",
+  "value": 0.0000015319518340672151,
+  "payload": {
+   "tier": "avoid",
+   "source": "fcf_reported ÷ market_cap × 100 (XBRL fallback)",
+   "thresholds": "\u003e5% attractive, 2-5% fair, \u003c2% avoid",
+   "fcf_yield_pct": 0.0000015319518340672151
+  }
+ },
+ {
+  "symbol": "ZZFAFULL",
+  "metric": "fcf_yield_tier",
+  "period": "derived",
+  "value": -1,
+  "payload": {
+   "tier": "avoid"
+  }
+ },
+ {
+  "symbol": "ZZFAFULL",
+  "metric": "gross_margin_tier",
+  "period": "derived",
+  "value": 1,
+  "payload": {
+   "tier": "strong_moat",
+   "thresholds": "\u003e40% strong_moat, 20-40% average, \u003c20% margin_pressure",
+   "gross_margin_pct": 67.94
+  }
+ },
+ {
+  "symbol": "ZZFAFULL",
+  "metric": "gross_margin_trend_8q",
+  "period": "derived",
+  "value": 0,
+  "payload": {
+   "note": "expanding = improving competitive position; compressing with revenue growth = cost structure breaking",
+   "old_mean": 68.6637376276569,
+   "quarters": 6,
+   "direction": "stable",
+   "recent_mean": 68.93480709101367,
+   "diff_pct_pts": 0.27106946335676696
+  }
+ },
+ {
+  "symbol": "ZZFAFULL",
+  "metric": "net_margin_tier",
+  "period": "derived",
+  "value": 1,
+  "payload": {
+   "tier": "strong",
+   "thresholds": "\u003e15% strong, 5-15% average, \u003c5% pressure",
+   "net_margin_pct": 40.31
+  }
+ },
+ {
+  "symbol": "ZZFAFULL",
+  "metric": "net_margin_trend_8q",
+  "period": "derived",
+  "value": 0,
+  "payload": {
+   "note": "expanding = improving competitive position; compressing with revenue growth = cost structure breaking",
+   "old_mean": 36.56903818921299,
+   "quarters": 6,
+   "direction": "stable",
+   "recent_mean": 35.93442665039988,
+   "diff_pct_pts": -0.634611538813111
+  }
+ },
+ {
+  "symbol": "ZZFAFULL",
+  "metric": "operating_margin_signal",
+  "period": "derived",
+  "value": 46.73,
+  "payload": {
+   "tier": "strong",
+   "operating_margin_pct": 46.73
+  }
+ },
+ {
+  "symbol": "ZZFAFULL",
+  "metric": "operating_margin_trend_8q",
+  "period": "derived",
+  "value": 1,
+  "payload": {
+   "note": "expanding = improving competitive position; compressing with revenue growth = cost structure breaking",
+   "old_mean": 41.825078514510565,
+   "quarters": 6,
+   "direction": "expanding",
+   "recent_mean": 47.24739746820843,
+   "diff_pct_pts": 5.422318953697868
+  }
+ },
+ {
+  "symbol": "ZZFAFULL",
+  "metric": "pe_vs_5y_mean",
+  "period": "derived",
+  "value": null,
+  "payload": {
+   "tier": "expensive",
+   "pe_ratio_ttm": 27.3884
+  }
+ },
+ {
+  "symbol": "ZZFAFULL",
+  "metric": "qual_insider_signal",
+  "period": "derived",
+  "value": 1,
+  "payload": {
+   "note": "cluster_buy = 3+ distinct insiders purchasing within 90 days (SEC Form 4)",
+   "tier": "cluster_buy",
+   "min_buyers": 3,
+   "buyer_count": 3,
+   "window_days": 90,
+   "seller_count": 1
+  }
+ },
+ {
+  "symbol": "ZZFAFULL",
+  "metric": "qual_moat_proxy",
+  "period": "derived",
+  "value": 1,
+  "payload": {
+   "note": "Structural proxy only — does not assess brand/patent/network effects. Tune QUAL_MOAT_STABLE_STD_PP.",
+   "tier": "strong_moat_proxy",
+   "roe_ttm": 33.22,
+   "quarters_used": 6,
+   "current_margin": 67.94,
+   "gross_margin_std": 0.41,
+   "stable_threshold": "std \u003c 5.0pp",
+   "gross_margin_mean": 68.98
+  }
+ },
+ {
+  "symbol": "ZZFAFULL",
+  "metric": "qual_news_sentiment_30d",
+  "period": "derived",
+  "value": 0.06666666666666667,
+  "payload": {
+   "days": 30,
+   "tier": "neutral",
+   "source": "Alpha Vantage NEWS_SENTIMENT ticker-specific scores",
+   "thresholds": "positive \u003e0.15, negative \u003c-0.15",
+   "article_count": 3,
+   "avg_sentiment": 0.07
+  }
+ },
+ {
+  "symbol": "ZZFAFULL",
+  "metric": "qual_news_sentiment_7d",
+  "period": "derived",
+  "value": 0.25,
+  "payload": {
+   "days": 7,
+   "tier": "positive",
+   "source": "Alpha Vantage NEWS_SENTIMENT ticker-specific scores",
+   "thresholds": "positive \u003e0.15, negative \u003c-0.15",
+   "article_count": 2,
+   "avg_sentiment": 0.25
+  }
+ },
+ {
+  "symbol": "ZZFAFULL",
+  "metric": "qual_rd_intensity",
+  "period": "derived",
+  "value": 12.324496692208843,
+  "payload": {
+   "note": "Both figures from same quarterly XBRL period. Tune thresholds by sector via QUAL_RD_HEALTHY_PCT.",
+   "tier": "investing_in_future",
+   "rd_pct": 12.32,
+   "revenue_m": 168088,
+   "thresholds": "tech healthy \u003e10%, moderate \u003e3%",
+   "rd_expense_m": 20716
+  }
+ },
+ {
+  "symbol": "ZZFAFULL",
+  "metric": "revenue_strength",
+  "period": "derived",
+  "value": 1,
+  "payload": {
+   "note": "organic growth (ex-acquisitions) not yet available",
+   "tier": "strong",
+   "thresholds": "strong \u003e10%, neutral 2-10%, weak \u003c2%",
+   "revenue_growth_ttm_yoy_pct": 17.79
+  }
+ },
+ {
+  "symbol": "ZZFAFULL",
+  "metric": "t2_capex_intensity",
+  "period": "derived",
+  "value": 49.074294417210034,
+  "payload": {
+   "tier": "capital_intensive",
+   "thresholds": "\u003c5% asset-light, 5-20% moderate, \u003e20% capital-intensive",
+   "revenue_millions": 168088,
+   "annual_capex_proxy": 82488,
+   "capex_intensity_pct": 49.074294417210034
+  }
+ },
+ {
+  "symbol": "ZZFAFULL",
+  "metric": "t2_current_ratio",
+  "period": "derived",
+  "value": 1.2303,
+  "payload": {
+   "tier": "monitor",
+   "thresholds": "\u003e1.5 safe, 1.0-1.5 monitor, \u003c1.0 liquidity risk",
+   "current_ratio": 1.2303
+  }
+ },
+ {
+  "symbol": "ZZFAFULL",
+  "metric": "t2_health_score",
+  "period": "derived",
+  "value": 0.75,
+  "payload": {
+   "tier": "healthy",
+   "score": 0.75,
+   "method": "tier2_balance_sheet_v1",
+   "components": [
+    "t2_roe",
+    "t2_leverage",
+    "t2_current_ratio"
+   ]
+  }
+ },
+ {
+  "symbol": "ZZFAFULL",
+  "metric": "t2_leverage",
+  "period": "derived",
+  "value": 0.3526636053751021,
+  "payload": {
+   "note": "industry context essential — utilities/banks operate at higher D/E safely",
+   "tier": "conservative",
+   "source": "xbrl_reported",
+   "thresholds": "\u003c1.0× conservative, 1.0-2.0× manageable, \u003e2.0× high risk",
+   "debt_to_equity": 0.3526636053751021
+  }
+ },
+ {
+  "symbol": "ZZFAFULL",
+  "metric": "t2_net_debt_ebitda",
+  "period": "derived",
+  "value": 0.12818954173579725,
+  "payload": {
+   "note": "EBITDA proxy = latest quarter operating income × 4 (excludes D\u0026A — slightly conservative)",
+   "tier": "conservative",
+   "ratio": 0.12818954173579725,
+   "net_debt": 35850,
+   "thresholds": "\u003c2× conservative, 2-4× manageable, \u003e4× high risk",
+   "ebitda_proxy": 279664
+  }
+ },
+ {
+  "symbol": "ZZFAFULL",
+  "metric": "t2_quick_ratio",
+  "period": "derived",
+  "value": 1.2221,
+  "payload": {
+   "note": "stricter than current ratio — excludes inventory; \u003e1.0 adequate, 0.7-1.0 monitor, \u003c0.7 risk",
+   "tier": "adequate",
+   "quick_ratio": 1.2221
+  }
+ },
+ {
+  "symbol": "ZZFAFULL",
+  "metric": "t2_roa",
+  "period": "derived",
+  "value": 19.42,
+  "payload": {
+   "note": "informational only; \u003e10% high efficiency, 5-10% moderate, \u003c5% low asset utilisation",
+   "tier": "high",
+   "roa_pct": 19.42
+  }
+ },
+ {
+  "symbol": "ZZFAFULL",
+  "metric": "t2_roe",
+  "period": "derived",
+  "value": 33.22,
+  "payload": {
+   "tier": "excellent",
+   "roe_pct": 33.22,
+   "thresholds": "\u003e15% excellent (moat), 8-15% adequate, \u003c8% destroying value"
+  }
+ },
+ {
+  "symbol": "ZZFAFULL",
+  "metric": "t2_roic",
+  "period": "derived",
+  "value": 100.69364958458324,
+  "payload": {
+   "note": "NOPAT = op_income_q×4×(1−tax_rate); InvCap = total_assets−current_liabilities",
+   "tier": "moat_quality",
+   "source": "xbrl_computed",
+   "roic_pct": 100.69364958458324,
+   "nopat_ttm": 246822.28773472217,
+   "thresholds": "\u003e15% moat, 8-15% adequate, \u003c8% low",
+   "total_assets": 333779,
+   "invested_capital": 245122,
+   "effective_tax_rate": "11.7%",
+   "operating_income_q": 69916,
+   "current_liabilities": 88657
+  }
+ },
+ {
+  "symbol": "ZZFAFULL",
+  "metric": "t3_asset_turnover",
+  "period": "derived",
+  "value": 0.5035906992351227,
+  "payload": {
+   "note": "informational — compare to sector peers over time; \u003e1.0 efficient, \u003c0.5 asset-heavy",
+   "tier": "moderate",
+   "total_assets": 333779,
+   "asset_turnover": 0.5035906992351227,
+   "revenue_millions": 168088
+  }
+ },
+ {
+  "symbol": "ZZFAFULL",
+  "metric": "t3_dcf",
+  "period": "derived",
+  "value": 275492292.85672104,
+  "payload": {
+   "note": "simplified 5-year DCF — use as directional check, not precise target",
+   "tier": "downside_risk",
+   "wacc_pct": 10,
+   "thresholds": "\u003c70% strong safety margin, 70-110% fairly valued, \u003e110% downside risk",
+   "fcf_millions": 56118,
+   "growth_years": 5,
+   "growth_rate_pct": 14.57,
+   "dcf_value_millions": 1329681.4811095835,
+   "market_cap_millions": 3663170000000,
+   "terminal_growth_pct": 3,
+   "market_cap_vs_dcf_pct": 275492292.85672104
+  }
+ },
+ {
+  "symbol": "ZZFAFULL",
+  "metric": "t3_fcf_conversion",
+  "period": "derived",
+  "value": 0.9158982226501934,
+  "payload": {
+   "note": "ratio \u003e1 = cash earnings exceed accounting earnings (depreciation adds back); \u003c0.7 = red flag",
+   "tier": "moderate",
+   "thresholds": "\u003e1.0× high quality cash, 0.7-1.0× moderate, \u003c0.7× accrual concern",
+   "fcf_millions": 56118,
+   "net_income_millions": 61271,
+   "fcf_conversion_ratio": 0.9158982226501934
+  }
+ },
+ {
+  "symbol": "ZZFAFULL",
+  "metric": "t3_goodwill_risk",
+  "period": "derived",
+  "value": 17.23026313818425,
+  "payload": {
+   "tier": "low_risk",
+   "goodwill": 49711,
+   "thresholds": "\u003c20% low risk, 20-40% monitor, \u003e40% impairment risk",
+   "intangibles": 7800,
+   "total_assets": 333779,
+   "goodwill_intangibles_pct": 17.23026313818425
+  }
+ },
+ {
+  "symbol": "ZZFAFULL",
+  "metric": "t3_inventory_turnover",
+  "period": "derived",
+  "value": 79.25948406676783,
+  "payload": {
+   "note": "COGS proxy = revenue_reported - gross_profit_reported; slowing turnover = demand warning",
+   "inventory": 2636,
+   "cogs_proxy_annual": 208928,
+   "inventory_turnover": 79.25948406676783
+  }
+ },
+ {
+  "symbol": "ZZFAFULL",
+  "metric": "t3_ps_ratio",
+  "period": "derived",
+  "value": 21793167.864451952,
+  "payload": {
+   "note": "compare within sector; SaaS 5-15× is normal, industrials \u003e3× is expensive",
+   "tier": "speculative",
+   "ps_ratio": 21793167.864451952,
+   "thresholds": "\u003c5× value, 5-10× fair, 10-15× growth premium, \u003e15× speculative",
+   "market_cap_millions": 3663170000000,
+   "revenue_ttm_millions": 168088
+  }
+ },
+ {
+  "symbol": "ZZFATHIN",
+  "metric": "composite_score",
+  "period": "derived",
+  "value": 0.1,
+  "payload": {
+   "tier": "neutral",
+   "score": 0.1,
+   "method": "tier1_weighted_v3",
+   "components": [
+    "eps_strength",
+    "revenue_strength",
+    "pe_vs_5y",
+    "fcf_yield_tier",
+    "gross_margin_tier",
+    "net_margin_tier",
+    "peg_tier"
+   ],
+   "max_points": 5,
+   "score_points": 0.5
+  }
+ },
+ {
+  "symbol": "ZZFATHIN",
+  "metric": "corr_earnings_quality",
+  "period": "derived",
+  "value": 0,
+  "payload": {
+   "note": "EPS/FCF alignment, revenue/EPS coherence, gross vs net margin trends",
+   "tier": "mixed_positive",
+   "warnings": null,
+   "positives": null,
+   "checks_run": 1
+  }
+ },
+ {
+  "symbol": "ZZFATHIN",
+  "metric": "corr_leverage_liquidity",
+  "period": "derived",
+  "value": 0,
+  "payload": {
+   "note": "Net Debt/EBITDA vs coverage, current ratio vs FCF conversion, D/E vs net margin, goodwill vs conversion",
+   "tier": "mixed_positive",
+   "warnings": null,
+   "positives": null,
+   "checks_run": 0
+  }
+ },
+ {
+  "symbol": "ZZFATHIN",
+  "metric": "corr_master_signals",
+  "period": "derived",
+  "value": 0,
+  "payload": {
+   "net_signal": "neutral",
+   "value_trap": {
+    "fired": false,
+    "score": 0,
+    "conditions_met": null
+   },
+   "hidden_value": {
+    "fired": false,
+    "score": 1,
+    "conditions_met": [
+     "eps_stagnant_or_neutral"
+    ]
+   },
+   "bearish_count": 0,
+   "bullish_count": 0,
+   "bullish_convergence": {
+    "fired": false,
+    "score": 0,
+    "conditions_met": null
+   },
+   "deterioration_warning": {
+    "fired": false,
+    "score": 0,
+    "conditions_met": null
+   },
+   "leverage_cycle_warning": {
+    "fired": false,
+    "score": 0,
+    "conditions_met": null
+   }
+  }
+ },
+ {
+  "symbol": "ZZFATHIN",
+  "metric": "corr_operational",
+  "period": "derived",
+  "value": 0,
+  "payload": {
+   "note": "ROIC vs revenue growth (dilution check), gross margin trend, CapEx vs FCF yield (harvest vs grow)",
+   "tier": "mixed_positive",
+   "warnings": null,
+   "positives": null,
+   "checks_run": 0
+  }
+ },
+ {
+  "symbol": "ZZFATHIN",
+  "metric": "corr_summary",
+  "period": "derived",
+  "value": 0,
+  "payload": {
+   "tier": "mixed_positive",
+   "clusters": {
+    "operational": "mixed_positive",
+    "earnings_quality": "mixed_positive",
+    "valuation_quality": "mixed_positive",
+    "leverage_liquidity": "mixed_positive"
+   },
+   "master_fired": {
+    "value_trap": false,
+    "hidden_value": false,
+    "bullish_convergence": false,
+    "deterioration_warning": false,
+    "leverage_cycle_warning": false
+   },
+   "overall_score": 0,
+   "warnings_count": 0,
+   "positives_count": 0,
+   "master_net_signal": "neutral"
+  }
+ },
+ {
+  "symbol": "ZZFATHIN",
+  "metric": "corr_valuation_quality",
+  "period": "derived",
+  "value": 0,
+  "payload": {
+   "note": "P/E vs growth/ROIC, FCF vs dividend coverage, P/B vs ROE",
+   "tier": "mixed_positive",
+   "warnings": null,
+   "positives": null,
+   "checks_run": 0
+  }
+ },
+ {
+  "symbol": "ZZFATHIN",
+  "metric": "eps_strength",
+  "period": "derived",
+  "value": 0,
+  "payload": {
+   "note": "growth rate not available; using sign of TTM EPS only",
+   "tier": "neutral",
+   "eps_ttm": 0.060700000000000004
+  }
+ },
+ {
+  "symbol": "ZZFATHIN",
+  "metric": "gross_margin_tier",
+  "period": "derived",
+  "value": 1,
+  "payload": {
+   "tier": "strong_moat",
+   "thresholds": "\u003e40% strong_moat, 20-40% average, \u003c20% margin_pressure",
+   "gross_margin_pct": 54.68
+  }
+ },
+ {
+  "symbol": "ZZFATHIN",
+  "metric": "net_margin_tier",
+  "period": "derived",
+  "value": -1,
+  "payload": {
+   "tier": "pressure",
+   "thresholds": "\u003e15% strong, 5-15% average, \u003c5% pressure",
+   "net_margin_pct": 0.85
+  }
+ },
+ {
+  "symbol": "ZZFATHIN",
+  "metric": "operating_margin_signal",
+  "period": "derived",
+  "value": 0.17,
+  "payload": {
+   "tier": "pressure",
+   "operating_margin_pct": 0.17
+  }
+ },
+ {
+  "symbol": "ZZFATHIN",
+  "metric": "pe_vs_5y_mean",
+  "period": "derived",
+  "value": null,
+  "payload": {
+   "tier": "expensive",
+   "pe_ratio_ttm": 375.598
+  }
+ },
+ {
+  "symbol": "ZZFATHIN",
+  "metric": "qual_insider_signal",
+  "period": "derived",
+  "value": 0,
+  "payload": {
+   "note": "cluster_buy = 3+ distinct insiders purchasing within 90 days (SEC Form 4)",
+   "tier": "neutral",
+   "min_buyers": 3,
+   "buyer_count": 0,
+   "window_days": 90,
+   "seller_count": 0
+  }
+ },
+ {
+  "symbol": "ZZFATHIN",
+  "metric": "qual_news_sentiment_30d",
+  "period": "derived",
+  "value": null,
+  "payload": {
+   "days": 30,
+   "note": "No news_headlines rows with sentiment scores in window. Requires FUNDAMENTAL_ENABLE_NEWS_SENTIMENT=true.",
+   "tier": "insufficient_data"
+  }
+ },
+ {
+  "symbol": "ZZFATHIN",
+  "metric": "qual_news_sentiment_7d",
+  "period": "derived",
+  "value": null,
+  "payload": {
+   "days": 7,
+   "note": "No news_headlines rows with sentiment scores in window. Requires FUNDAMENTAL_ENABLE_NEWS_SENTIMENT=true.",
+   "tier": "insufficient_data"
+  }
+ },
+ {
+  "symbol": "ZZFATHIN",
+  "metric": "revenue_strength",
+  "period": "derived",
+  "value": 1,
+  "payload": {
+   "note": "organic growth (ex-acquisitions) not yet available",
+   "tier": "strong",
+   "thresholds": "strong \u003e10%, neutral 2-10%, weak \u003c2%",
+   "revenue_growth_ttm_yoy_pct": 10.99
+  }
+ },
+ {
+  "symbol": "ZZFATHIN",
+  "metric": "t2_current_ratio",
+  "period": "derived",
+  "value": 2.2684,
+  "payload": {
+   "tier": "safe",
+   "thresholds": "\u003e1.5 safe, 1.0-1.5 monitor, \u003c1.0 liquidity risk",
+   "current_ratio": 2.2684
+  }
+ },
+ {
+  "symbol": "ZZFATHIN",
+  "metric": "t2_health_score",
+  "period": "derived",
+  "value": 0,
+  "payload": {
+   "tier": "neutral",
+   "score": 0,
+   "method": "tier2_balance_sheet_v1",
+   "components": [
+    "t2_roe",
+    "t2_leverage",
+    "t2_current_ratio"
+   ]
+  }
+ },
+ {
+  "symbol": "ZZFATHIN",
+  "metric": "t2_quick_ratio",
+  "period": "derived",
+  "value": 1.803,
+  "payload": {
+   "note": "stricter than current ratio — excludes inventory; \u003e1.0 adequate, 0.7-1.0 monitor, \u003c0.7 risk",
+   "tier": "adequate",
+   "quick_ratio": 1.803
+  }
+ },
+ {
+  "symbol": "ZZFATHIN",
+  "metric": "t2_roa",
+  "period": "derived",
+  "value": 1.05,
+  "payload": {
+   "note": "informational only; \u003e10% high efficiency, 5-10% moderate, \u003c5% low asset utilisation",
+   "tier": "low",
+   "roa_pct": 1.05
+  }
+ },
+ {
+  "symbol": "ZZFATHIN",
+  "metric": "t2_roe",
+  "period": "derived",
+  "value": 2.06,
+  "payload": {
+   "tier": "destroying_value",
+   "roe_pct": 2.06,
+   "thresholds": "\u003e15% excellent (moat), 8-15% adequate, \u003c8% destroying value"
+  }
+ }
+]

@@ -6,7 +6,6 @@ package store
 import (
 	"context"
 
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/konsbe/trading-agent/services/data-analyzer/internal/compute"
 )
 
@@ -66,7 +65,7 @@ func QueryEquityBars(ctx context.Context, pool Querier, symbol, interval string,
 
 // QueryCryptoBars returns up to limit crypto OHLCV bars for the given symbol
 // and interval, ordered oldest-first (chronological).
-func QueryCryptoBars(ctx context.Context, pool *pgxpool.Pool, symbol, interval string, limit int) ([]compute.Bar, error) {
+func QueryCryptoBars(ctx context.Context, pool Querier, symbol, interval string, limit int) ([]compute.Bar, error) {
 	rows, err := pool.Query(ctx, `
 		SELECT ts, open, high, low, close, volume
 		FROM crypto_ohlcv
@@ -84,7 +83,7 @@ func QueryCryptoBars(ctx context.Context, pool *pgxpool.Pool, symbol, interval s
 // QueryLatestEquityClose returns the most recent closing price for symbol from
 // equity_ohlcv, or (0, false) if no row exists.
 // Used by fundamental-analysis scoreTier3 to compute analyst target upside.
-func QueryLatestEquityClose(ctx context.Context, pool *pgxpool.Pool, symbol, interval string) (float64, bool, error) {
+func QueryLatestEquityClose(ctx context.Context, pool Querier, symbol, interval string) (float64, bool, error) {
 	var close float64
 	err := pool.QueryRow(ctx, `
 		SELECT close FROM equity_ohlcv

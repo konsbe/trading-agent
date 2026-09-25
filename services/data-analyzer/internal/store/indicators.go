@@ -7,8 +7,6 @@ import (
 	"context"
 	"encoding/json"
 	"time"
-
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 const upsertIndicatorSQL = `
@@ -25,7 +23,7 @@ ON CONFLICT (symbol, exchange, interval, indicator, ts) DO UPDATE SET
 //   - payload:   structured data (nil for scalar-only indicators)
 func UpsertIndicator(
 	ctx context.Context,
-	pool *pgxpool.Pool,
+	pool Execer,
 	ts time.Time,
 	symbol, exchange, interval, indicator string,
 	value *float64,

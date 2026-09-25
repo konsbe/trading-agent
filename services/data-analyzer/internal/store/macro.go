@@ -135,7 +135,7 @@ func UpsertMacroDerivedSource(
 
 // QueryLatestFREDValue is a convenience alias used by technical-analysis.
 // Returns (value, ok, error) for the most recent macro_fred observation.
-func QueryLatestFREDValue(ctx context.Context, pool *pgxpool.Pool, seriesID string) (float64, bool, error) {
+func QueryLatestFREDValue(ctx context.Context, pool Querier, seriesID string) (float64, bool, error) {
 	var val float64
 	var ts time.Time
 	row := pool.QueryRow(ctx,
