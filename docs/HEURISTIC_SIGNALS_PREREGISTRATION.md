@@ -314,6 +314,10 @@ first outcome is computed, following momentum's round 1
 - **Multiplicity.** Benjamini-Hochberg across the 11 hypotheses (H8a and H8b
   separately), on the CMH p-values (H5: bootstrap p). Raw and adjusted both
   reported.
+- **Confirmed** = the effect-size floor (and H9/H10's component clause)
+  cleared **and** BH-adjusted p < 0.05. A floor cleared without significance
+  is "not confirmed (unresolved)"; significance without the floor is "not
+  confirmed (below floor)".
 - **Context, not verdicts:** the same tests at 5 and 20 sessions (same ±3.0%
   hit), and each primary test without 2020.
 
