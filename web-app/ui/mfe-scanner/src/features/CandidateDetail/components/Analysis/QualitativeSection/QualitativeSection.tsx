@@ -2,13 +2,17 @@ import { CollapsibleCard } from '@trading-agent/shared-components';
 import { QualitativeAnalysis } from '@/api';
 import { formatNumber, formatPercent } from '@/common/format/format';
 import FactGrid, { FactCell } from '../../FactGrid';
-import { withBand } from '../../../utils/analysisFormat';
+import { MOAT_PROXY_TIER_LABELS, RD_INTENSITY_TIER_LABELS, withBand } from '../../../utils/analysisFormat';
 import { QualitativeSectionProps } from './types';
 import '@/styles/scanner-global.css';
 import '../analysis-styles.css';
 
 export const buildQualitativeCells = (q: QualitativeAnalysis): FactCell[] => [
-    { key: 'moat_proxy', label: 'Moat proxy', value: withBand(formatNumber(q.moat_proxy.value, 2), q.moat_proxy.tier) },
+    {
+        key: 'moat_proxy',
+        label: 'Moat proxy',
+        value: withBand(formatNumber(q.moat_proxy.value, 2), q.moat_proxy.tier, MOAT_PROXY_TIER_LABELS),
+    },
     { key: 'insider_signal', label: 'Insider activity', value: withBand(formatNumber(q.insider_signal.value, 2), q.insider_signal.tier) },
     {
         key: 'news_sentiment_7d',
@@ -23,7 +27,7 @@ export const buildQualitativeCells = (q: QualitativeAnalysis): FactCell[] => [
     {
         key: 'rd_intensity',
         label: 'R&D intensity',
-        value: withBand(formatPercent(q.rd_intensity.value, 1), q.rd_intensity.tier),
+        value: withBand(formatPercent(q.rd_intensity.value, 1), q.rd_intensity.tier, RD_INTENSITY_TIER_LABELS),
         sub: 'R&D as % of revenue',
     },
 ];

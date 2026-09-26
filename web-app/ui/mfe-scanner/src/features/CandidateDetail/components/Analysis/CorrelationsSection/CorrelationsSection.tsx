@@ -1,5 +1,6 @@
 import { CollapsibleCard } from '@trading-agent/shared-components';
-import { bandLabel, clusterLine, labelText } from '../../../utils/analysisFormat';
+import { EMPTY_VALUE } from '@/common/format/format';
+import { clusterLine, COMBINED_PATTERN_LABELS, CORRELATION_TIER_LABELS, displayBand, NET_SIGNAL_LABELS } from '../../../utils/analysisFormat';
 import CompositeLine from '../CompositeLine';
 import { CorrelationsSectionProps } from './types';
 import '@/styles/scanner-global.css';
@@ -20,7 +21,7 @@ const SentenceList = ({ items, empty, testId }: { items: string[]; empty: string
 
 /**
  * Section 4 — composite tier, each cluster's health as plain text, the master
- * signal, and the aligned (cluster positives) / divergent (cluster warnings)
+ * signal (as "Combined patterns": net count and patterns met), and the aligned (cluster positives) / divergent (cluster warnings)
  * lines as the stored sentences.
  */
 const CorrelationsSection = ({ correlations }: CorrelationsSectionProps) => {
@@ -34,18 +35,22 @@ const CorrelationsSection = ({ correlations }: CorrelationsSectionProps) => {
             data-testid="analysis-correlations"
             title="Correlations"
         >
-            <CompositeLine composite={correlations.composite} data-testid="correlations-composite" />
+            <CompositeLine composite={correlations.composite} labels={CORRELATION_TIER_LABELS} data-testid="correlations-composite" />
 
             <div className="scanner-analysis__group">
                 <h3 className="scanner-analysis__group-title">Cluster health</h3>
-                <SentenceList items={clusters.map(c => clusterLine(c.name, c.tier))} empty="No correlation clusters stored." testId="correlation-clusters" />
+                <SentenceList
+                    items={clusters.map(c => clusterLine(c.name, c.tier, CORRELATION_TIER_LABELS))}
+                    empty="No correlation clusters stored."
+                    testId="correlation-clusters"
+                />
             </div>
 
             <div className="scanner-analysis__group">
-                <h3 className="scanner-analysis__group-title">Master signal</h3>
+                <h3 className="scanner-analysis__group-title">Combined patterns</h3>
                 <p className="scanner-analysis__note" data-testid="master-signal">
-                    Net signal: {labelText(master.net_signal)}
-                    {master.fired.length > 0 && ` · fired: ${master.fired.map(name => bandLabel(name)).join(', ')}`}
+                    Net count: {displayBand(master.net_signal, NET_SIGNAL_LABELS) ?? EMPTY_VALUE}
+                    {master.fired.length > 0 && ` · met: ${master.fired.map(name => displayBand(name, COMBINED_PATTERN_LABELS)).join(', ')}`}
                 </p>
             </div>
 

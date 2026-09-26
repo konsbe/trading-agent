@@ -1,6 +1,7 @@
 /**
  * Display text for the analysis sections. Bands, tiers and severities are the
- * API's stored classifications, shown verbatim (underscores → spaces); nothing
+ * API's stored classifications, humanized (underscores → spaces) unless a
+ * `BandDisplayMap` gives softer display text for a code; nothing
  * here compares a number to a threshold. Null renders as EMPTY_VALUE.
  */
 
@@ -54,6 +55,43 @@ export const GROSS_MARGIN_TIER_LABELS: BandDisplayMap = { strong_moat: 'high' };
 
 export const NET_DEBT_OPERATING_INCOME_BAND_LABELS: BandDisplayMap = { negative_ebitda: 'operating loss' };
 
+/** Correlation cluster tiers and the correlations composite tier. */
+export const CORRELATION_TIER_LABELS: BandDisplayMap = {
+    healthy: 'mostly agree',
+    mixed_positive: 'mixed, leaning agree',
+    mixed_negative: 'mixed, leaning conflict',
+    alert: 'mostly conflict',
+};
+
+/** Master-signal `net_signal` codes as the net count of combined patterns met. */
+export const NET_SIGNAL_LABELS: BandDisplayMap = {
+    strongly_bullish: '+2 or more',
+    bullish: '+1',
+    neutral: '0',
+    bearish: '−1',
+    strongly_bearish: '−2 or less',
+};
+
+/** Master-signal `fired` pattern codes. */
+export const COMBINED_PATTERN_LABELS: BandDisplayMap = {
+    bullish_convergence: 'low P/E with quality conditions',
+    hidden_value: 'cash strength with flat EPS',
+    deterioration_warning: 'strong EPS with weak cash signs',
+    value_trap: 'low P/E with weak conditions',
+    leverage_cycle_warning: 'debt and liquidity strain',
+};
+
+export const MOAT_PROXY_TIER_LABELS: BandDisplayMap = {
+    strong_moat_proxy: '3 of 3 conditions',
+    moderate_moat_proxy: '2 of 3 conditions',
+    weak_moat_proxy: '0–1 of 3 conditions',
+};
+
+export const RD_INTENSITY_TIER_LABELS: BandDisplayMap = { investing_in_future: 'high', harvesting: 'low' };
+
+/** Market cycle, price phase and macro correlations regime codes. */
+export const MARKET_CONTEXT_LABELS: BandDisplayMap = { below_sma: 'below 200-day average' };
+
 /** Mapped display text for `band`, else the humanized code; null stays null. */
 export const displayBand = (band: string | null | undefined, labels?: BandDisplayMap): string | null =>
     (band && labels && Object.prototype.hasOwnProperty.call(labels, band) ? labels[band] : null) ?? bandLabel(band);
@@ -76,10 +114,11 @@ export const withBand = (valueText: string, band: string | null | undefined, lab
 };
 
 /** Composite header line: "0.70 · strong"; either part may be missing. */
-export const compositeText = ({ score, tier }: ScoreTier): string => {
-    const parts = [score === null ? null : formatNumber(score, 2), bandLabel(tier)].filter(Boolean);
+export const compositeText = ({ score, tier }: ScoreTier, labels?: BandDisplayMap): string => {
+    const parts = [score === null ? null : formatNumber(score, 2), displayBand(tier, labels)].filter(Boolean);
     return parts.length > 0 ? parts.join(' · ') : EMPTY_VALUE;
 };
 
 /** "Earnings Quality — healthy"; a null tier is "—". */
-export const clusterLine = (name: string, tier: string | null): string => `${titleCaseCode(name)} — ${bandLabel(tier) ?? EMPTY_VALUE}`;
+export const clusterLine = (name: string, tier: string | null, labels?: BandDisplayMap): string =>
+    `${titleCaseCode(name)} — ${displayBand(tier, labels) ?? EMPTY_VALUE}`;

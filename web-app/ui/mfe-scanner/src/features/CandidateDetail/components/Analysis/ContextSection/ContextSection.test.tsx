@@ -8,18 +8,47 @@ beforeEach(() => window.sessionStorage.clear());
 const value = (key: string) => screen.getByTestId(`context-${key}-value`);
 
 describe('ContextSection', () => {
-    it('shows the stored labels verbatim, with the Market Report tone indicators', () => {
+    it('shows the stored labels humanized, with the Market Report tone indicators', () => {
         render(<ContextSection context={makeAnalysis().context_vs_benchmark} />);
 
         expect(value('benchmark')).toHaveTextContent('SPY');
-        expect(value('market_cycle')).toHaveTextContent(/^pullback_healthy$/);
+        expect(value('market_cycle')).toHaveTextContent(/^pullback healthy$/);
         expect(screen.getByTestId('context-market_cycle-tone')).toHaveAccessibleName('Status: neutral');
         expect(screen.getByTestId('context-market_cycle-tone')).toHaveClass('scanner-tone--neutral');
         expect(value('price_phase')).toHaveTextContent(/^pullback$/);
         expect(value('drawdown')).toHaveTextContent('−5.58%');
-        expect(value('correlation_regime')).toHaveTextContent(/^stagflation_risk$/);
+        expect(value('correlation_regime')).toHaveTextContent(/^stagflation risk$/);
         expect(screen.getByTestId('context-correlation_regime-tone')).toHaveAccessibleName('Status: stressed');
         expect(value('relative_strength')).toHaveTextContent(/^—$/);
+    });
+
+    it('humanizes every context code and spells out below_sma, keeping the tone icons', () => {
+        const { context_vs_benchmark: context } = makeAnalysis();
+        render(
+            <ContextSection
+                context={{
+                    ...context,
+                    market_cycle_composite: 'late_cycle_stretched',
+                    price_phase: 'below_sma',
+                    correlation_regime: 'global_liquidity_stress',
+                }}
+            />,
+        );
+
+        expect(value('market_cycle').textContent).toBe('late cycle stretched');
+        expect(value('price_phase').textContent).toBe('below 200-day average');
+        expect(value('correlation_regime').textContent).toBe('global liquidity stress');
+        expect(screen.getByTestId('context-market_cycle-tone')).toHaveAccessibleName('Status: neutral');
+        expect(screen.getByTestId('context-correlation_regime-tone')).toHaveAccessibleName('Status: stressed');
+    });
+
+    it('shows below_sma and bull_extended the same way in any context field', () => {
+        const { context_vs_benchmark: context } = makeAnalysis();
+        render(<ContextSection context={{ ...context, market_cycle_composite: 'below_sma', price_phase: 'bull_extended', correlation_regime: 'below_sma' }} />);
+
+        expect(value('market_cycle').textContent).toBe('below 200-day average');
+        expect(value('price_phase').textContent).toBe('bull extended');
+        expect(value('correlation_regime').textContent).toBe('below 200-day average');
     });
 
     it('shows relative strength in percentage points when served', () => {
@@ -43,7 +72,7 @@ describe('ContextSection', () => {
         render(<ContextSection context={{ ...context, market_cycle_tone: 'yellow' }} />);
 
         expect(screen.queryByTestId('context-market_cycle-tone')).not.toBeInTheDocument();
-        expect(value('market_cycle')).toHaveTextContent('pullback_healthy');
+        expect(value('market_cycle')).toHaveTextContent('pullback healthy');
     });
 
     it('has no severity badges', () => {
