@@ -1,0 +1,89 @@
+.education-doc {
+    display: grid;
+    grid-template-columns: minmax(12rem, 16rem) minmax(0, 1fr);
+    align-items: start;
+    gap: var(--space-lg);
+    min-width: 0;
+}
+
+/* Sticks to the top of the page's scroll container (.education-page). */
+.education-doc__nav {
+    position: sticky;
+    top: 0;
+    max-height: calc(100vh - 10rem);
+    overflow: auto;
+    padding: var(--space-sm) var(--space-md);
+    border-radius: var(--radius-lg);
+    background: var(--color-surface-container-low);
+}
+
+.education-doc__nav-title {
+    margin: 0 0 var(--space-xs);
+    color: var(--color-on-surface-variant);
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-medium);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.education-doc__groups,
+.education-doc__items {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xxs);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.education-doc__group + .education-doc__group {
+    margin-top: var(--space-xs);
+}
+
+.education-doc__items {
+    margin-top: var(--space-xxs);
+    padding-left: var(--space-sm);
+    border-left: 1px solid var(--color-outline-variant);
+}
+
+.education-doc__link {
+    display: block;
+    padding: var(--space-xxs) var(--space-xs);
+    border-radius: var(--radius-md);
+    color: var(--color-on-surface-variant);
+    font-size: var(--font-size-sm);
+    text-decoration: none;
+}
+
+.education-doc__group > .education-doc__link {
+    color: var(--color-on-surface);
+    font-weight: var(--font-weight-medium);
+}
+
+.education-doc__link:hover {
+    background: color-mix(in srgb, var(--color-surface-container-low), var(--color-on-surface) 8%);
+    color: var(--color-on-surface);
+}
+
+.education-doc__link[aria-current='location'] {
+    background: var(--color-primary-container);
+    color: var(--color-on-primary-container);
+}
+
+.education-doc__content {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-lg);
+    min-width: 0;
+}
+
+@media (max-width: 900px) {
+    .education-doc {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .education-doc__nav {
+        position: static;
+        max-height: none;
+    }
+}
