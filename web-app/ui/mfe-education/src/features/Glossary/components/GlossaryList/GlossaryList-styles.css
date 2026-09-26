@@ -1,0 +1,64 @@
+.education-glossary {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding: 0;
+    border-radius: var(--radius-lg);
+    background: var(--color-surface-container);
+    list-style: none;
+}
+
+.education-glossary__row {
+    display: grid;
+    grid-template-columns: minmax(10rem, 16rem) minmax(0, 1fr) auto;
+    align-items: baseline;
+    gap: var(--space-xs) var(--space-md);
+    padding: var(--space-sm) var(--space-md);
+}
+
+.education-glossary__row + .education-glossary__row {
+    border-top: 1px solid var(--color-outline-variant);
+}
+
+.education-glossary__head {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xxs);
+    min-width: 0;
+}
+
+.education-glossary__term {
+    color: var(--color-on-surface);
+    font-style: normal;
+    font-weight: var(--font-weight-bold);
+}
+
+.education-glossary__synonyms {
+    color: var(--color-on-surface-variant);
+    font-size: var(--font-size-xs);
+}
+
+.education-glossary__definition {
+    margin: 0;
+    color: var(--color-on-surface);
+}
+
+.education-glossary__link {
+    padding: var(--space-xxs) var(--space-xs);
+    border-radius: var(--radius-md);
+    color: var(--color-primary);
+    font-size: var(--font-size-sm);
+    white-space: nowrap;
+    text-decoration: none;
+}
+
+.education-glossary__link:hover {
+    background: color-mix(in srgb, var(--color-surface-container), var(--color-on-surface) 8%);
+    text-decoration: underline;
+}
+
+@media (max-width: 720px) {
+    .education-glossary__row {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
