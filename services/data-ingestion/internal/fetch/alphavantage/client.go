@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/konsbe/trading-agent/services/data-ingestion/internal/fetch/barsource"
@@ -43,6 +44,17 @@ func New(apiKey string) *Client {
 
 // HasKey returns false when no API key is configured.
 func (c *Client) HasKey() bool { return c.APIKey != "" }
+
+// redactKey removes the API key from a provider message. Alpha Vantage's
+// rate-limit and invalid-key replies quote the key in the message body (not as
+// a URL parameter, so RedactSecrets cannot see it), and those messages are
+// logged.
+func (c *Client) redactKey(msg string) string {
+	if c.APIKey == "" {
+		return msg
+	}
+	return strings.ReplaceAll(msg, c.APIKey, "REDACTED")
+}
 
 // Overview fetches the COMPANY_OVERVIEW endpoint for a symbol.
 // Returns the raw flat string map; callers use FloatField / StringField to extract values.
@@ -82,7 +94,7 @@ func (c *Client) Overview(ctx context.Context, symbol string) (map[string]string
 	}
 	// Alpha Vantage returns {"Information": "..."} when the key is invalid or rate-limited.
 	if info, ok := m["Information"]; ok {
-		return nil, fmt.Errorf("alpha vantage: %s", info)
+		return nil, fmt.Errorf("alpha vantage: %s", c.redactKey(info))
 	}
 	// Empty symbol returns {"Symbol": ""}.
 	if m["Symbol"] == "" {
@@ -152,7 +164,7 @@ func (c *Client) NewsSentiment(ctx context.Context, ticker string) ([]NewsSentim
 		return nil, err
 	}
 	if raw.Information != "" {
-		return nil, fmt.Errorf("alpha vantage: %s", raw.Information)
+		return nil, fmt.Errorf("alpha vantage: %s", c.redactKey(raw.Information))
 	}
 
 	articles := make([]NewsSentimentArticle, 0, len(raw.Feed))
