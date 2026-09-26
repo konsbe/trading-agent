@@ -31,6 +31,7 @@ describe('Sidebar', () => {
         const main = screen.getByTestId('app-sidebar-main');
         expect(linkLabels(main)).toEqual([
             'Daily Market Report', 'Momentum Scanner', 'Backtest Lab', 'Watchlist',
+            'Handbook', 'MasterClass', 'Glossary',
             'Stock Detail', 'Alarm History', 'Tracked Positions', 'Settings',
         ]);
         expect(linkLabels(screen.getByTestId('app-sidebar-bottom'))).toEqual(['Data Source']);
@@ -46,6 +47,7 @@ describe('Sidebar', () => {
             'app-sidebar-group-market-reports',
             'app-sidebar-group-research',
             'app-sidebar-group-tracking',
+            'app-sidebar-group-education',
             'app-sidebar-group-coming-soon',
         ]);
         expect(screen.getByRole('region', { name: 'Research' })).toContainElement(

@@ -95,6 +95,51 @@
       "nav_sub_order": 1,
       "nav_icon": "mdi-chart-box-outline",
       "router_path": "/market-report"
+    },
+    "mfe_education_handbook": {
+      "label": "Handbook",
+      "version": "1.0.0",
+      "endpoint": "http://localhost:3006/remoteEntry.js",
+      "module": "./Handbook",
+      "scope": "mfe_education",
+      "description": "How each part of the app works and what its readings mean",
+      "roles": [],
+      "enabled": true,
+      "nav_group": "Education",
+      "nav_order": 4,
+      "nav_sub_order": 1,
+      "nav_icon": "mdi-bookmark-outline",
+      "router_path": "/handbook"
+    },
+    "mfe_education_masterclass": {
+      "label": "MasterClass",
+      "version": "1.0.0",
+      "endpoint": "http://localhost:3006/remoteEntry.js",
+      "module": "./MasterClass",
+      "scope": "mfe_education",
+      "description": "Standards-based trading concepts, independent of this app",
+      "roles": [],
+      "enabled": true,
+      "nav_group": "Education",
+      "nav_order": 4,
+      "nav_sub_order": 2,
+      "nav_icon": "mdi-eye",
+      "router_path": "/masterclass"
+    },
+    "mfe_education_glossary": {
+      "label": "Glossary",
+      "version": "1.0.0",
+      "endpoint": "http://localhost:3006/remoteEntry.js",
+      "module": "./Glossary",
+      "scope": "mfe_education",
+      "description": "Terms used across the Handbook and MasterClass",
+      "roles": [],
+      "enabled": true,
+      "nav_group": "Education",
+      "nav_order": 4,
+      "nav_sub_order": 3,
+      "nav_icon": "mdi-format-list-checks",
+      "router_path": "/glossary"
     }
   },
   "iframes": {}
