@@ -375,14 +375,15 @@ func (w *worker) storeFinancials(ctx context.Context, freq string, limit int) {
 			continue
 		}
 
-		if limit <= 0 || limit > len(reports) {
-			limit = len(reports)
+		n := limit
+		if n <= 0 || n > len(reports) {
+			n = len(reports)
 		}
 
 		source := "finnhub_financials_reported"
 		stored := 0
 
-		for i := 0; i < limit; i++ {
+		for i := 0; i < n; i++ {
 			report, ok := reports[i].(map[string]any)
 			if !ok {
 				continue
