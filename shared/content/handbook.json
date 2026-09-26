@@ -350,6 +350,85 @@
           "terms": []
         },
         {
+          "id": "technical-analysis",
+          "title": "Technical analysis",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "The **Technical analysis** card shows ten readings computed from the symbol's daily bars, for the session named in its header (\"· stale\" is added when a newer daily bar has arrived since they were computed). Each is a plain description of the chart, with the band the app puts it in: none of them is a signal, and the score does not use them. Readings that currently carry a flag — RSI outside its normal band, an active squeeze, or VIX above 25 — are not marked here; they are listed once, with their badge, under Classical Technical Signals. For what RSI and MACD are in general, see MasterClass, Module 3."
+            },
+            {
+              "type": "list",
+              "items": [
+                "**RSI (14)** — the 14-session Relative Strength Index of daily closes, with its band: **oversold** below 30, **overbought** above 70, **normal** from 30 to 70 (both included). These are the lines the analyst bot's RSI alerts use. The score's separate RSI rule — a penalty above 85 — is described under Today's Candidates.",
+                "**MACD histogram** — the MACD line (the 12-session minus the 26-session exponential moving average of closes) minus its 9-session signal line: positive when the MACD line is above its signal line, negative when below. \"Bullish cross\" or \"Bearish cross\" appears beneath it only on the session the MACD line crossed its signal line, upward or downward; on any other session there is no line.",
+                "**ADX (14)** — the 14-session Average Directional Index: how strong the trend is, **not which way** it runs — a steady fall reads as high as a steady rise. The band is **strong trend** above 25 and **not strong trend** at 25 or below. There is no \"weak\" band, because 25 is the only ADX threshold the app's rules use.",
+                "**Trend** — **Up**, **Down** or **Sideways** over the last 60 sessions. The window is split in half: if the second half made both a higher high and a higher low than the first, it reads Up; if it made neither, Down. If it made one but not the other, a straight line fitted through the 60 closes decides — but only when the fit is reasonably tight (R² of 0.3 or more); otherwise it reads Sideways. **Slope** beneath is that line's gradient as a percentage of the average close, **per session**: 0.07% means the fitted line rises by about 0.07% of the price each trading day.",
+                "**MA cross** — **Golden cross** when the 50-session simple moving average of closes moved above the 200-session one on this session, **Death cross** when it moved below. It marks only the session the cross happens, so on nearly every day it shows \"—\": no cross that session, not missing data (it is also \"—\" for a symbol with fewer than 202 daily bars). It does not say which average is currently on top.",
+                "**ATR (14)** — the 14-session Average True Range, in dollars: the stock's typical daily range, counting any gap from the prior close. ATR % in Primary facts is the same kind of measure divided by the close.",
+                "**BB squeeze** — **Active** when, on the latest session, the Bollinger Bands (the 20-session average of closes ± 2 standard deviations) sit entirely inside the Keltner Channel (the 20-session exponential average of closes ± 2 × the 10-session ATR); otherwise **Not active**. It describes a quiet, compressed stretch, and it is common. What testing found about squeezes is under Classical Technical Signals.",
+                "**VIX regime** — the CBOE Volatility Index, a market-wide measure of the S&P 500 volatility expected over the next 30 days. It is not a reading of this stock, and it is the same for every symbol. It is the newest daily VIX close the app had stored (from FRED) when the readings were computed, so it can be a day or more older than the session in the header. Bands: **extreme fear** above 35, **elevated** above 20 up to 35, **normal** from 12 to 20, **complacency** below 12. The Daily Market Report bands VIX with the same thresholds. **Elevated** is a label, not a warning: the analyst bot's VIX alert fires only above 25, and only above 25 is VIX listed as a flagged reading under Classical Technical Signals.",
+                "**Pivot (prior bar)** — classic pivot levels from the **previous** session's high, low and close: pivot (PP) = (high + low + close) ÷ 3, R1 = 2 × PP − low, S1 = 2 × PP − high. Because this page is as of the latest close, they are the levels for the session that just closed, worked out from the one before it — not levels for the next session.",
+                "**SMC counts** — three counts from the \"Smart Money Concepts\" style of chart reading, shown as, for example, \"3 FVG · 5 OB · 3 sweeps\". **FVG** (fair value gaps): three-bar gaps — a bar's low above the high of the bar two sessions earlier, or its high below that bar's low, by at least 0.1% — found in the last 50 sessions that no later bar has traded back into. **OB** (order blocks): in the last 100 sessions, the last down-candle before a swing low that was followed by a rise of at least 1.5% (or the last up-candle before a swing high followed by a fall of at least 1.5%), not closed through since. **Sweeps**: sessions in the last 50 whose high went above the most recent swing high but closed back below it, or whose low went below the most recent swing low but closed back above it; every such session in the window counts, not only recent ones. A swing high or low here is a bar higher (or lower) than the three bars on each side of it. The order-block and sweep counts feed the action signal in Classical Technical Signals; the FVG count does not. What testing found is in that entry."
+              ]
+            }
+          ],
+          "terms": []
+        },
+        {
+          "id": "fundamentals",
+          "title": "Fundamentals",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "The **Fundamentals** card shows the company's financial figures and the tier the app puts each one in. The figures come from the app's fundamentals data provider, and the header says when they were **computed** (\"· stale\" is added when newer raw figures have arrived since, or the computation has passed its maximum age). The app follows a fixed list of 26 symbols in full, storing their reported financial statements and earnings history as well; for any other symbol it has only the provider's summary figures, so fields that need the statements show \"—\". That list is set in the app's configuration — adding a stock to your Watchlist does not add it. \"—\" always means not available, never zero."
+            },
+            {
+              "type": "paragraph",
+              "text": "**Composite** is the average of whichever tiered readings are available, each scored +1 for its best tier, 0 for its middle tier, and −0.5 or −1 for its worst: EPS strength, Revenue, the P/E band, FCF yield, Gross margin, Net margin, and PEG. It runs from −1 to +1 and reads **strong** at 0.5 or above, **weak** at −0.5 or below, and **neutral** in between. Because only the available readings count, one symbol's composite can rest on four readings and another's on seven. PEG counts toward it whenever the provider supplies one, even though the PEG cell itself shows \"—\"."
+            },
+            {
+              "type": "list",
+              "items": [
+                "**EPS strength** — growth in earnings per share over the last twelve months against the twelve months before: **strong** at 15% or more, **neutral** from 5% up to 15%, **weak** below 5% (including any decline). When the provider has no growth figure, it falls back to whether trailing EPS is positive: positive reads **neutral**; zero or negative reads **weak**.",
+                "**Revenue** — revenue growth on the same basis: **strong** at 10% or more, **neutral** from 2% up to 10%, **weak** below 2%. It includes growth that came from acquisitions; organic growth is not available.",
+                "**P/E vs 5Y** — built to compare today's trailing P/E with the company's own five-year average: **cheap vs history** more than 15% below it, **expensive vs history** 15% or more above it, **fair vs history** in between, shown with the percentage. Today that comparison never appears, because the five-year average is not in the stored data for any symbol. The cell instead shows a fallback band on the trailing P/E itself, with no percentage: **value** under 15, **growth fair** from 15 up to 25, **expensive** at 25 or more, and **loss making** when the P/E is zero or negative. The caption \"vs own 5-year mean P/E\" does not apply to those bands.",
+                "**Gross margin** — gross profit as a share of revenue over the last twelve months: **strong moat** at 40% or more, **average** from 20% up to 40%, **margin pressure** below 20%. \"Strong moat\" is the app's name for the band, not a finding about the company's competitive position; normal gross margins differ widely between industries, and the band does not adjust for that.",
+                "**Net margin** — net income as a share of revenue over the last twelve months: **strong** at 15% or more, **average** from 5% up to 15%, **pressure** below 5% (including losses).",
+                "**PEG** — always \"—\", with the note \"Not served by the analysis API\". The app does store a PEG ratio (P/E divided by earnings growth) for the symbols whose provider supplies one, and it counts toward the composite — **undervalued growth** below 1, **fairly valued growth** from 1 up to 2, **expensive growth** at 2 or more — but this page does not show it yet.",
+                "**Earnings surprise** — always \"—\", with the same note. For the 26 fully followed symbols the app does compute an average earnings surprise — how far reported EPS beat or missed analysts' estimates, averaged over up to the last four quarters — but this page does not show it yet, and it does not count toward the composite.",
+                "**TTM P/E** — the trailing twelve-month price-to-earnings ratio as supplied by the provider: the same number the P/E band is judged on. \"—\" when the provider has no P/E for the company.",
+                "**Market cap** — the provider's latest market capitalisation for the company. It is not the value the scanner's market-cap gate uses (see the Today's Candidates entry), so the two can differ."
+              ]
+            }
+          ],
+          "terms": []
+        },
+        {
+          "id": "balance-sheet",
+          "title": "Balance sheet",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "The **Balance sheet** card shows how much profit the company makes on its capital, how much it owes, and whether it can cover its short-term bills, each with the tier the app puts it in. It has no date line of its own: it is computed together with the Fundamentals card, at the time shown there, and the same limit applies — for a symbol outside the 26 the app follows in full, figures that need reported financial statements show \"—\"."
+            },
+            {
+              "type": "paragraph",
+              "text": "**Composite** averages four tiered readings — ROE, ROIC, Debt / equity and Current ratio — each scored +1 for its best tier, 0 for its middle tier and −1 for its worst. It reads **healthy** at 0.5 or above, **stressed** at −0.5 or below, and **neutral** in between. Only available readings count: today ROIC and Debt / equity come only from reported statements, so for a symbol outside the 26 the composite rests on ROE and Current ratio alone. ROA, Quick ratio and Net debt / EBITDA are shown but do not count."
+            },
+            {
+              "type": "list",
+              "items": [
+                "**ROE** — return on equity: net income over the last twelve months as a share of shareholders' equity. **excellent** at 15% or more, **adequate** from 8% up to 15%, **destroying value** below 8%. That last name is the app's label for the band; it is not a comparison with the company's cost of capital.",
+                "**ROA** — return on assets: net income over the last twelve months as a share of total assets, i.e. how much profit the company makes from everything it owns. **high** at 10% or more, **moderate** from 5% up to 10%, **low** below 5%. Shown for information; it does not count toward the composite.",
+                "**Current ratio** — current assets divided by current liabilities, from the latest reported quarter: whether what the company expects to turn into cash within a year covers what it must pay within a year. **safe** at 1.5 or more, **monitor** from 1.0 up to 1.5, **liquidity risk** below 1.0.",
+                "**Quick ratio** — like the current ratio, but leaving out inventory, which can be slow to turn into cash. **adequate** at 1.0 or more, **monitor** from 0.7 up to 1.0, **low** below 0.7. Shown for information; it does not count toward the composite."
+              ]
+            }
+          ],
+          "terms": []
+        },
+        {
           "id": "classical-technical-signals",
           "title": "Classical Technical Signals",
           "blocks": [
