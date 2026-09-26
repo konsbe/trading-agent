@@ -1,0 +1,83 @@
+{
+  "version": "0.1.0",
+  "status": "draft",
+  "notes": "Education section MasterClass (docs/EDUCATION_SECTION_CONTENT_SPEC.md §2). General, standards-based content only: no field, label or output of this app may appear here.",
+  "modules": [
+    {
+      "id": "module-3",
+      "number": 3,
+      "title": "Technical indicators, standards-based",
+      "entries": [
+        {
+          "id": "rsi",
+          "title": "RSI (Relative Strength Index)",
+          "summary": "RSI measures whether a stock has been bought or sold too fast recently. Above 70 usually means \"bought a lot, lately.\" Below 30 usually means \"sold a lot, lately.\"",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "RSI, introduced by J. Welles Wilder in 1978, compares the size of recent up-moves with recent down-moves over a lookback period, most commonly 14 sessions. It averages the gains and the losses separately (with Wilder's smoothing, a slow moving average), takes their ratio (RS = average gain ÷ average loss), and rescales it to 0–100: RSI = 100 − 100 / (1 + RS). A reading of 50 means gains and losses were balanced."
+            },
+            {
+              "type": "paragraph",
+              "text": "The 70 and 30 levels are convention, not law. Some traders use 80/20, and the right levels differ by market and volatility. \"Overbought\" means only that recent buying was unusually one-sided. It does not mean a fall is due. The most common misreading follows from this: in a strong uptrend, RSI can stay above 70 for weeks while the price keeps rising, and selling on the first reading above 70 means fighting the trend. For the same reason, many practitioners read RSI differently depending on the trend. In an uptrend they watch for dips toward 40–50 rather than for readings above 70."
+            },
+            {
+              "type": "paragraph",
+              "text": "Two other common uses. *Divergence*: price makes a new high while RSI makes a lower high, a sign that momentum is fading. Divergence can persist a long time before anything happens, if it ever does. *The 50 line*: a simple read of which side has had the upper hand. RSI describes the recent past. On its own it is not considered a trading system, and practitioners typically combine it with trend, support/resistance and volume."
+            }
+          ],
+          "terms": []
+        },
+        {
+          "id": "macd",
+          "title": "MACD (Moving Average Convergence Divergence)",
+          "summary": "MACD compares a fast and a slow average of the price to show whether momentum is speeding up or slowing down. When the MACD line crosses above its signal line, momentum is turning up; below, turning down. It reacts late, because it is built from averages.",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "MACD, developed by Gerald Appel in the late 1970s, has three parts. The **MACD line** is the 12-period exponential moving average (EMA) of the closing price minus the 26-period EMA. The **signal line** is a 9-period EMA of the MACD line. The **histogram** is the MACD line minus the signal line. When the fast average pulls away from the slow one, the two are *diverging* and momentum is building. When they come back together, they are *converging* and momentum is fading."
+            },
+            {
+              "type": "paragraph",
+              "text": "Common readings. A *signal-line cross*: MACD crossing above the signal line is read as bullish, below as bearish. A *zero-line cross*: MACD turning positive means the 12-period average has moved above the 26-period one. A *shrinking histogram*: momentum is slowing even while the price is still moving. *Divergence*: price and MACD disagree, as with RSI."
+            },
+            {
+              "type": "paragraph",
+              "text": "The limitations are just as standard. MACD is a lagging indicator, built from averages of past prices, so a cross confirms a move that is already under way. In sideways, choppy markets it produces frequent crosses that reverse almost at once (\"whipsaws\"). Its values are in price units, so they can't be compared directly between a $10 stock and a $500 stock. The 12/26/9 settings are a convention from daily charts. Like RSI, MACD is generally used as one input among several, not as a stand-alone buy or sell rule."
+            }
+          ],
+          "terms": []
+        },
+        {
+          "id": "chart-patterns",
+          "title": "Classic chart patterns (head & shoulders, flags, triangles, double tops and bottoms)",
+          "summary": "Chart patterns are recognisable shapes that price sometimes traces, which traders read as hints about what comes next. The best-known are head & shoulders, flags, triangles and double tops or bottoms. They are long-standing rules of thumb, and whether they actually predict anything is debated.",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "The classic patterns come from the charting tradition of the early and mid-20th century (Schabacker, and later Edwards & Magee). A few standard ones:"
+            },
+            {
+              "type": "list",
+              "items": [
+                "**Head & shoulders:** three peaks, the middle one highest, with a \"neckline\" joining the lows between them. It's read as a possible top once price closes below the neckline. The inverted version is read as a possible bottom.",
+                "**Double top / double bottom:** two tests of the same level that fail to break through.",
+                "**Flags:** a sharp move (the \"pole\"), then a short, tight drift against it. It's read as a pause before the move continues.",
+                "**Triangles:** converging trendlines, ascending, descending or symmetrical. They're read as a compression that resolves with a breakout."
+              ]
+            },
+            {
+              "type": "paragraph",
+              "text": "Two ideas run through all of them. *Confirmation*: a pattern is traditionally treated as complete only when price breaks the key level, such as the neckline or the triangle edge, often with a rise in volume. Before that it is just a shape that might not finish. *Measured targets*: textbooks project a target from the pattern's height, such as the head's distance from the neckline. These are conventions, not guarantees."
+            },
+            {
+              "type": "paragraph",
+              "text": "The standard cautions are part of the subject too. Pattern recognition is subjective: two analysts can see different patterns in the same chart, and it is easy to spot shapes after the fact. Academic finance has studied this for decades, and the results are mixed. Lo, Mamaysky & Wang (2000) found that some patterns carried a little information in historical US data. Studies that correct for testing many rules on the same data, such as Sullivan, Timmermann & White (1999), found that many apparent edges from technical rules shrink or disappear out of sample, and trading costs reduce them further. The widely taught position is to treat patterns as heuristics for framing risk and scenarios, and not as reliable forecasts on their own."
+            }
+          ],
+          "terms": []
+        }
+      ]
+    }
+  ]
+}

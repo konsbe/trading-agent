@@ -5,6 +5,19 @@ Text that more than one service must render identically.
 | File | Read by |
 |------|---------|
 | `momentum_caveats.json` | analyst-bot (`notifier/discord/momentum.py`) and momentum-api (`services/data-analyzer/cmd/momentum-api`) |
+| `handbook.json` | momentum-api, Education endpoints (not built yet) — draft content, `docs/EDUCATION_SECTION_CONTENT_SPEC.md` §1 |
+| `masterclass.json` | momentum-api, Education endpoints (not built yet) — draft content, spec §2 |
+
+**Education content format.** Each Handbook entry and MasterClass entry is a
+list of `blocks`: `paragraph` (`text`), `heading` (`text`), `list` (`items`), and
+— Handbook only — `caveat` (`key` into `momentum_caveats.json`, e.g.
+`heuristic_ta_caveat`). Text may use `**bold**` and `*italic*`, nothing else.
+Caveat text is never typed into these files: the loader resolves the key, so a
+Handbook page can never drift from the caveat every other surface shows.
+MasterClass entries also carry a `summary` (the at-most-three-line version shown
+first). `terms` is reserved for the Glossary, which is extracted from both files
+at load, never authored separately. MasterClass must not contain any of this
+app's field names or output labels.
 
 `momentum_caveats.json` is the single source of `EVIDENCE_CAVEAT`,
 `RESEARCH_SCORE_CAVEAT`, `HEURISTIC_TA_CAVEAT` (key `heuristic_ta_caveat`,
