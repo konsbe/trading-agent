@@ -139,7 +139,7 @@ Same 404 behavior as `/today/{symbol}` for an unknown/no-data symbol.
     "clusters": [
       { "name": "earnings_quality", "score": 0.6, "tier": "healthy" }
     ],
-    "aligned_signals": ["Revenue and EPS growing together — genuine organic quality growth"]
+    "aligned_signals": ["Strong revenue growth and strong EPS growth"]
   },
   "sentiment": {
     "headlines": [
@@ -355,8 +355,8 @@ poll. Measured on the live DB: a scanner candidate outside the watchlist
 | `balance_sheet.roe` / `roa` / `current_ratio` / `quick_ratio` | `t2_roe` / `t2_roa` / `t2_current_ratio` / `t2_quick_ratio` value + `tier` |
 | `balance_sheet.debt_to_equity` / `net_debt_ebitda` / `roic` (added) | `t2_leverage` / `t2_net_debt_ebitda` / `t2_roic` |
 | `correlations.composite` | `corr_summary` value, `tier` |
-| `correlations.clusters[]` | `corr_earnings_quality`, `corr_valuation_quality`, `corr_leverage_liquidity`, `corr_operational`: value, `tier`, `positives`, `warnings` |
-| `correlations.aligned_signals` | **not stored** (§1.1): served as every cluster's stored `positives`, in cluster order |
+| `correlations.clusters[]` | `corr_earnings_quality`, `corr_valuation_quality`, `corr_leverage_liquidity`, `corr_operational`: value, `tier`, `positives`, `warnings`. `positives` / `warnings` are served as display text, not as stored: each stored sentence is mapped to a description of the comparison it met (`internal/momentumapi/correlation_text.go`; e.g. "High D/E + thin net margin 3.1% — any revenue shortfall can cascade to insolvency risk" → "High debt / equity with a net margin of 3.1%"). Numbers carry over as rendered; an unknown sentence is served as stored; a test fails when `analyze.go`'s sentences and the table drift apart. Stored payloads and the bot's Discord output keep the original sentences (2026-09-26) |
+| `correlations.aligned_signals` | **not stored** (§1.1): served as every cluster's `positives` (display text, as above), in cluster order |
 | `correlations.master_signals` (added) | `corr_master_signals` `net_signal`, and the names whose `fired` is true |
 | `qualitative.*` (added) | `qual_moat_proxy`, `qual_insider_signal`, `qual_news_sentiment_7d/_30d`, `qual_rd_intensity`: value + `tier` |
 | `sentiment.headlines` | `news_headlines` for the symbol, newest 10: `headline`, `url`, `source`, `ts`, `sentiment` |

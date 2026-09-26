@@ -313,7 +313,8 @@ func TestAnalysis_ReadyServesStoredRowsWithoutComputing(t *testing.T) {
 	if w := clusters[0].(map[string]any)["warnings"].([]any); len(w) != 0 {
 		t.Errorf("null warnings must serve as [], got %v", w)
 	}
-	if a := corr["aligned_signals"].([]any); len(a) != 2 || a[0] != "Revenue and EPS growing together — genuine organic quality growth" {
+	// Known stored sentences are served as their display text; an unknown one as stored.
+	if a := corr["aligned_signals"].([]any); len(a) != 2 || a[0] != "Strong revenue growth and strong EPS growth" || a[1] != "High ROIC + strong revenue growth" {
 		t.Errorf("aligned_signals = %v", a)
 	}
 	if m := obj(t, corr, "master_signals"); m["net_signal"] != "bearish" || len(m["fired"].([]any)) != 1 || m["fired"].([]any)[0] != "deterioration_warning" {

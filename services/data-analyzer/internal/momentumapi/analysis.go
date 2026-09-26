@@ -618,7 +618,7 @@ func buildCorrelations(d map[string]store.StoredRow) correlationsOut {
 			continue
 		}
 		cl := clusterOut{Name: name, Score: finite(r.Value), Tier: p.str("tier"),
-			Positives: p.strings("positives"), Warnings: p.strings("warnings")}
+			Positives: correlationDisplayTexts(p.strings("positives")), Warnings: correlationDisplayTexts(p.strings("warnings"))}
 		c.Clusters = append(c.Clusters, cl)
 		c.AlignedSignals = append(c.AlignedSignals, cl.Positives...)
 	}
