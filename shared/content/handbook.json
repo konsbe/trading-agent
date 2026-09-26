@@ -170,11 +170,11 @@
         },
         {
           "id": "market-cap",
-          "title": "Market Cap and Market Cap (est.)",
+          "title": "Market Cap",
           "blocks": [
             {
               "type": "paragraph",
-              "text": "**Market Cap** is the company's reported market value — share price times shares outstanding — as used by the market-cap gate. Free data sources often have no reported value for very small companies, which would silently empty the penny bucket, so when the reported figure is missing the scanner uses an estimate: shares outstanding times today's closing price. An estimate is always shown as **Market Cap (est.)**, never as if it were reported, and the stock's record keeps a note that the gate relied on it. If the share count is missing too, there is no estimate and the stock fails the gate."
+              "text": "**Market Cap** is the value the market-cap gate uses: the session's closing price times the company's most recent share count **filed with the SEC** on or before that day. It is the same definition the scanner's research used, so today's list is drawn the same way as the history that was tested. If the company has no such filing, or its latest one is **more than 15 months old** — too old to trust once shares have been issued or reverse-split since — the market cap counts as unavailable and the stock fails the gate. The scanner never fills the gap with an estimate. Some companies that still file are excluded this way because their recent filings are missing from the scanner's data; that is a known gap, not a judgement about the company."
             }
           ],
           "terms": []
