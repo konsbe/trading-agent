@@ -9,8 +9,18 @@ One Module Federation container exposes three page modules. spog lists them as t
 sidebar items in an "Education" group, from three `config.json` entries that share the
 one remote.
 
-**Status: scaffold.** The three pages are placeholders, and the API client is a
-typed stub for endpoints that momentum-api does not serve yet.
+## Pages
+
+| Route | Page | What it shows |
+|---|---|---|
+| `/handbook` | `HandbookPage` | Narrative sections → entries with a jump-nav. Each section's `intro` renders first under its title. Caveat blocks render the served `text` verbatim in the same callout as mfe-scanner's research-score / heuristic caveats, always expanded. |
+| `/masterclass` | `MasterClassPage` | Modules → entries with a jump-nav. Each entry shows its `summary` ("In short") first, always visible; the full explanation (`blocks`) sits below it in a `CollapsibleCard` (state remembered per entry, `education.masterclass.<entry-id>`). |
+| `/glossary` | `GlossaryPage` | Search-first flat list, alphabetised. The search matches term and synonyms, case-insensitively. Each row shows the term, its synonyms, the one-line definition, and a link to `/<handbook\|masterclass>#<entry_id>`. |
+
+- **Deep links:** `/handbook#<entry-id>` and `/masterclass#<entry-id>` (section / module ids work too) scroll to and focus the target once the content has loaded (`useHashScroll`). Jump-nav links are real `#<id>` anchors on the current route: they work from the keyboard, and the current one is marked `aria-current="location"`. The nav is sticky beside the content on wide screens and sits at the top of the page below 900px.
+- **Blocks** (`ContentBlocks`): `paragraph`, `heading`, `list`, and (Handbook only) `caveat`. Text goes through `InlineText`, a small parser that supports `**bold**` and `*italic*` (italic may nest in bold). Markers must hug their text, so `3 * 4` stays literal. Everything else, HTML-looking text included, renders as literal React text; there is no `dangerouslySetInnerHTML`. Caveat text is not parsed at all.
+- **States:** a skeleton while loading. On failure, `ApiErrorState` shows the error with Retry (sibling pattern). The Glossary's empty state uses `MFEDataWrapper` with the text "Glossary terms are added as Handbook and MasterClass sections are written"; that is the expected state today, because every `terms` array is empty. Searching with no matches shows "No terms match “…”.". All three pages use neutral colours only.
+- Handbook sections are deliberately **not** collapsible, so a caveat can never be hidden. In MasterClass, only the full explanation collapses.
 
 | | |
 |---|---|
@@ -39,10 +49,13 @@ the title and the "Screener — not a forecast" pill, which spog's header alread
 | `GET /api/v1/education/masterclass` | `fetchMasterClass` |
 | `GET /api/v1/education/glossary` | `fetchGlossary` |
 
-Types in `src/api/education/types.ts` are provisional, modelled on
-`shared/content/handbook.json` / `masterclass.json`. The parsers only check for a JSON
-object with the top-level array (`sections`, `modules`, `terms`); a mismatch surfaces
-as `invalid_response`. Tighten both once the Go handler exists.
+The types in `src/api/education/types.ts` match the live responses
+(`services/data-analyzer/internal/momentumapi/education.go`; `docs/MOMENTUM_SCANNER_API.md`,
+"Education content"). The parsers in `src/api/education/parsers.ts` are strict: unknown block
+types, a caveat block without its resolved `text`, a caveat in MasterClass, or a
+missing `summary` all fail with the JSON path. `getJson` surfaces any such failure as
+`invalid_response`. Optional fields (`spec_ref`, `intro`, `notes`, `number`, term
+`synonyms`) may be absent.
 
 ## Configuration
 
@@ -94,15 +107,21 @@ cd web-app/spog && npm run start-dev:all  # :3000 → http://localhost:3000/hand
 
 ```
 src/
-  api/            fetch-client (GET, ApiError {status, code}), education/{types, educationApi}
+  api/            fetch-client (GET, ApiError {status, code}), education/{types, parsers, educationApi}
   app/            handbook-root, masterclass-root, glossary-root (exposed, hosted),
                   bootstrap (standalone), wrapper (ThemeProvider + host mode)
-  common/         webpack MF helper
-  components/     PageLayout (pill when standalone)
+  common/         webpack MF helper, errors/errorMessages
+  components/     PageLayout (pill when standalone), DocLayout (jump-nav + content),
+                  ContentBlocks, InlineText (bold/italic parser), CaveatCallout,
+                  ContentStatus, DocSkeleton, ApiErrorState
   config/         api.config.ts
-  pages/          HandbookPage, MasterClassPage, GlossaryPage (placeholders)
+  features/       Handbook (HandbookSection), MasterClass (MasterClassModule, MasterClassEntry),
+                  Glossary (GlossarySearch, GlossaryList, utils: sort / filter / entry link)
+  hooks/          useApiResource, education (useHandbook / useMasterClass / useGlossary), useHashScroll
+  pages/          HandbookPage, MasterClassPage, GlossaryPage
   providers/      HostModeContext (hosted vs standalone)
   router/         AppRouter (standalone routes)
-  test-utils/     mockResponse
+  styles/         education-document.css (section / module cards, entry rows)
+  test-utils/     mockResponse, response fixtures, mockPage
   types/          MF remote declarations, constants
 ```
