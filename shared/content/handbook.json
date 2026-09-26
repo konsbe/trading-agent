@@ -4,6 +4,240 @@
   "notes": "Education section Handbook (docs/EDUCATION_SECTION_CONTENT_SPEC.md §1). Caveat blocks reference shared/content/momentum_caveats.json by key and are resolved at load; never retype caveat text here.",
   "sections": [
     {
+      "id": "todays-candidates",
+      "spec_ref": "1.2",
+      "title": "Today's Candidates (Momentum Scanner)",
+      "intro": "*What this part of the app is for:* Today's Candidates is a screener. Once per trading session, after the US close, the scanner checks every eligible US common stock against six fixed rules — the gates — and lists the ones that passed all six, split into a market bucket and a penny bucket. It narrows roughly five thousand stocks to a short, reviewable list of unusual moves on unusual volume. It does not rank them by how likely they are to keep going, and nothing on this page is a forecast.",
+      "entries": [
+        {
+          "id": "candidates-caveat",
+          "title": "What this page claims — and does not",
+          "blocks": [
+            {
+              "type": "caveat",
+              "key": "evidence_caveat"
+            },
+            {
+              "type": "paragraph",
+              "text": "Every candidate on this page met the published gates. That is the whole claim: none of the columns, and not the score, has been shown to predict what happens next."
+            }
+          ],
+          "terms": []
+        },
+        {
+          "id": "gates",
+          "title": "The gates",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "A gate is a pass/fail rule. A stock must pass **all six** gates on the session's closing data to appear on the list. Failing any one gate **excludes** it — it is not listed with a low score, it is not listed at all. Scoring only ever happens among stocks that have already passed."
+            },
+            {
+              "type": "paragraph",
+              "text": "Stocks are judged in one of two **buckets**, decided by closing **price**, not by company size: **market** (closing at $2.00 or more) and **penny** ($0.30 to $2.00). The two buckets use the same six gates with different thresholds. Stocks under $0.30 are not judged at all, because at those prices ticks and reverse splits dominate the numbers."
+            },
+            {
+              "type": "paragraph",
+              "text": "On a stock's detail page you can see a partial pass — for example \"Failed 3 of 6 gates\" — with each gate's actual value next to its threshold. That is how a stock that is not on today's list explains itself."
+            }
+          ],
+          "terms": []
+        },
+        {
+          "id": "the-six-gates",
+          "title": "The six gates, one by one",
+          "blocks": [
+            {
+              "type": "list",
+              "items": [
+                "**Price** — market: at least $2.00; penny: $0.30 to $2.00. This is also what decides the bucket.",
+                "**History** — at least 252 daily bars (about a year of trading), so that the 52-week measures below always have a full window.",
+                "**Day change** — market: up +8% to +25% on the day; penny: up +10% to +40%. The upper bound is deliberate: the scanner is built to notice a move early, and a stock already up +60% today is past that point. The bound stops the list from filling with moves that have already happened.",
+                "**Relative volume (RVOL)** — market: at least 3.0× its usual volume; penny: at least 4.0×. A price move on ordinary volume is not what this screener looks for.",
+                "**Dollar volume** — market: at least $5 million traded; penny: at least $2 million. Without this, the penny bucket fills with stocks so thinly traded that a small order moves the price and the RVOL figure means little.",
+                "**Market cap** — market: $300 million to $10 billion; penny: $300 million or less. This is a size check inside the price-decided bucket; it does not change which bucket a stock is in."
+              ]
+            },
+            {
+              "type": "paragraph",
+              "text": "All thresholds are published defaults of the scanner, and every one of them is applied to the session's closing data only."
+            }
+          ],
+          "terms": []
+        },
+        {
+          "id": "rvol",
+          "title": "RVOL (relative volume)",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "**RVOL** is today's volume divided by the stock's average daily volume over the previous 20 sessions — today excluded, so an unusual day cannot inflate its own baseline. 3.0× means three times the usual volume. If fewer than 20 prior sessions exist, RVOL is blank and the stock fails the RVOL gate rather than being given a made-up value. The list is sorted by RVOL by default because it describes *how unusual* today was, which is what a screener is for — not because a higher RVOL has been shown to predict a better outcome (it has not; see Backtest Lab)."
+            }
+          ],
+          "terms": []
+        },
+        {
+          "id": "dollar-volume",
+          "title": "Dollar volume",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "**Dollar volume** is the closing price times the day's share volume: roughly how much money changed hands in the stock that session. It is a liquidity check — a stock can have huge RVOL on a few thousand dollars of trading, and dollar volume is what screens that out."
+            }
+          ],
+          "terms": []
+        },
+        {
+          "id": "rsi-on-candidates",
+          "title": "RSI(14) on the candidates list",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "**RSI(14)** is the standard 14-session Relative Strength Index (see MasterClass, Module 3, for what it is in general). On this list it is **not** a reason a stock scores higher. A stock breaking out on heavy volume is *expected* to show a high RSI, so rewarding RSI would reward exactly what every candidate already has, and rewarding a low RSI would select against the moves the screener is looking for. RSI is used only as a **penalty**: above 85, the score loses 5 points as \"exhausted momentum\". Otherwise it is shown for information."
+            }
+          ],
+          "terms": []
+        },
+        {
+          "id": "breakout-state",
+          "title": "Breakout State",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "**Breakout State** describes where today's close sits against the stock's highest high of the previous 20 sessions (today excluded), judged on the close, never on an intraday spike:"
+            },
+            {
+              "type": "list",
+              "items": [
+                "**breakout_from_consolidation** — closed above that 20-session high after a quiet stretch (the prior 20 sessions' range was under 25% of the price).",
+                "**breakout** — closed above that high without the quiet stretch before it.",
+                "**approaching** — closed within 2% below that high.",
+                "**none** — anything else."
+              ]
+            },
+            {
+              "type": "heading",
+              "text": "What testing found"
+            },
+            {
+              "type": "paragraph",
+              "text": "This field was tested for one question: does it help predict which candidates go on to rise **100% or more within 120 sessions**? In the original check on 218 candidates, the stocks in the stronger-breakout half reached +100% far *less* often than the weaker half (8 against 26 hits) — the field measured **inverted**. That is why its weight in the score was set to **zero**: it once earned up to 20 points, and now earns none."
+            },
+            {
+              "type": "paragraph",
+              "text": "A larger follow-up on 6,924 candidate episodes sharpened the picture instead of simply repeating it. **breakout_from_consolidation**, the most common state, reached +100% just 6.42% of the time, against 15.57% for **none**. But a plain **breakout** was the best state in that sample at 20.89%, above the 10.53% average. So \"inverted\" is true of the field as it was scored, and of its most common value — not of every value. One weight cannot fit both, which is a design finding, not a tuning one."
+            },
+            {
+              "type": "paragraph",
+              "text": "The likely reading is lateness: among stocks that have already passed the gates, a fresh breakout often marks a move further along, with less room left to run. Both checks were made on the scanner's earlier candidate definition and have not been repeated since. The field is still computed and shown because it describes the chart, and because it is informative in other ways — it simply does not add to the score."
+            }
+          ],
+          "terms": []
+        },
+        {
+          "id": "pct-of-52w-high",
+          "title": "52-Week High %",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "**52-Week High %** is today's close divided by the highest high of the previous 251 sessions (today excluded). 100% means the stock closed exactly at its prior 52-week high; above 100% means today set a **new** 52-week high."
+            },
+            {
+              "type": "heading",
+              "text": "What testing found"
+            },
+            {
+              "type": "paragraph",
+              "text": "Tested for the same question — reaching **+100% within 120 sessions** — it also measured **inverted**. In the original check on 218 candidates, the half nearer its 52-week high reached +100% less often (10 against 24 hits). In the 6,924-episode follow-up, candidates above the median reached +100% 6.70% of the time against 14.36% below it: a gap of 7.65 percentage points, far too large to be chance. Unlike Breakout State, this one held cleanly in both checks."
+            },
+            {
+              "type": "paragraph",
+              "text": "That is why its weight is **zero**. It once earned up to 5 points, the most of all for a fresh 52-week high — which is precisely the case that measured backwards. The reading is the same lateness: among stocks that have already passed the gates, being at a new high marks a move further along, not a better one. Both checks were made on the scanner's earlier candidate definition and have not been repeated since. The field is still computed and shown, because it describes where the price is."
+            }
+          ],
+          "terms": []
+        },
+        {
+          "id": "catalyst-tier",
+          "title": "Catalyst Tier",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "**Catalyst Tier** is meant to say whether company news explains the move: **A** (strong news such as an approval, acquisition, major contract or raised guidance), **B** (weaker news such as an analyst upgrade or a partnership), or **none** (the stock was checked and there was no company news in the last 48 hours). A blank means the stock was **not checked** — and today that is every stock, because the news classifier is not yet running on live data. A blank is therefore missing information, not a sign that nothing happened; the detail page says \"Not checked — catalyst data not yet ingested\"."
+            }
+          ],
+          "terms": []
+        },
+        {
+          "id": "market-cap",
+          "title": "Market Cap and Market Cap (est.)",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "**Market Cap** is the company's reported market value — share price times shares outstanding — as used by the market-cap gate. Free data sources often have no reported value for very small companies, which would silently empty the penny bucket, so when the reported figure is missing the scanner uses an estimate: shares outstanding times today's closing price. An estimate is always shown as **Market Cap (est.)**, never as if it were reported, and the stock's record keeps a note that the gate relied on it. If the share count is missing too, there is no estimate and the stock fails the gate."
+            }
+          ],
+          "terms": []
+        },
+        {
+          "id": "score",
+          "title": "Score and the \"/75\" ceiling",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "The **score** is a 0–100 research number computed only for stocks that passed the gates. It adds up weighted parts: relative volume (up to 35), volume acceleration (25), catalyst (15), estimated float (10), and trading above the 20-day volume-weighted average price (5). Breakout State and 52-Week High % are weighted **zero** because they measured inverted. Ten points are deliberately left unassigned, so the most any stock can reach is 90. Penalties then subtract points for exhausted momentum (RSI above 85), an already-extended day (up more than 20%), and volume that is high but already fading."
+            },
+            {
+              "type": "paragraph",
+              "text": "Each score is shown against **its own ceiling**, e.g. **53/75** rather than 53: the ceiling is 90 minus the weight of every part that is missing for that stock. With the catalyst part blank for every stock today, the ceiling is 75. Showing \"/75\" stops a 53 from reading as \"53 out of 100\"."
+            },
+            {
+              "type": "paragraph",
+              "text": "The score is always labelled **unvalidated**, everywhere it appears:"
+            },
+            {
+              "type": "caveat",
+              "key": "research_score_caveat"
+            }
+          ],
+          "terms": []
+        },
+        {
+          "id": "universe-scanned",
+          "title": "Universe scanned vs. universe eligible",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "The header reads, for example, \"4,967 of 5,000 symbols scanned\". **Eligible** is the list of stocks the scanner is meant to cover: common stock on NASDAQ, NYSE or NYSE American — no ETFs, funds, warrants, units, preferred shares, ADRs or REITs. **Scanned** is how many of them actually got a result for this session. The two differ when a stock's data is not available for that day — for example a missing daily bar — so it could not be evaluated. A stock that was not scanned is simply absent; it has not been judged and failed."
+            }
+          ],
+          "terms": []
+        },
+        {
+          "id": "scan-staleness",
+          "title": "Scan date and a stale scan",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "The **scan date** is the trading session the list covers. The scanner runs after the close, so each morning the list shows the previous session. The scan is **stale** when a newer session should exist by now — its 4:00 pm New York close plus a six-hour grace period has passed, on the NYSE's own trading calendar with its holidays — but no scan for it has been stored. Weekends and market holidays never make it stale. When it is stale, the page keeps showing the older, still-correct list and says so above it: \"Couldn't load today's results — showing the scan from …\"."
+            }
+          ],
+          "terms": []
+        },
+        {
+          "id": "sorting-is-not-ranking",
+          "title": "Why sorting is not ranking",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "Every column can be sorted, the score included, and the list opens sorted by RVOL. The sort line always says what it is — \"Sorted by RVOL — descriptive, not predictive\" — because reordering a list is not the same as ranking candidates by how good they are. That is why the \"unvalidated\" label stays next to the score in every row and every sort order: sorting by score puts the highest numbers on top, but those numbers have not been shown to predict anything, so the top of that list is not \"the best\" candidates."
+            }
+          ],
+          "terms": []
+        }
+      ]
+    },
+    {
       "id": "stock-detail",
       "spec_ref": "1.3",
       "title": "Stock Detail — full analysis",
