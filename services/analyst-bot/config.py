@@ -101,7 +101,7 @@ class BotConfig(BaseSettings):
     #: screener | score. Screener alerts on a gate pass per bucket and shows no
     #: score; score restores the 65/72 threshold behaviour. Default screener,
     #: because the score does not separate outcomes within a bucket
-    #: out-of-sample (MH OR 0.991, p=0.947) and a threshold on it implies a
+    #: out-of-sample (penny p=0.891, market p=0.645) and a threshold on it implies a
     #: ranking that is not there.
     bot_momentum_alert_mode: str = "screener"
     #: Max screener alerts posted per channel per day; 0 disables the cap.

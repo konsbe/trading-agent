@@ -44,3 +44,32 @@ func TestHeuristicTACaveat_StatesTheRound1NullResult(t *testing.T) {
 		t.Errorf("LoadCaveats HeuristicTA = %q\nshared file         = %q", got, text)
 	}
 }
+
+// RESEARCH_SCORE_CAVEAT cites the score's OWN out-of-sample result. It used to
+// cite MH OR 0.991 / p=0.947, which is the Phase 2 entry-gate test of rvol (one
+// component), not the score; that attribution is inverted here so it cannot
+// come back.
+func TestResearchScoreCaveat_CitesTheScoresOwnResult(t *testing.T) {
+	raw, err := os.ReadFile(sharedCaveatsPath(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var file map[string]any
+	if err := json.Unmarshal(raw, &file); err != nil {
+		t.Fatal(err)
+	}
+	text, _ := file["research_score_caveat"].(string)
+	for _, must := range []string{"NOT VALIDATED", "neither bucket", "penny p=0.891", "market p=0.645"} {
+		if !strings.Contains(text, must) {
+			t.Errorf("research_score_caveat must say %q", must)
+		}
+	}
+	for _, retired := range []string{"0.991", "0.947"} {
+		if strings.Contains(text, retired) {
+			t.Errorf("research_score_caveat cites rvol's entry-gate figure %q as the score's", retired)
+		}
+	}
+	if got := loadSharedCaveats(t).ResearchScore; got != text {
+		t.Errorf("LoadCaveats ResearchScore = %q\nshared file          = %q", got, text)
+	}
+}
