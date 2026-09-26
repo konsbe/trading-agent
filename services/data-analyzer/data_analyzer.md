@@ -571,6 +571,36 @@ Separate binary from **`macro-analysis`**. Writes **`mo_reference_snapshot`** to
 
 ---
 
+## `momentum-scanner` — §8.2 daily scan
+
+Computes §3 features for every eligible symbol's latest bar, applies the §3.2
+gates, scores gate-passers (§4) and writes `momentum_features` /
+`momentum_scores` plus the `momentum_chain_runs` marker in one transaction.
+`momentum-daily` runs it with no arguments.
+`go run ./cmd/momentum-scanner` (or `-dry-run` to compute and print without
+writing).
+
+| Flag | Env fallback | Default | Meaning |
+|---|---|---|---|
+| `-gate-version` | `MOMENTUM_GATE_VERSION` | `2` | §3.2 market cap: `2` = point-in-time (`raw_close[t] × shares_outstanding_pit` filed ≤ t, both unadjusted); `1` = today's Finnhub cap + §3.9 estimate |
+| `-pit-max-age-months` | `MOMENTUM_PIT_MAX_FILING_AGE_MONTHS` | `15` (`DefaultGateConfig`) | v2 only: a share count filed more than N months before the session counts as unavailable → `market_cap_pit_unavailable`; `0` = no limit |
+| `-source` / `-interval` | — | `tiingo` / `1Day` | bars to read |
+| `-dry-run` | — | off | compute and report, write nothing |
+| `-explain` | — | — | comma-separated symbols: print their gate verdict and market-cap input (PIT value, filed date, `STALE`) |
+
+An explicit flag wins over the env var; a non-integer env value is fatal. The
+gate version and age limit are printed at startup and in the run summary.
+
+**Live gate history.** Until 2026-09-26 the scanner ran **v1** (it never set
+`GateConfig.Version`, whose zero value behaves as v1). Since then it runs v2
+with the 15-month filing-age limit — see Phase 1 §3.2's v2 box for why the
+limit exists (JAGX priced on a 2018 share count). Under v2 the stored
+`momentum_features.market_cap` is the point-in-time value the gate used (null
+when unavailable or stale) and `market_cap_est` is null, since v2 has no proxy.
+The point-in-time share series is loaded by `store.LoadSharesPIT`, shared with
+`momentum-backtest` (whose `-pit-max-age-months` defaults to `0`, the setting
+the published Phase 2 numbers were computed under).
+
 ## `momentum-tracker` — §5 exit tracking
 
 Daily: evaluates exits on every active `momentum_tracked` row, then opens rows
