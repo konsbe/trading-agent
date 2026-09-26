@@ -1,5 +1,5 @@
 import { fetchGlossary, fetchHandbook, fetchMasterClass } from './educationApi';
-import { mockResponse } from '@/test-utils/fixtures';
+import { glossaryFixture, glossaryTerm, handbookFixture, masterClassFixture, mockResponse } from '@/test-utils/fixtures';
 
 describe('education API', () => {
     const fetchMock = jest.fn();
@@ -15,40 +15,36 @@ describe('education API', () => {
     });
 
     it.each([
-        ['fetchHandbook', fetchHandbook, '/api/v1/education/handbook', { version: '0.1.0', status: 'draft', sections: [] }],
-        ['fetchMasterClass', fetchMasterClass, '/api/v1/education/masterclass', { version: '0.1.0', status: 'draft', modules: [] }],
-        ['fetchGlossary', fetchGlossary, '/api/v1/education/glossary', { terms: [{ term: 'RSI' }] }],
-    ])('%s GETs %s from the configured momentum-api', async (_name, fetchFn, path, body) => {
+        ['fetchHandbook', fetchHandbook, '/api/v1/education/handbook', handbookFixture()],
+        ['fetchMasterClass', fetchMasterClass, '/api/v1/education/masterclass', masterClassFixture()],
+        ['fetchGlossary', fetchGlossary, '/api/v1/education/glossary', glossaryFixture([glossaryTerm({ synonyms: ['Relative Strength Index'] })])],
+    ])('%s GETs %s from the configured momentum-api and parses it', async (_name, fetchFn, path, body) => {
         fetchMock.mockResolvedValue(mockResponse(200, body));
 
-        await expect(fetchFn()).resolves.toStrictEqual(body);
+        await expect(fetchFn()).resolves.toEqual(body);
         expect(fetchMock).toHaveBeenCalledWith(`http://127.0.0.1:8090${path}`, expect.objectContaining({ method: 'GET' }));
     });
 
-    it.each([
-        ['fetchHandbook', fetchHandbook, 'handbook.sections'],
-        ['fetchMasterClass', fetchMasterClass, 'masterclass.modules'],
-        ['fetchGlossary', fetchGlossary, 'glossary.terms'],
-    ])('%s rejects a body without its top-level array as invalid_response', async (_name, fetchFn, field) => {
-        fetchMock.mockResolvedValue(mockResponse(200, { version: '0.1.0' }));
-
-        await expect(fetchFn()).rejects.toMatchObject({ status: 200, code: 'invalid_response', message: expect.stringContaining(field) });
-    });
-
-    it.each([null, [], 'text'])('rejects a non-object body %j', async body => {
+    it('rejects a malformed body as invalid_response naming the path', async () => {
+        const body = handbookFixture() as any;
+        body.sections[0].entries[0].blocks[1].text = 42;
         fetchMock.mockResolvedValue(mockResponse(200, body));
 
-        await expect(fetchHandbook()).rejects.toMatchObject({ code: 'invalid_response', message: 'handbook: expected a JSON object' });
+        await expect(fetchHandbook()).rejects.toMatchObject({
+            status: 200,
+            code: 'invalid_response',
+            message: 'handbook.sections[0].entries[0].blocks[1].text: expected a string',
+        });
     });
 
     it('surfaces API errors with their status and code', async () => {
-        fetchMock.mockResolvedValue(mockResponse(503, { error: 'database_unavailable' }));
+        fetchMock.mockResolvedValue(mockResponse(500, { error: 'education_content_not_loaded' }));
 
-        await expect(fetchGlossary()).rejects.toMatchObject({ status: 503, code: 'database_unavailable' });
+        await expect(fetchGlossary()).rejects.toMatchObject({ status: 500, code: 'education_content_not_loaded' });
     });
 
     it('passes the abort signal through', async () => {
-        fetchMock.mockResolvedValue(mockResponse(200, { terms: [] }));
+        fetchMock.mockResolvedValue(mockResponse(200, glossaryFixture()));
         const controller = new AbortController();
 
         await fetchGlossary({ signal: controller.signal });

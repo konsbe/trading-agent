@@ -1,7 +1,8 @@
 /**
- * Provisional response types for momentum-api's Education endpoints, modelled on
- * `shared/content/handbook.json` / `masterclass.json` (format: `shared/content/README.md`).
- * The endpoints are not built yet; align these with the Go handler once it lands.
+ * Response types for momentum-api's Education endpoints
+ * (`services/data-analyzer/internal/momentumapi/education.go`,
+ * `docs/MOMENTUM_SCANNER_API.md` "Education content"; block format:
+ * `shared/content/README.md`).
  */
 
 /** Text may use `**bold**` and `*italic*`, nothing else. */
@@ -22,48 +23,62 @@ export interface ListBlock {
     items: InlineText[];
 }
 
-/** Handbook only. `key` points into `momentum_caveats.json`; the server may resolve it to `text`. */
+/**
+ * Handbook only. The server resolves `key` (into `momentum_caveats.json`) to
+ * `text`, the caveat byte-for-byte; render it verbatim, never as inline markup.
+ */
 export interface CaveatBlock {
     type: 'caveat';
     key: string;
-    text?: InlineText;
+    text: string;
 }
 
-export type ContentBlock = ParagraphBlock | HeadingBlock | ListBlock | CaveatBlock;
+export type MasterClassBlock = ParagraphBlock | HeadingBlock | ListBlock;
+export type HandbookBlock = MasterClassBlock | CaveatBlock;
+export type ContentBlock = HandbookBlock;
+
+/** Reserved for the Glossary; the server extracts these, pages don't render them. */
+export interface EducationTerm {
+    term: string;
+    synonyms: string[];
+    definition: string;
+}
 
 export interface HandbookEntry {
     id: string;
     title: string;
-    blocks: ContentBlock[];
-    terms: string[];
+    blocks: HandbookBlock[];
+    terms: EducationTerm[];
 }
 
 export interface HandbookSection {
     id: string;
-    spec_ref: string;
+    spec_ref?: string;
     title: string;
-    intro: InlineText;
+    /** "What this part of the app is for"; rendered first, under the section title. */
+    intro?: InlineText;
     entries: HandbookEntry[];
 }
 
 export interface Handbook {
     version: string;
     status: string;
+    notes?: string;
     sections: HandbookSection[];
 }
 
 export interface MasterClassEntry {
     id: string;
     title: string;
-    /** The at-most-three-line version shown first. */
+    /** The at-most-three-line version, always shown first. */
     summary: InlineText;
-    blocks: ContentBlock[];
-    terms: string[];
+    blocks: MasterClassBlock[];
+    terms: EducationTerm[];
 }
 
 export interface MasterClassModule {
     id: string;
-    number: number;
+    number?: number;
     title: string;
     entries: MasterClassEntry[];
 }
@@ -71,16 +86,24 @@ export interface MasterClassModule {
 export interface MasterClass {
     version: string;
     status: string;
+    notes?: string;
     modules: MasterClassModule[];
 }
 
-/** Extracted by the server from Handbook and MasterClass `terms`; never authored separately. */
+export type GlossarySource = 'handbook' | 'masterclass';
+
 export interface GlossaryTerm {
     term: string;
-    [key: string]: unknown;
+    synonyms: string[];
+    definition: string;
+    source: GlossarySource;
+    /** The fuller entry this term points at (a Handbook or MasterClass entry id). */
+    entry_id: string;
+    section_or_module_id: string;
 }
 
 export interface Glossary {
+    handbook_version: string;
+    masterclass_version: string;
     terms: GlossaryTerm[];
-    [key: string]: unknown;
 }
