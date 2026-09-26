@@ -44,4 +44,4 @@ test:
 
 # Real-Postgres tests. Fixtures run inside rolled-back transactions.
 test-integration:
-	TEST_DATABASE_URL=$${TEST_DATABASE_URL:-$$DATABASE_URL} go test -tags integration -count=1 ./internal/testdb/ ./internal/store/ ./internal/momentumapi/ ./cmd/fundamental-analysis/ ./internal/technical/runner/
+	TEST_DATABASE_URL=$${TEST_DATABASE_URL:-$$DATABASE_URL} go test -tags integration -count=1 ./internal/testdb/ ./internal/store/ ./internal/momentumapi/ ./cmd/fundamental-analysis/ ./internal/fundamental/ ./internal/technical/runner/

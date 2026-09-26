@@ -25,15 +25,17 @@
   "symbol": "ZZFAFULL",
   "metric": "corr_earnings_quality",
   "period": "derived",
-  "value": 1,
+  "value": 0,
   "payload": {
    "note": "EPS/FCF alignment, revenue/EPS coherence, gross vs net margin trends",
-   "tier": "healthy",
-   "warnings": null,
+   "tier": "mixed_positive",
+   "warnings": [
+    "EPS growing but FCF accrual concern — possible earnings inflation via non-cash accounting"
+   ],
    "positives": [
     "Revenue and EPS growing together — genuine organic quality growth"
    ],
-   "checks_run": 1
+   "checks_run": 2
   }
  },
  {
@@ -55,9 +57,9 @@
   "symbol": "ZZFAFULL",
   "metric": "corr_master_signals",
   "period": "derived",
-  "value": 1,
+  "value": 0,
   "payload": {
-   "net_signal": "bullish",
+   "net_signal": "neutral",
    "value_trap": {
     "fired": false,
     "score": 0,
@@ -68,7 +70,7 @@
     "score": 0,
     "conditions_met": null
    },
-   "bearish_count": 0,
+   "bearish_count": 1,
    "bullish_count": 1,
    "bullish_convergence": {
     "fired": true,
@@ -80,10 +82,11 @@
     ]
    },
    "deterioration_warning": {
-    "fired": false,
-    "score": 1,
+    "fired": true,
+    "score": 2,
     "conditions_met": [
-     "eps_strong"
+     "eps_strong",
+     "fcf_accruals_concern"
     ]
    },
    "leverage_cycle_warning": {
@@ -114,12 +117,12 @@
   "symbol": "ZZFAFULL",
   "metric": "corr_summary",
   "period": "derived",
-  "value": 0.33,
+  "value": 0.08,
   "payload": {
    "tier": "mixed_positive",
    "clusters": {
     "operational": "mixed_positive",
-    "earnings_quality": "healthy",
+    "earnings_quality": "mixed_positive",
     "valuation_quality": "mixed_positive",
     "leverage_liquidity": "mixed_positive"
    },
@@ -127,13 +130,13 @@
     "value_trap": false,
     "hidden_value": false,
     "bullish_convergence": true,
-    "deterioration_warning": false,
+    "deterioration_warning": true,
     "leverage_cycle_warning": false
    },
-   "overall_score": 0.33,
-   "warnings_count": 1,
+   "overall_score": 0.08,
+   "warnings_count": 2,
    "positives_count": 3,
-   "master_net_signal": "bullish"
+   "master_net_signal": "neutral"
   }
  },
  {
@@ -863,6 +866,27 @@
    "tier": "destroying_value",
    "roe_pct": 2.06,
    "thresholds": "\u003e15% excellent (moat), 8-15% adequate, \u003c8% destroying value"
+  }
+ },
+ {
+  "symbol": "ZZFATHIN",
+  "metric": "t3_interest_coverage",
+  "period": "derived",
+  "value": -5.94,
+  "payload": {
+   "tier": "high_risk",
+   "coverage_ratio": -5.94
+  }
+ },
+ {
+  "symbol": "ZZFATHIN",
+  "metric": "t3_interest_coverage",
+  "period": "derived",
+  "value": null,
+  "payload": {
+   "note": "not computable from the current inputs; the earlier row is no longer current",
+   "status": "not_computable",
+   "superseded_ts": "2026-09-25T22:19:29Z"
   }
  }
 ]

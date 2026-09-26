@@ -37,6 +37,7 @@ import (
 	"fmt"
 	"log/slog"
 	"math"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgconn"
@@ -68,11 +69,13 @@ func AnalyzeSymbol(ctx context.Context, db store.ReadWriter, symbol string, cfg 
 	}
 	cdb := &countingDB{ReadWriter: db}
 	w := &analyzer{cfg: cfg, pool: cdb, log: log}
+	runStart := time.Now().UTC()
 	w.score(ctx, symbol, rows)
 	w.analyzeMarginTrend(ctx, symbol, rows)
 	w.scoreTier2(ctx, symbol, rows)
 	w.scoreTier3(ctx, symbol, rows)
 	w.scoreQualitative(ctx, symbol, rows)
+	w.supersedeUnwritten(ctx, symbol, runStart)
 	w.scoreCorrelations(ctx, symbol, rows)
 	res.Scored = true
 	if cdb.failed > 0 {
@@ -104,6 +107,38 @@ type analyzer struct {
 	cfg  config.FundamentalAnalysis
 	pool store.ReadWriter
 	log  *slog.Logger
+}
+
+// supersedeUnwritten writes a nil-valued "not_computable" row for every derived
+// metric this run did not write. A pass that cannot compute a metric (a line
+// missing from the newest filing, FCF ≤ 0, no market cap) skips the write, and
+// the previous row, from older filings or older code, would stay the latest
+// row that scoreCorrelations, momentum-api and the bot read. It runs before
+// scoreCorrelations, which rewrites every corr_ row itself.
+func (w *analyzer) supersedeUnwritten(ctx context.Context, symbol string, runStart time.Time) {
+	rows, err := store.QueryLatestDerived(ctx, w.pool, symbol)
+	if err != nil {
+		w.log.Error("supersede unwritten: load derived", "symbol", symbol, "err", err)
+		return
+	}
+	ts := time.Now().UTC()
+	for _, r := range rows {
+		if !r.TS.Before(runStart) || strings.HasPrefix(r.Metric, "corr_") {
+			continue
+		}
+		var p map[string]any
+		_ = json.Unmarshal(r.Payload, &p)
+		if r.Value == nil && p["status"] != nil {
+			continue
+		}
+		if err := store.UpsertFundamentalDerived(ctx, w.pool, ts, symbol, r.Period, r.Metric, nil, map[string]any{
+			"status":        "not_computable",
+			"superseded_ts": r.TS.UTC().Format(time.RFC3339),
+			"note":          "not computable from the current inputs; the earlier row is no longer current",
+		}); err != nil {
+			w.log.Error("supersede unwritten", "symbol", symbol, "metric", r.Metric, "err", err)
+		}
+	}
 }
 
 // score derives all Tier 1 FA signals from the raw rows fetched by data-fundamental.
@@ -510,7 +545,7 @@ func (w *analyzer) score(ctx context.Context, symbol string, rows []store.Fundam
 //
 // For a symbol with filings but fewer than 4 10-Qs, a nil-valued row without a
 // direction is written, so an earlier trend does not stay the latest row. Its
-// payload has "status", not "tier": scoreCorrelations reads "tier".
+// payload has "status", not "direction", so scoreCorrelations sees no trend.
 //
 // TODO: Python — use pandas rolling().mean() and scipy linregress() for
 // a proper slope-based trend test with p-value confidence.
@@ -1764,15 +1799,18 @@ func (w *analyzer) scoreCorrelations(ctx context.Context, symbol string, rows []
 		}
 	}
 
-	// dTier returns the "tier" field from a derived metric's payload.
-	dTier := func(metric string) string {
+	// dField returns a string field from a derived metric's payload.
+	dField := func(metric, field string) string {
 		if p, ok := dPay[metric]; ok {
-			if t, ok2 := p["tier"].(string); ok2 {
+			if t, ok2 := p[field].(string); ok2 {
 				return t
 			}
 		}
 		return ""
 	}
+	// dTier returns the "tier" field. fcf_eps_divergence stores its class as
+	// "quality" and the margin trends as "direction"; read those by name.
+	dTier := func(metric string) string { return dField(metric, "tier") }
 
 	// seriesTrend queries the 2 most recent 10-K values for a metric and returns
 	// the ratio (newest/older), a year-over-year change. >1 = rising, <1 =
@@ -1797,14 +1835,14 @@ func (w *analyzer) scoreCorrelations(ctx context.Context, symbol string, rows []
 	eq1Score, eq1Max := 0.0, 0.0
 
 	// 1a. EPS vs FCF alignment (already computed by score() as fcf_eps_divergence).
-	epsFCFTier := dTier("fcf_eps_divergence")
+	epsFCFTier := dField("fcf_eps_divergence", "quality")
 	if epsFCFTier != "" {
 		eq1Max++
 		switch epsFCFTier {
-		case "accruals_concern":
+		case "warning_eps_growing_fcf_low":
 			eq1Score--
 			eq1Warnings = append(eq1Warnings, "EPS growing but FCF accrual concern — possible earnings inflation via non-cash accounting")
-		case "eps_backed_by_fcf":
+		case "high_quality_earnings":
 			eq1Score++
 			eq1Positives = append(eq1Positives, "EPS growth backed by real FCF — high-quality earnings")
 		}
@@ -1832,15 +1870,8 @@ func (w *analyzer) scoreCorrelations(ctx context.Context, symbol string, rows []
 
 	// 1c. Gross vs Net margin trend coherence.
 	// Gross expanding + net compressing = SG&A or interest costs surging below the gross line.
-	gmTrend := dTier("gross_margin_trend_8q")
-	nmTrend := dTier("net_margin_trend_8q")
-	// Fallback: some versions stored without _8q suffix.
-	if gmTrend == "" {
-		gmTrend = dTier("gross_margin_trend")
-	}
-	if nmTrend == "" {
-		nmTrend = dTier("net_margin_trend")
-	}
+	gmTrend := dField("gross_margin_trend_8q", "direction")
+	nmTrend := dField("net_margin_trend_8q", "direction")
 	if gmTrend != "" && nmTrend != "" {
 		eq1Max++
 		switch {
@@ -2165,7 +2196,7 @@ func (w *analyzer) scoreCorrelations(ctx context.Context, symbol string, rows []
 		if epsTier == "strong" {
 			met = append(met, "eps_strong")
 		}
-		if epsFCFTier == "accruals_concern" {
+		if epsFCFTier == "warning_eps_growing_fcf_low" {
 			met = append(met, "fcf_accruals_concern")
 		}
 		// Compare receivables growth to revenue growth via XBRL series.

@@ -79,6 +79,11 @@ func seedFixture(t *testing.T, ctx context.Context, tx pgx.Tx) {
 		        (now() - interval '7 days', 'ZZFAFULL', 'Insider C', 'P', 300),
 		        (now() - interval '8 days', 'ZZFAFULL', 'Insider D', 'S', 400),
 		        (now() - interval '200 days', 'ZZFAFULL', 'Insider E', 'P', 500)`,
+		// A derived row from an earlier run that this run cannot recompute
+		// (ZZFATHIN has no filings): it must be superseded, not left latest.
+		`INSERT INTO equity_fundamentals (ts, symbol, period, metric, value, payload, source)
+		 VALUES ('2026-09-25 22:19:29+00', 'ZZFATHIN', 'derived', 't3_interest_coverage', -5.94,
+		         '{"tier": "high_risk", "coverage_ratio": -5.94}', 'fundamental_analysis')`,
 		`INSERT INTO news_headlines (ts, source, symbol, headline, sentiment)
 		 VALUES (now() - interval '2 days', 'zz_fixture', 'ZZFAFULL', 'zz one', 0.40),
 		        (now() - interval '3 days', 'zz_fixture', 'ZZFAFULL', 'zz two', 0.10),
@@ -163,6 +168,53 @@ func TestAnalyzeMatchesGolden(t *testing.T) {
 	}
 	if !bytes.Equal(body, want) {
 		t.Fatalf("worker derived output changed; diff testdata/derived_golden.json against:\n%s", firstDiff(want, body))
+	}
+}
+
+// ZZFAFULL is MSFT: fcf_eps_divergence stores "warning_eps_growing_fcf_low"
+// under "quality" (EPS growth 31.56%, FCF yield 1.95%). scoreCorrelations read
+// "tier" and matched values the worker never writes ("accruals_concern"), so
+// live MSFT's earnings quality ran 1 check and read "healthy", and the
+// deterioration warning never saw the condition.
+func TestFCFEPSDivergenceReachesCorrelations(t *testing.T) {
+	ctx := context.Background()
+	t.Setenv("DATABASE_URL", "postgres://unused")
+	cfg, err := config.LoadFundamentalAnalysis()
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg.Symbols = []string{"ZZFAFULL"}
+	tx := testdb.Tx(t)
+	seedFixture(t, ctx, tx)
+	w := &worker{cfg: cfg, pool: tx, log: slog.New(slog.NewTextHandler(io.Discard, nil))}
+	w.analyzeAll(ctx)
+
+	payload := func(metric string) map[string]any {
+		var raw []byte
+		if err := tx.QueryRow(ctx, `SELECT payload FROM equity_fundamentals
+			WHERE symbol = 'ZZFAFULL' AND source = 'fundamental_analysis' AND metric = $1
+			ORDER BY ts DESC LIMIT 1`, metric).Scan(&raw); err != nil {
+			t.Fatalf("%s: %v", metric, err)
+		}
+		var p map[string]any
+		_ = json.Unmarshal(raw, &p)
+		return p
+	}
+	if q := payload("fcf_eps_divergence")["quality"]; q != "warning_eps_growing_fcf_low" {
+		t.Fatalf("precondition: fcf_eps_divergence quality = %v", q)
+	}
+	eq := payload("corr_earnings_quality")
+	if eq["checks_run"] != 2.0 || len(eq["warnings"].([]any)) != 1 {
+		t.Errorf("corr_earnings_quality checks_run %v warnings %v, want 2 checks and the FCF/EPS warning (live bug: 1, none)", eq["checks_run"], eq["warnings"])
+	}
+	det, _ := payload("corr_master_signals")["deterioration_warning"].(map[string]any)
+	conds, _ := det["conditions_met"].([]any)
+	found := false
+	for _, c := range conds {
+		found = found || c == "fcf_accruals_concern"
+	}
+	if !found {
+		t.Errorf("deterioration_warning conditions %v, want fcf_accruals_concern", conds)
 	}
 }
 
