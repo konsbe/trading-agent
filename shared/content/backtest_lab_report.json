@@ -24,7 +24,11 @@
       "verdict": "FAILS on both"
     },
     "route_taken": "feature_research_only",
-    "note": "The pooled, unstratified number was still large (+6.80pp, p < 0.001) and still meaningless — within bucket x ATR cells rvol pointed the wrong way in both high-volatility strata."
+    "note": "The pooled, unstratified number was still large (+6.80pp, p < 0.001) and still meaningless — within bucket x ATR cells rvol pointed the wrong way in both high-volatility strata.",
+    "post_closure_note": {
+      "date": "2026-09-26",
+      "text": "Added 2026-09-26, after the research closed. Gate v2 used each company's most recent share filing on or before the day, with no age limit, so where a company had stopped filing it used an outdated share count. Measured afterwards on the round-1 research extract, which stands in for this sample: about 3.8% of the evaluation sample's episodes (289 of 7,579), and about 6.3% in the unopened lockbox region (95 of 1,517, counted without reading any outcome), relied on a share count filed more than 15 months earlier. The published result above is not recomputed. The live scanner now treats a share count older than 15 months as unavailable. Details: Phase 2 §3.2.5."
+    }
   },
   "v2_score_finding": {
     "title": "Why the hand-weighted score (v2) is not a validated ranker",
