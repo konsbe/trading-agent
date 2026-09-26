@@ -360,8 +360,8 @@ Tall/narrow format — one row per `(symbol, period, metric)`. This mirrors the 
 | Period | Description | Example |
 |---|---|---|
 | `ttm` | Trailing twelve months — latest snapshot ratios | `pe_ratio_ttm`, `eps_ttm` |
-| `q_YYYYQN` | A specific fiscal quarter from a 10-Q filing | `q_2024Q3` |
-| `annual_YYYY` | A full fiscal year from a 10-K filing | `annual_2024` |
+| `q_YYYY-MM-DD` | A 10-Q filing, labelled by its period end (`finnhub_financials_reported`); a quarter's EPS by its period (`finnhub_earnings`). Finnhub's 10-Q figures are fiscal-year-to-date — the span is `report_raw`'s `startDate`..`endDate` | `q_2026-03-28` |
+| `annual_YYYY` | A full fiscal year from a 10-K (or 20-F / 40-F) filing | `annual_2024` |
 | `derived` | Computed by `data-analyzer` (scores, tiers, signals) | `composite_score`, `margin_trend` |
 
 **Metrics stored (TTM period):**
