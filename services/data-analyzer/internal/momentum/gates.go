@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 )
 
 // §3.2 hard gates: the candidate filter.
@@ -60,6 +61,25 @@ type GateConfig struct {
 	// universe filter at symbol-list load AND a scan-time gate, because a symbol
 	// can be eligible while its stored history is still short.
 	MinBars int
+
+	// PITMaxFilingAgeMonths bounds how old the SEC filing behind v2's
+	// MarketCapPIT may be, measured back from the session date. A share count
+	// filed earlier than session - N months counts as NO filing: the day fails
+	// with market_cap_pit_unavailable. 0 disables the limit. Ignored by v1.
+	//
+	// Why a limit exists: "latest filing on or before t" has no notion of
+	// staleness, and a series that stopped updating keeps pricing today's close
+	// against a share count from years ago. JAGX on 2026-09-25 passed the market
+	// band at $1.32B on a count filed 2018-05-15 — several reverse splits
+	// earlier, so the count was off by orders of magnitude. Reverse splits and
+	// dilution are exactly what happens to the names that stop filing, so the
+	// error is not random: it inflates the caps of shrinking micro-caps into
+	// the market band. 337 of 5,000 eligible symbols had a latest filing older
+	// than 15 months on that date.
+	//
+	// 15 months (decided 2026-09-26) leaves a full annual cycle plus a late
+	// filing's slack, so a company that files even once a year stays inside it.
+	PITMaxFilingAgeMonths int
 }
 
 // DefaultGateConfig returns §3.2's table verbatim.
@@ -86,8 +106,30 @@ func DefaultGateConfig() GateConfig {
 			MinRVol20:      4.0,
 			MinDollarVolPS: 2e6,
 		},
-		MinBars: 252,
+		MinBars:               252,
+		PITMaxFilingAgeMonths: 15,
 	}
+}
+
+// PITFilingTooOld reports whether a share count filed on filed is older than
+// cfg allows for a session on session. Compared on calendar dates, so the
+// time-of-day and zone of either value cannot move the boundary; a filing
+// exactly N months before the session is still accepted. A zero date on
+// either side is reported as too old whenever a limit is set — an age that
+// cannot be measured cannot be shown to be inside the limit.
+func (c GateConfig) PITFilingTooOld(session, filed time.Time) bool {
+	if c.PITMaxFilingAgeMonths <= 0 {
+		return false
+	}
+	if session.IsZero() || filed.IsZero() {
+		return true
+	}
+	cutoff := dateOnly(session).AddDate(0, -c.PITMaxFilingAgeMonths, 0)
+	return dateOnly(filed).Before(cutoff)
+}
+
+func dateOnly(t time.Time) time.Time {
+	return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, time.UTC)
 }
 
 // Thresholds returns the configuration for a bucket.
@@ -133,6 +175,8 @@ const (
 
 	// GateMarketCapPITUnavailable is gate v2's rejection when no SEC filing
 	// exists on or before t, so a point-in-time market cap cannot be computed.
+	// Also used when the latest such filing is older than
+	// GateConfig.PITMaxFilingAgeMonths: a stale count is not a measurement.
 	//
 	// A REJECTION, never a fallback. Substituting today's market cap here would
 	// reinstate the exact lookahead v2 removes, and would do it precisely on the
@@ -172,6 +216,13 @@ type GateInput struct {
 	// for reverse-split penny names — which is large enough to move a symbol
 	// between buckets, i.e. exactly the error this field exists to fix.
 	MarketCapPIT *float64
+
+	// MarketCapPITFiled is the filed date of the share count behind
+	// MarketCapPIT, and SessionDate is t. Together they let v2 enforce
+	// GateConfig.PITMaxFilingAgeMonths inside EvaluateGates, the one place both
+	// the live scanner and the backtest pass through.
+	MarketCapPITFiled time.Time
+	SessionDate       time.Time
 
 	// MarketCapPITMultiClass records that the share count behind MarketCapPIT
 	// is the SUM of several share classes priced at the traded class's price.
@@ -334,6 +385,12 @@ func EvaluateGates(f *Features, in GateInput, cfg GateConfig) GateResult {
 		// falling back would restore the lookahead on exactly the rows where it
 		// is largest and least checkable.
 		mcap = in.MarketCapPIT
+		if mcap != nil && cfg.PITFilingTooOld(in.SessionDate, in.MarketCapPITFiled) {
+			// A stale share count is treated exactly like no filing: same
+			// reason, no band check. Judging it against the band would let a
+			// years-old count (pre reverse split) decide the bucket's cap.
+			mcap = nil
+		}
 		if mcap == nil {
 			res.Failures = append(res.Failures, GateMarketCapPITUnavailable)
 		}

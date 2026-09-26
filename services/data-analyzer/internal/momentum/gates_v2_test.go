@@ -61,7 +61,7 @@ func TestGateV1AndV2DisagreeOnTheMarketCapBand(t *testing.T) {
 
 	v2 := DefaultGateConfig()
 	v2.Version = GateV2
-	r2 := EvaluateGates(f, GateInput{MarketCap: &today, MarketCapPIT: &pit}, v2)
+	r2 := EvaluateGates(f, freshFiling(GateInput{MarketCap: &today, MarketCapPIT: &pit}), v2)
 
 	if r1.Bucket != r2.Bucket {
 		t.Errorf("bucket differed (%s vs %s); bucket comes from price and must NOT move with the market-cap version",
@@ -88,7 +88,7 @@ func TestGateV2_ExcludesWhatTodaysCapWronglyAdmits(t *testing.T) {
 
 	cfg := DefaultGateConfig()
 	cfg.Version = GateV2
-	res := EvaluateGates(f, GateInput{MarketCap: &today, MarketCapPIT: &pit}, cfg)
+	res := EvaluateGates(f, freshFiling(GateInput{MarketCap: &today, MarketCapPIT: &pit}), cfg)
 
 	if res.Passed {
 		t.Fatal("v2 passed a symbol-day that was $20bn on the day, above the market ceiling")
@@ -128,7 +128,7 @@ func TestGateV2_PassesOnAnInBandPointInTimeCap(t *testing.T) {
 
 	cfg := DefaultGateConfig()
 	cfg.Version = GateV2
-	res := EvaluateGates(f, GateInput{MarketCapPIT: &pit}, cfg)
+	res := EvaluateGates(f, freshFiling(GateInput{MarketCapPIT: &pit}), cfg)
 
 	if !res.Passed {
 		t.Fatalf("v2 rejected an in-band point-in-time cap: %v", res.Failures)
