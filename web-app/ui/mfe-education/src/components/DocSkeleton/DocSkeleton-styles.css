@@ -1,0 +1,12 @@
+.education-skeleton {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+    max-width: 72ch;
+}
+
+.education-skeleton__block {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+}
