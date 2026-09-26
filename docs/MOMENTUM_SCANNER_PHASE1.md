@@ -279,6 +279,35 @@ later rather than a code edit.
 > fifths of the universe (Phase 2 §3.2.1), and the remainder are excluded rather
 > than approximated. Who they are, and whether excluding them biases the sample,
 > is characterised in Phase 2 §3.2.3.
+>
+> **2026-09-26: the live scanner now runs v2, with a 15-month maximum filing
+> age.** Until this date the daily `momentum-scanner` (run by `momentum-daily`)
+> was still gating **v1**: `DefaultGateConfig()` leaves `Version` unset, which
+> behaves as v1, and the scanner never opted in — v2 was wired only into
+> `momentum-backtest -gate-version 2`. It now defaults to v2
+> (`-gate-version` / `MOMENTUM_GATE_VERSION`).
+>
+> Switching exposed a gap in v2 itself: "latest filing on or before `t`" has no
+> notion of staleness. A symbol whose EDGAR series stopped updating keeps
+> pricing today's close against a years-old share count. JAGX on 2026-09-25
+> passed the market band at **$1.32B** on a count filed **2018-05-15**, several
+> reverse splits earlier. The error is not random: reverse splits and dilution
+> are what happens to the names that stop filing, so stale counts push
+> shrinking micro-caps up into the market band. On that date 337 of 5,000
+> eligible symbols had a latest filing older than 15 months.
+>
+> So v2 now has **`PITMaxFilingAgeMonths` (default 15; 0 = no limit)** in
+> `GateConfig`: a share count filed more than 15 months before the session
+> counts as no filing and the day fails with the existing
+> `market_cap_pit_unavailable`. Enforced inside `EvaluateGates`, so the scanner
+> and the backtest cannot diverge. Live: `-pit-max-age-months` /
+> `MOMENTUM_PIT_MAX_FILING_AGE_MONTHS`. `momentum-backtest` keeps
+> `-pit-max-age-months 0` as its default so the published Phase 2 v2 results,
+> which were computed **without** an age limit, stay reproducible exactly.
+>
+> Effect on 2026-09-25 (dry run): v1 had 10 candidates; v2 without the limit
+> 10 (9 shared, ABLV out, JAGX in); v2 with the limit **8** — JAGX and FFAI
+> (latest filing 2021-08-13) now fail `market_cap_pit_unavailable`.
 
 Hard gates produce the candidate set. **Scoring only ranks within the candidate set — a gate failure means excluded, not low-scored.** Every threshold below is an env-var default, not a constant.
 
