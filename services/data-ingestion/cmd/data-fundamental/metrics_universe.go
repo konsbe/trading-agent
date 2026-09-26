@@ -40,6 +40,11 @@ func (w *worker) runMetricsUniverse(ctx context.Context) int {
 		w.log.Error("seed fundamental fetch state", "err", err)
 		return 0
 	}
+	if n, err := store.SeedFundamentalFetchStateSymbols(ctx, w.pool, store.TaskMetrics, cfg.Symbols); err != nil {
+		w.log.Warn("seed configured symbols into the metrics fetch rotation", "err", err)
+	} else {
+		seeded += n
+	}
 	if seeded > 0 {
 		w.log.Info("seeded new symbols into the metrics fetch rotation", "count", seeded)
 	}

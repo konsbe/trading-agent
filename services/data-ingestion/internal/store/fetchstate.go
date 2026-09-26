@@ -63,6 +63,27 @@ ON CONFLICT (symbol, task) DO NOTHING`
 	return ct.RowsAffected(), nil
 }
 
+// SeedFundamentalFetchStateSymbols creates missing (symbol, task) rows for an
+// explicit symbol list — the configured FUNDAMENTAL_SYMBOLS. Without it the
+// checkpointed pass is not the union ResolveMetricsSymbols promises: configured
+// symbols that §3.1 excludes (ADRs such as TSM, ETFs such as SPY) are never
+// seeded, and since the static ticker stands down under checkpointing they
+// would never be refreshed at all.
+func SeedFundamentalFetchStateSymbols(ctx context.Context, pool *pgxpool.Pool, task string, symbols []string) (int64, error) {
+	if len(symbols) == 0 {
+		return 0, nil
+	}
+	const q = `
+INSERT INTO fundamental_fetch_state (symbol, task)
+SELECT s, $1 FROM unnest($2::text[]) AS s WHERE s <> ''
+ON CONFLICT (symbol, task) DO NOTHING`
+	ct, err := pool.Exec(ctx, q, task, symbols)
+	if err != nil {
+		return 0, fmt.Errorf("seed configured symbols (%s): %w", task, err)
+	}
+	return ct.RowsAffected(), nil
+}
+
 // FetchClaim is one symbol leased for a fundamentals sub-task.
 type FetchClaim struct {
 	Symbol   string
