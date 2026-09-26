@@ -285,6 +285,8 @@ services:
       MOMENTUM_API_ADDR: 0.0.0.0:8090
       MOMENTUM_CAVEATS_PATH: /shared/content/momentum_caveats.json
       MOMENTUM_BACKTEST_REPORT_PATH: /shared/content/backtest_lab_report.json
+      MOMENTUM_EDUCATION_HANDBOOK_PATH: /shared/content/handbook.json
+      MOMENTUM_EDUCATION_MASTERCLASS_PATH: /shared/content/masterclass.json
     volumes:
       - ../shared/content:/shared/content:ro
     ports:
