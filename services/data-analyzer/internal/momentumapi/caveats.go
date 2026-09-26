@@ -54,3 +54,14 @@ func LoadCaveats(path string) (Caveats, error) {
 	}
 	return c, nil
 }
+
+// byKey resolves a Handbook caveat block's key: the caveat's own key in
+// momentum_caveats.json.
+func (c Caveats) byKey(key string) (string, bool) {
+	text := map[string]string{
+		"evidence_caveat":       c.Evidence,
+		"research_score_caveat": c.ResearchScore,
+		"heuristic_ta_caveat":   c.HeuristicTA,
+	}[key]
+	return text, text != ""
+}

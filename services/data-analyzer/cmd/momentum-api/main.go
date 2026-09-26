@@ -67,6 +67,8 @@ func main() {
 	addr := env("MOMENTUM_API_ADDR", "127.0.0.1:8090")
 	caveatsPath := env("MOMENTUM_CAVEATS_PATH", "../../shared/content/momentum_caveats.json")
 	reportPath := env("MOMENTUM_BACKTEST_REPORT_PATH", "../../shared/content/backtest_lab_report.json")
+	handbookPath := env("MOMENTUM_EDUCATION_HANDBOOK_PATH", "../../shared/content/handbook.json")
+	masterClassPath := env("MOMENTUM_EDUCATION_MASTERCLASS_PATH", "../../shared/content/masterclass.json")
 	scanGrace := duration(log, "MOMENTUM_API_SCAN_GRACE", 6*time.Hour)
 	cacheTTL := duration(log, "MOMENTUM_API_CACHE_TTL", maxCacheTTL)
 	if cacheTTL > maxCacheTTL {
@@ -123,6 +125,12 @@ func main() {
 			"fix", "set MOMENTUM_BACKTEST_REPORT_PATH to shared/content/backtest_lab_report.json (in Docker, mount ../shared/content)")
 		os.Exit(1)
 	}
+	education, err := momentumapi.LoadEducation(handbookPath, masterClassPath, caveats)
+	if err != nil {
+		log.Error("momentum-api: education content", "err", err,
+			"fix", "set MOMENTUM_EDUCATION_HANDBOOK_PATH / MOMENTUM_EDUCATION_MASTERCLASS_PATH to shared/content/handbook.json / masterclass.json (in Docker, mount ../shared/content)")
+		os.Exit(1)
+	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -142,6 +150,7 @@ func main() {
 		Store:             momentumapi.DBStore{Q: pool, PingFn: pool.Ping},
 		Caveats:           caveats,
 		BacktestReport:    report,
+		Education:         education,
 		Log:               log,
 		SessionReadyAfter: scanGrace,
 		CacheTTL:          cacheTTL,

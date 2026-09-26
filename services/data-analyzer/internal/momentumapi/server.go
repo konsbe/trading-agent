@@ -133,7 +133,9 @@ type Config struct {
 	Caveats Caveats
 	// BacktestReport is the frozen Backtest Lab report (loaded at startup).
 	BacktestReport BacktestReport
-	Log            *slog.Logger
+	// Education is the Handbook, MasterClass and Glossary (loaded at startup).
+	Education Education
+	Log       *slog.Logger
 
 	// SessionReadyAfter is how long after the 16:00 New York close a session's
 	// scan is expected to exist before is_stale flips (see ExpectedSession).
@@ -252,6 +254,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("DELETE /api/v1/watchlist/{symbol}", s.handleWatchlistRemove)
 	mux.HandleFunc("GET /api/v1/symbols", s.handleSymbolSearch)
 	mux.HandleFunc("GET /api/v1/backtest-lab/report", s.handleBacktestReport)
+	mux.HandleFunc("GET /api/v1/education/handbook", s.handleEducationHandbook)
+	mux.HandleFunc("GET /api/v1/education/masterclass", s.handleEducationMasterClass)
+	mux.HandleFunc("GET /api/v1/education/glossary", s.handleEducationGlossary)
 	mux.HandleFunc("GET /api/v1/data-sources/status", s.handleDataSourcesStatus)
 	mux.HandleFunc("GET /api/v1/market-report/today", s.handleMarketReport)
 	mux.HandleFunc("GET /api/v1/alerts", s.handleAlerts)
