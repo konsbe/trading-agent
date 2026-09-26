@@ -963,6 +963,54 @@ The flag exists so the choice is auditable and so §3.2's sensitivity check can
 re-run excluding these symbols, rather than the decision being invisible inside
 a number.
 
+### 3.2.5 Finding recorded after closure (2026-09-26): stale share counts
+
+Recorded after Phase 2 closed. **Nothing was recomputed and the lockbox was not
+opened** — only symbols, dates and filing dates were read, never an outcome.
+
+Gate v2 takes the latest share count **filed on or before `t`**, with no maximum
+age. When a company's EDGAR series stops updating, v2 keeps multiplying today's
+raw close by an ever-older share count; after reverse splits or dilution the
+market cap can be wrong by orders of magnitude. Found while comparing v1 and v2
+on live sessions: on 2026-09-25 JAGX would have passed the market bucket at
+$1.32B using a share count filed 2018-05-15. Across the eligible universe today,
+337 of 5,000 symbols have a latest filing older than 15 months (219 older than
+three years).
+
+**How much of the research population relied on such filings.** Measured on the
+round-1 gate-v2 extract (`.work/data/cand_round1.csv`, 10,069 candidate rows)
+against the current `shares_outstanding_pit`, counting a candidate as stale when
+its share count was filed more than 15 months before the candidate date:
+
+| Population | Candidate rows | Stale | Episodes | Stale |
+|---|---|---|---|---|
+| Published evaluation sample (lockbox and population A excluded) | 8,116 | 300 (3.7%) | 7,579 | 289 (3.8%) |
+| Lockbox region (counted only) | 1,648 | 102 (6.2%) | 1,517 | 95 (6.3%) |
+| Population A (in-sample pilot) | 305 | 17 (5.6%) | 290 | 17 (5.9%) |
+
+Market-bucket rows carry almost all of it (285 of the 300 in the published
+sample). The lockbox era is affected more, as expected: series that stop
+updating grow staler toward the present.
+
+**Reading.** About 4% of the published sample's episodes rest on a share count
+more than 15 months old, some of which will have placed a symbol in the wrong
+gate outcome or bucket. The error runs in both directions — a stale count can
+admit a symbol that did not qualify (as JAGX would have been) or exclude one that
+did — so its effect on each result cannot be signed without recomputation.
+Phase 2's conclusions were null results well below their effect-size floors
+(e.g. the entry-gate rvol MH OR 0.991, p = 0.947), and a ~4% contamination is
+not of a size that plausibly manufactures or hides an effect of 1.25; but this
+is a judgement, not a measurement, and it is recorded as a standing caveat on
+every v2 figure. Caveats on the measurement itself: the Backtest Lab entry-gate
+extract (9,407 candidates / 6,936 episodes) is not on disk, so the round-1
+extract stands in for it; and `shares_outstanding_pit` may have gained filings
+since the research ran.
+
+**Consequence.** The live scanner adopts v2 with a 15-month maximum filing age
+(Phase 1 §3.2, 2026-09-26): an older share count counts as unavailable and fails
+with `market_cap_pit_unavailable`. The backtest keeps the unlimited behaviour by
+default so the published numbers stay reproducible exactly as computed.
+
 ### 3.3 Survivorship
 
 Today's universe excludes every company that delisted, and delisted companies
