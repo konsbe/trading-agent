@@ -344,7 +344,7 @@
             },
             {
               "type": "paragraph",
-              "text": "In plain terms: the score was tested for whether higher-scoring candidates reached **+100% within 120 sessions** more often than lower-scoring ones in the same bucket. They did not. Within the penny bucket and within the market bucket, higher and lower scores did no better than each other (penny p = 0.891, market p = 0.645); an earlier pooled result that looked positive turned out to be 97% explained by which bucket the candidates came from. The **0.991** in the note is the odds ratio from the follow-up test of **relative volume**, the score's largest part: 1.0 would mean no difference at all, and 0.991 is indistinguishable from it (p = 0.947). The score is kept as a research baseline, not as a ranking."
+              "text": "In plain terms: the score was tested for whether higher-scoring candidates reached **+100% within 120 sessions** more often than lower-scoring ones in the same bucket. They did not — within the penny bucket and within the market bucket, higher and lower scores did no better than each other, which is what the p-values in the note say. An earlier result that pooled both buckets looked positive, but 97% of it was explained by which bucket the candidates came from, not by the score. The score is kept as a research baseline, not as a ranking."
             }
           ],
           "terms": []
