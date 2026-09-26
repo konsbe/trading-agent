@@ -125,6 +125,36 @@ describe('Section 1 — entry gate', () => {
             'Sample: 9,407 candidates · 6,936 episodes · base rate 9.90% · excludes the lockbox region and population A (in-sample pilot)'
         );
     });
+
+    it('shows a dated post-closure note, verbatim and always visible, right after the gate note', () => {
+        const report = makeReport();
+        report.entry_gate.post_closure_note = { date: '2026-09-26', text: 'Added after closure. Not recomputed.' };
+        renderReport(report);
+
+        const note = screen.getByTestId('gate-post-closure-note');
+        expect(note).toBeVisible();
+        expect(note).toHaveAccessibleName('Post-closure note · Sep 26, 2026');
+        expect(screen.getByTestId('gate-post-closure-label')).toHaveTextContent('Post-closure note · Sep 26, 2026');
+        expect(within(note).getByText('Sep 26, 2026')).toHaveAttribute('dateTime', '2026-09-26');
+        expect(screen.getByTestId('gate-post-closure-text').textContent).toBe('Added after closure. Not recomputed.');
+        expect(within(note).queryByRole('button')).not.toBeInTheDocument();
+        expect(screen.getByTestId('gate-note').nextElementSibling).toBe(note);
+    });
+
+    it('renders the shared report post-closure note text exactly', () => {
+        const { report } = renderReport();
+
+        expect(screen.getByTestId('gate-post-closure-text').textContent).toBe(report.entry_gate.post_closure_note!.text);
+    });
+
+    it('renders no post-closure note when the field is absent', () => {
+        const report = makeReport();
+        delete report.entry_gate.post_closure_note;
+        renderReport(report);
+
+        expect(screen.queryByTestId('gate-post-closure-note')).not.toBeInTheDocument();
+        expect(screen.queryByText(/post-closure note/i)).not.toBeInTheDocument();
+    });
 });
 
 describe('Section 2 — v2 score finding', () => {

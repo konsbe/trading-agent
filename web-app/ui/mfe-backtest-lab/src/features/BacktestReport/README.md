@@ -23,6 +23,9 @@ hypothesis `b` note disclosure.
 - Funnel bars are sized on one linear axis from 0 to `funnelScaleMax`, which is the
   largest OR rounded up to 0.2. The dashed line is at OR 1.0. The bars are
   `aria-hidden`, and each step's label, OR and details are real text.
+- `entry_gate.post_closure_note` (optional) renders right after `entry_gate.note`
+  as a separate, always-visible block labelled "Post-closure note · <date>" with
+  the text verbatim. It is a later disclosure, not part of the published result.
 - Research-round rows are tested and abandoned hypotheses merged in id order.
   Abandoned rows get effect `—` and verdict "Abandoned before testing".
   `verdict_note` sits behind a "Note" disclosure (`aria-expanded`) that opens a row

@@ -30,6 +30,13 @@ export interface EntryGateResult {
     verdict: string;
 }
 
+/** A disclosure added after the research closed; the published result is not recomputed. */
+export interface PostClosureNote {
+    /** `YYYY-MM-DD`. */
+    date: string;
+    text: string;
+}
+
 export interface EntryGate {
     title: string;
     /** The fact that makes the report trustworthy rather than post-hoc; foreground it. */
@@ -39,6 +46,7 @@ export interface EntryGate {
     result: EntryGateResult;
     route_taken: string;
     note: string;
+    post_closure_note?: PostClosureNote;
 }
 
 export interface V2ScoreFinding {

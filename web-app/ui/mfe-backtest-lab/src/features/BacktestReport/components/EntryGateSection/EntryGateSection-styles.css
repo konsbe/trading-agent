@@ -74,3 +74,18 @@
 .backtest-gate__verdict {
     font-weight: var(--font-weight-bold);
 }
+
+/* Added after closure: set apart from the published result, informational not alarming. */
+.backtest-gate__post-closure {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xxs);
+    padding: var(--space-sm) var(--space-md);
+    border-left: 2px solid var(--color-outline);
+    border-radius: var(--radius-sm);
+    background: var(--color-surface-container-low);
+}
+
+.backtest-gate__post-closure-text {
+    font-size: var(--font-size-sm);
+}

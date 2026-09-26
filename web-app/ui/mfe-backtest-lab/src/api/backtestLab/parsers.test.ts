@@ -4,6 +4,7 @@ import { makeReportBody, SHARED_REPORT_JSON } from '@/test-utils/fixtures';
 const OPTIONAL_PATHS = [
     /^rvol_stratification_funnel\.steps\[\d+\]\.(excess_odds|composition_share_pct|verdict)$/,
     /^research_round_1\.hypotheses\[\d+\]\.verdict_note$/,
+    /^entry_gate\.post_closure_note(\.|$)/,
 ];
 
 const isOptional = (path: string) => OPTIONAL_PATHS.some(re => re.test(path));
@@ -74,6 +75,16 @@ describe('parseBacktestReport', () => {
 
         expect(report.rvol_stratification_funnel.steps.every(s => Object.keys(s).sort().join() === 'label,odds_ratio')).toBe(true);
         expect(report.research_round_1.hypotheses.some(h => 'verdict_note' in h)).toBe(false);
+        expect('post_closure_note' in report.entry_gate).toBe(false);
+        expect(report.entry_gate.post_closure_note).toBeUndefined();
+    });
+
+    it('keeps the entry-gate post-closure note verbatim when present', () => {
+        const body = makeReportBody();
+        const note = parseBacktestReport(body).entry_gate.post_closure_note;
+
+        expect(note).toStrictEqual(body.entry_gate.post_closure_note);
+        expect(note?.date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     });
 
     it('accepts an empty abandoned list', () => {
@@ -107,6 +118,12 @@ describe('parseBacktestReport', () => {
         ['a string composition_share_pct', 'rvol_stratification_funnel.steps[1].composition_share_pct', '59'],
         ['a numeric step verdict', 'rvol_stratification_funnel.steps[3].verdict', 0],
         ['a null verdict_note', 'research_round_1.hypotheses[1].verdict_note', null],
+        ['a null post_closure_note', 'entry_gate.post_closure_note', null],
+        ['a string post_closure_note', 'entry_gate.post_closure_note', 'stale share counts'],
+        ['a post_closure_note without a date', 'entry_gate.post_closure_note', { text: 'x' }],
+        ['a post_closure_note without text', 'entry_gate.post_closure_note', { date: '2026-09-26' }],
+        ['a post_closure_note date that is not YYYY-MM-DD', 'entry_gate.post_closure_note.date', '26 Sep 2026'],
+        ['a numeric post_closure_note text', 'entry_gate.post_closure_note.text', 42],
         ['a string p_value', 'entry_gate.result.p_value', '0.947'],
         ['a non-finite odds ratio', 'rvol_stratification_funnel.steps[0].odds_ratio', Infinity],
         ['a string lockbox flag', 'sample_size.lockbox_opened', 'false'],

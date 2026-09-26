@@ -5,6 +5,7 @@ import {
     EntryGate,
     FunnelStep,
     Hypothesis,
+    PostClosureNote,
     ReportMeta,
     ResearchRound,
     SampleSize,
@@ -55,6 +56,14 @@ const parseReportMeta = (value: unknown, path: string): ReportMeta => {
     };
 };
 
+const parsePostClosureNote = (value: unknown, path: string): PostClosureNote => {
+    const o = obj(value, path);
+    return {
+        date: date(o.date, `${path}.date`),
+        text: str(o.text, `${path}.text`),
+    };
+};
+
 const parseEntryGate = (value: unknown, path: string): EntryGate => {
     const o = obj(value, path);
     const sample = obj(o.sample, `${path}.sample`);
@@ -78,6 +87,7 @@ const parseEntryGate = (value: unknown, path: string): EntryGate => {
         },
         route_taken: str(o.route_taken, `${path}.route_taken`),
         note: str(o.note, `${path}.note`),
+        ...optional(o, 'post_closure_note', path, parsePostClosureNote),
     };
 };
 

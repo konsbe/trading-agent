@@ -1,6 +1,6 @@
 import { LockIcon } from '@trading-agent/shared-components';
 import ReportCard from '@/components/ReportCard';
-import { fixed, formatInteger, formatOddsRatio, formatPValue, PRECISION } from '../../utils/format';
+import { fixed, formatInteger, formatOddsRatio, formatPValue, formatReportDate, PRECISION } from '../../utils/format';
 import SampleNote from '../SampleNote';
 import { EntryGateSectionProps } from './types';
 import '@/styles/backtest-global.css';
@@ -8,7 +8,7 @@ import './EntryGateSection-styles.css';
 
 /** Section 1 — the pre-registered entry-gate test. Always expanded: it is the report's anchor. */
 const EntryGateSection = ({ gate }: EntryGateSectionProps) => {
-    const { result, sample } = gate;
+    const { result, sample, post_closure_note: postClosure } = gate;
     const stats = [
         { key: 'chi-square', label: 'Chi-square', value: fixed(result.chi_square, PRECISION.chiSquare) },
         { key: 'p-value', label: 'p-value', value: formatPValue(result.p_value) },
@@ -66,6 +66,25 @@ const EntryGateSection = ({ gate }: EntryGateSectionProps) => {
             <p className="backtest-text" data-testid="gate-note">
                 {gate.note}
             </p>
+
+            {postClosure && (
+                <aside
+                    className="backtest-gate__post-closure"
+                    aria-labelledby="backtest-gate-post-closure-label"
+                    data-testid="gate-post-closure-note"
+                >
+                    <p
+                        id="backtest-gate-post-closure-label"
+                        className="backtest-eyebrow"
+                        data-testid="gate-post-closure-label"
+                    >
+                        Post-closure note · <time dateTime={postClosure.date}>{formatReportDate(postClosure.date)}</time>
+                    </p>
+                    <p className="backtest-text backtest-gate__post-closure-text" data-testid="gate-post-closure-text">
+                        {postClosure.text}
+                    </p>
+                </aside>
+            )}
 
             <SampleNote data-testid="gate-sample">
                 {formatInteger(sample.candidates)} candidates · {formatInteger(sample.episodes)} episodes · base rate{' '}
