@@ -767,7 +767,7 @@ give-up window is not changed mid-count to rescue a session.
 | Session | Result | Count |
 |---|---|---|
 | 2026-09-24 | clean | 1 |
-| 2026-09-25 | **paused, operator-disrupted**: data-universe was recreated at 22:07 UTC (Finnhub key rotation), which re-ran its ~2.5 h startup quote-pricing pass before arming the daily-bars timer; the machine then slept 23:24–07:44 UTC. Outcome against the 10:00 UTC give-up recorded below when known | 1 |
+| 2026-09-25 | **paused, operator-disrupted**: data-universe was recreated at 22:07 UTC (Finnhub key rotation), which re-ran its ~2.5 h startup quote-pricing pass before arming the daily-bars timer; the machine then slept 23:24–07:44 UTC. Outcome: completed 2026-09-26 at 09:42 UTC (scanner 09:41), 1 attempt, no error, ~18 min before the 10:00 UTC give-up — technically clean, but it stays **paused** as decided before the outcome was known | 1 |
 
 This is **research instrumentation, not a portfolio or trading dashboard** — the
 system has never executed a trade. No "P&L", "your holdings", or portfolio-app
