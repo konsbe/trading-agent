@@ -18,7 +18,15 @@
 // than low-scored — persisting a score for a failed symbol would let it appear
 // in a ranked query.
 //
-//	DATABASE_URL=... go run ./cmd/momentum-scanner
+// Gate version: v2 (point-in-time market cap, raw_close[t] x shares filed <= t)
+// since 2026-09-26, with a 15-month maximum filing age. Before that the live
+// scan ran v1 (today's Finnhub cap) because DefaultGateConfig's zero Version
+// behaves as v1 and this command never opted in. See Phase 1 §3.2.
+//
+//	DATABASE_URL=... go run ./cmd/momentum-scanner [-gate-version 2] [-pit-max-age-months 15]
+//
+// Flags fall back to MOMENTUM_GATE_VERSION / MOMENTUM_PIT_MAX_FILING_AGE_MONTHS
+// (momentum-daily runs this with no arguments); an explicit flag wins.
 package main
 
 import (
@@ -26,6 +34,8 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -39,7 +49,33 @@ func main() {
 	source := flag.String("source", "tiingo", "equity_ohlcv.source to read")
 	interval := flag.String("interval", "1Day", "equity_ohlcv.interval to read")
 	dryRun := flag.Bool("dry-run", false, "compute and report without writing")
+	gateVersion := flag.Int("gate-version", envInt("MOMENTUM_GATE_VERSION", int(momentum.GateV2)),
+		"§3.2 market-cap definition: 2 = point-in-time (default), 1 = today's Finnhub cap. Env MOMENTUM_GATE_VERSION")
+	pitMaxAge := flag.Int("pit-max-age-months", envInt("MOMENTUM_PIT_MAX_FILING_AGE_MONTHS", momentum.DefaultGateConfig().PITMaxFilingAgeMonths),
+		"gate v2: a share count filed more than N months before the session counts as unavailable (market_cap_pit_unavailable); 0 = no limit. Env MOMENTUM_PIT_MAX_FILING_AGE_MONTHS")
+	explain := flag.String("explain", "", "comma-separated symbols whose gate verdict and market-cap inputs are printed")
 	flag.Parse()
+	explainSet := map[string]bool{}
+	for _, s := range strings.Split(*explain, ",") {
+		if s = strings.TrimSpace(strings.ToUpper(s)); s != "" {
+			explainSet[s] = true
+		}
+	}
+	if *gateVersion != int(momentum.GateV1) && *gateVersion != int(momentum.GateV2) {
+		fmt.Fprintf(os.Stderr, "-gate-version must be 1 or 2, got %d\n", *gateVersion)
+		os.Exit(2)
+	}
+	if *pitMaxAge < 0 {
+		fmt.Fprintf(os.Stderr, "-pit-max-age-months must be >= 0, got %d\n", *pitMaxAge)
+		os.Exit(2)
+	}
+
+	fcfg := momentum.DefaultConfig()
+	gcfg := momentum.DefaultGateConfig()
+	gcfg.Version = momentum.GateVersion(*gateVersion)
+	gcfg.PITMaxFilingAgeMonths = *pitMaxAge
+	gateDesc := describeGate(gcfg)
+	fmt.Println("gate:", gateDesc)
 
 	ctx := context.Background()
 	pool, err := pgxpool.New(ctx, os.Getenv("DATABASE_URL"))
@@ -63,11 +99,21 @@ func main() {
 	sharesOut := loadMetric(ctx, pool, "shares_outstanding")
 	catalysts := loadCatalystTiers(ctx, pool)
 
-	fcfg := momentum.DefaultConfig()
-	gcfg := momentum.DefaultGateConfig()
+	var sharesPIT map[string]*store.SharesPIT
+	if gcfg.Version == momentum.GateV2 {
+		// Fatal, unlike the backtest: without the series every symbol fails
+		// market_cap_pit_unavailable and the scan would commit as a valid day
+		// with zero candidates.
+		sharesPIT, err = store.LoadSharesPIT(ctx, pool)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+	}
+
 	stats := momentum.NewGateStats()
 
-	var skipped int
+	var skipped, pitUnavailable int
 	var writes []store.ScanWrite
 	var latest []time.Time
 	var candidates []string
@@ -105,6 +151,23 @@ func main() {
 			shares := so
 			row.FloatSharesEst = &shares
 		}
+		if gcfg.Version == momentum.GateV2 {
+			// raw_close[t] x shares(filed <= t), both UNADJUSTED, exactly as the
+			// backtest computes it. v2 has no proxy path, so MarketCapEst stays
+			// nil and MarketCap records the PIT value — the value the gate was
+			// evaluated against, which is what that column means.
+			gi.SessionDate = ts
+			row.MarketCap, row.MarketCapEst = nil, nil
+			if raw := series[last].RawClose; raw != nil {
+				if sh, filed, ok := sharesPIT[sym].AsOf(ts); ok {
+					pit := *raw * sh
+					gi.MarketCapPIT = &pit
+					gi.MarketCapPITFiled = filed
+					gi.MarketCapPITMultiClass = sharesPIT[sym].MultiClass
+					row.MarketCap = &pit
+				}
+			}
+		}
 		if t, ok := catalysts[sym]; ok && t != "" {
 			tier := t
 			row.CatalystTier = &tier
@@ -112,7 +175,19 @@ func main() {
 
 		g := momentum.EvaluateGates(&f, gi, gcfg)
 		row.Gate = g
+		if gcfg.Version == momentum.GateV2 && hasFailure(g, momentum.GateMarketCapPITUnavailable) {
+			// Stale filing: the gate did not use the value, so it is not stored
+			// as if it had.
+			row.MarketCap = nil
+			pitUnavailable++
+		}
 		stats.Add(g)
+
+		if explainSet[sym] {
+			fmt.Printf("  explain %-7s %s passed=%v failures=[%s] %s\n",
+				sym, g.Bucket, g.Passed, g.FailureString(), describeCap(gi, gcfg))
+			delete(explainSet, sym)
+		}
 
 		w := store.ScanWrite{Feature: row}
 		latest = append(latest, ts)
@@ -131,7 +206,8 @@ func main() {
 		s, ok := momentum.ScoreCandidate(&f, si, g)
 		if ok {
 			w.Score = &s
-			candidates = append(candidates, fmt.Sprintf("  candidate %-7s %s score=%d/%d", sym, s.Bucket, s.Total, momentum.WeightAllocated))
+			candidates = append(candidates, fmt.Sprintf("  candidate %-7s %-6s score=%d/%d %s",
+				sym, s.Bucket, s.Total, momentum.WeightAllocated, describeCap(gi, gcfg)))
 		}
 		writes = append(writes, w)
 	}
@@ -152,8 +228,16 @@ func main() {
 	for _, c := range candidates {
 		fmt.Println(c)
 	}
+	for sym := range explainSet {
+		fmt.Printf("  explain %-7s not scanned (no eligible bars or no usable close)\n", sym)
+	}
 
 	fmt.Println("\n§8.2 scanner:")
+	fmt.Printf("  gate:                 %s\n", gateDesc)
+	if gcfg.Version == momentum.GateV2 {
+		fmt.Printf("  PIT share series:     %d symbols; %d scanned symbols failed market_cap_pit_unavailable\n",
+			len(sharesPIT), pitUnavailable)
+	}
 	fmt.Printf("  symbols with bars:    %d\n", len(bars))
 	fmt.Printf("  no usable close:      %d\n", skipped)
 	fmt.Printf("  session:              %s\n", session.Format(time.DateOnly))
@@ -162,7 +246,9 @@ func main() {
 	if !*dryRun {
 		fmt.Printf("  committed:            one transaction, with the momentum_chain_runs marker\n")
 	}
-	fmt.Printf("  gate rejections:      %v\n", stats.TopFailures(6))
+	fmt.Printf("  passed by bucket:     market=%d penny=%d\n",
+		stats.PassedByBkt[momentum.BucketMarket], stats.PassedByBkt[momentum.BucketPenny])
+	fmt.Printf("  gate rejections:      %v\n", stats.TopFailures(8))
 	if *dryRun {
 		fmt.Println("  DRY RUN — nothing written")
 	}
@@ -170,7 +256,7 @@ func main() {
 
 func loadBars(ctx context.Context, pool *pgxpool.Pool, interval, source string) (map[string][]compute.Bar, error) {
 	rows, err := pool.Query(ctx, `
-SELECT o.symbol, o.ts, o.open, o.high, o.low, o.close, o.volume
+SELECT o.symbol, o.ts, o.open, o.high, o.low, o.close, o.volume, o.raw_close
 FROM equity_ohlcv o
 -- data_unavailable_reason excludes symbols whose history the provider no
 -- longer serves. Their stored bars are a frozen remnant, and the feature
@@ -188,7 +274,7 @@ ORDER BY o.symbol, o.ts`, interval, source)
 	for rows.Next() {
 		var sym string
 		var b compute.Bar
-		if err := rows.Scan(&sym, &b.TS, &b.Open, &b.High, &b.Low, &b.Close, &b.Volume); err != nil {
+		if err := rows.Scan(&sym, &b.TS, &b.Open, &b.High, &b.Low, &b.Close, &b.Volume, &b.RawClose); err != nil {
 			return nil, err
 		}
 		out[sym] = append(out[sym], b)
@@ -250,4 +336,58 @@ ORDER BY symbol, CASE tier WHEN 'A' THEN 2 WHEN 'B' THEN 1 ELSE 0 END DESC,
 		out[sym] = tier
 	}
 	return out
+}
+
+// envInt is the flag default: the env value when set and numeric, else def.
+// A malformed value is fatal rather than silently falling back, so a typo in
+// the deployment cannot quietly change which gate runs.
+func envInt(key string, def int) int {
+	v := os.Getenv(key)
+	if v == "" {
+		return def
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "%s=%q is not an integer\n", key, v)
+		os.Exit(2)
+	}
+	return n
+}
+
+func describeGate(c momentum.GateConfig) string {
+	if c.Version != momentum.GateV2 {
+		return "v1 (today's market cap; LOOKAHEAD in any historical use)"
+	}
+	if c.PITMaxFilingAgeMonths <= 0 {
+		return "v2 (point-in-time market cap), max filing age: none"
+	}
+	return fmt.Sprintf("v2 (point-in-time market cap), max filing age: %d months", c.PITMaxFilingAgeMonths)
+}
+
+func hasFailure(g momentum.GateResult, reason string) bool {
+	for _, f := range g.Failures {
+		if f == reason {
+			return true
+		}
+	}
+	return false
+}
+
+// describeCap renders the market-cap input the gate used, for candidate and
+// -explain lines.
+func describeCap(gi momentum.GateInput, c momentum.GateConfig) string {
+	if c.Version != momentum.GateV2 {
+		if gi.MarketCap == nil {
+			return "mcap=none"
+		}
+		return fmt.Sprintf("mcap=$%.0fM proxy=%v", *gi.MarketCap/1e6, gi.MarketCapIsProxy)
+	}
+	if gi.MarketCapPIT == nil {
+		return "mcap_pit=none"
+	}
+	stale := ""
+	if c.PITFilingTooOld(gi.SessionDate, gi.MarketCapPITFiled) {
+		stale = " STALE"
+	}
+	return fmt.Sprintf("mcap_pit=$%.0fM filed=%s%s", *gi.MarketCapPIT/1e6, gi.MarketCapPITFiled.Format(time.DateOnly), stale)
 }
