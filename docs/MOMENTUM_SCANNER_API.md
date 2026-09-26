@@ -409,6 +409,15 @@ this section stays the endpoint index:
 | `GET /api/v1/alerts?symbol=&since=&limit=` | §3.2 — `fired_alerts`, newest first, default limit 100 (max 500) |
 | `recent_alert` on each `/today` candidate | §4.1 — see §2.2 above |
 
+The Education routes are documented in the "Education content" addendum at the
+end of this file:
+
+| Route | Where |
+|---|---|
+| `GET /api/v1/education/handbook` | Education content §2 — `shared/content/handbook.json`, caveat blocks resolved |
+| `GET /api/v1/education/masterclass` | Education content §2 — `shared/content/masterclass.json`, as authored |
+| `GET /api/v1/education/glossary` | Education content §2 — extracted from both files' `terms` |
+
 ---
 
 ## 3. Non-functional requirements
@@ -1315,3 +1324,131 @@ built speculatively now.
 Report back after step 1 — this addendum has the most open schema
 questions of any built so far, and it's worth confirming the shape before
 writing UI against fields that might not exist as assumed.
+---
+
+# Momentum Scanner — API Service Spec, Addendum: Education content
+
+**Status:** built (`internal/momentumapi/education.go`, tests in
+`education_test.go`). **Serves:** the `EDUCATION` nav group — Handbook,
+MasterClass, Glossary. **Content spec:** `docs/EDUCATION_SECTION_CONTENT_SPEC.md`.
+**Block format:** `shared/content/README.md`.
+
+## 1. What these endpoints are
+
+Static, authored content, the Backtest Lab pattern exactly: read from
+`shared/content/handbook.json` and `masterclass.json` at startup
+(`MOMENTUM_EDUCATION_HANDBOOK_PATH`, `MOMENTUM_EDUCATION_MASTERCLASS_PATH`;
+repo-relative defaults `../../shared/content/…`, `/shared/content/…` in Compose).
+No fallback copy: a missing or malformed file, or any failed check below, stops
+the service. Every response body is built once at load. All three are
+read-only (`POST`/`PUT`/`DELETE` → 405) and send
+`Cache-Control: public, max-age=86400`.
+
+## 2. Endpoints and response shapes
+
+**`GET /api/v1/education/handbook`** — the file's structure, with each caveat
+block's `text` added from `momentum_caveats.json` (the caveat's text
+byte-for-byte; the key stays):
+
+```json
+{
+  "version": "0.1.0",
+  "status": "draft",
+  "notes": "…",
+  "sections": [
+    {
+      "id": "stock-detail", "spec_ref": "1.3", "title": "…", "intro": "…",
+      "entries": [
+        {
+          "id": "classical-technical-signals", "title": "…",
+          "blocks": [
+            { "type": "paragraph", "text": "…" },
+            { "type": "caveat", "key": "heuristic_ta_caveat", "text": "<HEURISTIC_TA_CAVEAT, verbatim>" },
+            { "type": "heading", "text": "…" },
+            { "type": "list", "items": ["…"] }
+          ],
+          "terms": []
+        }
+      ]
+    }
+  ]
+}
+```
+
+`spec_ref`, `intro` and `notes` are optional and omitted when absent; `terms` is
+always an array.
+
+**`GET /api/v1/education/masterclass`** — the file as authored (compacted, bytes
+otherwise unchanged):
+
+```json
+{
+  "version": "0.1.0", "status": "draft", "notes": "…",
+  "modules": [
+    {
+      "id": "module-3", "number": 3, "title": "…",
+      "entries": [
+        { "id": "rsi", "title": "…", "summary": "<≤3-line version>",
+          "blocks": [{ "type": "paragraph", "text": "…" }], "terms": [] }
+      ]
+    }
+  ]
+}
+```
+
+**`GET /api/v1/education/glossary`** — flat, alphabetised (case-insensitive) list
+extracted from every entry's `terms` in both files; never authored separately:
+
+```json
+{
+  "handbook_version": "0.1.0",
+  "masterclass_version": "0.1.0",
+  "terms": [
+    { "term": "P/E ratio", "synonyms": ["PE ratio"], "definition": "…",
+      "source": "masterclass", "entry_id": "…", "section_or_module_id": "module-4" }
+  ]
+}
+```
+
+`source` is `"handbook"` or `"masterclass"`; `entry_id` plus
+`section_or_module_id` locate the fuller entry. `synonyms` is always an array.
+Every `terms` array is empty today, so `terms` is `[]` — expected, not an error.
+
+## 3. Load-time checks (each one refuses startup)
+
+- `version` and `status` present; at least one section / module; unknown fields
+  refused (a field the loader does not know would be silently dropped).
+- Every section / module and every entry has `id` + `title`; section / module ids
+  unique; entry ids unique within the file; every entry has non-empty `blocks`.
+- Block types: `paragraph` / `heading` (non-empty `text` only), `list`
+  (non-empty `items` only), and — Handbook only — `caveat` (`key` only). A caveat
+  block's key must be `evidence_caveat`, `research_score_caveat` or
+  `heuristic_ta_caveat`; an unknown key, typed-in caveat text, or a caveat block
+  in MasterClass is an error.
+- MasterClass entries require a non-empty `summary`.
+- `terms` entries are `{term, synonyms?, definition}` with non-empty strings;
+  a term defined twice across both files (case-insensitive) is an error.
+- **MasterClass purity** (content spec §0, §5 step 6): no string anywhere in
+  `masterclass.json` may contain one of this app's own field names or output
+  labels. The list lives in one place, `masterClassBannedTerms`
+  (`education.go`): score fields (`momentum_score_100`, `score_attainable`,
+  `score_status`, …), action labels (`BUY_WATCH`, `TRIM_WATCH`, `PREPARE_LONG`,
+  `HOLD_WATCH`, …), caveat labels and keys, scanner features and every gate
+  reason code, analysis / alert fields (`heuristic_signals`, `fired_alerts`, …)
+  and tracked-position fields including the five exit reasons. Matching is
+  case-sensitive and whole-token (neighbours may not be letters, digits or `_`),
+  so plain English — "heuristics", "time out", "momentum score" — passes; only
+  the exact snake_case names and UPPERCASE labels are refused. Handbook is
+  exempt: it exists to explain those names.
+
+## 4. Tests
+
+`education_test.go`: every validation failure above on fixtures; each caveat key
+resolves; the served Handbook's `heuristic_ta_caveat` text equals the shared
+file's value byte-for-byte (file read independently of `LoadCaveats`); the
+served Handbook equals the file once caveat text is removed; MasterClass served
+byte-for-byte; the real MasterClass passes purity, a fixture containing
+`BUY_WATCH` fails to load, every banned term is caught in a paragraph, list
+item, summary and term, and plain English does not trip it; Glossary
+extraction, sort order and duplicates; headers, 405s, and 500 on a miswired
+server.

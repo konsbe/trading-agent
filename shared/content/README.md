@@ -5,8 +5,8 @@ Text that more than one service must render identically.
 | File | Read by |
 |------|---------|
 | `momentum_caveats.json` | analyst-bot (`notifier/discord/momentum.py`) and momentum-api (`services/data-analyzer/cmd/momentum-api`) |
-| `handbook.json` | momentum-api, Education endpoints (not built yet) — draft content, `docs/EDUCATION_SECTION_CONTENT_SPEC.md` §1 |
-| `masterclass.json` | momentum-api, Education endpoints (not built yet) — draft content, spec §2 |
+| `handbook.json` | momentum-api, `GET /api/v1/education/handbook` (+ glossary) — draft content, `docs/EDUCATION_SECTION_CONTENT_SPEC.md` §1 |
+| `masterclass.json` | momentum-api, `GET /api/v1/education/masterclass` (+ glossary) — draft content, spec §2 |
 
 **Education content format.** Each Handbook entry and MasterClass entry is a
 list of `blocks`: `paragraph` (`text`), `heading` (`text`), `list` (`items`), and

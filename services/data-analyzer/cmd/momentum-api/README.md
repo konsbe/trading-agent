@@ -34,6 +34,9 @@ and writes exactly the rows those workers would
 | `GET /api/v1/scanner/symbols/{symbol}/bars?range=1D\|5D\|1M\|6M\|1Y\|ALL` | Price history for the chart (5-minute bars for 1D/5D when stored, else daily with `fallback`) |
 | `GET /api/v1/scanner/tracked?status=active\|closed\|all` | Tracked Positions (read-only view of `momentum_tracked`, with a per-rule `exit_reason_note` from the shared caveats file) |
 | `GET /api/v1/alerts?symbol=&since=YYYY-MM-DD&limit=` | Fired alerts (`fired_alerts`, migration 026), newest first; filters optional and combinable, default limit 100 (max 500), `has_more` when truncated |
+| `GET /api/v1/education/handbook` | Handbook (`shared/content/handbook.json`) with each caveat block's `text` resolved from the shared caveats file; `Cache-Control: public, max-age=86400` |
+| `GET /api/v1/education/masterclass` | MasterClass (`shared/content/masterclass.json`) as authored; same 24h cache |
+| `GET /api/v1/education/glossary` | `{handbook_version, masterclass_version, terms[]}`, extracted from both files' `terms` and alphabetised; same 24h cache |
 | `GET /api/v1/watchlist` · `PUT` / `DELETE /api/v1/watchlist/{symbol}` | The watchlist — the service's only write path (table `watchlist_items`, migration 024). Unauthenticated list until auth exists |
 
 | Condition | Response |
@@ -72,6 +75,10 @@ never `0`. The detail view returns both shared caveats: `evidence_note`
 - **Caveats** are read at startup from `shared/content/momentum_caveats.json`,
   the same file `analyst-bot` reads. A missing file stops the service; there is
   no built-in fallback text.
+- **Education content** (Handbook, MasterClass) is read and validated at
+  startup, the same way: a missing or malformed file, an unknown caveat key, or
+  one of this app's field names or labels in MasterClass stops the service. See
+  the "Education content" addendum of the spec.
 
 ## Configuration
 
@@ -83,6 +90,8 @@ never `0`. The detail view returns both shared caveats: `evidence_note`
 | `MOMENTUM_API_CACHE_TTL` | `5m` | Response cache TTL, capped at 5m |
 | `MOMENTUM_API_SCAN_GRACE` | `6h` | Time after the 16:00 NY close before a session's scan is expected |
 | `MOMENTUM_CAVEATS_PATH` | `../../shared/content/momentum_caveats.json` | Shared caveats file (relative to the working directory) |
+| `MOMENTUM_EDUCATION_HANDBOOK_PATH` | `../../shared/content/handbook.json` | Handbook content |
+| `MOMENTUM_EDUCATION_MASTERCLASS_PATH` | `../../shared/content/masterclass.json` | MasterClass content |
 | `MOMENTUM_API_ANALYSIS_CONCURRENCY` | `2` | On-demand analyses running at once |
 | `MOMENTUM_API_ANALYSIS_TIMEOUT` | `2m` | Per analysis, queueing included; past it the analysis reports `failed` |
 | `MOMENTUM_API_ANALYSIS_RETRY_AFTER` | `3s` | Poll interval suggested with `computing` |
@@ -113,4 +122,5 @@ make log-api
 ```
 
 The image is the shared `services/data-analyzer` image (`/app/momentum-api`);
-Compose mounts `shared/content` read-only for the caveats file.
+Compose mounts `shared/content` read-only for the caveats file and the
+education content.
