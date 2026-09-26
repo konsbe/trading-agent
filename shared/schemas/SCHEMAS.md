@@ -322,7 +322,7 @@ This table uses a **tall/narrow** layout: each computed number is its own row, i
 | `revenue_growth_quarterly_yoy` | Latest quarter revenue YoY % | |
 | `pe_ratio_ttm` | Price / TTM EPS | Trailing P/E |
 | `pe_ratio_annual` | Price / annual EPS | |
-| `pe_ratio_5y_avg` | 5-year normalised P/E average | |
+| `pe_ratio_5y_avg` | Always null | Mapped from `peExclExtraNormalizedAnnual`, a key absent from every stored `/stock/metric` payload; no key there is a 5-year average P/E |
 | `pe_ratio_forward` | null | Forward P/E not on free tier; payload has note |
 | `fcf_ttm` | Free cash flow TTM ($) | |
 | `fcf_per_share_ttm` | FCF / diluted shares TTM | |
@@ -336,9 +336,10 @@ This table uses a **tall/narrow** layout: each computed number is its own row, i
 | `net_margin_ttm` | Net income / revenue TTM % | |
 | `net_margin_annual` | Annual net margin % | |
 | `net_margin_5y` | 5-year avg net margin % | |
-| `market_cap` | Market capitalisation ($M) | Used to derive FCF yield locally |
+| `market_cap` | Market capitalisation (USD absolute) | Null when the figure is not USD: profile2 reports a non-USD currency, or Finnhub priced a non-US listing whose figure does not reconcile with the USD close. Payload carries `currency`, `listing_exchange`, `usd_price_ratio` and, when null, `market_cap_millions_local` |
 | `shares_outstanding` | Diluted shares outstanding (M) | |
 | `metrics_raw` | null | Full `/stock/metric` JSON in payload |
+| `profile_raw` | null | Full `/stock/profile2` JSON in payload (source `finnhub_profile2`) |
 
 **Source: `finnhub_financials_reported` (period = `q_YYYY-MM-DD` or `annual_YYYY`)**
 
@@ -424,7 +425,7 @@ Deviating from these is a silent, invisible bug — the numbers still look plaus
 | Percent points | every `*_pct` column | `11.8` means +11.8 % (§3.3 multiplies by 100) |
 | **Ratio** | `pct_of_52w_high` | `1.0` = at the 52-week high. **Not** a percent — the Discord embed multiplies by 100 for display |
 | Ratio | `rvol_20`, `vol_accel`, `range_20` | plain multiples |
-| USD absolute | `market_cap`, `dollar_volume` | Finnhub serves market cap in **$ millions**; the writer multiplies by `1e6` because the §3.2 gates are stated in dollars ($300M–$10B) |
+| USD absolute | `market_cap`, `dollar_volume` | Finnhub serves market cap in **$ millions**; the writer multiplies by `1e6` because the §3.2 gates are stated in dollars ($300M–$10B). "$ millions" holds only for USD listings; non-USD figures are stored null |
 | Share count absolute | `shares_outstanding`, `float_shares_est` | Finnhub serves **millions**; the writer multiplies by `1e6` because the §4.2 float bands are in shares (20M/50M/100M/300M) |
 
 ### Null semantics
