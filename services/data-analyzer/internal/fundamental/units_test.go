@@ -60,11 +60,12 @@ func TestMarketCapIsReadInMillions(t *testing.T) {
 	w := &analyzer{cfg: cfg, pool: db, log: slog.New(slog.NewTextHandler(io.Discard, nil))}
 	rows := []store.FundamentalRow{
 		raw("market_cap", 3_663_170_000_000), // USD
-		raw("fcf_reported", 56_118),          // millions
 		raw("revenue_ttm", 168_090),          // millions
 		raw("eps_growth_5y", 14.57),
 		raw("revenue_growth_5y", 15),
 	}
+	rows = append(rows, filingRows("annual_2021", "10-K", "2020-07-01", "2021-06-30",
+		map[string]float64{"fcf_reported": 56_118})...) // millions
 
 	w.score(context.Background(), "MSFT", rows)
 	w.scoreTier3(context.Background(), "MSFT", rows)

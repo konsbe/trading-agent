@@ -69,7 +69,7 @@ func AnalyzeSymbol(ctx context.Context, db store.ReadWriter, symbol string, cfg 
 	cdb := &countingDB{ReadWriter: db}
 	w := &analyzer{cfg: cfg, pool: cdb, log: log}
 	w.score(ctx, symbol, rows)
-	w.analyzeMarginTrend(ctx, symbol)
+	w.analyzeMarginTrend(ctx, symbol, rows)
 	w.scoreTier2(ctx, symbol, rows)
 	w.scoreTier3(ctx, symbol, rows)
 	w.scoreQualitative(ctx, symbol, rows)
@@ -117,22 +117,11 @@ type analyzer struct {
 //	df = pd.DataFrame(rows).pivot(index='period', columns='metric', values='value')
 func (w *analyzer) score(ctx context.Context, symbol string, rows []store.FundamentalRow) {
 	// ── Build lookup maps ────────────────────────────────────────────────────
-	// latest: one value per metric name (most recent across all periods).
-	// surprises: all eps_surprise_pct values across quarters for rolling avg.
-	latest := make(map[string]float64, len(rows))
-	var surprises []float64
-
-	for _, r := range rows {
-		if r.Value == nil {
-			continue
-		}
-		if _, exists := latest[r.Metric]; !exists {
-			latest[r.Metric] = *r.Value
-		}
-		if r.Metric == "eps_surprise_pct" {
-			surprises = append(surprises, *r.Value)
-		}
-	}
+	// latest: one value per metric name (most recent period).
+	// surprises: eps_surprise_pct across quarters, oldest first, for the rolling avg.
+	latest := latestValues(rows)
+	fs := buildFilings(rows)
+	surprises := chronological(rows, "eps_surprise_pct")
 
 	ts := time.Now().UTC()
 	ptr := func(v float64) *float64 { return &v }
@@ -262,7 +251,7 @@ func (w *analyzer) score(ctx context.Context, symbol string, rows []store.Fundam
 	//
 	// TODO: Python — compute trailing 4-quarter FCF from quarterly CF statements.
 	var fcfYield *float64
-	var fcfYieldSource string
+	var fcfYieldSource, fcfBasis string
 
 	if fy, ok := latest["fcf_yield_1y"]; ok && fy != 0 {
 		fcfYield = ptr(fy * 100) // Finnhub returns as decimal (0.05 = 5%)
@@ -273,13 +262,15 @@ func (w *analyzer) score(ctx context.Context, symbol string, rows []store.Fundam
 			fcfYield = ptr(fy)
 			fcfYieldSource = "fcf_ttm ÷ market_cap × 100"
 		}
-	} else if fcf, okF := latest["fcf_reported"]; okF && fcf > 0 {
-		// Fallback: use XBRL-derived FCF (operating CF − CapEx, in millions).
-		// fcf_reported and marketCapMillions are both in millions.
+	} else if fcf, basis, okF := annualFlow(fs, "fcf_reported"); okF {
+		// Fallback: XBRL-derived FCF (operating CF − CapEx, in millions) for one
+		// year (see yearFlows). fcf_reported and marketCapMillions are both in millions.
+		// Negative FCF gives a negative yield ("avoid"), as fcf_ttm does above.
 		if mktCap, okM := marketCapMillions(latest); okM {
 			fy := fcf / mktCap * 100
 			fcfYield = ptr(fy)
 			fcfYieldSource = "fcf_reported ÷ market_cap × 100 (XBRL fallback)"
+			fcfBasis = basis
 		}
 	}
 
@@ -296,12 +287,16 @@ func (w *analyzer) score(ctx context.Context, symbol string, rows []store.Fundam
 		}
 		scorePoints += score
 		maxPoints++
-		upsert("fcf_yield", fcfYield, map[string]any{
+		fyPayload := map[string]any{
 			"fcf_yield_pct": *fcfYield,
 			"tier":          tier,
 			"source":        fcfYieldSource,
 			"thresholds":    fmt.Sprintf(">%.0f%% attractive, %.0f-%.0f%% fair, <%.0f%% avoid", cfg.FCFYieldAttractive, cfg.FCFYieldFair, cfg.FCFYieldAttractive, cfg.FCFYieldFair),
-		})
+		}
+		if fcfBasis != "" {
+			fyPayload["fcf_basis"] = fcfBasis
+		}
+		upsert("fcf_yield", fcfYield, fyPayload)
 		upsert("fcf_yield_tier", ptr(score), map[string]any{"tier": tier})
 	}
 
@@ -448,7 +443,7 @@ func (w *analyzer) score(ctx context.Context, symbol string, rows []store.Fundam
 		// Beat/miss thresholds: FUNDAMENTAL_SURPRISE_BEAT_PCT / FUNDAMENTAL_SURPRISE_MISS_PCT.
 		n := len(surprises)
 		if n > cfg.SurpriseQuarters {
-			surprises = surprises[:cfg.SurpriseQuarters]
+			surprises = surprises[n-cfg.SurpriseQuarters:]
 			n = cfg.SurpriseQuarters
 		}
 		sum := 0.0
@@ -503,24 +498,51 @@ func (w *analyzer) score(ctx context.Context, symbol string, rows []store.Fundam
 }
 
 // analyzeMarginTrend derives the 8-quarter direction of gross, operating, and net
-// margins from the quarterly financials-reported rows stored by data-fundamental.
+// margins from the last N 10-Q filings (period "q_YYYY-MM-DD") stored by
+// data-fundamental. 10-Ks are excluded: mixing them in compared a full-year
+// margin with a quarter's.
 //
-// Margin per quarter = income_statement_line ÷ revenue_reported.
+// Margin per filing = income_statement_line ÷ revenue_reported, both from the
+// same 10-Q. Finnhub reports 10-Q figures fiscal-year-to-date, so each point is
+// the YTD margin at that quarter end (Q1 three months, Q3 nine).
 // Trend is "expanding", "stable", or "compressing" based on comparing the
-// newest 2-quarter mean to the oldest 2-quarter mean in the series.
+// newest 2-filing mean to the oldest 2-filing mean in the series.
 //
-// This is only meaningful once FUNDAMENTAL_FINANCIALS_LIMIT ≥ 4 quarters of
-// data have accumulated in equity_fundamentals.
+// For a symbol with filings but fewer than 4 10-Qs, a nil-valued row without a
+// direction is written, so an earlier trend does not stay the latest row. Its
+// payload has "status", not "tier": scoreCorrelations reads "tier".
 //
 // TODO: Python — use pandas rolling().mean() and scipy linregress() for
 // a proper slope-based trend test with p-value confidence.
-func (w *analyzer) analyzeMarginTrend(ctx context.Context, symbol string) {
+func (w *analyzer) analyzeMarginTrend(ctx context.Context, symbol string, rows []store.FundamentalRow) {
 	// Quarter window: FUNDAMENTAL_MARGIN_TREND_QUARTERS.
 	nQuarters := w.cfg.MarginTrendQuarters
+	ts := time.Now().UTC()
+	hasFilings := len(buildFilings(rows)) > 0
 
-	revRows, err := store.QueryMetricSeries(ctx, w.pool, symbol, "revenue_reported", nQuarters)
-	if err != nil || len(revRows) < 4 {
-		return // not enough data yet
+	insufficient := func(outputMetric string, quarters int) {
+		if !hasFilings {
+			return
+		}
+		if err := store.UpsertFundamentalDerived(ctx, w.pool, ts, symbol, "derived", outputMetric, nil, map[string]any{
+			"status":   "insufficient_data",
+			"quarters": quarters,
+			"note":     "fewer than 4 10-Q filings with revenue and this line; no trend",
+		}); err != nil {
+			w.log.Error("upsert margin trend", "symbol", symbol, "metric", outputMetric, "err", err)
+		}
+	}
+	outputs := []string{"gross_margin_trend_8q", "operating_margin_trend_8q", "net_margin_trend_8q"}
+
+	revRows, err := store.QueryMetricSeries(ctx, w.pool, symbol, "revenue_reported", store.QuarterlyFilings, nQuarters)
+	if err != nil {
+		return
+	}
+	if len(revRows) < 4 {
+		for _, m := range outputs {
+			insufficient(m, len(revRows))
+		}
+		return
 	}
 
 	// Build period→revenue map.
@@ -531,11 +553,9 @@ func (w *analyzer) analyzeMarginTrend(ctx context.Context, symbol string) {
 		}
 	}
 
-	ts := time.Now().UTC()
-
 	computeTrend := func(numeratorMetric, outputMetric string) {
-		numRows, err := store.QueryMetricSeries(ctx, w.pool, symbol, numeratorMetric, nQuarters)
-		if err != nil || len(numRows) < 4 {
+		numRows, err := store.QueryMetricSeries(ctx, w.pool, symbol, numeratorMetric, store.QuarterlyFilings, nQuarters)
+		if err != nil {
 			return
 		}
 
@@ -558,6 +578,7 @@ func (w *analyzer) analyzeMarginTrend(ctx context.Context, symbol string) {
 			})
 		}
 		if len(points) < 4 {
+			insufficient(outputMetric, len(points))
 			return
 		}
 
@@ -588,6 +609,7 @@ func (w *analyzer) analyzeMarginTrend(ctx context.Context, symbol string) {
 			"old_mean":     oldMean,
 			"diff_pct_pts": diff,
 			"quarters":     n,
+			"basis":        "10-Q filings, fiscal-YTD margins as filed",
 			"note":         "expanding = improving competitive position; compressing with revenue growth = cost structure breaking",
 		}
 
@@ -596,9 +618,9 @@ func (w *analyzer) analyzeMarginTrend(ctx context.Context, symbol string) {
 		}
 	}
 
-	computeTrend("gross_profit_reported", "gross_margin_trend_8q")
-	computeTrend("operating_income_reported", "operating_margin_trend_8q")
-	computeTrend("net_income_reported", "net_margin_trend_8q")
+	computeTrend("gross_profit_reported", outputs[0])
+	computeTrend("operating_income_reported", outputs[1])
+	computeTrend("net_income_reported", outputs[2])
 
 	w.log.Info("margin trend computed", "symbol", symbol, "quarters_available", len(revRows))
 }
@@ -624,15 +646,8 @@ func (w *analyzer) analyzeMarginTrend(ctx context.Context, symbol string) {
 // TODO: migrate to Python pandas — quarterly series joins and ratio math are
 // simpler with DataFrame.resample() and vectorised pct_change().
 func (w *analyzer) scoreTier2(ctx context.Context, symbol string, rows []store.FundamentalRow) {
-	latest := make(map[string]float64, len(rows))
-	for _, r := range rows {
-		if r.Value == nil {
-			continue
-		}
-		if _, exists := latest[r.Metric]; !exists {
-			latest[r.Metric] = *r.Value
-		}
-	}
+	latest := latestValues(rows)
+	fs := buildFilings(rows)
 
 	ts := time.Now().UTC()
 	cfg := w.cfg
@@ -690,9 +705,12 @@ func (w *analyzer) scoreTier2(ctx context.Context, symbol string, rows []store.F
 	//   Effective rate = tax_expense / pretax_income (bounded 0–50%)
 	//   Invested Cap   = Total Assets − Current Liabilities
 	//
-	// All XBRL values are per-quarter (the latest filed period). We annualise the
-	// income-statement items (×4) to produce a TTM NOPAT estimate. The balance-
-	// sheet denominator is point-in-time (no annualisation needed).
+	// Every input comes from ONE filing, yearFlows': the newest 10-K, whose
+	// operating income is already a fiscal year (no ×4), with that 10-K's own
+	// balance sheet, so ROIC is the fiscal year's. Only without any 10-K is a
+	// 10-Q used, its YTD operating income scaled by 365.25/days covered.
+	// (Reading the first period seen per metric took INTC's FY2021 operating
+	// income, 19,456, ×4, and scored ROIC 50.5% "moat" in a loss-making year.)
 	//
 	// Primary source: XBRL (tax_expense_reported, pretax_income_reported,
 	//                        operating_income_reported, total_assets_reported,
@@ -704,13 +722,14 @@ func (w *analyzer) scoreTier2(ctx context.Context, symbol string, rows []store.F
 		var roicSource string
 		var roicPayload map[string]any
 
-		opInc, hasOpInc := latest["operating_income_reported"]
-		taxExp, hasTax := latest["tax_expense_reported"]
-		pretax, hasPretax := latest["pretax_income_reported"]
-		totAssets, hasAssets := latest["total_assets_reported"]
-		curLiab, hasCurLiab := latest["current_liabilities_reported"]
+		fl, factor, basis, hasFlows := fs.yearFlows()
+		opInc, hasOpInc := fl.get("operating_income_reported")
+		taxExp, hasTax := fl.get("tax_expense_reported")
+		pretax, hasPretax := fl.get("pretax_income_reported")
+		totAssets, hasAssets := fl.get("total_assets_reported")
+		curLiab, hasCurLiab := fl.get("current_liabilities_reported")
 
-		if hasOpInc && opInc != 0 && hasAssets && totAssets > 0 && hasCurLiab && curLiab >= 0 {
+		if hasFlows && hasOpInc && opInc != 0 && hasAssets && totAssets > 0 && hasCurLiab && curLiab >= 0 {
 			// Effective tax rate from latest period; clamp to [0, 0.50].
 			taxRate := 0.21 // statutory US default when tax data is absent
 			if hasTax && hasPretax && pretax != 0 {
@@ -719,20 +738,21 @@ func (w *analyzer) scoreTier2(ctx context.Context, symbol string, rows []store.F
 					taxRate = r
 				}
 			}
-			nopatTTM := (opInc * 4) * (1 - taxRate) // annualised NOPAT
+			nopat := opInc * factor * (1 - taxRate) // one year's NOPAT
 			investedCap := totAssets - curLiab
 			if investedCap > 0 {
-				roic = nopatTTM / investedCap * 100
+				roic = nopat / investedCap * 100
 				roicSource = "xbrl_computed"
 				roicPayload = map[string]any{
 					"roic_pct":            roic,
-					"nopat_ttm":           nopatTTM,
+					"nopat_annual":        nopat,
 					"invested_capital":    investedCap,
 					"effective_tax_rate":  fmt.Sprintf("%.1f%%", taxRate*100),
-					"operating_income_q":  opInc,
+					"operating_income":    opInc,
 					"total_assets":        totAssets,
 					"current_liabilities": curLiab,
-					"note":                "NOPAT = op_income_q×4×(1−tax_rate); InvCap = total_assets−current_liabilities",
+					"basis":               basis,
+					"note":                "NOPAT = annual op_income×(1−tax_rate); InvCap = total_assets−current_liabilities; all from one filing",
 				}
 			}
 		}
@@ -771,8 +791,10 @@ func (w *analyzer) scoreTier2(ctx context.Context, symbol string, rows []store.F
 	// ── T2.3 Debt-to-Equity leverage ──────────────────────────────────────────
 	// Rank 07 from reference. D/E above 2× demands scrutiny of debt maturity.
 	// Primary: debt_to_equity_quarterly (Finnhub).
-	// Fallback: total_debt_reported / total_equity_reported (XBRL).
+	// Fallback: total_debt_reported / total_equity_reported (XBRL), both from the
+	// newest filing's balance sheet (point-in-time, so a 10-Q's is as valid).
 	// Thresholds: FUNDAMENTAL_DE_CONSERVATIVE (1.0) / FUNDAMENTAL_DE_MANAGEABLE (2.0).
+	bs, hasBS := fs.balanceSheet()
 	var de *float64
 	var deSource string
 	if v, ok := latest["debt_to_equity_quarterly"]; ok {
@@ -781,8 +803,8 @@ func (w *analyzer) scoreTier2(ctx context.Context, symbol string, rows []store.F
 	} else if v, ok := latest["debt_to_equity_annual"]; ok {
 		de = ptr(v)
 		deSource = "finnhub_annual"
-	} else if td, okD := latest["total_debt_reported"]; okD {
-		if eq, okE := latest["total_equity_reported"]; okE && eq > 0 {
+	} else if td, okD := bs.get("total_debt_reported"); hasBS && okD {
+		if eq, okE := bs.get("total_equity_reported"); okE && eq > 0 {
 			de = ptr(td / eq)
 			deSource = "xbrl_reported"
 		}
@@ -811,14 +833,24 @@ func (w *analyzer) scoreTier2(ctx context.Context, symbol string, rows []store.F
 	// ── T2.4 Net Debt / EBITDA ────────────────────────────────────────────────
 	// Cleaner leverage metric than D/E as it accounts for cash holdings.
 	// Net Debt = total_debt – cash. EBITDA proxy = operating_income (EBIT; D&A excluded).
+	// Net debt is the newest balance sheet's; the EBITDA proxy is one year of
+	// operating income from yearFlows (the newest 10-K as filed, no ×4). With
+	// operating income ≤ 0 the ratio is meaningless, and a nil-valued
+	// negative_ebitda row is written so an earlier ratio does not stay latest.
 	// Thresholds: FUNDAMENTAL_NET_DEBT_EBITDA_LOW (2) / FUNDAMENTAL_NET_DEBT_EBITDA_HIGH (4).
-	if td, okD := latest["total_debt_reported"]; okD {
-		if cash, okC := latest["cash_reported"]; okC {
+	if td, okD := bs.get("total_debt_reported"); hasBS && okD {
+		if cash, okC := bs.get("cash_reported"); okC {
 			netDebt := td - cash
-			// Annualise operating_income_reported if available as EBITDA proxy.
-			if opInc, ok := latest["operating_income_reported"]; ok && opInc > 0 {
-				// Quarterly value × 4 = rough TTM EBITDA proxy (excludes D&A, conservative).
-				ebitdaProxy := opInc * 4
+			ebitdaProxy, basis, ok := annualFlow(fs, "operating_income_reported")
+			if ok && ebitdaProxy <= 0 {
+				upsert("t2_net_debt_ebitda", nil, map[string]any{
+					"net_debt":     netDebt,
+					"ebitda_proxy": ebitdaProxy,
+					"tier":         "negative_ebitda",
+					"basis":        basis,
+					"note":         "operating income ≤ 0 over the year; Net Debt/EBITDA not meaningful",
+				})
+			} else if ok {
 				ratio := netDebt / ebitdaProxy
 				tier := "high_risk"
 				if ratio < 0 {
@@ -833,8 +865,9 @@ func (w *analyzer) scoreTier2(ctx context.Context, symbol string, rows []store.F
 					"ebitda_proxy": ebitdaProxy,
 					"ratio":        ratio,
 					"tier":         tier,
+					"basis":        basis,
 					"thresholds":   fmt.Sprintf("<%.0f× conservative, %.0f-%.0f× manageable, >%.0f× high risk", cfg.NetDebtEBITDALow, cfg.NetDebtEBITDALow, cfg.NetDebtEBITDAHigh, cfg.NetDebtEBITDAHigh),
-					"note":         "EBITDA proxy = latest quarter operating income × 4 (excludes D&A — slightly conservative)",
+					"note":         "EBITDA proxy = one year of operating income (excludes D&A — slightly conservative)",
 				})
 			}
 		}
@@ -968,17 +1001,19 @@ func (w *analyzer) scoreTier2(ctx context.Context, symbol string, rows []store.F
 	// Rank 20 from reference. Asset-light businesses (SaaS, brands) keep CapEx <5%.
 	// Capital-intensive industries (semis, airlines, mining) >20%.
 	// Computed from: capex_reported (XBRL, in millions) ÷ revenue (in millions).
-	// Revenue source: revenue_ttm (Finnhub TTM) or revenue_reported (XBRL fallback).
+	// CapEx is one year's from yearFlows (a 10-K's is already annual; the old
+	// ×4 quadrupled it). Revenue source: revenue_ttm (Finnhub TTM) or the same
+	// year's revenue_reported (XBRL fallback).
 	// Thresholds: FUNDAMENTAL_CAPEX_INTENSITY_LOW (5) / HIGH (20).
-	if capex, okC := latest["capex_reported"]; okC {
+	if capex, capexBasis, okC := annualFlow(fs, "capex_reported"); okC {
 		t2Rev := 0.0
 		if rev, okR := latest["revenue_ttm"]; okR && rev > 0 {
 			t2Rev = rev
-		} else if rev, okR := latest["revenue_reported"]; okR && rev > 0 {
+		} else if rev, _, okR := annualFlow(fs, "revenue_reported"); okR && rev > 0 {
 			t2Rev = rev
 		}
 		if t2Rev > 0 {
-			annualCapex := absFloat(capex) * 4
+			annualCapex := absFloat(capex)
 			intensityPct := annualCapex / t2Rev * 100
 			tier := "moderate_intensity"
 			if intensityPct < cfg.CapExIntensityLow {
@@ -990,6 +1025,7 @@ func (w *analyzer) scoreTier2(ctx context.Context, symbol string, rows []store.F
 				"capex_intensity_pct": intensityPct,
 				"annual_capex_proxy":  annualCapex,
 				"revenue_millions":    t2Rev,
+				"capex_basis":         capexBasis,
 				"tier":                tier,
 				"thresholds":          fmt.Sprintf("<%.0f%% asset-light, %.0f-%.0f%% moderate, >%.0f%% capital-intensive", cfg.CapExIntensityLow, cfg.CapExIntensityLow, cfg.CapExIntensityHigh, cfg.CapExIntensityHigh),
 			})
@@ -1040,15 +1076,10 @@ func (w *analyzer) scoreTier2(ctx context.Context, symbol string, rows []store.F
 // TODO: Python migration — pandas rolling join for share count series;
 // scenario-range DCF with Monte Carlo; Finviz/Seeking Alpha revision trend.
 func (w *analyzer) scoreTier3(ctx context.Context, symbol string, rows []store.FundamentalRow) {
-	latest := make(map[string]float64, len(rows))
-	for _, r := range rows {
-		if r.Value == nil {
-			continue
-		}
-		if _, exists := latest[r.Metric]; !exists {
-			latest[r.Metric] = *r.Value
-		}
-	}
+	latest := latestValues(rows)
+	fs := buildFilings(rows)
+	bs, hasBS := fs.balanceSheet()
+	fl, flFactor, flBasis, hasFlows := fs.yearFlows()
 
 	ts := time.Now().UTC()
 	cfg := w.cfg
@@ -1062,21 +1093,20 @@ func (w *analyzer) scoreTier3(ctx context.Context, symbol string, rows []store.F
 
 	// ── Derived inputs reused across multiple T3 metrics ─────────────────────
 	// revTTM: annual revenue in millions. Prefer Finnhub TTM metric; fall back to
-	// XBRL annual/quarterly revenue_reported (also stored in millions after the
-	// statementMap fix in data-fundamental).
+	// one year of XBRL revenue_reported (yearFlows: the newest 10-K).
 	revTTM := 0.0
 	if rev, ok := latest["revenue_ttm"]; ok && rev > 0 {
 		revTTM = rev
-	} else if rev, ok := latest["revenue_reported"]; ok && rev > 0 {
+	} else if rev, _, ok := annualFlow(fs, "revenue_reported"); ok && rev > 0 {
 		revTTM = rev
 	}
 
 	// fcfM: free cash flow in millions. Prefer Finnhub TTM metric; fall back to
-	// XBRL-derived FCF (operating CF − CapEx, stored in millions by data-fundamental).
+	// one year of XBRL-derived FCF (operating CF − CapEx, yearFlows).
 	fcfM := 0.0
 	if fcf, ok := latest["fcf_ttm"]; ok && fcf > 0 {
 		fcfM = fcf
-	} else if fcf, ok := latest["fcf_reported"]; ok && fcf > 0 {
+	} else if fcf, _, ok := annualFlow(fs, "fcf_reported"); ok && fcf > 0 {
 		fcfM = fcf
 	}
 
@@ -1202,13 +1232,15 @@ func (w *analyzer) scoreTier3(ctx context.Context, symbol string, rows []store.F
 
 	// ── T3.3 Interest Coverage Ratio (rank 15) ─────────────────────────────────
 	// Interest Coverage = EBIT ÷ Interest Expense.
-	// EBIT proxy = operating_income_reported (most recent quarter × 4 to annualise).
+	// EBIT proxy = operating_income_reported; both figures are one year from the
+	// same yearFlows filing (a 10-K as filed; the old ×4 of both cancelled, so
+	// only the period choice changed the ratio).
 	// Interest expense from XBRL is typically reported as a negative number; abs() applied.
 	// Thresholds: FUNDAMENTAL_INTEREST_COVERAGE_SAFE (5×) / _ADEQUATE (2×).
-	if opInc, okO := latest["operating_income_reported"]; okO {
-		if intExp, okI := latest["interest_expense_reported"]; okI {
-			annualEBIT := opInc * 4 // approximate annualisation from quarterly
-			absIntExp := absFloat(intExp) * 4
+	if opInc, okO := fl.get("operating_income_reported"); hasFlows && okO {
+		if intExp, okI := fl.get("interest_expense_reported"); okI {
+			annualEBIT := opInc * flFactor
+			absIntExp := absFloat(intExp) * flFactor
 			if absIntExp > 0 {
 				coverage := annualEBIT / absIntExp
 				tier := "high_risk"
@@ -1222,8 +1254,9 @@ func (w *analyzer) scoreTier3(ctx context.Context, symbol string, rows []store.F
 					"ebit_proxy":      annualEBIT,
 					"interest_annual": absIntExp,
 					"tier":            tier,
+					"basis":           flBasis,
 					"thresholds":      fmt.Sprintf(">%.0f× very safe, %.0f-%.0f× adequate, <%.0f× high risk", cfg.InterestCoverageSafe, cfg.InterestCoverageAdequate, cfg.InterestCoverageSafe, cfg.InterestCoverageAdequate),
-					"note":            "EBIT = quarterly operating income × 4; interest expense abs value × 4",
+					"note":            "EBIT = one year of operating income; interest expense abs value, same filing",
 				})
 			}
 		}
@@ -1236,7 +1269,7 @@ func (w *analyzer) scoreTier3(ctx context.Context, symbol string, rows []store.F
 	// No composite scoring: cross-sector comparison is meaningless.
 	// TODO: Python — compute sector-relative z-score once sector classification feed added.
 	if revTTM > 0 {
-		if totAssets, okA := latest["total_assets_reported"]; okA && totAssets > 0 {
+		if totAssets, okA := bs.get("total_assets_reported"); hasBS && okA && totAssets > 0 {
 			assetTurnover := revTTM / totAssets
 			tier := "low"
 			if assetTurnover >= 1.0 {
@@ -1257,17 +1290,21 @@ func (w *analyzer) scoreTier3(ctx context.Context, symbol string, rows []store.F
 	// ── T3.5 Inventory Turnover (rank 16) ─────────────────────────────────────
 	// Inventory Turnover = COGS ÷ Inventory.
 	// COGS proxy = revenue_reported - gross_profit_reported (both from XBRL).
+	// COGS and inventory come from the same yearFlows filing: one year of COGS
+	// (a 10-K's is already annual; the old ×4 quadrupled it) over that filing's
+	// period-end inventory.
 	// Slowing inventory turnover signals demand weakness before it hits revenue.
 	// Informational only — only meaningful for product companies (not SaaS/services).
-	if rev, okR := latest["revenue_reported"]; okR {
-		if gp, okG := latest["gross_profit_reported"]; okG {
-			cogsProxy := rev - gp // gross_profit = revenue - COGS → COGS = revenue - gross_profit
-			if inv, okI := latest["inventory_reported"]; okI && inv > 0 && cogsProxy > 0 {
-				inventoryTurnover := (cogsProxy * 4) / inv // annualise quarterly COGS
+	if rev, okR := fl.get("revenue_reported"); hasFlows && okR {
+		if gp, okG := fl.get("gross_profit_reported"); okG {
+			cogsProxy := (rev - gp) * flFactor // gross_profit = revenue - COGS → COGS = revenue - gross_profit
+			if inv, okI := fl.get("inventory_reported"); okI && inv > 0 && cogsProxy > 0 {
+				inventoryTurnover := cogsProxy / inv
 				upsert("t3_inventory_turnover", ptr(inventoryTurnover), map[string]any{
 					"inventory_turnover": inventoryTurnover,
-					"cogs_proxy_annual":  cogsProxy * 4,
+					"cogs_proxy_annual":  cogsProxy,
 					"inventory":          inv,
+					"basis":              flBasis,
 					"note":               "COGS proxy = revenue_reported - gross_profit_reported; slowing turnover = demand warning",
 				})
 			}
@@ -1305,9 +1342,10 @@ func (w *analyzer) scoreTier3(ctx context.Context, symbol string, rows []store.F
 	// Heavy goodwill (>40% of assets) carries impairment write-down risk.
 	// Source: XBRL balance sheet goodwill_reported + intangible_assets_reported.
 	// Thresholds: FUNDAMENTAL_GOODWILL_LOW_PCT (20%) / _HIGH_PCT (40%).
-	if totAssets, okA := latest["total_assets_reported"]; okA && totAssets > 0 {
-		goodwill := latest["goodwill_reported"]
-		intangibles := latest["intangible_assets_reported"]
+	// All three from the newest filing's balance sheet.
+	if totAssets, okA := bs.get("total_assets_reported"); hasBS && okA && totAssets > 0 {
+		goodwill, _ := bs.get("goodwill_reported")
+		intangibles, _ := bs.get("intangible_assets_reported")
 		combined := goodwill + intangibles
 		if combined > 0 {
 			pct := combined / totAssets * 100
@@ -1361,10 +1399,10 @@ func (w *analyzer) scoreTier3(ctx context.Context, symbol string, rows []store.F
 	// more than 100% of its accounting profits into real cash — a sign of high
 	// earnings quality (non-cash depreciation adds back). <0.7 = aggressive
 	// accruals or large working-capital drag relative to reported income.
-	// Source: fcf_reported and net_income_reported (both XBRL, in millions).
+	// Source: fcfM and one year of net_income_reported (yearFlows), in millions.
 	// Thresholds: FUNDAMENTAL_FCF_CONVERSION_HIGH (1.0) / FUNDAMENTAL_FCF_CONVERSION_LOW (0.7).
 	if fcfM > 0 {
-		if netInc, ok := latest["net_income_reported"]; ok && netInc > 0 {
+		if netInc, _, ok := annualFlow(fs, "net_income_reported"); ok && netInc > 0 {
 			fcfConv := fcfM / netInc
 			tier := "accrual_concern"
 			if fcfConv >= cfg.FCFConversionHigh {
@@ -1430,15 +1468,8 @@ func (w *analyzer) scoreQualitative(ctx context.Context, symbol string, rows []s
 	ts := time.Now().UTC()
 	cfg := w.cfg
 
-	// Build latest map (same pattern as score()).
-	latest := make(map[string]float64, len(rows))
-	for _, r := range rows {
-		if r.Value != nil {
-			if _, exists := latest[r.Metric]; !exists {
-				latest[r.Metric] = *r.Value
-			}
-		}
-	}
+	latest := latestValues(rows)
+	fs := buildFilings(rows)
 
 	ptr := func(v float64) *float64 { return &v }
 	upsert := func(metric string, value *float64, payload any) {
@@ -1453,9 +1484,12 @@ func (w *analyzer) scoreQualitative(ctx context.Context, symbol string, rows []s
 	//   2. Gross margin std dev across N quarterly periods (stability signal)
 	//   3. ROE as a proxy for sustained profitability
 	// score 3/3 = strong_moat_proxy, 2/3 = moderate, 1/3 or 0 = weak
+	// The stability series is 10-Q filings only (a 10-K's full-year margin is not
+	// comparable with a quarter's); for a symbol with filings but fewer than 4
+	// 10-Qs an insufficient_data row (nil value) replaces any earlier classification.
 	{
-		gpRows, _ := store.QueryMetricSeries(ctx, w.pool, symbol, "gross_profit_reported", cfg.QualMoatStabilityQuarters)
-		revRows, _ := store.QueryMetricSeries(ctx, w.pool, symbol, "revenue_reported", cfg.QualMoatStabilityQuarters)
+		gpRows, _ := store.QueryMetricSeries(ctx, w.pool, symbol, "gross_profit_reported", store.QuarterlyFilings, cfg.QualMoatStabilityQuarters)
+		revRows, _ := store.QueryMetricSeries(ctx, w.pool, symbol, "revenue_reported", store.QuarterlyFilings, cfg.QualMoatStabilityQuarters)
 
 		gpMap := make(map[string]float64, len(gpRows))
 		revMap := make(map[string]float64, len(revRows))
@@ -1520,6 +1554,12 @@ func (w *analyzer) scoreQualitative(ctx context.Context, symbol string, rows []s
 				"roe_ttm":           latest["roe_ttm"],
 				"stable_threshold":  fmt.Sprintf("std < %.1fpp", cfg.QualMoatStableStdPP),
 				"note":              "Structural proxy only — does not assess brand/patent/network effects. Tune QUAL_MOAT_STABLE_STD_PP.",
+			})
+		} else if len(fs) > 0 {
+			upsert("qual_moat_proxy", nil, map[string]any{
+				"tier":          "insufficient_data",
+				"quarters_used": len(margins),
+				"note":          "fewer than 4 10-Q filings with gross profit and revenue; margin stability not assessed",
 			})
 		}
 	}
@@ -1634,16 +1674,17 @@ func (w *analyzer) scoreQualitative(ctx context.Context, symbol string, rows []s
 		})
 	}
 
-	// ── T2: qual_rd_intensity — R&D as % of quarterly revenue ────────────────
+	// ── T2: qual_rd_intensity — R&D as % of revenue ──────────────────────────
 	// High R&D investment signals a company building future products rather than
 	// harvesting its existing position. Thresholds vary by sector:
 	//   Tech: healthy 10–20%, warning <5%
 	//   Pharma: healthy 15–25%
 	//   Industrials: healthy 2–5%
 	// Configure QUAL_RD_HEALTHY_PCT and QUAL_RD_MODERATE_PCT for your watchlist.
+	// Both figures are one year from the same yearFlows filing (newest 10-K).
 	{
-		rdExp, hasRD := latest["rd_expense_reported"]
-		revRep, hasRev := latest["revenue_reported"]
+		rdExp, _, hasRD := annualFlow(fs, "rd_expense_reported")
+		revRep, _, hasRev := annualFlow(fs, "revenue_reported")
 
 		if hasRD && hasRev && revRep > 0 {
 			rdPct := rdExp / revRep * 100
@@ -1664,7 +1705,7 @@ func (w *analyzer) scoreQualitative(ctx context.Context, symbol string, rows []s
 				"rd_expense_m": round2(rdExp),
 				"revenue_m":    round2(revRep),
 				"thresholds":   fmt.Sprintf("tech healthy >%.0f%%, moderate >%.0f%%", cfg.QualRDHealthyPct, cfg.QualRDModeratePct),
-				"note":         "Both figures from same quarterly XBRL period. Tune thresholds by sector via QUAL_RD_HEALTHY_PCT.",
+				"note":         "Both figures from the same annual XBRL filing. Tune thresholds by sector via QUAL_RD_HEALTHY_PCT.",
 			})
 		}
 	}
@@ -1691,16 +1732,7 @@ func (w *analyzer) scoreCorrelations(ctx context.Context, symbol string, rows []
 	ts := time.Now().UTC()
 	cfg := w.cfg
 
-	// Build raw latest map (same pattern as all other scoring functions).
-	latest := make(map[string]float64, len(rows))
-	for _, r := range rows {
-		if r.Value == nil {
-			continue
-		}
-		if _, exists := latest[r.Metric]; !exists {
-			latest[r.Metric] = *r.Value
-		}
-	}
+	latest := latestValues(rows)
 
 	// Load all derived metrics written by prior passes in this cycle.
 	derivedRows, err := store.QueryLatestDerived(ctx, w.pool, symbol)
@@ -1742,10 +1774,12 @@ func (w *analyzer) scoreCorrelations(ctx context.Context, symbol string, rows []
 		return ""
 	}
 
-	// seriesTrend queries the 2 most recent XBRL values for a metric and returns
-	// the ratio (newest/oldest). >1 = rising, <1 = falling.
+	// seriesTrend queries the 2 most recent 10-K values for a metric and returns
+	// the ratio (newest/older), a year-over-year change. >1 = rising, <1 =
+	// falling. 10-Ks only: a 10-K and a 10-Q figure cover different spans, and
+	// consecutive 10-Qs carry seasonality.
 	seriesTrend := func(metric string) (ratio float64, ok bool) {
-		s, qErr := store.QueryMetricSeries(ctx, w.pool, symbol, metric, 2)
+		s, qErr := store.QueryMetricSeries(ctx, w.pool, symbol, metric, store.AnnualFilings, 2)
 		if qErr != nil || len(s) < 2 || s[0].Value == nil || s[1].Value == nil {
 			return 1, false
 		}

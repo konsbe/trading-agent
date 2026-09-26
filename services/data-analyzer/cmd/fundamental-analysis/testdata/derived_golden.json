@@ -55,9 +55,9 @@
   "symbol": "ZZFAFULL",
   "metric": "corr_master_signals",
   "period": "derived",
-  "value": 0,
+  "value": 1,
   "payload": {
-   "net_signal": "neutral",
+   "net_signal": "bullish",
    "value_trap": {
     "fired": false,
     "score": 0,
@@ -68,7 +68,7 @@
     "score": 0,
     "conditions_met": null
    },
-   "bearish_count": 1,
+   "bearish_count": 0,
    "bullish_count": 1,
    "bullish_convergence": {
     "fired": true,
@@ -80,11 +80,10 @@
     ]
    },
    "deterioration_warning": {
-    "fired": true,
-    "score": 2,
+    "fired": false,
+    "score": 1,
     "conditions_met": [
-     "eps_strong",
-     "receivables_growing_faster_than_revenue (AR 0.76× vs Rev 0.28×)"
+     "eps_strong"
     ]
    },
    "leverage_cycle_warning": {
@@ -128,13 +127,13 @@
     "value_trap": false,
     "hidden_value": false,
     "bullish_convergence": true,
-    "deterioration_warning": true,
+    "deterioration_warning": false,
     "leverage_cycle_warning": false
    },
    "overall_score": 0.33,
    "warnings_count": 1,
    "positives_count": 3,
-   "master_net_signal": "neutral"
+   "master_net_signal": "bullish"
   }
  },
  {
@@ -181,7 +180,7 @@
   "payload": {
    "rule": "EPS growth \u003e10% with FCF yield \u003c2% = suspect earnings quality",
    "quality": "warning_eps_growing_fcf_low",
-   "fcf_yield_pct": 1.5319518340672151,
+   "fcf_yield_pct": 1.9548915283756967,
    "eps_growth_ttm_yoy_pct": 31.56
   }
  },
@@ -189,12 +188,13 @@
   "symbol": "ZZFAFULL",
   "metric": "fcf_yield",
   "period": "derived",
-  "value": 1.5319518340672151,
+  "value": 1.9548915283756967,
   "payload": {
    "tier": "avoid",
    "source": "fcf_reported ÷ market_cap × 100 (XBRL fallback)",
+   "fcf_basis": "10-K annual_2025",
    "thresholds": "\u003e5% attractive, 2-5% fair, \u003c2% avoid",
-   "fcf_yield_pct": 1.5319518340672151
+   "fcf_yield_pct": 1.9548915283756967
   }
  },
  {
@@ -221,14 +221,11 @@
   "symbol": "ZZFAFULL",
   "metric": "gross_margin_trend_8q",
   "period": "derived",
-  "value": 0,
+  "value": null,
   "payload": {
-   "note": "expanding = improving competitive position; compressing with revenue growth = cost structure breaking",
-   "old_mean": 68.6637376276569,
-   "quarters": 6,
-   "direction": "stable",
-   "recent_mean": 68.93480709101367,
-   "diff_pct_pts": 0.27106946335676696
+   "note": "fewer than 4 10-Q filings with revenue and this line; no trend",
+   "status": "insufficient_data",
+   "quarters": 1
   }
  },
  {
@@ -246,14 +243,11 @@
   "symbol": "ZZFAFULL",
   "metric": "net_margin_trend_8q",
   "period": "derived",
-  "value": 0,
+  "value": null,
   "payload": {
-   "note": "expanding = improving competitive position; compressing with revenue growth = cost structure breaking",
-   "old_mean": 36.56903818921299,
-   "quarters": 6,
-   "direction": "stable",
-   "recent_mean": 35.93442665039988,
-   "diff_pct_pts": -0.634611538813111
+   "note": "fewer than 4 10-Q filings with revenue and this line; no trend",
+   "status": "insufficient_data",
+   "quarters": 1
   }
  },
  {
@@ -270,14 +264,11 @@
   "symbol": "ZZFAFULL",
   "metric": "operating_margin_trend_8q",
   "period": "derived",
-  "value": 1,
+  "value": null,
   "payload": {
-   "note": "expanding = improving competitive position; compressing with revenue growth = cost structure breaking",
-   "old_mean": 41.825078514510565,
-   "quarters": 6,
-   "direction": "expanding",
-   "recent_mean": 47.24739746820843,
-   "diff_pct_pts": 5.422318953697868
+   "note": "fewer than 4 10-Q filings with revenue and this line; no trend",
+   "status": "insufficient_data",
+   "quarters": 1
   }
  },
  {
@@ -308,16 +299,11 @@
   "symbol": "ZZFAFULL",
   "metric": "qual_moat_proxy",
   "period": "derived",
-  "value": 1,
+  "value": null,
   "payload": {
-   "note": "Structural proxy only — does not assess brand/patent/network effects. Tune QUAL_MOAT_STABLE_STD_PP.",
-   "tier": "strong_moat_proxy",
-   "roe_ttm": 33.22,
-   "quarters_used": 6,
-   "current_margin": 67.94,
-   "gross_margin_std": 0.41,
-   "stable_threshold": "std \u003c 5.0pp",
-   "gross_margin_mean": 68.98
+   "note": "fewer than 4 10-Q filings with gross profit and revenue; margin stability not assessed",
+   "tier": "insufficient_data",
+   "quarters_used": 1
   }
  },
  {
@@ -352,14 +338,14 @@
   "symbol": "ZZFAFULL",
   "metric": "qual_rd_intensity",
   "period": "derived",
-  "value": 12.324496692208843,
+  "value": 11.531853871164687,
   "payload": {
-   "note": "Both figures from same quarterly XBRL period. Tune thresholds by sector via QUAL_RD_HEALTHY_PCT.",
+   "note": "Both figures from the same annual XBRL filing. Tune thresholds by sector via QUAL_RD_HEALTHY_PCT.",
    "tier": "investing_in_future",
-   "rd_pct": 12.32,
-   "revenue_m": 168088,
+   "rd_pct": 11.53,
+   "revenue_m": 281724,
    "thresholds": "tech healthy \u003e10%, moderate \u003e3%",
-   "rd_expense_m": 20716
+   "rd_expense_m": 32488
   }
  },
  {
@@ -378,13 +364,14 @@
   "symbol": "ZZFAFULL",
   "metric": "t2_capex_intensity",
   "period": "derived",
-  "value": 49.074294417210034,
+  "value": 22.912850875324786,
   "payload": {
    "tier": "capital_intensive",
    "thresholds": "\u003c5% asset-light, 5-20% moderate, \u003e20% capital-intensive",
-   "revenue_millions": 168088,
-   "annual_capex_proxy": 82488,
-   "capex_intensity_pct": 49.074294417210034
+   "capex_basis": "10-K annual_2025",
+   "revenue_millions": 281724,
+   "annual_capex_proxy": 64551,
+   "capex_intensity_pct": 22.912850875324786
   }
  },
  {
@@ -418,27 +405,28 @@
   "symbol": "ZZFAFULL",
   "metric": "t2_leverage",
   "period": "derived",
-  "value": 0.3526636053751021,
+  "value": 0.0974341460190153,
   "payload": {
    "note": "industry context essential — utilities/banks operate at higher D/E safely",
    "tier": "conservative",
    "source": "xbrl_reported",
    "thresholds": "\u003c1.0× conservative, 1.0-2.0× manageable, \u003e2.0× high risk",
-   "debt_to_equity": 0.3526636053751021
+   "debt_to_equity": 0.0974341460190153
   }
  },
  {
   "symbol": "ZZFAFULL",
   "metric": "t2_net_debt_ebitda",
   "period": "derived",
-  "value": 0.12818954173579725,
+  "value": 0.05078270882609237,
   "payload": {
-   "note": "EBITDA proxy = latest quarter operating income × 4 (excludes D\u0026A — slightly conservative)",
+   "note": "EBITDA proxy = one year of operating income (excludes D\u0026A — slightly conservative)",
    "tier": "conservative",
-   "ratio": 0.12818954173579725,
-   "net_debt": 35850,
+   "basis": "10-K annual_2025",
+   "ratio": 0.05078270882609237,
+   "net_debt": 6527,
    "thresholds": "\u003c2× conservative, 2-4× manageable, \u003e4× high risk",
-   "ebitda_proxy": 279664
+   "ebitda_proxy": 128528
   }
  },
  {
@@ -478,105 +466,107 @@
   "symbol": "ZZFAFULL",
   "metric": "t2_roic",
   "period": "derived",
-  "value": 100.69364958458324,
+  "value": 22.158286917144643,
   "payload": {
-   "note": "NOPAT = op_income_q×4×(1−tax_rate); InvCap = total_assets−current_liabilities",
+   "note": "NOPAT = annual op_income×(1−tax_rate); InvCap = total_assets−current_liabilities; all from one filing",
    "tier": "moat_quality",
+   "basis": "10-K annual_2025",
    "source": "xbrl_computed",
-   "roic_pct": 100.69364958458324,
-   "nopat_ttm": 246822.28773472217,
+   "roic_pct": 22.158286917144643,
    "thresholds": "\u003e15% moat, 8-15% adequate, \u003c8% low",
-   "total_assets": 333779,
-   "invested_capital": 245122,
-   "effective_tax_rate": "11.7%",
-   "operating_income_q": 69916,
-   "current_liabilities": 88657
+   "nopat_annual": 105868.97114707953,
+   "total_assets": 619003,
+   "invested_capital": 477785,
+   "operating_income": 128528,
+   "effective_tax_rate": "17.6%",
+   "current_liabilities": 141218
   }
  },
  {
   "symbol": "ZZFAFULL",
   "metric": "t3_asset_turnover",
   "period": "derived",
-  "value": 0.5035906992351227,
+  "value": 0.4427179339704031,
   "payload": {
    "note": "informational — compare to sector peers over time; \u003e1.0 efficient, \u003c0.5 asset-heavy",
-   "tier": "moderate",
-   "total_assets": 333779,
-   "asset_turnover": 0.5035906992351227,
-   "revenue_millions": 168088
+   "tier": "low",
+   "total_assets": 636351,
+   "asset_turnover": 0.4427179339704031,
+   "revenue_millions": 281724
   }
  },
  {
   "symbol": "ZZFAFULL",
   "metric": "t3_dcf",
   "period": "derived",
-  "value": 275.49229285672106,
+  "value": 215.88968860277714,
   "payload": {
    "note": "simplified 5-year DCF — use as directional check, not precise target",
    "tier": "downside_risk",
    "wacc_pct": 10,
    "thresholds": "\u003c70% strong safety margin, 70-110% fairly valued, \u003e110% downside risk",
-   "fcf_millions": 56118,
+   "fcf_millions": 71611,
    "growth_years": 5,
    "growth_rate_pct": 14.57,
-   "dcf_value_millions": 1329681.4811095835,
+   "dcf_value_millions": 1696778.5834088596,
    "market_cap_millions": 3663170,
    "terminal_growth_pct": 3,
-   "market_cap_vs_dcf_pct": 275.49229285672106
+   "market_cap_vs_dcf_pct": 215.88968860277714
   }
  },
  {
   "symbol": "ZZFAFULL",
   "metric": "t3_fcf_conversion",
   "period": "derived",
-  "value": 0.9158982226501934,
+  "value": 0.7032268834943829,
   "payload": {
    "note": "ratio \u003e1 = cash earnings exceed accounting earnings (depreciation adds back); \u003c0.7 = red flag",
    "tier": "moderate",
    "thresholds": "\u003e1.0× high quality cash, 0.7-1.0× moderate, \u003c0.7× accrual concern",
-   "fcf_millions": 56118,
-   "net_income_millions": 61271,
-   "fcf_conversion_ratio": 0.9158982226501934
+   "fcf_millions": 71611,
+   "net_income_millions": 101832,
+   "fcf_conversion_ratio": 0.7032268834943829
   }
  },
  {
   "symbol": "ZZFAFULL",
   "metric": "t3_goodwill_risk",
   "period": "derived",
-  "value": 17.23026313818425,
+  "value": 22.115624867408084,
   "payload": {
-   "tier": "low_risk",
-   "goodwill": 49711,
+   "tier": "monitor",
+   "goodwill": 119497,
    "thresholds": "\u003c20% low risk, 20-40% monitor, \u003e40% impairment risk",
-   "intangibles": 7800,
-   "total_assets": 333779,
-   "goodwill_intangibles_pct": 17.23026313818425
+   "intangibles": 21236,
+   "total_assets": 636351,
+   "goodwill_intangibles_pct": 22.115624867408084
   }
  },
  {
   "symbol": "ZZFAFULL",
   "metric": "t3_inventory_turnover",
   "period": "derived",
-  "value": 79.25948406676783,
+  "value": 93.636460554371,
   "payload": {
    "note": "COGS proxy = revenue_reported - gross_profit_reported; slowing turnover = demand warning",
-   "inventory": 2636,
-   "cogs_proxy_annual": 208928,
-   "inventory_turnover": 79.25948406676783
+   "basis": "10-K annual_2025",
+   "inventory": 938,
+   "cogs_proxy_annual": 87831,
+   "inventory_turnover": 93.636460554371
   }
  },
  {
   "symbol": "ZZFAFULL",
   "metric": "t3_ps_ratio",
   "period": "derived",
-  "value": 21.793167864451952,
+  "value": 13.002690576592693,
   "payload": {
    "note": "compare within sector; SaaS 5-15× is normal, industrials \u003e3× is expensive",
-   "tier": "speculative",
-   "ps_ratio": 21.793167864451952,
+   "tier": "growth_premium_required",
+   "ps_ratio": 13.002690576592693,
    "thresholds": "\u003c5× value, 5-10× fair, 10-15× growth premium, \u003e15× speculative",
    "market_cap_millions": 3663170,
-   "revenue_ttm_millions": 168088
+   "revenue_ttm_millions": 281724
   }
  },
  {
