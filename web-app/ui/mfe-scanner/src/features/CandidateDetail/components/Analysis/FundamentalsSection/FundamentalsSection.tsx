@@ -2,7 +2,7 @@ import { CollapsibleCard } from '@trading-agent/shared-components';
 import { FundamentalsAnalysis, MarginReading } from '@/api';
 import { EMPTY_VALUE, formatDateTime, formatNumber, formatPercent, formatSignedPercent, formatUsdShort } from '@/common/format/format';
 import FactGrid, { FactCell } from '../../FactGrid';
-import { bandLabel, labelText, withBand } from '../../../utils/analysisFormat';
+import { bandLabel, BandDisplayMap, GROSS_MARGIN_TIER_LABELS, labelText, withBand } from '../../../utils/analysisFormat';
 import CompositeLine from '../CompositeLine';
 import { FundamentalsSectionProps } from './types';
 import '@/styles/scanner-global.css';
@@ -11,19 +11,24 @@ import '../analysis-styles.css';
 /** The analysis API serves no value for these yet; shown so the grid matches the spec, always "—". */
 const NOT_SERVED = 'Not served by the analysis API';
 
-const marginCell = (key: string, label: string, m: MarginReading): FactCell => ({
+const marginCell = (key: string, label: string, m: MarginReading, tierLabels?: BandDisplayMap): FactCell => ({
     key,
     label,
-    value: withBand(formatPercent(m.value, 2), m.tier),
+    value: withBand(formatPercent(m.value, 2), m.tier, tierLabels),
     sub: m.trend ? `Trend ${bandLabel(m.trend)}` : undefined,
 });
 
 export const buildFundamentalCells = (f: FundamentalsAnalysis): FactCell[] => [
     { key: 'eps_strength', label: 'EPS strength', value: labelText(f.eps_strength), plain: true },
     { key: 'revenue', label: 'Revenue', value: labelText(f.revenue), plain: true },
-    { key: 'pe_vs_5y', label: 'P/E vs 5Y', value: withBand(formatSignedPercent(f.pe_vs_5y.value), f.pe_vs_5y.band), sub: 'vs own 5-year mean P/E' },
+    {
+        key: 'pe_vs_5y',
+        label: 'P/E band (trailing)',
+        value: withBand(formatSignedPercent(f.pe_vs_5y.value), f.pe_vs_5y.band),
+        sub: 'Band on trailing P/E — no 5-year comparison is available',
+    },
     { key: 'fcf_yield', label: 'FCF yield', value: withBand(formatPercent(f.fcf_yield.value, 2), f.fcf_yield.tier) },
-    marginCell('gross_margin', 'Gross margin', f.gross_margin),
+    marginCell('gross_margin', 'Gross margin', f.gross_margin, GROSS_MARGIN_TIER_LABELS),
     marginCell('net_margin', 'Net margin', f.net_margin),
     { key: 'peg', label: 'PEG', value: EMPTY_VALUE, sub: NOT_SERVED },
     { key: 'earnings_surprise', label: 'Earnings surprise', value: EMPTY_VALUE, sub: NOT_SERVED },

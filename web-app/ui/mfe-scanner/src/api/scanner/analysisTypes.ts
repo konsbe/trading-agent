@@ -53,7 +53,7 @@ export interface FundamentalsAnalysis {
     composite: ScoreTier;
     eps_strength: string | null;
     revenue: string | null;
-    /** `value` is % vs the symbol's own 5-year mean P/E. */
+    /** `band` is a band on the trailing P/E; no 5-year P/E exists in the data, so `value` is always null. */
     pe_vs_5y: ValueBand;
     fcf_yield: ValueTier;
     gross_margin: MarginReading;
@@ -70,6 +70,7 @@ export interface BalanceSheetAnalysis {
     current_ratio: ValueBand;
     quick_ratio: ValueBand;
     debt_to_equity: ValueBand;
+    /** Net debt / latest annual (10-K) operating income, despite the field name. */
     net_debt_ebitda: ValueBand;
     roic: ValueBand;
 }

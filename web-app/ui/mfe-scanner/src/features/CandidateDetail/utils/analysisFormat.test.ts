@@ -1,4 +1,18 @@
-import { bandLabel, CHART_PATTERN_LABELS, chartPatternLabel, clusterLine, compositeText, labelText, sentenceCaseCode, titleCaseCode, withBand } from './analysisFormat';
+import {
+    bandLabel,
+    CHART_PATTERN_LABELS,
+    chartPatternLabel,
+    clusterLine,
+    compositeText,
+    displayBand,
+    GROSS_MARGIN_TIER_LABELS,
+    labelText,
+    NET_DEBT_OPERATING_INCOME_BAND_LABELS,
+    ROE_BAND_LABELS,
+    sentenceCaseCode,
+    titleCaseCode,
+    withBand,
+} from './analysisFormat';
 
 describe('analysisFormat', () => {
     it('bandLabel replaces underscores and keeps null', () => {
@@ -34,6 +48,28 @@ describe('analysisFormat', () => {
         expect(withBand('50.1', null)).toBe('50.1');
         expect(withBand('—', 'expensive')).toBe('Expensive');
         expect(withBand('—', null)).toBe('—');
+    });
+
+    it('displayBand maps the two renamed codes and humanizes everything else', () => {
+        expect(displayBand('destroying_value', ROE_BAND_LABELS)).toBe('low');
+        expect(displayBand('strong_moat', GROSS_MARGIN_TIER_LABELS)).toBe('high');
+        expect(displayBand('excellent', ROE_BAND_LABELS)).toBe('excellent');
+        expect(displayBand('adequate', ROE_BAND_LABELS)).toBe('adequate');
+        expect(displayBand('average', GROSS_MARGIN_TIER_LABELS)).toBe('average');
+        expect(displayBand('margin_pressure', GROSS_MARGIN_TIER_LABELS)).toBe('margin pressure');
+        expect(displayBand('negative_ebitda', NET_DEBT_OPERATING_INCOME_BAND_LABELS)).toBe('operating loss');
+        expect(displayBand('negative_ebitda')).toBe('negative ebitda');
+        expect(displayBand('some_new_code', ROE_BAND_LABELS)).toBe('some new code');
+        expect(displayBand('toString', ROE_BAND_LABELS)).toBe('toString');
+        expect(displayBand('destroying_value')).toBe('destroying value');
+        expect(displayBand(null, ROE_BAND_LABELS)).toBeNull();
+    });
+
+    it('withBand applies a display map when given one', () => {
+        expect(withBand('5.20%', 'destroying_value', ROE_BAND_LABELS)).toBe('5.20% (low)');
+        expect(withBand('—', 'strong_moat', GROSS_MARGIN_TIER_LABELS)).toBe('High');
+        expect(withBand('5.20%', 'unknown_band', ROE_BAND_LABELS)).toBe('5.20% (unknown band)');
+        expect(withBand('5.20%', 'destroying_value')).toBe('5.20% (destroying value)');
     });
 
     it('compositeText joins score and tier', () => {

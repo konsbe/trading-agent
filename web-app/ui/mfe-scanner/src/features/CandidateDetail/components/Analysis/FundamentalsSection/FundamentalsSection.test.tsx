@@ -23,6 +23,42 @@ describe('FundamentalsSection', () => {
         expect(value('market_cap')).toHaveTextContent('$1.2T');
     });
 
+    it('labels the P/E cell as a trailing-P/E band with no 5-year claim', () => {
+        render(<FundamentalsSection fundamentals={makeAnalysis().fundamentals} computedAt={null} />);
+
+        const cell = screen.getByTestId('fundamentals-pe_vs_5y');
+        expect(within(cell).getByRole('term')).toHaveTextContent(/^P\/E band \(trailing\)$/);
+        expect(cell).toHaveTextContent('Band on trailing P/E — no 5-year comparison is available');
+        expect(cell).not.toHaveTextContent('vs own 5-year mean P/E');
+        expect(screen.queryByText('P/E vs 5Y')).not.toBeInTheDocument();
+    });
+
+    it('shows the served P/E band when the numeric value is null', () => {
+        const { fundamentals } = makeAnalysis();
+        render(<FundamentalsSection fundamentals={{ ...fundamentals, pe_vs_5y: { value: null, band: 'growth_fair' } }} computedAt={null} />);
+
+        expect(value('pe_vs_5y')).toHaveTextContent(/^Growth fair$/);
+    });
+
+    it('displays the gross-margin tier strong_moat as "high"; other tiers are humanized as before', () => {
+        const { fundamentals } = makeAnalysis();
+        const withTier = (tier: string) => ({ ...fundamentals, gross_margin: { ...fundamentals.gross_margin, tier } });
+
+        const { unmount } = render(<FundamentalsSection fundamentals={withTier('strong_moat')} computedAt={null} />);
+        expect(value('gross_margin')).toHaveTextContent(/^59\.89% \(high\)$/);
+        unmount();
+
+        render(<FundamentalsSection fundamentals={withTier('margin_pressure')} computedAt={null} />);
+        expect(value('gross_margin')).toHaveTextContent(/^59\.89% \(margin pressure\)$/);
+    });
+
+    it('does not remap strong_moat on net margin', () => {
+        const { fundamentals } = makeAnalysis();
+        render(<FundamentalsSection fundamentals={{ ...fundamentals, net_margin: { ...fundamentals.net_margin, tier: 'strong_moat' } }} computedAt={null} />);
+
+        expect(value('net_margin')).toHaveTextContent('45.10% (strong moat)');
+    });
+
     it('lists PEG and earnings surprise as "—" (the API serves no value for them)', () => {
         render(<FundamentalsSection fundamentals={makeAnalysis().fundamentals} computedAt={null} />);
 

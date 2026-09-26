@@ -39,6 +39,23 @@ export const CHART_PATTERN_LABELS: Record<string, string> = {
 /** Known pattern key → its label; an unknown key is humanized ("new_pattern" → "New pattern"). */
 export const chartPatternLabel = (pattern: string): string => CHART_PATTERN_LABELS[pattern] ?? sentenceCaseCode(pattern);
 
+/**
+ * Display text for stored band codes whose humanized form reads wrong. Keys
+ * are the API's codes (unchanged; correlations read them); unmapped codes fall
+ * back to `bandLabel`.
+ */
+export type BandDisplayMap = Readonly<Record<string, string>>;
+
+export const ROE_BAND_LABELS: BandDisplayMap = { destroying_value: 'low' };
+
+export const GROSS_MARGIN_TIER_LABELS: BandDisplayMap = { strong_moat: 'high' };
+
+export const NET_DEBT_OPERATING_INCOME_BAND_LABELS: BandDisplayMap = { negative_ebitda: 'operating loss' };
+
+/** Mapped display text for `band`, else the humanized code; null stays null. */
+export const displayBand = (band: string | null | undefined, labels?: BandDisplayMap): string | null =>
+    (band && labels && Object.prototype.hasOwnProperty.call(labels, band) ? labels[band] : null) ?? bandLabel(band);
+
 /** A bare tier / band / label: "Strong", or "—". */
 export const labelText = (value: string | null | undefined): string => {
     const label = bandLabel(value);
@@ -47,10 +64,11 @@ export const labelText = (value: string | null | undefined): string => {
 
 /**
  * A reading with its stored band as plain text: "50.1 (normal)". Value only →
- * "50.1"; band only → "Expensive"; neither → "—".
+ * "50.1"; band only → "Expensive"; neither → "—". `labels` overrides the
+ * display text of specific codes.
  */
-export const withBand = (valueText: string, band: string | null | undefined): string => {
-    const label = bandLabel(band);
+export const withBand = (valueText: string, band: string | null | undefined, labels?: BandDisplayMap): string => {
+    const label = displayBand(band, labels);
     if (valueText === EMPTY_VALUE) return label ? capitalizeFirst(label) : EMPTY_VALUE;
     return label ? `${valueText} (${label})` : valueText;
 };
