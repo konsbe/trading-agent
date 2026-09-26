@@ -23,12 +23,16 @@ func TestHeuristicTACaveat_StatesTheRound1NullResult(t *testing.T) {
 	if text == "" {
 		t.Fatal("shared file has no heuristic_ta_caveat")
 	}
-	for _, must := range []string{"not confirmed", "lockbox", "not a demonstrated edge"} {
+	// Order blocks were only ever one input of the BUY/TRIM composite (H9/H10),
+	// never a standalone hypothesis; the caveat must not list them as tested alone.
+	for _, must := range []string{"not confirmed", "lockbox", "not a demonstrated edge",
+		"order blocks were tested only as one input inside the BUY/TRIM composite"} {
 		if !strings.Contains(text, must) {
 			t.Errorf("heuristic_ta_caveat must say %q", must)
 		}
 	}
-	for _, retired := range []string{"neither validated nor refuted", "have not been tested", "0.991"} {
+	for _, retired := range []string{"neither validated nor refuted", "have not been tested", "0.991",
+		"liquidity sweeps, order blocks,"} {
 		if strings.Contains(text, retired) {
 			t.Errorf("heuristic_ta_caveat still carries the retired claim %q", retired)
 		}
