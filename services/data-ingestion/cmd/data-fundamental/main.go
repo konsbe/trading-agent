@@ -388,7 +388,7 @@ func (w *worker) storeFinancials(ctx context.Context, freq string, limit int) {
 				continue
 			}
 
-			period := financialPeriodLabel(report)
+			period := financialPeriodLabel(report, freq)
 
 			upsert := func(metric string, value *float64, payload any) {
 				if err := store.UpsertFundamental(ctx, w.pool, ts, sym, period, metric, value, payload, source); err != nil {
@@ -1062,13 +1062,38 @@ func statementMap(reportBody map[string]any, key string) map[string]any {
 	return out
 }
 
-// financialPeriodLabel builds a period string like "q_2024Q3" or "annual_2024".
-func financialPeriodLabel(report map[string]any) string {
-	freq, _ := report["freq"].(string)
+// financialPeriodLabel labels one /stock/financials-reported report:
+// "annual_<fiscal year>" for an annual filing (10-K, 20-F, 40-F and their
+// amendments) and "q_<period end>" (YYYY-MM-DD) for a 10-Q, the shape
+// finnhub_earnings' quarter labels already have.
+//
+// The report's form decides; reqFreq (the request's freq) is only the
+// fallback when form is absent. Report items carry no "freq" field, so
+// reading one labelled every 10-Q annual_<year>: beside that year's 10-K,
+// and with all of a year's 10-Qs in one run sharing a key, each overwriting
+// the last (migration 029 relabels what was stored).
+//
+// A q_ label is the period END only: Finnhub's 10-Q figures run from the
+// fiscal-year start (INTC Q3 2023 revenue 38,822 is nine months); the span
+// is report_raw's startDate..endDate.
+func financialPeriodLabel(report map[string]any, reqFreq string) string {
+	form, _ := report["form"].(string)
 	year, _ := report["year"].(float64)
-	quarter, _ := report["quarter"].(float64)
-	if freq == "quarterly" && quarter > 0 {
-		return fmt.Sprintf("q_%dQ%d", int(year), int(quarter))
+	quarterly := reqFreq == "quarterly"
+	switch f := strings.ToUpper(form); {
+	case strings.HasPrefix(f, "10-Q"):
+		quarterly = true
+	case strings.HasPrefix(f, "10-K"), strings.HasPrefix(f, "20-F"), strings.HasPrefix(f, "40-F"):
+		quarterly = false
+	}
+	if quarterly {
+		end, _ := report["endDate"].(string)
+		if len(end) >= 10 {
+			if _, err := time.Parse("2006-01-02", end[:10]); err == nil {
+				return "q_" + end[:10]
+			}
+		}
+		return "unknown"
 	}
 	if year > 0 {
 		return fmt.Sprintf("annual_%d", int(year))
