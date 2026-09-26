@@ -9,6 +9,7 @@ import {
     labelText,
     NET_DEBT_OPERATING_INCOME_BAND_LABELS,
     ROE_BAND_LABELS,
+    ROIC_BAND_LABELS,
     sentenceCaseCode,
     titleCaseCode,
     withBand,
@@ -63,6 +64,14 @@ describe('analysisFormat', () => {
         expect(displayBand('toString', ROE_BAND_LABELS)).toBe('toString');
         expect(displayBand('destroying_value')).toBe('destroying value');
         expect(displayBand(null, ROE_BAND_LABELS)).toBeNull();
+    });
+
+    it('ROIC_BAND_LABELS maps moat_quality to "high" only', () => {
+        expect(displayBand('moat_quality', ROIC_BAND_LABELS)).toBe('high');
+        expect(displayBand('adequate_roic', ROIC_BAND_LABELS)).toBe('adequate roic');
+        expect(displayBand('low_roic', ROIC_BAND_LABELS)).toBe('low roic');
+        expect(displayBand('moat_quality')).toBe('moat quality');
+        expect(withBand('22.16%', 'moat_quality', ROIC_BAND_LABELS)).toBe('22.16% (high)');
     });
 
     it('withBand applies a display map when given one', () => {

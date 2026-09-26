@@ -48,6 +48,8 @@ export type BandDisplayMap = Readonly<Record<string, string>>;
 
 export const ROE_BAND_LABELS: BandDisplayMap = { destroying_value: 'low' };
 
+export const ROIC_BAND_LABELS: BandDisplayMap = { moat_quality: 'high' };
+
 export const GROSS_MARGIN_TIER_LABELS: BandDisplayMap = { strong_moat: 'high' };
 
 export const NET_DEBT_OPERATING_INCOME_BAND_LABELS: BandDisplayMap = { negative_ebitda: 'operating loss' };

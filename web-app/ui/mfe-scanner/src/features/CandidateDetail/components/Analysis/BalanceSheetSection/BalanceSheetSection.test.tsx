@@ -60,6 +60,41 @@ describe('BalanceSheetSection', () => {
         expect(screen.queryByText(/EBITDA/)).not.toBeInTheDocument();
     });
 
+    it('displays the ROIC band moat_quality as "high"; adequate_roic and low_roic unchanged', () => {
+        const { balance_sheet } = makeAnalysis();
+        const withRoic = (band: string, v: number | null = 22.16) => ({ ...balance_sheet, roic: { value: v, band } });
+
+        const { rerender } = render(<BalanceSheetSection balanceSheet={withRoic('moat_quality')} />);
+        expect(value('roic')).toHaveTextContent(/^22\.16% \(high\)$/);
+
+        rerender(<BalanceSheetSection balanceSheet={withRoic('moat_quality', null)} />);
+        expect(value('roic')).toHaveTextContent(/^High$/);
+
+        rerender(<BalanceSheetSection balanceSheet={withRoic('adequate_roic')} />);
+        expect(value('roic')).toHaveTextContent(/^22\.16% \(adequate roic\)$/);
+
+        rerender(<BalanceSheetSection balanceSheet={withRoic('low_roic')} />);
+        expect(value('roic')).toHaveTextContent(/^22\.16% \(low roic\)$/);
+    });
+
+    it('does not remap moat_quality on other ratios', () => {
+        const { balance_sheet } = makeAnalysis();
+        render(
+            <BalanceSheetSection
+                balanceSheet={{
+                    ...balance_sheet,
+                    roe: { value: 30.5, band: 'moat_quality' },
+                    roa: { value: 12.25, band: 'moat_quality' },
+                    roic: { value: 22.16, band: 'moat_quality' },
+                }}
+            />,
+        );
+
+        expect(value('roe')).toHaveTextContent(/^30\.50% \(moat quality\)$/);
+        expect(value('roa')).toHaveTextContent(/^12\.25% \(moat quality\)$/);
+        expect(value('roic')).toHaveTextContent(/^22\.16% \(high\)$/);
+    });
+
     it('does not remap destroying_value on other ratios', () => {
         const { balance_sheet } = makeAnalysis();
         render(<BalanceSheetSection balanceSheet={{ ...balance_sheet, roic: { value: 3.1, band: 'destroying_value' } }} />);
