@@ -7,7 +7,7 @@
       "id": "stock-detail",
       "spec_ref": "1.3",
       "title": "Stock Detail — full analysis",
-      "intro": null,
+      "intro": "*What this part of the app is for:* Stock Detail is the full picture of one symbol. For a symbol the scanner covers, the top of the page shows which of the scanner's gates it passed or failed, its primary facts, and its score, marked unvalidated; a symbol the scanner has never covered shows \"No scanner data for this symbol\" there instead, and everything below still works. Below that comes the full analysis — technical readings, fundamentals, balance sheet, correlations, news, qualitative signals, and context against the market benchmark (SPY) — each a plain, neutral reading of stored data, not a signal. The first time a symbol's analysis is opened it may take a few seconds to compute, and the page says so instead of showing a spinner. Last comes Classical Technical Signals, the one section with its own accent colour, because it is pattern-matching rather than a reading of data; its entry below explains what it shows and what testing found.",
       "entries": [
         {
           "id": "classical-technical-signals",
