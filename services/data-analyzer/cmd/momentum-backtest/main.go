@@ -23,13 +23,13 @@ import (
 	"math"
 	"os"
 	"sort"
-	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/konsbe/trading-agent/services/data-analyzer/internal/compute"
 	"github.com/konsbe/trading-agent/services/data-analyzer/internal/momentum"
 	"github.com/konsbe/trading-agent/services/data-analyzer/internal/reportscope"
+	"github.com/konsbe/trading-agent/services/data-analyzer/internal/store"
 )
 
 type row struct {
@@ -81,6 +81,8 @@ func main() {
 	dumpWide := flag.String("dump-full", "", "write every gate-passing complete-label candidate as CSV with sub-scores, features and the episode flag")
 	episodeGap := flag.Int("episode-gap", 5, "sessions without a gate pass that start a new episode; matches the alert cooldown")
 	gateVersion := flag.Int("gate-version", 1, "§3.2 market-cap definition: 1 = today's cap (LOOKAHEAD, ablation only), 2 = point-in-time")
+	pitMaxAge := flag.Int("pit-max-age-months", 0, "gate v2 only: a share count filed more than N months before t counts as unavailable (market_cap_pit_unavailable); 0 = no limit. "+
+		"Default 0 because the published Phase 2 results were computed WITHOUT an age limit; the live scanner uses 15")
 	scope := flag.String("scope", "eligible", "symbol scope: eligible (full §3.1 universe) or pilot (the frozen 450, in-sample for v2)")
 	flag.Parse()
 
@@ -140,10 +142,15 @@ func main() {
 	fmt.Printf("  sector classifications: %d symbols\n", len(sectors))
 	fmt.Printf("  regime sessions (as-of t-1): %d\n", len(regime))
 
-	var sharesPIT map[string]*pitSeries
+	var sharesPIT map[string]*store.SharesPIT
 	if *gateVersion == 2 {
-		sharesPIT = loadSharesPIT(ctx, pool)
-		fmt.Printf("  point-in-time share series: %d symbols\n", len(sharesPIT))
+		sharesPIT, err = store.LoadSharesPIT(ctx, pool)
+		if err != nil {
+			// Non-fatal, as before the loader moved to internal/store: every
+			// symbol-day then fails market_cap_pit_unavailable, visibly.
+			fmt.Fprintln(os.Stderr, err)
+		}
+		fmt.Printf("  point-in-time share series: %d symbols (max filing age: %s)\n", len(sharesPIT), fmtAgeLimit(*pitMaxAge))
 	}
 	denom.Print()
 	reportscope.ReportMetricCoverage("market_cap", len(marketCaps), denom.Loaded)
@@ -153,6 +160,7 @@ func main() {
 	gcfg := momentum.DefaultGateConfig()
 	gcfg.MinBars = *minBars
 	gcfg.Version = momentum.GateVersion(*gateVersion)
+	gcfg.PITMaxFilingAgeMonths = *pitMaxAge
 
 	var rows []row
 	stats := momentum.NewGateStats()
@@ -201,12 +209,14 @@ func main() {
 				// by the cumulative split factor, 10-100x for reverse-split
 				// penny names, which is enough to cross a band edge.
 				if ps := sharesPIT[sym]; ps != nil && cb[i].RawClose != nil {
-					if sh, ok := ps.asOf(cb[i].TS.Format("2006-01-02")); ok {
+					if sh, filed, ok := ps.AsOf(cb[i].TS); ok {
 						pit := *cb[i].RawClose * sh
 						g.MarketCapPIT = &pit
-						g.MarketCapPITMultiClass = ps.multiClass
+						g.MarketCapPITFiled = filed
+						g.MarketCapPITMultiClass = ps.MultiClass
 					}
 				}
+				g.SessionDate = cb[i].TS
 			}
 
 			res := momentum.EvaluateGates(&f, g, gcfg)
@@ -842,65 +852,12 @@ SELECT series_id, ts::text, value FROM reference_series ORDER BY series_id, ts`)
 	return out
 }
 
-// loadSharesPIT reads the point-in-time share series per symbol, oldest first.
-//
-// Returned as parallel slices of (filed_date, shares) so an as-of lookup is a
-// binary search. Keyed on FILED date, never period_end: the period end precedes
-// the filing by weeks, and joining on it would use a share count before it was
-// public — swapping one lookahead for a subtler one.
-func loadSharesPIT(ctx context.Context, pool *pgxpool.Pool) map[string]*pitSeries {
-	out := map[string]*pitSeries{}
-	rows, err := pool.Query(ctx, `
-SELECT symbol, filed_date, shares, multi_class
-FROM shares_outstanding_pit
-ORDER BY symbol, filed_date`)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, "load shares_outstanding_pit:", err)
-		return out
+// fmtAgeLimit renders -pit-max-age-months for the report header.
+func fmtAgeLimit(months int) string {
+	if months <= 0 {
+		return "none"
 	}
-	defer rows.Close()
-	for rows.Next() {
-		var sym string
-		var d time.Time
-		var sh float64
-		var mc bool
-		if err := rows.Scan(&sym, &d, &sh, &mc); err != nil {
-			return out
-		}
-		ps := out[sym]
-		if ps == nil {
-			ps = &pitSeries{}
-			out[sym] = ps
-		}
-		ps.filed = append(ps.filed, d.Format("2006-01-02"))
-		ps.shares = append(ps.shares, sh)
-		ps.multiClass = ps.multiClass || mc
-	}
-	return out
-}
-
-type pitSeries struct {
-	filed      []string
-	shares     []float64
-	multiClass bool
-}
-
-// asOf returns the most recent share count FILED on or before date.
-//
-// Returns false when no filing exists yet. That is not a gap to be patched: a
-// symbol-day before the company's first filing is UNMEASURABLE, and gate v2
-// rejects it with market_cap_pit_unavailable rather than substituting today's
-// value, which would restore the leak exactly where it is largest.
-func (p *pitSeries) asOf(date string) (float64, bool) {
-	i := sort.SearchStrings(p.filed, date)
-	// SearchStrings gives the first index >= date; step back unless it is exact.
-	if i < len(p.filed) && p.filed[i] == date {
-		return p.shares[i], true
-	}
-	if i == 0 {
-		return 0, false
-	}
-	return p.shares[i-1], true
+	return fmt.Sprintf("%d months", months)
 }
 
 // loadMetric reads the most recent value of one fundamental metric per symbol.
