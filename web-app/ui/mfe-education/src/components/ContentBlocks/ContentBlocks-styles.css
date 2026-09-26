@@ -1,0 +1,30 @@
+/* Narrative reading measure; neutral text colours only. */
+.education-blocks {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+    max-width: 72ch;
+}
+
+.education-block {
+    margin: 0;
+    color: var(--color-on-surface);
+}
+
+.education-block--heading {
+    margin-top: var(--space-xs);
+    font-family: var(--font-family-headline);
+    font-size: var(--font-size-md);
+    font-weight: var(--font-weight-bold);
+}
+
+.education-block--list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xxs);
+    padding-left: var(--space-lg);
+}
+
+.education-blocks strong {
+    font-weight: var(--font-weight-bold);
+}
