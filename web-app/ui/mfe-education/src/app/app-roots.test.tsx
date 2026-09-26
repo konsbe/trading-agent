@@ -4,6 +4,10 @@ import Glossary from './glossary-root';
 import Handbook from './handbook-root';
 import MasterClass from './masterclass-root';
 
+jest.mock('@/pages/HandbookPage', () => require('@/test-utils/mockPage').mockPageModule('Handbook'));
+jest.mock('@/pages/MasterClassPage', () => require('@/test-utils/mockPage').mockPageModule('MasterClass'));
+jest.mock('@/pages/GlossaryPage', () => require('@/test-utils/mockPage').mockPageModule('Glossary'));
+
 const subscribeMock = mfeUserDataMessageService.subscribe as jest.Mock;
 
 describe.each([
@@ -19,8 +23,7 @@ describe.each([
 
         render(<Root />);
 
-        expect(screen.getByText(`${title} content coming.`)).toBeInTheDocument();
-        expect(screen.getByTestId('education-page')).toHaveClass('education-page--hosted');
+        expect(screen.getByText(`${title} page (hosted)`)).toBeInTheDocument();
         await waitFor(() => expect(screen.getByTestId('ta-theme-root')).toHaveAttribute('data-theme', 'dark'));
         expect(subscribeMock).toHaveBeenCalledWith('mfe-education', expect.any(Function));
     });
@@ -30,7 +33,7 @@ describe.each([
 
         render(<Root />);
 
-        expect(screen.getByText(`${title} content coming.`)).toBeInTheDocument();
+        expect(screen.getByText(`${title} page (hosted)`)).toBeInTheDocument();
         expect(screen.getByTestId('ta-theme-root')).toHaveAttribute('data-theme', 'light');
     });
 });

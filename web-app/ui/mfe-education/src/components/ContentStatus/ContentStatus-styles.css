@@ -1,0 +1,9 @@
+.education-status {
+    margin: 0;
+    color: var(--color-on-surface-variant);
+    font-size: var(--font-size-xs);
+}
+
+.education-status__version {
+    font-family: var(--font-family-label);
+}
