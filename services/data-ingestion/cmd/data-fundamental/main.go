@@ -206,9 +206,9 @@ func (w *worker) fetchMetricsForSymbol(ctx context.Context, sym string, ts time.
 	}
 
 	// profile2 is fetched before the metric writes, not after, because its
-	// currency fields decide whether marketCapitalization can be stored as USD.
+	// currency and exchange decide whether marketCapitalization can be stored as USD.
 	prof, profErr := w.fh.Profile2(ctx, sym)
-	cur := w.currencyForMarketCap(ctx, sym, prof)
+	mcBasis := w.marketCapBasisFor(ctx, sym, prof)
 
 	{
 		upsert := func(metric string, value *float64, payload any) {
@@ -279,9 +279,9 @@ func (w *worker) fetchMetricsForSymbol(ctx context.Context, sym string, ts time.
 		// rejects everything in one bucket and waves through the other, while
 		// looking like it ran, is worse than one that errors.
 		//
-		// And "millions of dollars" only holds for USD reporters: the figure is
-		// in the reporting currency (see marketCapRow).
-		w.writeMarketCap(ctx, upsert, sym, metricMap, cur)
+		// And "millions of dollars" only holds when Finnhub priced a USD
+		// listing: the figure is in the listing's currency (see marketCapBasis).
+		w.writeMarketCap(ctx, upsert, sym, metricMap, mcBasis)
 
 		// shareOutstanding is NOT on /stock/metric — verified absent even for
 		// AAPL, not merely null for micro-caps. It comes from /stock/profile2

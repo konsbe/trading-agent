@@ -28,7 +28,8 @@ INSERT INTO equity_fundamentals (ts, symbol, period, metric, value, source)
 VALUES ($1, $2, 'ttm', 'market_cap', 62885996000000, 'finnhub_metric')`, old, sym)
 	}
 
-	n, err := NullNonUSDMarketCapHistory(ctx, pool, "ZZTWD", "TWD")
+	reason := map[string]any{"currency": "TWD", "note": "nulled"}
+	n, err := NullNonUSDMarketCapHistory(ctx, pool, "ZZTWD", reason)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -51,7 +52,7 @@ VALUES ($1, $2, 'ttm', 'market_cap', 62885996000000, 'finnhub_metric')`, old, sy
 		t.Errorf("payload = %v, want currency TWD and the local figure in millions", p)
 	}
 
-	if n, _ := NullNonUSDMarketCapHistory(ctx, pool, "ZZTWD", "TWD"); n != 0 {
+	if n, _ := NullNonUSDMarketCapHistory(ctx, pool, "ZZTWD", reason); n != 0 {
 		t.Errorf("second run repaired %d rows, want 0", n)
 	}
 	if v, _ := LatestFundamental(ctx, pool, "ZZUSD", "market_cap"); v == nil {

@@ -7,42 +7,68 @@ import (
 	"github.com/konsbe/trading-agent/services/data-ingestion/internal/store"
 )
 
-// reportingCurrency is what /stock/profile2 says about the currency Finnhub's
-// figures are denominated in.
+// marketCapBasis is what can be established about the currency Finnhub's
+// marketCapitalization is denominated in.
 //
-// /stock/metric carries no currency field at all, yet its marketCapitalization
-// is in millions of the company's REPORTING currency, not USD. TSM is the case
-// that exposed it: the whole payload is on the Taiwan listing's basis
-// (52WeekHigh 2535, epsTTM 87.38 — TWD per ordinary share, while the NYSE ADR
-// trades near $450), so 62,885,996 "millions" is TWD 62.9T, about $2T, and was
-// stored and served as $62.9T.
-type reportingCurrency struct {
+// /stock/metric carries no currency field, and its marketCapitalization is in
+// millions of the currency of the LISTING Finnhub resolved the symbol to — not
+// USD, and not necessarily the filing currency either:
+//
+//	TSM   TAIWAN STOCK EXCHANGE     currency TWD  62,885,996 = TWD 62.9T, served as $62.9T
+//	TEVA  TEL AVIV STOCK EXCHANGE   currency USD  140,418    = ILS, about 3.08x its USD cap
+//	HAFN  OSLO BORS ASA             currency USD  40,997     = NOK, about 9.2x
+//	AZN   LONDON STOCK EXCHANGE     currency USD  192,311    = GBP, about 0.74x
+//
+// profile2's "currency" is the filing currency, so it catches TSM but reports
+// USD for the other three. The listing is what matters, so a non-US exchange
+// is only trusted when the figure reconciles with the stored USD close.
+type marketCapBasis struct {
 	Currency          string // profile2 "currency": currency of company filings
 	EstimateCurrency  string // profile2 "estimateCurrency"
 	MarketCapCurrency string // profile2 "marketCapCurrency" (not on every tier)
+	Exchange          string // profile2 "exchange": the listing Finnhub priced
+
+	// USDPriceRatio is profile2 marketCapitalization / (shareOutstanding × the
+	// latest stored USD close): the listing's implied share price over the US
+	// price. ~1 for a USD figure; the FX rate (times any ADR ratio) otherwise.
+	// nil when any input is missing.
+	USDPriceRatio *float64
 }
 
-func reportingCurrencyFrom(prof map[string]any) reportingCurrency {
+// A USD figure reconciles within share-count staleness and a day's price move;
+// every foreign-currency case observed sits well outside (GBP 0.74, CAD ~1.4,
+// ILS ~3.1, TWD-per-ADR 5.5, NOK ~9).
+const (
+	usdRatioMin = 0.87
+	usdRatioMax = 1.15
+)
+
+func marketCapBasisFrom(prof map[string]any, usdClose *float64) marketCapBasis {
 	s := func(k string) string {
 		v, _ := prof[k].(string)
 		return strings.ToUpper(strings.TrimSpace(v))
 	}
-	return reportingCurrency{
+	b := marketCapBasis{
 		Currency:          s("currency"),
 		EstimateCurrency:  s("estimateCurrency"),
 		MarketCapCurrency: s("marketCapCurrency"),
+		Exchange:          s("exchange"),
 	}
+	mc, sh := floatPtr(prof, "marketCapitalization"), floatPtr(prof, "shareOutstanding")
+	if mc != nil && sh != nil && usdClose != nil && *mc > 0 && *sh > 0 && *usdClose > 0 {
+		r := *mc / (*sh * *usdClose)
+		b.USDPriceRatio = &r
+	}
+	return b
 }
 
-func (c reportingCurrency) known() bool {
-	return c.Currency != "" || c.EstimateCurrency != "" || c.MarketCapCurrency != ""
+func (b marketCapBasis) known() bool {
+	return b.Currency != "" || b.EstimateCurrency != "" || b.MarketCapCurrency != "" || b.Exchange != ""
 }
 
-// nonUSD returns the first non-USD code among the fields present, or "".
-// Any one of them being foreign is enough to distrust the figure: which field
-// governs marketCapitalization is undocumented for the free tier.
-func (c reportingCurrency) nonUSD() string {
-	for _, v := range []string{c.MarketCapCurrency, c.Currency, c.EstimateCurrency} {
+// nonUSD returns the first non-USD code among the currency fields present.
+func (b marketCapBasis) nonUSD() string {
+	for _, v := range []string{b.MarketCapCurrency, b.Currency, b.EstimateCurrency} {
 		if v != "" && v != "USD" {
 			return v
 		}
@@ -50,72 +76,109 @@ func (c reportingCurrency) nonUSD() string {
 	return ""
 }
 
+func isUSExchange(ex string) bool {
+	for _, m := range []string{"NASDAQ", "NEW YORK STOCK EXCHANGE", "NYSE", "OTC", "CBOE", "BATS", "IEX"} {
+		if strings.Contains(ex, m) {
+			return true
+		}
+	}
+	return false
+}
+
+// untrusted returns why the figure cannot be taken as USD, or "".
+func (b marketCapBasis) untrusted() string {
+	if code := b.nonUSD(); code != "" {
+		return "reporting currency " + code
+	}
+	if b.Exchange == "" || isUSExchange(b.Exchange) {
+		return ""
+	}
+	if b.USDPriceRatio != nil && *b.USDPriceRatio >= usdRatioMin && *b.USDPriceRatio <= usdRatioMax {
+		return ""
+	}
+	return "priced on a non-US listing and does not reconcile with the USD close"
+}
+
+// payload records the basis on every market_cap row.
+func (b marketCapBasis) payload() map[string]any {
+	p := map[string]any{}
+	if b.Currency != "" {
+		p["currency"] = b.Currency
+	}
+	if b.Exchange != "" {
+		p["listing_exchange"] = b.Exchange
+	}
+	if b.USDPriceRatio != nil {
+		p["usd_price_ratio"] = *b.USDPriceRatio
+	}
+	return p
+}
+
 // marketCapRow decides the stored market_cap value and payload.
 //
-// USD reporters are converted from millions as before. Non-USD reporters are
-// stored as NULL with the local figure and currency in the payload: the only
+// A trusted figure is converted from millions as before. An untrusted one is
+// stored as NULL with the local figure and the reason in the payload: the only
 // FX series in the store are JPY and EUR (DEXJPUS, DEXUSEU), so a conversion
-// would be unavailable for most currencies seen (TWD, ILS, GBP, NOK, ...), and a
-// wrong number is worse than an honest absence — every consumer already
-// handles a null market cap. An unknown currency keeps the historical USD
-// assumption but says so in the payload.
-func marketCapRow(metricMap map[string]any, cur reportingCurrency) (*float64, map[string]any) {
+// would be unavailable for most currencies seen, and a wrong number is worse
+// than an honest absence — every consumer already handles a null market cap.
+// No profile at all keeps the historical USD assumption but says so.
+func marketCapRow(metricMap map[string]any, b marketCapBasis) (*float64, map[string]any) {
 	raw := floatPtr(metricMap, "marketCapitalization")
 	if raw == nil {
 		return nil, nil
 	}
-	if code := cur.nonUSD(); code != "" {
-		return nil, map[string]any{
-			"currency":                  code,
-			"market_cap_millions_local": *raw,
-			"note":                      "Finnhub marketCapitalization is in the reporting currency; no FX conversion to USD is available, so market_cap is null",
-		}
+	p := b.payload()
+	if why := b.untrusted(); why != "" {
+		p["market_cap_millions_local"] = *raw
+		p["note"] = "market_cap is null: Finnhub marketCapitalization is not in USD (" + why + ") and no FX conversion is available"
+		return nil, p
 	}
-	if !cur.known() {
-		return mulM(raw), map[string]any{
-			"currency":       nil,
-			"currency_basis": "assumed USD: no /stock/profile2 currency available",
-		}
+	if !b.known() {
+		p["currency_basis"] = "assumed USD: no /stock/profile2 data available"
 	}
-	return mulM(raw), map[string]any{"currency": "USD"}
+	return mulM(raw), p
 }
 
-// currencyForMarketCap resolves the reporting currency from this pass's
-// profile2 response, falling back to the last stored profile when this pass's
-// request failed — otherwise a single transient profile failure would write a
-// local-currency figure as USD again and it would become the newest row.
-func (w *worker) currencyForMarketCap(ctx context.Context, sym string, prof map[string]any) reportingCurrency {
-	if cur := reportingCurrencyFrom(prof); cur.known() {
-		return cur
+// marketCapBasisFor resolves the basis from this pass's profile2 response,
+// falling back to the last stored profile when this pass's request failed —
+// otherwise a single transient profile failure would write a local-currency
+// figure as USD again and it would become the newest row.
+func (w *worker) marketCapBasisFor(ctx context.Context, sym string, prof map[string]any) marketCapBasis {
+	if len(prof) == 0 {
+		stored, err := store.LatestFundamentalPayload(ctx, w.pool, sym, "profile_raw")
+		if err != nil {
+			w.log.Warn("stored profile lookup failed; market_cap basis unknown", "symbol", sym, "err", err)
+		}
+		prof = stored
 	}
-	stored, err := store.LatestFundamentalPayload(ctx, w.pool, sym, "profile_raw")
+	usdClose, err := store.LatestDailyClose(ctx, w.pool, sym)
 	if err != nil {
-		w.log.Warn("stored profile lookup failed; market_cap currency unknown", "symbol", sym, "err", err)
-		return reportingCurrency{}
+		w.log.Warn("latest close lookup failed; market_cap USD reconciliation unavailable", "symbol", sym, "err", err)
 	}
-	return reportingCurrencyFrom(stored)
+	return marketCapBasisFrom(prof, usdClose)
 }
 
-// writeMarketCap stores market_cap and, for a non-USD reporter, repairs the
-// rows written before the currency was checked.
-func (w *worker) writeMarketCap(ctx context.Context, upsert func(string, *float64, any), sym string, metricMap map[string]any, cur reportingCurrency) {
-	value, payload := marketCapRow(metricMap, cur)
+// writeMarketCap stores market_cap and, when the figure is not USD, repairs the
+// rows written before the basis was checked.
+func (w *worker) writeMarketCap(ctx context.Context, upsert func(string, *float64, any), sym string, metricMap map[string]any, b marketCapBasis) {
+	value, payload := marketCapRow(metricMap, b)
 	if payload == nil {
 		upsert("market_cap", value, nil)
 		return
 	}
 	upsert("market_cap", value, payload)
-	code := cur.nonUSD()
-	if code == "" {
+	if value != nil {
 		return
 	}
-	n, err := store.NullNonUSDMarketCapHistory(ctx, w.pool, sym, code)
+	reason := b.payload()
+	reason["note"] = "nulled: Finnhub marketCapitalization is not in USD (" + b.untrusted() + ")"
+	n, err := store.NullNonUSDMarketCapHistory(ctx, w.pool, sym, reason)
 	if err != nil {
 		w.log.Error("repair non-USD market_cap history", "symbol", sym, "err", err)
 		return
 	}
 	if n > 0 {
-		w.log.Info("nulled local-currency market_cap rows previously stored as USD",
-			"symbol", sym, "currency", code, "rows", n)
+		w.log.Info("nulled non-USD market_cap rows previously stored as USD",
+			"symbol", sym, "reason", b.untrusted(), "rows", n)
 	}
 }
