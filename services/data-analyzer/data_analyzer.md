@@ -681,6 +681,8 @@ stored output to the web app. No auth — loopback / trusted network only. See
 [`cmd/momentum-api/README.md`](cmd/momentum-api/README.md) and
 `docs/MOMENTUM_SCANNER_API.md`.
 
+**Deploy rule: rebuild it whenever `internal/fundamental`, `internal/technical` or the heuristics code changes.** Its on-demand analysis runs those packages in-process and writes the same rows the workers write, so a container that is only restarted keeps the old binary and can overwrite freshly corrected rows with old logic. This happened on 2026-09-26: after the latest-period fix, an un-rebuilt momentum-api recomputed INTC and MSFT with the old code and put back the wrong ROIC / D/E / FCF yield until it was rebuilt (`docker compose --profile api up -d --build momentum-api`) and the worker re-ran.
+
 ## Known Limitations & Future Work
 
 | Area | Current state | Future plan |
