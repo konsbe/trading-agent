@@ -755,6 +755,20 @@ Scheduling scanner + tracker is not enough on its own: on 2026-09-24 both were
 scheduled, but the bars worker had skipped 2026-09-22 and -23, so the chain was
 wired up but stalled.
 
+**Stricter build gate (product owner, 2026-09-24):** three **clean, unattended**
+daily-chain sessions counted from 2026-09-24, on top of the "completed live at
+least once" gate above, because two bugs surfaced in this subsystem in quick
+succession. Clean = one `momentum_chain_runs` row with `attempts = 1`, both
+markers set, no `last_error`, no `gave_up_at`. A session disrupted by operator
+action or with the machine asleep is recorded as **paused** (neither clean nor a
+failure, the count holds); a failure while the machine was up resets it. The
+give-up window is not changed mid-count to rescue a session.
+
+| Session | Result | Count |
+|---|---|---|
+| 2026-09-24 | clean | 1 |
+| 2026-09-25 | **paused, operator-disrupted**: data-universe was recreated at 22:07 UTC (Finnhub key rotation), which re-ran its ~2.5 h startup quote-pricing pass before arming the daily-bars timer; the machine then slept 23:24–07:44 UTC. Outcome against the 10:00 UTC give-up recorded below when known | 1 |
+
 This is **research instrumentation, not a portfolio or trading dashboard** — the
 system has never executed a trade. No "P&L", "your holdings", or portfolio-app
 framing; no live/streaming language; no "performance"/"returns" framing beyond
