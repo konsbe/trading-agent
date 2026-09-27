@@ -14,6 +14,7 @@ import (
 
 	"github.com/konsbe/trading-agent/services/data-analyzer/internal/compute"
 	"github.com/konsbe/trading-agent/services/data-analyzer/internal/config"
+	"github.com/konsbe/trading-agent/services/data-analyzer/internal/heuristics"
 	"github.com/konsbe/trading-agent/services/data-analyzer/internal/technical"
 	"github.com/konsbe/trading-agent/services/data-analyzer/internal/testdb"
 )
@@ -116,6 +117,21 @@ func TestComputeAndStoreWritesTheEmitterOutput(t *testing.T) {
 		t.Errorf("vix_regime = %+v", vix)
 	}
 	delete(got, "vix_regime")
+
+	// alert_onsets: the bot's onset flags for the last bar, from heuristics.OnsetsAt.
+	onsets, ok := got["alert_onsets"]
+	wantOn := heuristics.OnsetsAt(bars, len(bars)-1, heuristics.Config{Lookback: cfg.ComputeLookback, Params: technical.ParamsFrom(cfg)})
+	if !ok || onsets.Value == nil || int(*onsets.Value) != wantOn.Count() {
+		t.Errorf("alert_onsets = %+v, want count %d", onsets, wantOn.Count())
+	} else {
+		pl := onsets.Payload.(map[string]any)
+		if pl["bar_date"] != bars[299].TS.UTC().Format(time.DateOnly) || pl["gap_sessions"] != 5.0 || pl["judged"] != true ||
+			pl["bb_squeeze_onset"] != wantOn.BBSqueezeOnset || pl["sweep_onset"] != wantOn.SweepOnset ||
+			pl["rsi_overbought_onset"] != wantOn.RSIOverbought || pl["rsi_oversold_onset"] != wantOn.RSIOversold {
+			t.Errorf("alert_onsets payload = %v, want %+v", pl, wantOn)
+		}
+	}
+	delete(got, "alert_onsets")
 	delete(got, "pivots_weekly") // no 1Week bars seeded
 	if len(want) < 40 {
 		t.Fatalf("emitter produced only %d indicators", len(want))

@@ -296,6 +296,22 @@ On first launch, waits `ANALYZER_STARTUP_DELAY_SECS` (default 60s) for `data-tec
 | `TECHNICAL_MTF_EQUITY_INTERVALS` | — | Secondary equity intervals for MTF confluence |
 | `TECHNICAL_MTF_CRYPTO_INTERVALS` | — | Secondary crypto intervals for MTF confluence |
 
+#### Alert onsets (`alert_onsets`, 2026-09-27)
+
+Every computation run also stores `alert_onsets` for the latest bar (written by
+`internal/technical/runner`, so the worker and momentum-api's on-demand path
+both produce it): the analyst bot posts an alert only for a flag set here.
+`heuristics.OnsetsAt` evaluates the latest bar and the 5 before it with
+`heuristics.ComputeAt` (the pre-registered replay, fed the worker's own
+parameters); an onset is a firing on the latest bar with no firing — and
+every input computable — on the 5 bars before (the episode rule,
+`SIGNAL_EPISODE_GAP_SESSIONS` = 5). Payload: `bar_date`, `gap_sessions`,
+`judged` (false when fewer than 5 earlier bars), `rsi_14`,
+`rsi_overbought_onset` / `rsi_oversold_onset` (lines 70 / 30),
+`bb_squeeze_onset`, `sweep_onset` and `sweep` (`kind`, `swept_level`,
+`bar_close`); value = number of onsets. Computed from bars because
+`technical_indicators` keeps only the latest bar's reading.
+
 #### Feature toggles (all default `true` unless noted)
 
 | Variable | Default |

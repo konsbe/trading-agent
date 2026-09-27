@@ -68,6 +68,7 @@ func ComputeAndStore(ctx context.Context, db store.ReadWriter, symbol, exchange,
 		}
 	})
 
+	w.computeAlertOnsets(ctx, ts, symbol, exchange, interval, bars)
 	w.computeRSBenchmark(ctx, ts, symbol, exchange, interval, bars)
 	w.computeMTFConfluence(ctx, ts, symbol, exchange, interval, bars)
 	w.computeVIXRegime(ctx, ts, symbol, exchange, interval)
