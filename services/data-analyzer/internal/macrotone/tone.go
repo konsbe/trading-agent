@@ -277,7 +277,7 @@ func Labels(metric string) map[string]Tone {
 
 func lookup(t map[string]Tone, label string) (Tone, bool) {
 	switch label {
-	case "no_data", "insufficient_data":
+	case "no_data", "insufficient_data", "no_recent_data":
 		return NoData, true
 	case "":
 		return "", false

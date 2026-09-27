@@ -17,7 +17,7 @@
 // Growth Cycle signals (analyzeGrowth) — all free FRED data:
 //
 //	gc_pmi            ISM Manufacturing PMI (NAPM)
-//	gc_lei            Conference Board LEI level + 6m trend (USSLIND)
+//	gc_lei            Philadelphia Fed Leading Index 6m sum (USSLIND, discontinued 2020-02; no_recent_data past the age limit)
 //	gc_claims         Initial + continuing jobless claims (ICSA / CCSA)
 //	gc_housing        Housing starts + permits (HOUST / PERMIT)
 //	gc_gdp            Real GDP annualized QoQ growth (GDPC1)
@@ -30,7 +30,7 @@
 //
 //	gg_broad_dollar   Trade-weighted broad USD (DTWEXBGS)
 //	gg_usdjpy         USD/JPY spot + ~20d % change (DEXJPUS) — carry unwind
-//	gg_china_gdp      China GDP YoY % (CHNGDPNQDSMEI, OECD quarterly)
+//	gg_china_gdp      China nominal GDP YoY % (CHNGDPNQDSMEI, OECD quarterly, last 2023-07; no_recent_data past the age limit)
 //	gg_fiscal         FY deficit (FYFSD) + deficit % of GDP (GDP SAAR)
 //	gg_stance         Composite global stress score (-1 benign … +1 elevated)
 //
@@ -755,16 +755,23 @@ func (w *worker) analyzeGrowth(ctx context.Context) {
 		upsert("gc_pmi", nil, map[string]any{"regime": pmiRegime})
 	}
 
-	// ── Tier 1: LEI — Conference Board Leading Economic Index (USSLIND) ──────
-	// IMPORTANT: FRED USSLIND stores the month-over-month PERCENT CHANGE in the
-	// Conference Board LEI (e.g. -0.3, +0.2), NOT the index level.
-	// 6-month cumulative sum = sum of last 6 MoM changes.
+	// ── Tier 1: LEI (USSLIND) ─────────────────────────────────────────────────
+	// FRED USSLIND is the Philadelphia Fed's Leading Index for the United States
+	// (a forecast of the coincident index's 6-month growth, %), not the
+	// Conference Board LEI, and it was discontinued: the last observation is
+	// 2020-02. The Conference Board LEI is not on FRED. Past GROWTH_LEI_MAX_AGE_DAYS
+	// the row is no_recent_data and unscored.
+	// 6-month cumulative sum = sum of the last 6 observations.
 	// Rule of three: 3+ consecutive months with a NEGATIVE MoM value.
 	// Note: FRED provides the composite only; sub-components are paid.
 	leiObs := fredSeries("USSLIND", 12)
 	leiRegime := "no_data"
 	var leiScore float64
-	if len(leiObs) >= 2 {
+	if observationStale(leiObs, ts, gc.LEIMaxAgeDays) {
+		// USSLIND stopped at 2020-02: its values fed the stance as current.
+		leiRegime = "no_recent_data"
+		upsert("gc_lei", nil, staleRowPayload("USSLIND", leiObs, gc.LEIMaxAgeDays))
+	} else if len(leiObs) >= 2 {
 		leiTrend := "stable"
 		leiCumSum6m := 0.0
 		if len(leiObs) >= 6 {
@@ -1132,14 +1139,7 @@ func (w *worker) analyzeGrowth(ctx context.Context) {
 		if weightSum > 0 {
 			stanceScore /= weightSum
 		}
-		switch {
-		case stanceScore >= gc.GrowthExpansionScore:
-			gcStance = "expansion"
-		case stanceScore <= gc.GrowthContractionScore:
-			gcStance = "contraction"
-		default:
-			gcStance = "slowdown"
-		}
+		gcStance = growthStanceFor(stanceScore, gc)
 		gcStanceScore = ptr(stanceScore)
 		upsert("gc_stance", gcStanceScore, map[string]any{
 			"stance":          gcStance,
@@ -1810,7 +1810,11 @@ func (w *worker) analyzeGlobal(ctx context.Context) {
 	chinaRegime := "no_data"
 	var chinaScore float64
 	chObs := fredSeries("CHNGDPNQDSMEI", 6)
-	if len(chObs) >= 5 && chObs[4].Value != 0 {
+	if observationStale(chObs, ts, g.ChinaGDPMaxAgeDays) {
+		// CHNGDPNQDSMEI stopped at 2023-07: its YoY fed the stance as current.
+		chinaRegime = "no_recent_data"
+		upsert("gg_china_gdp", nil, staleRowPayload("CHNGDPNQDSMEI", chObs, g.ChinaGDPMaxAgeDays))
+	} else if len(chObs) >= 5 && chObs[4].Value != 0 {
 		yoy := (chObs[0].Value/chObs[4].Value - 1) * 100
 		switch {
 		case yoy >= g.ChinaGDPExpansion:

@@ -842,6 +842,9 @@ type GrowthCycle struct {
 	// Tracks the 6-month annualized rate of change.
 	// 3 consecutive monthly declines = historical recession signal ("rule of three").
 	LEIExpansionRate float64 // 6m rate > this = "expanding"      default 0.0
+	// LEIMaxAgeDays: a monthly series normally 1–2 months behind; older than
+	// this (one missed release and slack) the row is no_recent_data and unscored.
+	LEIMaxAgeDays    int     // GROWTH_LEI_MAX_AGE_DAYS  default 120
 	LEIRecessionRate float64 // 6m rate < this = "recession_risk"  default -3.0
 
 	// ── Initial Jobless Claims (ICSA — weekly, persons) ──────────────────────
@@ -903,6 +906,7 @@ func LoadGrowthCycle() GrowthCycle {
 
 		LEIExpansionRate: floatEnv("GROWTH_LEI_EXPANSION_RATE", 0.0),
 		LEIRecessionRate: floatEnv("GROWTH_LEI_RECESSION_RATE", -3.0),
+		LEIMaxAgeDays:    intEnv("GROWTH_LEI_MAX_AGE_DAYS", 120),
 
 		ClaimsTight:       floatEnv("GROWTH_CLAIMS_TIGHT", 225000),
 		ClaimsNormalizing: floatEnv("GROWTH_CLAIMS_NORMALIZING", 300000),
@@ -1058,6 +1062,10 @@ type GlobalGeopolitical struct {
 	ChinaGDPContract  float64 // YoY < this = contraction  default 3
 	ChinaGDPStable    float64 // YoY < this = stable  default 5
 	ChinaGDPExpansion float64 // YoY ≥ this = expansion  default 6
+	// ChinaGDPMaxAgeDays: quarterly, dated at the quarter start and published
+	// months later (normally ~6 months old); older than this the row is
+	// no_recent_data and unscored.
+	ChinaGDPMaxAgeDays int // GLOBAL_CHINA_GDP_MAX_AGE_DAYS  default 270
 
 	// US federal deficit % of nominal GDP (FYFSD millions, GDP billions SAAR).
 	FiscalManageablePct float64 // < this = manageable  default 3
@@ -1079,9 +1087,10 @@ func LoadGlobalGeopolitical() GlobalGeopolitical {
 		USDJPYSystemicUnwindPct: floatEnv("GLOBAL_USDJPY_SYSTEMIC_UNWIND_PCT", -10.0),
 		USDJPYLookbackObs:       intEnv("GLOBAL_USDJPY_LOOKBACK_OBS", 22),
 
-		ChinaGDPContract:  floatEnv("GLOBAL_CHINA_GDP_CONTRACT", 3.0),
-		ChinaGDPStable:    floatEnv("GLOBAL_CHINA_GDP_STABLE", 5.0),
-		ChinaGDPExpansion: floatEnv("GLOBAL_CHINA_GDP_EXPANSION", 6.0),
+		ChinaGDPContract:   floatEnv("GLOBAL_CHINA_GDP_CONTRACT", 3.0),
+		ChinaGDPStable:     floatEnv("GLOBAL_CHINA_GDP_STABLE", 5.0),
+		ChinaGDPExpansion:  floatEnv("GLOBAL_CHINA_GDP_EXPANSION", 6.0),
+		ChinaGDPMaxAgeDays: intEnv("GLOBAL_CHINA_GDP_MAX_AGE_DAYS", 270),
 
 		FiscalManageablePct: floatEnv("GLOBAL_FISCAL_MANAGEABLE_PCT", 3.0),
 		FiscalElevatedPct:   floatEnv("GLOBAL_FISCAL_ELEVATED_PCT", 6.0),
