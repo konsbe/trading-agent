@@ -164,15 +164,18 @@ No parameters. Latest generated report.
 - **`unavailable_reason` is required whenever `market_cycle` or `price`
   is null for an equity/ETF instrument**, same pattern as every other
   addendum's honest-absence handling. Never silently show an empty card.
-- **The fixed instrument list is exactly seven entries**: S&P (SPY),
+- **The fixed instrument list is eight entries**: S&P (SPY),
   Gold (GLD — confirm exact ticker in step 1), Oil (ticker TBD — confirm
   in step 1, e.g. USO vs XLE mean different things and the choice should
-  be deliberate, not default), US10Y, US5Y, US2Y, Shell (SHEL). **Verify
+  be deliberate, not default), US10Y, US5Y, US2Y, Shell (SHEL), and
+  Bitcoin (BTCUSDT). *(Corrected 2026-09-27: this said seven; the code —
+  `internal/store/market_report.go` fixed list — has eight, with Bitcoin,
+  which the API has always served.)* **Verify
   each has the data it needs before promising it in the UI** — do not
   assume ETF/yield coverage exists just because equity coverage does.
 - **Watchlist instruments are appended dynamically**, read live from the
   existing `GET /api/v1/watchlist` data path (reuse, don't re-implement).
-  `source: "watchlist"` distinguishes them from the fixed seven so the UI
+  `source: "watchlist"` distinguishes them from the fixed eight so the UI
   can group or label them separately if useful.
 
 ---
@@ -208,7 +211,7 @@ No parameters. Latest generated report.
 - Fixture confirming an instrument with no data returns
   `unavailable_reason` and null prices, not a 500 or a silently-dropped
   entry.
-- Confirm watchlist instruments merge correctly with the fixed seven and
+- Confirm watchlist instruments merge correctly with the fixed eight and
   are labeled `source: "watchlist"`.
 - Confirm the `automation_status` pass-through matches the existing
   report's list unchanged.
@@ -227,7 +230,7 @@ No parameters. Latest generated report.
 
 **This build order is longer than the other addendums' for a reason.**
 Every prior addendum reused an already-working, already-parameterized
-data path. This one may not have one yet for two of its seven
+data path. This one may not have one yet for two of its seven (now eight)
 instruments and for the market-cycle metric generally. Step 1 finds out
 which parts are a straightforward reshape and which parts are real new
 work, before any UI gets designed against an assumption.

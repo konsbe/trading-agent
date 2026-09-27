@@ -1374,7 +1374,7 @@ The worker reads the **latest payloads** for stances/regimes already upserted in
 
 | Block | What it is |
 |--------|------------|
-| **Bond–equity (60d)** | Pearson **ρ** of benchmark **daily log returns** vs **Δ FRED `DGS10`** (forward-filled). Regimes: `deflationary_hedge` / `inflationary_positive` / `transition_neutral`. |
+| **Bond–equity (60d)** | Pearson **ρ** of benchmark **daily log returns** vs the daily change in **−`DGS10`** (forward-filled) — a bond-price proxy, since a bond's price moves opposite its yield. Until 2026-09-27 it used +Δ `DGS10`, so every regime read backwards. Regimes: `deflationary_hedge` (ρ ≤ −0.25: bonds rise as stocks fall) / `inflationary_positive` (ρ ≥ 0.25: bonds and stocks move together) / `transition_neutral`. |
 | **Oil–equity (60d)** | Same vs **Δ `DCOILWTICO`** (WTI). Regimes: `procyclical` / `decoupled` / `neutral_mixed`. |
 | **VIX–equity (60d)** | Same vs **Δ `VIXCLS`**. Regimes: `typical_fear_greed` / `unusual_positive` / `compressed_link`. |
 | **Month seasonality** | **Static almanac** per calendar month (tie-breaker only). |

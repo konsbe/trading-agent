@@ -60,7 +60,7 @@ listing its terms — the orientation matters as much as the definitions.
   project's own confusion about this, resolved a few sessions ago, is
   worth writing up plainly: "cycle" is a blended regime score, "index"
   is one instrument's own price facts)
-- Tracked instruments (fixed seven + watchlist), BTC's different windows
+- Tracked instruments (fixed eight, including BTC, + watchlist), BTC's different windows
 - Seasonality/presidential cycle — explicitly labeled "reference tilt,
   not predictive" in the Handbook too, matching the app's own framing
 - Automation status list — what "not_automated"/"needs_data"/"partial"
