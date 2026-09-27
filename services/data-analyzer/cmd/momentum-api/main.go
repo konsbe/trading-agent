@@ -71,6 +71,7 @@ func main() {
 	masterClassPath := env("MOMENTUM_EDUCATION_MASTERCLASS_PATH", "../../shared/content/masterclass.json")
 	marketTextPath := env("MOMENTUM_MARKET_REPORT_TEXT_PATH", "../../shared/content/market_report_descriptions.json")
 	corrTextPath := env("MOMENTUM_CORRELATION_TEXT_PATH", "../../shared/content/correlation_sentences.json")
+	corrLabelsPath := env("MOMENTUM_CORRELATION_LABELS_PATH", "../../shared/content/correlation_labels.json")
 	scanGrace := duration(log, "MOMENTUM_API_SCAN_GRACE", 6*time.Hour)
 	cacheTTL := duration(log, "MOMENTUM_API_CACHE_TTL", maxCacheTTL)
 	if cacheTTL > maxCacheTTL {
@@ -148,6 +149,13 @@ func main() {
 		os.Exit(1)
 	}
 
+	corrLabels, err := momentumapi.LoadCorrelationLabels(corrLabelsPath)
+	if err != nil {
+		log.Error("momentum-api: correlation labels", "err", err,
+			"fix", "set MOMENTUM_CORRELATION_LABELS_PATH to shared/content/correlation_labels.json (in Docker, mount ../shared/content)")
+		os.Exit(1)
+	}
+
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
@@ -183,6 +191,7 @@ func main() {
 		GPRSourceConfigured:    strings.TrimSpace(os.Getenv("GPR_CSV_URL")) != "",
 		MarketReportText:       marketText,
 		CorrelationText:        corrText,
+		CorrelationLabels:      corrLabels,
 
 		AnalysisNames: technical.NamesFor(technical.Emitter{Cfg: taCfg}),
 		AnalysisCompute: func(ctx context.Context, symbol string, parts momentumapi.AnalysisParts) error {

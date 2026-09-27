@@ -18,7 +18,7 @@ from typing import Optional
 import asyncpg
 
 from db import cache as _cache
-from reports import correlation_text, market_text
+from reports import correlation_labels, correlation_text, market_text
 from db.queries import fundamental, macro_intel, news, ohlcv, sentiment, technical
 from reports.models import (
     AdditionalAnalysisSnapshot,
@@ -718,11 +718,19 @@ class ReportBuilder:
             def _corr_payload(key: str) -> dict:
                 return derived.get(key, {}).get("payload") or {}
 
-            # Cluster tiers
-            snap.corr_earnings_quality_tier = (_corr_payload("corr_earnings_quality").get("tier"))
-            snap.corr_valuation_quality_tier = (_corr_payload("corr_valuation_quality").get("tier"))
-            snap.corr_leverage_liquidity_tier = (_corr_payload("corr_leverage_liquidity").get("tier"))
-            snap.corr_operational_tier = (_corr_payload("corr_operational").get("tier"))
+            # Cluster tiers. A cluster that ran no comparison is stored as
+            # 0 / "mixed_positive"; that is not a reading, so it is marked
+            # not evaluated (rows before checks_run existed keep their tier).
+            def _cluster_tier(key: str) -> Optional[str]:
+                p = _corr_payload(key)
+                if p.get("checks_run") == 0:
+                    return correlation_labels.NOT_EVALUATED
+                return p.get("tier")
+
+            snap.corr_earnings_quality_tier = _cluster_tier("corr_earnings_quality")
+            snap.corr_valuation_quality_tier = _cluster_tier("corr_valuation_quality")
+            snap.corr_leverage_liquidity_tier = _cluster_tier("corr_leverage_liquidity")
+            snap.corr_operational_tier = _cluster_tier("corr_operational")
 
             # Summary
             corr_sum_p = _corr_payload("corr_summary")

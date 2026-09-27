@@ -1,0 +1,35 @@
+{
+  "_about": "Correlation card labels, keyed by the stored codes (tiers, patterns, net signal and cluster names). Read by momentum-api (served with the analysis, rendered by mfe-scanner) and analyst-bot (Discord correlation embed); edit here and nowhere else.",
+  "clusters": {
+    "earnings_quality": "Earnings Quality",
+    "valuation_quality": "Valuation vs Quality",
+    "leverage_liquidity": "Leverage & Liquidity",
+    "operational": "Operational"
+  },
+  "cluster_tiers": {
+    "healthy": "mostly agree",
+    "mixed_positive": "mixed, leaning agree",
+    "mixed_negative": "mixed, leaning conflict",
+    "alert": "mostly conflict"
+  },
+  "not_evaluated": "not evaluated",
+  "patterns": {
+    "bullish_convergence": "low P/E with quality conditions",
+    "hidden_value": "cash strength with flat EPS",
+    "deterioration_warning": "strong EPS with weak cash signs",
+    "value_trap": "low P/E with weak conditions",
+    "leverage_cycle_warning": "debt and liquidity strain"
+  },
+  "net_signal": {
+    "strongly_bullish": "+2 or more",
+    "bullish": "+1",
+    "neutral": "0",
+    "bearish": "−1",
+    "strongly_bearish": "−2 or less"
+  },
+  "text": {
+    "patterns_heading": "Combined patterns",
+    "net_count": "Net count",
+    "met": "met"
+  }
+}

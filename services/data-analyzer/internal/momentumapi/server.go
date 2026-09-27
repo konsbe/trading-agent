@@ -169,6 +169,9 @@ type Config struct {
 	// CorrelationText is shared/content/correlation_sentences.json: the
 	// correlation sentences as shown, shared with the bot's Discord report.
 	CorrelationText CorrelationText
+	// CorrelationLabels is shared/content/correlation_labels.json: the
+	// correlation card's labels, shared with the bot's Discord embed.
+	CorrelationLabels CorrelationLabels
 
 	// Full stock analysis (GET /today/{symbol}/analysis). AnalysisNames are the
 	// stored indicator names (technical.NamesFor the worker's config).

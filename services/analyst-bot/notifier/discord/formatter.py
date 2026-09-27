@@ -17,6 +17,8 @@ from typing import Optional
 
 import discord
 
+from reports import correlation_labels
+
 from reports.models import (
     AlertEvent,
     AnalyzeContextSnapshot,
@@ -642,9 +644,11 @@ def correlations_embed(fund: FundamentalSnapshot) -> Optional[discord.Embed]:
         "bearish": "🔴",
         "strongly_bearish": "🔴🔴",
     }
+    # Labels come from shared/content/correlation_labels.json, the file the web
+    # card is served from; the codes decide only the emoji and colour.
     net_display = (
         f"{signal_emoji.get(fund.corr_master_net_signal or 'neutral', '⚪')} "
-        f"{fund.corr_master_net_signal or '—'}"
+        f"{correlation_labels.text('net_count')}: {correlation_labels.net(fund.corr_master_net_signal) or '—'}"
     )
     score_display = f"({_num(fund.corr_summary_score, 2)})" if fund.corr_summary_score is not None else ""
 
@@ -658,40 +662,35 @@ def correlations_embed(fund: FundamentalSnapshot) -> Optional[discord.Embed]:
         return {"healthy": "🟢", "mixed_positive": "🟡", "mixed_negative": "🟠", "alert": "🔴"}.get(tier or "", "⚪")
 
     cluster_lines = []
-    if fund.corr_earnings_quality_tier:
-        cluster_lines.append(f"{_cluster_emoji(fund.corr_earnings_quality_tier)} **Earnings Quality** — {fund.corr_earnings_quality_tier.replace('_', ' ')}")
-    if fund.corr_valuation_quality_tier:
-        cluster_lines.append(f"{_cluster_emoji(fund.corr_valuation_quality_tier)} **Valuation vs Quality** — {fund.corr_valuation_quality_tier.replace('_', ' ')}")
-    if fund.corr_leverage_liquidity_tier:
-        cluster_lines.append(f"{_cluster_emoji(fund.corr_leverage_liquidity_tier)} **Leverage & Liquidity** — {fund.corr_leverage_liquidity_tier.replace('_', ' ')}")
-    if fund.corr_operational_tier:
-        cluster_lines.append(f"{_cluster_emoji(fund.corr_operational_tier)} **Operational** — {fund.corr_operational_tier.replace('_', ' ')}")
+    for key, tier in (
+        ("earnings_quality", fund.corr_earnings_quality_tier),
+        ("valuation_quality", fund.corr_valuation_quality_tier),
+        ("leverage_liquidity", fund.corr_leverage_liquidity_tier),
+        ("operational", fund.corr_operational_tier),
+    ):
+        if tier:
+            cluster_lines.append(
+                f"{_cluster_emoji(tier)} **{correlation_labels.cluster_name(key)}** — {correlation_labels.tier(tier)}"
+            )
     if cluster_lines:
         embed.add_field(name="Cluster Health", value="\n".join(cluster_lines), inline=False)
 
-    # ── Master Divergence Signals ─────────────────────────────────────────────
-    master_parts = []
-
-    if fund.corr_bullish_convergence_fired:
-        score_str = f" ({fund.corr_bullish_convergence_score}/5 conditions)" if fund.corr_bullish_convergence_score is not None else ""
-        master_parts.append(f"🟢 **★ Bullish Convergence**{score_str} — low P/E + high ROIC + FCF + conservative leverage + insider buying")
-
-    if fund.corr_hidden_value_fired:
-        master_parts.append("🟢 **★ Hidden Value** — EPS stagnant but FCF conversion high + attractive FCF yield (market prices on EPS; real cash missed)")
-
-    if fund.corr_deterioration_warning_fired:
-        master_parts.append("🔴 **★ Deterioration Warning** — EPS rising + FCF accrual concern + receivables growing faster than revenue (earnings possibly manufactured)")
-
-    if fund.corr_value_trap_fired:
-        master_parts.append("🔴 **★ Value Trap** — low P/E + low/adequate ROIC + elevated leverage + declining revenue (cheap for a reason)")
-
-    if fund.corr_leverage_cycle_fired:
-        master_parts.append("🔴 **★ Leverage Cycle Warning** — ≥3 of: high Net Debt/EBITDA, low interest coverage, poor FCF, liquidity risk (financial distress trajectory)")
-
-    if master_parts:
+    # Combined patterns that were met — names only, as on the web card.
+    met = [
+        key for key, fired in (
+            ("bullish_convergence", fund.corr_bullish_convergence_fired),
+            ("hidden_value", fund.corr_hidden_value_fired),
+            ("deterioration_warning", fund.corr_deterioration_warning_fired),
+            ("value_trap", fund.corr_value_trap_fired),
+            ("leverage_cycle_warning", fund.corr_leverage_cycle_fired),
+        ) if fired
+    ]
+    if met:
         embed.add_field(
-            name="⚡ Master Signals Fired",
-            value=_trunc("\n".join(master_parts), 1024),
+            name=correlation_labels.text("patterns_heading"),
+            value=_trunc(
+                f"{correlation_labels.text('met')}: " + ", ".join(correlation_labels.pattern(k) for k in met), 1024
+            ),
             inline=False,
         )
 

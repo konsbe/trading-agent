@@ -127,7 +127,7 @@ func (s *Server) handleAnalysis(w http.ResponseWriter, r *http.Request) {
 		s.storeError(w, r, err)
 		return
 	}
-	resp := buildAnalysis(symbol, in, fr, techFresh, faFresh, s.cfg.AnalysisNames, s.cfg.Caveats, s.cfg.CorrelationText)
+	resp := buildAnalysis(symbol, in, fr, techFresh, faFresh, s.cfg.AnalysisNames, s.cfg.Caveats, s.cfg.CorrelationText, s.cfg.CorrelationLabels)
 	body, err := json.Marshal(resp)
 	if err != nil {
 		s.cfg.Log.Error("momentum-api: encode analysis", "err", err)
@@ -273,6 +273,11 @@ type clusterOut struct {
 	Name  string   `json:"name"`
 	Score *float64 `json:"score"`
 	Tier  *string  `json:"tier"`
+	// NameLabel / TierLabel are the shared display labels
+	// (shared/content/correlation_labels.json); TierLabel is the not-evaluated
+	// wording when the cluster ran no check.
+	NameLabel string  `json:"name_label"`
+	TierLabel *string `json:"tier_label"`
 	// ChecksRun is how many comparisons the cluster ran. At 0 the stored score
 	// is 0 and the tier "mixed_positive"; both are served null instead.
 	ChecksRun *int     `json:"checks_run"`
@@ -281,13 +286,23 @@ type clusterOut struct {
 }
 
 type correlationsOut struct {
-	Composite      scoreTier    `json:"composite"`
+	Composite scoreTier `json:"composite"`
+	// CompositeLabel is the composite tier's display label, or the
+	// not-evaluated wording when no cluster was evaluated.
+	CompositeLabel *string      `json:"composite_label"`
 	Clusters       []clusterOut `json:"clusters"`
 	AlignedSignals []string     `json:"aligned_signals"`
 	MasterSignals  struct {
-		NetSignal *string  `json:"net_signal"`
-		Fired     []string `json:"fired"`
+		NetSignal   *string  `json:"net_signal"`
+		NetLabel    *string  `json:"net_label"`
+		Fired       []string `json:"fired"`
+		FiredLabels []string `json:"fired_labels"`
 	} `json:"master_signals"`
+	Labels struct {
+		PatternsHeading string `json:"patterns_heading"`
+		NetCount        string `json:"net_count"`
+		Met             string `json:"met"`
+	} `json:"labels"`
 }
 
 type qualitativeOut struct {
@@ -430,7 +445,7 @@ func sectionStatus(stored, fresh bool) string {
 }
 
 func buildAnalysis(symbol string, in store.AnalysisInputs, fr store.AnalysisFreshness, techFresh, faFresh bool,
-	n technical.Names, caveats Caveats, corrText CorrelationText) analysisResponse {
+	n technical.Names, caveats Caveats, corrText CorrelationText, corrLabels CorrelationLabels) analysisResponse {
 	out := analysisResponse{
 		Symbol:      symbol,
 		Status:      analysisReady,
@@ -449,7 +464,7 @@ func buildAnalysis(symbol string, in store.AnalysisInputs, fr store.AnalysisFres
 	out.Technical = buildTechnical(in.Indicators, n)
 	out.Fundamentals = buildFundamentals(in)
 	out.BalanceSheet = buildBalance(in.Derived)
-	out.Correlations = buildCorrelations(in.Derived, corrText)
+	out.Correlations = buildCorrelations(in.Derived, corrText, corrLabels)
 	out.Qualitative = buildQualitative(in.Derived)
 	out.Sentiment = sentimentOut{Headlines: []headlineOut{}}
 	for _, h := range in.Headlines {
@@ -612,9 +627,16 @@ var correlationClusters = []string{"earnings_quality", "valuation_quality", "lev
 // masterSignals are corr_master_signals' patterns, each {fired, score, conditions_met}.
 var masterSignals = []string{"value_trap", "hidden_value", "bullish_convergence", "deterioration_warning", "leverage_cycle_warning"}
 
-func buildCorrelations(d map[string]store.StoredRow, corrText CorrelationText) correlationsOut {
+func buildCorrelations(d map[string]store.StoredRow, corrText CorrelationText, labels CorrelationLabels) correlationsOut {
 	c := correlationsOut{Composite: derivedScoreTier(d, "corr_summary"), Clusters: []clusterOut{}, AlignedSignals: []string{}}
-	c.MasterSignals.Fired = []string{}
+	c.MasterSignals.Fired, c.MasterSignals.FiredLabels = []string{}, []string{}
+	c.Labels.PatternsHeading, c.Labels.NetCount, c.Labels.Met = labels.Text.PatternsHeading, labels.Text.NetCount, labels.Text.Met
+	tierLabel := func(tier *string) *string {
+		if tier == nil {
+			return nil
+		}
+		return strPtr(label(labels.ClusterTiers, *tier))
+	}
 	evaluated := 0
 	for _, name := range correlationClusters {
 		r, p, ok := rowPayload(d, "corr_"+name)
@@ -623,10 +645,13 @@ func buildCorrelations(d map[string]store.StoredRow, corrText CorrelationText) c
 		}
 		cl := clusterOut{Name: name, Score: finite(r.Value), Tier: p.str("tier"), ChecksRun: intPtr(p.num("checks_run")),
 			Positives: corrText.Displays(p.strings("positives")), Warnings: corrText.Displays(p.strings("warnings"))}
+		cl.NameLabel = label(labels.Clusters, name)
 		if cl.ChecksRun != nil && *cl.ChecksRun == 0 {
 			cl.Score, cl.Tier = nil, nil
+			cl.TierLabel = strPtr(labels.NotEvaluated)
 		} else {
 			evaluated++
+			cl.TierLabel = tierLabel(cl.Tier)
 		}
 		c.Clusters = append(c.Clusters, cl)
 		c.AlignedSignals = append(c.AlignedSignals, cl.Positives...)
@@ -636,12 +661,19 @@ func buildCorrelations(d map[string]store.StoredRow, corrText CorrelationText) c
 	// describes nothing. Newer rows store no score then.
 	if len(c.Clusters) > 0 && evaluated == 0 {
 		c.Composite = scoreTier{}
+		c.CompositeLabel = strPtr(labels.NotEvaluated)
+	} else {
+		c.CompositeLabel = tierLabel(c.Composite.Tier)
 	}
 	if _, p, ok := rowPayload(d, "corr_master_signals"); ok {
 		c.MasterSignals.NetSignal = p.str("net_signal")
+		if c.MasterSignals.NetSignal != nil {
+			c.MasterSignals.NetLabel = strPtr(label(labels.NetSignal, *c.MasterSignals.NetSignal))
+		}
 		for _, name := range masterSignals {
 			if f := p.sub(name).boolean("fired"); f != nil && *f {
 				c.MasterSignals.Fired = append(c.MasterSignals.Fired, name)
+				c.MasterSignals.FiredLabels = append(c.MasterSignals.FiredLabels, label(labels.Patterns, name))
 			}
 		}
 	}

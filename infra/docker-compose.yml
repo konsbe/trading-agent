@@ -289,6 +289,7 @@ services:
       MOMENTUM_EDUCATION_MASTERCLASS_PATH: /shared/content/masterclass.json
       MOMENTUM_MARKET_REPORT_TEXT_PATH: /shared/content/market_report_descriptions.json
       MOMENTUM_CORRELATION_TEXT_PATH: /shared/content/correlation_sentences.json
+      MOMENTUM_CORRELATION_LABELS_PATH: /shared/content/correlation_labels.json
     volumes:
       - ../shared/content:/shared/content:ro
     ports:
@@ -317,6 +318,8 @@ services:
       MARKET_REPORT_TEXT_PATH: /shared/content/market_report_descriptions.json
       # Correlation aligned/divergent sentences, shared with momentum-api (web).
       CORRELATION_TEXT_PATH: /shared/content/correlation_sentences.json
+      # Correlation card labels (tiers, patterns, net count), shared with momentum-api.
+      CORRELATION_LABELS_PATH: /shared/content/correlation_labels.json
     volumes:
       - ../shared/content:/shared/content:ro
     depends_on:
