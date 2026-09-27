@@ -1,5 +1,6 @@
 import { DatedValue, GlobalSection, VixValue } from '@/api';
 import { EMPTY, formatDate, formatNumber } from '../../utils/format';
+import { displayCode } from '../../utils/humanize';
 import { asObject, str, strings } from '../../utils/payload';
 import MarketCycleDetails from '../MarketCycleDetails';
 import ReadingCard from '../ReadingCard';
@@ -22,7 +23,7 @@ const VixBand = ({ vix, testId }: { vix: VixValue; testId: string }) =>
             <ToneIndicator tone={vix.tone} size={16} data-testid={`${testId}-tone`} />
             {vix.regime && (
                 <span className="market-report-strip__regime" data-testid={`${testId}-regime`}>
-                    {vix.regime}
+                    {displayCode(vix.regime)}
                 </span>
             )}
         </span>
@@ -134,7 +135,7 @@ const MarketOverview = ({ global }: MarketOverviewProps) => {
                             {flags.length > 0 && (
                                 <ul className="market-report-list market-report-mono market-report-small" data-testid="macro-correlations-flags">
                                     {flags.map(flag => (
-                                        <li key={flag}>{flag}</li>
+                                        <li key={flag}>{displayCode(flag)}</li>
                                     ))}
                                 </ul>
                             )}

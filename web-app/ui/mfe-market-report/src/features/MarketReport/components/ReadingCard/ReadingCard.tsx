@@ -1,6 +1,7 @@
 import { useId, useState } from 'react';
 import { Button, ChevronDownIcon } from '@trading-agent/shared-components';
 import { formatDate, formatNumber } from '../../utils/format';
+import { displayCode } from '../../utils/humanize';
 import ToneIndicator from '../ToneIndicator';
 import { ReadingCardProps } from './types';
 import '@/styles/market-report-global.css';
@@ -8,7 +9,7 @@ import './ReadingCard-styles.css';
 
 /**
  * One macro reading (a classification, or the market-cycle composite): the
- * stored label verbatim and the score, plus an optional in-card disclosure for
+ * stored label code humanized and the score, plus an optional in-card disclosure for
  * the details. A `classified` reading also shows the indicator for its stored
  * tone — and the no-data one when the section is missing.
  */
@@ -41,7 +42,7 @@ const ReadingCard = ({
                     <p className="market-report-reading__headline">
                         {classified && <ToneIndicator tone={tone} data-testid={testId && `${testId}-tone`} />}
                         <span className="market-report-reading__label" data-testid={testId && `${testId}-label`}>
-                            {label ?? '—'}
+                            {displayCode(label) ?? '—'}
                         </span>
                     </p>
                     <p className="market-report-muted market-report-small">

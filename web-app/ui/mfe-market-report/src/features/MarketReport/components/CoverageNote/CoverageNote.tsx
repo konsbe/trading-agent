@@ -1,4 +1,4 @@
-import { humanizeCode } from '../../utils/humanize';
+import { displayCode, humanizeCode } from '../../utils/humanize';
 import { CoverageNoteProps } from './types';
 import '@/styles/market-report-global.css';
 import './CoverageNote-styles.css';
@@ -17,7 +17,7 @@ const CoverageNote = ({ automation, gaps }: CoverageNoteProps) => {
                     {modules.map(([module, entry]) => (
                         <li key={module} data-testid={`automation-${module}`}>
                             <span className="market-report-coverage__name">{humanizeCode(module)}</span> —{' '}
-                            <span className="market-report-mono">{entry.status}</span>: {entry.hint}
+                            <span className="market-report-mono">{displayCode(entry.status)}</span>: {entry.hint}
                         </li>
                     ))}
                 </ul>

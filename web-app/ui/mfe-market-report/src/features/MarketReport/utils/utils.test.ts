@@ -1,5 +1,5 @@
 import { EMPTY, formatCompactNumber, formatDate, formatDateTime, formatNumber, formatPercent, formatSignedPercent, formatTime } from './format';
-import { humanizeCode, humanizeMetric, humanizePair } from './humanize';
+import { CODE_LABELS, displayCode, humanizeCode, humanizeMetric, humanizePair } from './humanize';
 import { MacroSignal } from '@/api';
 import { asObject, bool, marketCycleInputs, num, signalLabel, storedTone, str, strings, yieldLevels } from './payload';
 import { groupSignalsByTier } from './signals';
@@ -50,6 +50,40 @@ describe('humanize', () => {
         expect(humanizeCode('usd_strong_em_headwind')).toBe('USD strong EM headwind');
         expect(humanizePair('bond_equity_60d')).toBe('Bond vs equity (60d)');
         expect(humanizePair('vix_equity_60d')).toBe('VIX vs equity (60d)');
+    });
+
+    it.each([
+        ['below_sma', 'below 200-day average'],
+        ['no_recent_data', 'no recent data'],
+        ['no_data', 'no data'],
+        ['insufficient_data', 'insufficient data'],
+    ])('displays the override for %s', (code, text) => {
+        expect(CODE_LABELS[code]).toBe(text);
+        expect(displayCode(code)).toBe(text);
+    });
+
+    it.each([
+        ['late_cycle_stretched', 'late cycle stretched'],
+        ['extreme_fear', 'extreme fear'],
+        ['stagflation_risk', 'stagflation risk'],
+        ['bull_extended', 'bull extended'],
+        ['partial_live', 'partial live'],
+        ['neutral', 'neutral'],
+    ])('falls back to the humanized code for unmapped %s', (code, text) => {
+        expect(displayCode(code)).toBe(text);
+    });
+
+    it('keeps null, undefined and empty codes null', () => {
+        expect(displayCode(null)).toBeNull();
+        expect(displayCode(undefined)).toBeNull();
+        expect(displayCode('')).toBeNull();
+    });
+
+    it('uses a given override map instead of the default, falling back to the humanized code', () => {
+        const labels = { healthy: 'mostly agree' };
+        expect(displayCode('healthy', labels)).toBe('mostly agree');
+        expect(displayCode('below_sma', labels)).toBe('below sma');
+        expect(displayCode('toString', labels)).toBe('toString');
     });
 });
 

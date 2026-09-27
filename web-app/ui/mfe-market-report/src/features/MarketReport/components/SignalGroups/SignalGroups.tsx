@@ -1,6 +1,6 @@
 import { MacroSignal } from '@/api';
 import { formatCompactNumber, formatDate, formatNumber } from '../../utils/format';
-import { humanizeMetric } from '../../utils/humanize';
+import { displayCode, humanizeMetric } from '../../utils/humanize';
 import { signalLabel, yieldLevels } from '../../utils/payload';
 import { groupSignalsByTier, SignalGroup } from '../../utils/signals';
 import ToneIndicator from '../ToneIndicator';
@@ -25,7 +25,7 @@ const Levels = ({ payload, testId }: { payload: unknown; testId: string }) => {
 const SignalRow = ({ name, signal }: { name: string; signal: MacroSignal }) => {
     const testId = `signal-${name}`;
     const displayOnly = signal.tone === 'display_only';
-    const label = displayOnly ? null : signalLabel(signal.payload);
+    const label = displayOnly ? null : displayCode(signalLabel(signal.payload));
     return (
         <li className="market-report-signal" data-testid={testId}>
             <span className="market-report-signal__indicator">

@@ -3,7 +3,7 @@ import { Tone } from '@/api';
 
 export interface ReadingCardProps {
     title: string;
-    /** The stored label, rendered verbatim, e.g. "neutral", "elevated_stress". */
+    /** The stored label code, rendered humanized: `elevated_stress` → "elevated stress". */
     label?: string | null;
     /** The stored tone; drives the indicator only when `classified`. */
     tone?: Tone | null;

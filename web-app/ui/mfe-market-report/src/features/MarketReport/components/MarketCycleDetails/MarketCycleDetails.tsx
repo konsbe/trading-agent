@@ -1,4 +1,5 @@
 import { EMPTY, formatNumber, formatPercent, formatSignedPercent } from '../../utils/format';
+import { displayCode } from '../../utils/humanize';
 import { asObject, bool, marketCycleInputs, num, str } from '../../utils/payload';
 import ToneIndicator from '../ToneIndicator';
 import { MarketCycleDetailsProps } from './types';
@@ -17,7 +18,7 @@ const MarketCycleDetails = ({ payload, 'data-testid': testId = 'market-cycle' }:
     const hasSma = bool(obj, 'has_sma200') !== false;
     const facts: { key: string; label: string; value: string; mono?: boolean }[] = [
         { key: 'symbol', label: 'Symbol', value: str(obj, 'symbol') ?? EMPTY, mono: true },
-        { key: 'phase', label: 'Price phase', value: str(obj, 'price_phase') ?? EMPTY },
+        { key: 'phase', label: 'Price phase', value: displayCode(str(obj, 'price_phase')) ?? EMPTY },
         { key: 'drawdown', label: 'Drawdown', value: formatPercent(num(obj, 'drawdown_pct')), mono: true },
         { key: 'vs-sma200', label: 'vs 200DMA', value: hasSma ? formatSignedPercent(num(obj, 'pct_vs_sma200')) : EMPTY, mono: true },
         { key: 'sma200', label: 'SMA200', value: hasSma ? formatNumber(num(obj, 'sma200')) : EMPTY, mono: true },
@@ -35,7 +36,7 @@ const MarketCycleDetails = ({ payload, 'data-testid': testId = 'market-cycle' }:
                             <span className="market-report-cycle__input-name">{label}</span>
                             <ToneIndicator tone={tone} size={16} data-testid={`${testId}-input-${key}-tone`} />
                             <span className="market-report-cycle__input-word" data-testid={`${testId}-input-${key}-stance`}>
-                                {stance ?? EMPTY}
+                                {displayCode(stance) ?? EMPTY}
                             </span>
                         </li>
                     ))}
