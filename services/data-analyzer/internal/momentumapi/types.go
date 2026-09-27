@@ -204,6 +204,23 @@ type watchlistItem struct {
 	Close     *float64 `json:"close"`
 	ChangePct *float64 `json:"change_pct"`
 	RVol20    *float64 `json:"rvol_20"`
+
+	// The candidates list's other columns, same names and null handling as
+	// candidate. Score fields are set only when IsCandidateToday (the row is
+	// the latest scan and passed its gates); every other symbol has no score
+	// row, so they are null — not a missing value.
+	DollarVolume     *float64 `json:"dollar_volume"`
+	RSI14            *float64 `json:"rsi_14"`
+	BreakoutState    *string  `json:"breakout_state"`
+	PctOf52wHigh     *float64 `json:"pct_of_52w_high"`
+	CatalystTier     *string  `json:"catalyst_tier"`
+	MarketCap        *float64 `json:"market_cap"`
+	MarketCapEst     *float64 `json:"market_cap_est"`
+	MarketCapIsProxy bool     `json:"market_cap_is_proxy"`
+	IsCandidateToday bool     `json:"is_candidate_today"`
+	MomentumScore100 *int     `json:"momentum_score_100"`
+	ScoreAttainable  *int     `json:"score_attainable"`
+	ScoreStatus      string   `json:"score_status"`
 }
 
 type symbolSearchResponse struct {

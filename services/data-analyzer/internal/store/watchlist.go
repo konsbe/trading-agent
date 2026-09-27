@@ -40,6 +40,25 @@ type WatchlistItem struct {
 	Close     *float64
 	ChangePct *float64
 	RVol20    *float64
+
+	// The same features-row fields the candidates list shows.
+	DollarVolume     *float64
+	RSI14            *float64
+	BreakoutState    *string
+	PctOf52wHigh     *float64
+	CatalystTier     *string
+	MarketCap        *float64
+	MarketCapEst     *float64
+	MarketCapIsProxy bool
+
+	// IsCandidateToday: that row is from the latest scan and passed its gates.
+	// MomentumScore / ScoreNullInputs are its momentum_scores row, read only
+	// then — a symbol that passed on an older date is never shown with a
+	// score, as on Stock Detail — and nil for every other symbol, which has
+	// no score row (only gate passes are scored).
+	IsCandidateToday bool
+	MomentumScore    *int
+	ScoreNullInputs  []string
 }
 
 // ownerKey is the value the unique index compares on: ” for the
@@ -53,17 +72,27 @@ func ownerArg(owner *string) any {
 
 func ListWatchlist(ctx context.Context, q Querier, owner *string) ([]WatchlistItem, error) {
 	rows, err := q.Query(ctx, `
+WITH latest AS (SELECT max(ts) AS ts FROM momentum_features)
 SELECT w.symbol, u.name, u.exchange, w.added_at,
-       mf.ts, mf.close, mf.change_pct, mf.rvol_20
+       mf.ts, mf.close, mf.change_pct, mf.rvol_20,
+       mf.dollar_volume, mf.rsi_14, mf.breakout_state, mf.pct_of_52w_high, mf.catalyst_tier,
+       mf.market_cap, mf.market_cap_est, COALESCE(mf.market_cap_is_proxy, false),
+       COALESCE(mf.gates_passed AND mf.ts = latest.ts, false),
+       ms.momentum_score_100, ms.null_inputs
 FROM watchlist_items w
+CROSS JOIN latest
 LEFT JOIN universe_symbols u ON u.symbol = w.symbol
 LEFT JOIN LATERAL (
-    SELECT f.ts, f.close, f.change_pct, f.rvol_20
+    SELECT f.ts, f.close, f.change_pct, f.rvol_20,
+           f.dollar_volume, f.rsi_14, f.breakout_state, f.pct_of_52w_high, f.catalyst_tier,
+           f.market_cap, f.market_cap_est, f.market_cap_is_proxy, f.gates_passed
     FROM momentum_features f
     WHERE f.symbol = w.symbol
     ORDER BY f.ts DESC
     LIMIT 1
 ) mf ON true
+LEFT JOIN momentum_scores ms
+       ON ms.symbol = w.symbol AND ms.ts = mf.ts AND mf.gates_passed AND mf.ts = latest.ts
 WHERE w.owner_sub IS NOT DISTINCT FROM $1
 ORDER BY w.added_at DESC, w.symbol`, ownerArg(owner))
 	if err != nil {
@@ -74,7 +103,10 @@ ORDER BY w.added_at DESC, w.symbol`, ownerArg(owner))
 	for rows.Next() {
 		var it WatchlistItem
 		if err := rows.Scan(&it.Symbol, &it.CompanyName, &it.Exchange, &it.AddedAt,
-			&it.AsOf, &it.Close, &it.ChangePct, &it.RVol20); err != nil {
+			&it.AsOf, &it.Close, &it.ChangePct, &it.RVol20,
+			&it.DollarVolume, &it.RSI14, &it.BreakoutState, &it.PctOf52wHigh, &it.CatalystTier,
+			&it.MarketCap, &it.MarketCapEst, &it.MarketCapIsProxy,
+			&it.IsCandidateToday, &it.MomentumScore, &it.ScoreNullInputs); err != nil {
 			return nil, fmt.Errorf("scan watchlist item: %w", err)
 		}
 		it.AddedAt = it.AddedAt.UTC()

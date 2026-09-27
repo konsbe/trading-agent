@@ -4,6 +4,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/konsbe/trading-agent/services/data-analyzer/internal/momentum"
 )
 
 // Watchlist endpoints: the one write path in this service, designed separately
@@ -97,6 +99,22 @@ func (s *Server) writeWatchlist(w http.ResponseWriter, r *http.Request, status i
 			Close:     finite(it.Close),
 			ChangePct: finite(it.ChangePct),
 			RVol20:    finite(it.RVol20),
+
+			DollarVolume:     finite(it.DollarVolume),
+			RSI14:            finite(it.RSI14),
+			BreakoutState:    it.BreakoutState,
+			PctOf52wHigh:     finite(it.PctOf52wHigh),
+			CatalystTier:     it.CatalystTier,
+			MarketCap:        finite(it.MarketCap),
+			MarketCapEst:     finite(it.MarketCapEst),
+			MarketCapIsProxy: it.MarketCapIsProxy,
+			IsCandidateToday: it.IsCandidateToday,
+			MomentumScore100: it.MomentumScore,
+			ScoreStatus:      momentum.ScoreStatus,
+		}
+		if it.MomentumScore != nil {
+			a := momentum.Attainable(it.ScoreNullInputs)
+			item.ScoreAttainable = &a
 		}
 		if it.AsOf != nil {
 			d := it.AsOf.Format(time.DateOnly)

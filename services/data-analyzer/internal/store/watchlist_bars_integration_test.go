@@ -219,3 +219,62 @@ func containsSymbol(ms []SymbolMatch, sym string) bool {
 	}
 	return false
 }
+
+// The watchlist serves the candidates list's columns from the same features
+// row. Score fields only for a symbol that passed the gates in the LATEST
+// scan: a non-candidate has no momentum_scores row (only gate passes are
+// scored), and one that passed on an older date is never shown with a score.
+func TestWatchlist_CandidateColumnsAndScoreOnlyForTodaysCandidates(t *testing.T) {
+	ctx := context.Background()
+	tx := fixtureTx(t)
+	if _, err := tx.Exec(ctx, `INSERT INTO universe_symbols (symbol, exchange, name) VALUES
+		('ZZW21','NASDAQ','Candidate Today'), ('ZZW22','NYSE','Not A Candidate'), ('ZZW23','NYSE','Old Candidate')`); err != nil {
+		t.Fatal(err)
+	}
+	latest := time.Date(2099, 5, 2, 0, 0, 0, 0, time.UTC) // newest ts in the table inside this tx
+	older := time.Date(2099, 5, 1, 0, 0, 0, 0, time.UTC)
+	if _, err := tx.Exec(ctx, `INSERT INTO momentum_features
+		(ts, symbol, bucket, close, change_pct, rvol_20, dollar_volume, rsi_14, breakout_state, pct_of_52w_high,
+		 market_cap, market_cap_est, market_cap_is_proxy, gates_passed) VALUES
+		($1, 'ZZW21', 'market', 12.0, 0.11, 4.2, 9000000, 71.5, 'breakout', 1.02, 800000000, NULL, false, true),
+		($1, 'ZZW22', NULL,      30.0, 0.01, 1.1, 5500000, 48.2, 'none',     0.81, NULL, 450000000, true, false),
+		($2, 'ZZW23', 'market',  8.0, 0.09, 3.5, 6000000, 66.0, 'approaching', 0.97, 500000000, NULL, false, true)`,
+		latest, older); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tx.Exec(ctx, `INSERT INTO momentum_scores (ts, symbol, bucket, momentum_score_100, null_inputs) VALUES
+		($1, 'ZZW21', 'market', 53, '{catalyst_tier}'), ($2, 'ZZW23', 'market', 61, '{catalyst_tier}')`, latest, older); err != nil {
+		t.Fatal(err)
+	}
+	for _, s := range []string{"ZZW21", "ZZW22", "ZZW23"} {
+		if _, err := AddToWatchlist(ctx, tx, nil, s); err != nil {
+			t.Fatal(err)
+		}
+	}
+	items, err := ListWatchlist(ctx, tx, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]WatchlistItem{}
+	for _, it := range items {
+		got[it.Symbol] = it
+	}
+	c := got["ZZW21"]
+	if !c.IsCandidateToday || c.MomentumScore == nil || *c.MomentumScore != 53 || len(c.ScoreNullInputs) != 1 {
+		t.Errorf("today's candidate: candidate %v score %v null %v, want true / 53 / [catalyst_tier]", c.IsCandidateToday, c.MomentumScore, c.ScoreNullInputs)
+	}
+	if c.RSI14 == nil || *c.RSI14 != 71.5 || c.BreakoutState == nil || *c.BreakoutState != "breakout" || *c.DollarVolume != 9e6 || *c.MarketCap != 8e8 {
+		t.Errorf("today's candidate features = %+v", c)
+	}
+	n := got["ZZW22"]
+	if n.IsCandidateToday || n.MomentumScore != nil || n.ScoreNullInputs != nil {
+		t.Errorf("non-candidate: candidate %v score %v, want false / nil", n.IsCandidateToday, n.MomentumScore)
+	}
+	if n.RSI14 == nil || *n.RSI14 != 48.2 || *n.PctOf52wHigh != 0.81 || n.MarketCap != nil || *n.MarketCapEst != 4.5e8 || !n.MarketCapIsProxy {
+		t.Errorf("non-candidate features must still be served: %+v", n)
+	}
+	o := got["ZZW23"]
+	if o.IsCandidateToday || o.MomentumScore != nil {
+		t.Errorf("older candidate: candidate %v score %v, want false / nil (its gate pass is not today's)", o.IsCandidateToday, o.MomentumScore)
+	}
+}
