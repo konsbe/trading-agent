@@ -211,3 +211,16 @@ async def rel_return_vs_benchmark_excess_pct(
     ra = (ca[-1] / ca[0] - 1.0) * 100.0
     rb = (cb[-1] / cb[0] - 1.0) * 100.0
     return round(ra - rb, 2)
+
+
+async def macro_observations(pool: asyncpg.Pool, series_id: str, n: int) -> list[dict]:
+    """The newest n non-null observations of a FRED series, newest first: {value, ts}."""
+    rows = await pool.fetch(
+        """
+        SELECT value, ts FROM macro_fred
+        WHERE series_id = $1 AND value IS NOT NULL
+        ORDER BY ts DESC LIMIT $2
+        """,
+        series_id, n,
+    )
+    return [{"value": float(r["value"]), "ts": r["ts"]} for r in rows]

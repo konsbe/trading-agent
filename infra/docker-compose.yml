@@ -321,6 +321,8 @@ services:
       CORRELATION_TEXT_PATH: /shared/content/correlation_sentences.json
       # Correlation card labels (tiers, patterns, net count), shared with momentum-api.
       CORRELATION_LABELS_PATH: /shared/content/correlation_labels.json
+      # Alert labels and message templates, shared with momentum-api (Alarm History).
+      ALERT_MESSAGES_PATH: /shared/content/alert_messages.json
     volumes:
       - ../shared/content:/shared/content:ro
     depends_on:

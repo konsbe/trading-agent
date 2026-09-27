@@ -213,7 +213,7 @@ def technical_embed(tech: TechnicalSnapshot, current_price: Optional[float] = No
     embed.add_field(name="ATR 14", value=_num(tech.atr, 3), inline=True)
 
     # Volatility
-    squeeze_str = "🔴 ACTIVE — breakout expected" if tech.bb_squeeze else "—"
+    squeeze_str = "Active — bands inside the Keltner Channel (recent volatility is low)" if tech.bb_squeeze else "—"
     embed.add_field(name="BB Squeeze", value=squeeze_str, inline=True)
 
     vix_str = f"{_regime_emoji(tech.vix_regime)} {tech.vix_regime or '—'}"

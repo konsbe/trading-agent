@@ -103,10 +103,10 @@ Higher ATR = more volatility. Lower ATR = tighter price action (often precedes a
 
 ### BB Squeeze (Bollinger Band Squeeze)
 
-`🔴 ACTIVE — breakout expected` — Bollinger Bands are now **inside** Keltner Channels. Volatility has compressed to an unusually tight range. A big move is building. Direction unknown until the breakout occurs.
+`Active — bands inside the Keltner Channel (recent volatility is low)` — the Bollinger Bands are **inside** the Keltner Channels: recent volatility is unusually low.
 `—` — No squeeze, bands are at normal width.
 
-One of the highest-value alerts — it often precedes sharp directional moves.
+It describes the condition only. It implies no breakout, direction or move size: in this project's pre-registered test (H5, `docs/HEURISTIC_SIGNALS_PREREGISTRATION.md`) squeezes were followed by slightly *smaller* moves than other days (0.966x).
 
 ### VIX Regime (Market Fear Index)
 
@@ -507,16 +507,18 @@ Configurable via `FUNDAMENTAL_FCF_CONVERSION_HIGH` (default 1.0) and `FUNDAMENTA
 
 ## Alert Types
 
-Alerts post to `#alerts` automatically every 5 minutes (configurable). Each has a severity level.
+The alert scan runs every 5 minutes (configurable) and posts **onsets** to `#alerts`: a condition that *started* on the latest bar after at least 5 sessions without it (the pre-registered episode rule). A condition that stays true is not re-posted, however long it lasts. Labels and message text come from `shared/content/alert_messages.json` (shared with Alarm History).
 
-`rsi_oversold` ⚠️ — RSI < 30. Price has fallen sharply, potential bounce.
-`rsi_overbought` ⚠️ — RSI > 70. Price has risen sharply, potential pullback.
-`bb_squeeze` ℹ️ — BB inside Keltner. Volatility coiling, breakout incoming.
-`vix_elevated` ⚠️ — VIX > 25. Market fear rising, risk-off environment.
-`fa_tier_flip` ⚠️ — Composite tier changed (e.g. neutral → weak).
-`liquidity_sweep` ℹ️ — Sweep detected. Institutions hunted stop-losses, potential directional move.
+`rsi_oversold` — RSI(14) crossed below 30.
+`rsi_overbought` — RSI(14) crossed above 70.
+`bb_squeeze` — Bollinger Squeeze began: the Bollinger Bands moved inside the Keltner Channel (recent volatility is low). No breakout is implied.
+`liquidity_sweep` — a new liquidity sweep on the latest bar (price ran a prior swing high or low and closed back), with the swept level.
+`vix_elevated` — VIXCLS crossed above `BOT_VIX_ALERT_THRESHOLD` (25). Market-wide; stored under the equity whose scan saw it (backlog, `analyst_bot.md`).
+`fa_tier_flip` — the fundamental composite tier changed to strong or weak.
 
-**Cooldown**: Same alert for same symbol won't repeat for 4 hours (configurable via `BOT_ALERT_COOLDOWN_SECS`).
+None of these is a forecast: the pre-registered tests found no reliable effect for any of them (heuristic caveat).
+
+**At most once per onset**: `fired_alerts` holds one row per symbol, alert type and bar (migration 031); the bot claims it before posting, so the same onset is never posted twice. `BOT_ALERT_COOLDOWN_SECS` (4 h) remains only as a backstop.
 
 ## Macro Fields (Daily Report Header)
 

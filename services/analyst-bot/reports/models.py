@@ -611,3 +611,6 @@ class AlertEvent:
     value: Optional[float] = None
     payload: dict = field(default_factory=dict)
     cache_key: str = ""   # Redis dedup key — set by scanner
+    # The onset bar (YYYY-MM-DD): fired_alerts stores at most one row per
+    # symbol, kind and bar_date (migration 031).
+    bar_date: Optional[str] = None

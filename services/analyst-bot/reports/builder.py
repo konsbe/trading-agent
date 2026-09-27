@@ -18,7 +18,7 @@ from typing import Optional
 import asyncpg
 
 from db import cache as _cache
-from reports import correlation_labels, correlation_text, market_text
+from reports import alert_messages, correlation_labels, correlation_text, market_text
 from db.queries import fundamental, macro_intel, news, ohlcv, sentiment, technical
 from reports.models import (
     AdditionalAnalysisSnapshot,
@@ -45,6 +45,11 @@ log = logging.getLogger(__name__)
 
 # How long the last-seen FA composite tier is remembered for flip detection.
 FA_TIER_MEMORY_SECS = 86400
+
+# technical-analysis's per-bar onset flags (heuristics.OnsetsAt) and the quiet
+# run an onset needs — the pre-registered episode gap.
+ALERT_ONSETS_INDICATOR = "alert_onsets"
+ONSET_GAP_SESSIONS = 5
 
 # Dashboard strip: (label, kind, ref, hint) — kind is "fred" or "eq"
 _DASHBOARD_ITEMS: tuple[tuple[str, str, str, str], ...] = (
@@ -294,14 +299,21 @@ class ReportBuilder:
         self,
         equity_symbols: list[str],
         crypto_symbols: list[str],
-        rsi_oversold: float = 30.0,
-        rsi_overbought: float = 70.0,
         vix_alert_threshold: float = 25.0,
     ) -> list[AlertEvent]:
-        """Alerts detected now and not in cooldown.
+        """Onsets detected now and not yet posted.
 
-        Detection only: the cooldown flag is set by the alert scan job after a
-        notifier confirms the post, so a failed send does not burn it.
+        An alert marks an ONSET: the condition started on the latest bar after
+        at least ONSET_GAP_SESSIONS bars without it. technical-analysis judges
+        RSI, squeeze and sweep onsets from bars (indicator ``alert_onsets``,
+        heuristics.OnsetsAt — the pre-registered episode rule, RSI lines 70 /
+        30); VIX onsets come from the VIXCLS series here; the FA tier flip is a
+        change against the remembered tier. An unchanged reading is never an
+        alert, however long it lasts.
+
+        Detection only: the job claims the fired_alerts row (unique per symbol,
+        kind and bar_date) and sets the cooldown after a confirmed post. The
+        cooldown key is a backstop, not the de-duplication.
         """
         alerts: list[AlertEvent] = []
         # A market-wide key (vix_elevated) is detected once per symbol; without
@@ -315,57 +327,75 @@ class ReportBuilder:
             alerts.append(event)
             return True
 
+        vix_onset = await self._vix_onset(vix_alert_threshold) if equity_symbols else None
+
         async def _check(symbol: str, asset_type: str) -> None:
             exchange = "equity" if asset_type == "equity" else "binance"
             interval = self._equity_interval if asset_type == "equity" else self._crypto_interval
             indicators = await technical.latest_indicators(self._pool, symbol, exchange, interval)
+            onsets = (indicators.get(ALERT_ONSETS_INDICATOR) or {}).get("payload") or {}
+            bar_date = onsets.get("bar_date")
 
-            # ── RSI ──────────────────────────────────────────────────────────
-            rsi_key = f"rsi_{14}"
-            if rsi_key in indicators:
-                rsi_val = indicators[rsi_key]["value"]
-                if rsi_val is not None:
-                    if rsi_val < rsi_oversold:
-                        ck = f"alert:rsi_oversold:{symbol}:{interval}"
-                        await _emit(AlertEvent(
-                            kind="rsi_oversold",
-                            symbol=symbol, exchange=exchange, interval=interval,
-                            message=f"RSI {rsi_val:.1f} — oversold (<{rsi_oversold})",
-                            severity="warning", value=rsi_val, cache_key=ck,
-                        ))
-                    elif rsi_val > rsi_overbought:
-                        ck = f"alert:rsi_overbought:{symbol}:{interval}"
-                        await _emit(AlertEvent(
-                            kind="rsi_overbought",
-                            symbol=symbol, exchange=exchange, interval=interval,
-                            message=f"RSI {rsi_val:.1f} — overbought (>{rsi_overbought})",
-                            severity="warning", value=rsi_val, cache_key=ck,
-                        ))
-
-            # ── Bollinger Squeeze ─────────────────────────────────────────────
-            if "bb_squeeze" in indicators:
-                sq = indicators["bb_squeeze"]["value"]
-                if sq and sq >= 1.0:
-                    ck = f"alert:bb_squeeze:{symbol}:{interval}"
+            if bar_date and onsets.get("judged"):
+                rsi = onsets.get("rsi_14")
+                # ── RSI crossed its line ──────────────────────────────────────
+                if onsets.get("rsi_oversold_onset") and rsi is not None:
+                    line = onsets.get("rsi_oversold_threshold", 30.0)
+                    await _emit(AlertEvent(
+                        kind="rsi_oversold",
+                        symbol=symbol, exchange=exchange, interval=interval,
+                        message=alert_messages.render("rsi_oversold", rsi=rsi, threshold=line),
+                        severity="warning", value=rsi, bar_date=bar_date,
+                        cache_key=f"alert:rsi_oversold:{symbol}:{interval}",
+                    ))
+                if onsets.get("rsi_overbought_onset") and rsi is not None:
+                    line = onsets.get("rsi_overbought_threshold", 70.0)
+                    await _emit(AlertEvent(
+                        kind="rsi_overbought",
+                        symbol=symbol, exchange=exchange, interval=interval,
+                        message=alert_messages.render("rsi_overbought", rsi=rsi, threshold=line),
+                        severity="warning", value=rsi, bar_date=bar_date,
+                        cache_key=f"alert:rsi_overbought:{symbol}:{interval}",
+                    ))
+                # ── Bollinger Squeeze began ───────────────────────────────────
+                if onsets.get("bb_squeeze_onset"):
                     await _emit(AlertEvent(
                         kind="bb_squeeze",
                         symbol=symbol, exchange=exchange, interval=interval,
-                        message="Bollinger Squeeze active — low-volatility coil, breakout expected",
-                        severity="info", value=sq, cache_key=ck,
+                        message=alert_messages.render("bb_squeeze"),
+                        severity="info", value=1.0, bar_date=bar_date,
+                        cache_key=f"alert:bb_squeeze:{symbol}:{interval}",
+                    ))
+                # ── New liquidity sweep on the latest bar ─────────────────────
+                sweep = onsets.get("sweep") or {}
+                if onsets.get("sweep_onset") and sweep.get("swept_level") is not None:
+                    side = "high" if sweep.get("kind") == "high_sweep" else "low"
+                    await _emit(AlertEvent(
+                        kind="liquidity_sweep",
+                        symbol=symbol, exchange=exchange, interval=interval,
+                        message=alert_messages.render(
+                            "liquidity_sweep", side=side,
+                            level=float(sweep["swept_level"]), close=float(sweep.get("bar_close") or 0.0),
+                        ),
+                        severity="info", value=float(sweep["swept_level"]), bar_date=bar_date,
+                        cache_key=f"alert:liq_sweep:{symbol}:{interval}",
+                        payload={"sweep": sweep},
                     ))
 
-            # ── VIX regime change ─────────────────────────────────────────────
-            if "vix_regime" in indicators and asset_type == "equity":
-                regime = (indicators["vix_regime"]["payload"] or {}).get("regime")
-                vix_val = indicators["vix_regime"]["value"]
-                if vix_val and vix_val > vix_alert_threshold:
-                    ck = f"alert:vix_elevated:{interval}"
-                    await _emit(AlertEvent(
-                        kind="vix_elevated",
-                        symbol=symbol, exchange=exchange, interval=interval,
-                        message=f"VIX {vix_val:.1f} — regime: {regime}",
-                        severity="warning", value=vix_val, cache_key=ck,
-                    ))
+            # ── VIX crossed its threshold (market-wide; see analyst_bot.md) ────
+            if vix_onset and asset_type == "equity":
+                # The band technical-analysis stores for the same VIX (compute.ClassifyVIX).
+                regime = ((indicators.get("vix_regime") or {}).get("payload") or {}).get("regime") or "elevated"
+                await _emit(AlertEvent(
+                    kind="vix_elevated",
+                    symbol=symbol, exchange=exchange, interval=interval,
+                    message=alert_messages.render(
+                        "vix_elevated", vix=vix_onset["value"], threshold=vix_alert_threshold,
+                        regime=regime,
+                    ),
+                    severity="warning", value=vix_onset["value"], bar_date=vix_onset["bar_date"],
+                    cache_key=f"alert:vix_elevated:{interval}",
+                ))
 
             # ── FA composite tier flip (equity only) ──────────────────────────
             if asset_type == "equity":
@@ -377,31 +407,20 @@ class ReportBuilder:
                     flip_emitted = False
                     if prev_tier and prev_tier != tier and tier in ("strong", "weak"):
                         ck = f"alert:fa_tier_flip:{symbol}"
+                        computed = derived["composite_score"].get("ts")
+                        flip_date = (computed or datetime.now(timezone.utc)).astimezone(timezone.utc).date().isoformat()
                         flip_emitted = await _emit(AlertEvent(
                             kind="fa_tier_flip",
                             symbol=symbol, exchange=exchange, interval=interval,
-                            message=f"FA composite tier changed: {prev_tier} → {tier}",
+                            message=alert_messages.render("fa_tier_flip", prev_tier=prev_tier, new_tier=tier),
                             severity="warning" if tier == "weak" else "info",
-                            cache_key=ck,
+                            cache_key=ck, bar_date=flip_date,
                             payload={"prev_tier": prev_tier, "new_tier": tier},
                         ))
                     # An emitted flip keeps the old tier until the job confirms
                     # the post, so a failed send is retried rather than lost.
                     if tier and not flip_emitted:
                         await _cache.set(prev_tier_key, tier, FA_TIER_MEMORY_SECS)
-
-            # ── Liquidity sweep ───────────────────────────────────────────────
-            liq_key = next((k for k in indicators if k.startswith("liquidity_sweep")), None)
-            if liq_key:
-                count = indicators[liq_key]["value"]
-                if count and count > 0:
-                    ck = f"alert:liq_sweep:{symbol}:{interval}"
-                    await _emit(AlertEvent(
-                        kind="liquidity_sweep",
-                        symbol=symbol, exchange=exchange, interval=interval,
-                        message=f"Liquidity sweep detected ({int(count)} sweeps)",
-                        severity="info", value=count, cache_key=ck,
-                    ))
 
         for sym in equity_symbols:
             try:
@@ -416,6 +435,20 @@ class ReportBuilder:
                 log.error("alert scan error symbol=%s: %s", sym, exc)
 
         return alerts
+
+    async def _vix_onset(self, threshold: float) -> Optional[dict]:
+        """VIXCLS crossed above threshold on its latest observation after
+        ONSET_GAP_SESSIONS observations at or below it; None otherwise."""
+        obs = await ohlcv.macro_observations(self._pool, "VIXCLS", ONSET_GAP_SESSIONS + 1)
+        if len(obs) < ONSET_GAP_SESSIONS + 1:
+            return None
+        latest, prior = obs[0], obs[1:]
+        if latest["value"] <= threshold or any(o["value"] > threshold for o in prior):
+            return None
+        return {
+            "value": latest["value"],
+            "bar_date": latest["ts"].astimezone(timezone.utc).date().isoformat(),
+        }
 
     # ── Private builders ──────────────────────────────────────────────────────
 
