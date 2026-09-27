@@ -638,8 +638,8 @@ reset to their opening state and re-tracked.)
 
 ## `momentum-daily` — the scheduled chain
 
-> **Change freeze (from the 2026-09-28 deploy).** After the onset-alerts
-> deploy on Monday 2026-09-28, make no changes to `momentum-daily`,
+> **Change freeze (from the 2026-09-27 deploy).** After the onset-alerts
+> deploy on Sunday 2026-09-27, 23:52 Greek time (20:52 UTC), make no changes to `momentum-daily`,
 > `momentum-scanner` or `momentum-tracker` until the clean-session gate clears
 > (Thursday 2026-10-01 at the earliest). That deploy rebuilds the image because
 > momentum-daily's computation pass calls `runner.ComputeAndStore`, which now
