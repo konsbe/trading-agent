@@ -302,3 +302,224 @@ Backtest Lab's response ever contains a live score or symbol-specific
 field. A boundary this project cares about should be enforced somewhere
 a test can catch a violation, not left to whoever writes content later
 remembering the rule.
+
+
+#   Handbook — Full Term Inventory
+
+**Status:** coverage audit. Only §1.3's "Classical Technical Signals" entry
+exists today. Everything else below is outlined in
+`EDUCATION_SECTION_CONTENT_SPEC.md` §1 but **not yet written**. This is the
+complete checklist — every field, header, and label currently rendered on
+the three surfaces named, pulled from the actual built API responses and
+UI briefs, not reconstructed from memory.
+
+---
+
+## A. Daily Market Report
+
+### A1. Top strip
+- VIX (raw value + regime band: normal/elevated/extreme_fear/complacency)
+- 10Y Yield
+- EUR/USD
+
+### A2. Five stance cards (each: composite score, tone/label, expandable signals)
+**Monetary Policy** — tier 1: Policy Rate, Yield Curve (2s10s / 3m10y),
+Real Rate (TIPS 10Y), Balance Sheet (Fed, QE/QT), Credit Spreads (HY/IG OAS).
+tier 2: Breakeven Inflation, Treasury Yields (2Y/10Y/30Y), M2 Money Supply.
+
+**Growth Cycle** — tier 1: ISM PMI, LEI, Initial Claims, Housing
+Starts/Permits. tier 2: Real GDP, Payrolls + Sahm Rule, Real Retail Sales.
+tier 3: Michigan Sentiment, Core Capex.
+
+**Inflation & Prices** — tier 1: Core PCE, CPI + Core CPI, Shelter CPI.
+tier 2: PPI Final Demand + PPI-CPI spread, WTI/Brent Oil. tier 3: Wages
+(AHE/ECI), Copper.
+
+**Global/Geopolitical Stress** — tier 1: Broad USD (DTWEXBGS — note: not
+ICE DXY), USD/JPY (carry unwind risk). tier 2: China GDP YoY, US fiscal
+deficit % of GDP.
+
+**Macro Correlations Regime** — the regime label itself (e.g.
+`stagflation_risk`, `global_liquidity_stress`), its score, and its flags
+list.
+
+### A3. Market Cycle (market-wide) — its own card
+- Composite phase + score (the 12-phase enum, tone-mapped)
+- Blended inputs (Growth/Policy/Inflation/Global, each with its own tone)
+- Index sub-section: Symbol (benchmark), Price Phase, Drawdown from Peak,
+  vs 200DMA, SMA200, Close, Crash Velocity Flag
+- **Needs its own explanation of why this is two different things bundled
+  in one card** — the composite is a blended regime score; the Index
+  sub-section is one instrument's own price facts. This distinction was a
+  real design correction mid-project and deserves to be taught, not just
+  displayed correctly.
+
+### A4. Instruments (Tracked + Watchlist groups)
+- Price, change %, session_closed flag
+- Market-cycle phase, drawdown from peak, vs 200DMA (equities/ETFs only)
+- Yield cards: yield %, as-of date (no price-phase fields — explain why
+  yields don't get one)
+- BTC's distinct treatment: "00:00 UTC daily close (closed candles only)",
+  365/14/7/200-day windows instead of the 252/10/5-session equity ones
+
+### A5. Seasonality & cycle context
+- Month seasonality (the almanac label, e.g. "weak_bear")
+- Presidential cycle (year 1-4, midterm framing)
+- Intermarket correlations: bond-equity ρ, oil-equity ρ, VIX-equity ρ, and
+  their regime labels (deflationary_hedge, decoupled, typical_fear_greed,
+  etc.)
+
+### A6. Calendar & news
+- Economic calendar (and what a 403/unavailable state means)
+- Earnings calendar, and the three-way `earnings_coverage` states
+  (upcoming / none_in_window / not_ingested)
+- News headlines format
+
+### A7. Data coverage note
+- What `not_automated` / `needs_data` / `partial` / `live_static` /
+  `partial_live` actually mean — this list looks like a feature gap but is
+  actually a transparency disclosure; the Handbook entry should say that
+  explicitly.
+
+---
+
+## B. Today's Candidates
+
+### B1. The gates (all six, §3.2)
+- Price band (market ≥$2.00, penny $0.30-$2.00)
+- History minimum (≥252 bars)
+- Day-change band (market +8-25%, penny +10-40% — **and why the upper
+  bound exists**, not just the lower)
+- RVOL minimum (market ≥3.0×, penny ≥4.0×)
+- Dollar volume minimum (market ≥$5M, penny ≥$2M)
+- Market cap band (market $300M-$10B, penny ≤$300M)
+- What "failed a gate" means (excluded, not scored low) vs. "passed" +
+  what a partial pass looks like on the detail page
+
+### B2. List columns
+- Bucket (market/penny) — what determines it (price, not size)
+- RVOL (rvol_20) — plain definition, why it's the default sort
+- Dollar Volume
+- RSI(14) — reused from MasterClass Module 3, but this entry should
+  explain the platform-specific fact that RSI is a *penalty*, not a
+  positive scoring input here (Phase 1 §3.10) — a genuinely
+  counter-intuitive design choice worth explaining
+- Breakout State (none/approaching/breakout/breakout_from_consolidation)
+  — **and the honest finding**: this field measured *inverted* for
+  predicting big moves (Phase 1 §10.1.0), which is exactly why it's
+  zeroed in the score. This is a must-include, high-value fact.
+- 52-Week High % — same treatment: also measured inverted, also zeroed
+- Catalyst Tier (A/B/none/null) — why null is the common case
+- Market Cap, Market Cap (est.), the `is_proxy` flag — what "estimated"
+  means and why it's disclosed rather than presented as reported
+- Score (`momentum_score_100`), Score Attainable (the "/75" ceiling, why
+  it's not "/100"), `score_status: unvalidated`
+- Recent Alert badge — what triggers it, links to Alarm History once
+  that entry exists
+
+### B3. Page-level facts
+- Universe scanned vs. universe eligible, and why they can differ
+- Scan date, `is_stale`, and the stale-scan messaging
+- Why sorting by score doesn't imply ranking (the `score_status` marker
+  travels with every sort order)
+
+---
+
+## C. Stock Detail (candidate/symbol detail page)
+
+### C1. Top block
+- "Passed the gates" panel — same six gates as B1, shown per-symbol with
+  actual value vs. band
+- Gate failures list (for a symbol that didn't pass)
+- "No scanner data for this symbol" state (never-scanned symbols)
+- `as_of`, `is_stale`, `is_candidate_today` — what each means for a
+  non-candidate or stale symbol
+
+### C2. Primary Facts grid
+Last Close, Day Change, Volume, Avg Volume (20-day), Dollar Volume, RVOL
+(20-day), Float Shares (est.) + `float_is_proxy`, RSI(14), 52-Week High +
+% from peak, Breakout State, Gap %, VWAP Distance, ATR%, Market Cap,
+Identified Catalyst.
+
+### C3. Price chart
+- Range options (1D/5D/1M/6M/1Y/ALL) and what changes between them
+  (intraday 5-min bars vs. daily, adjusted vs. unadjusted)
+- The `fallback: no_intraday_data` case — why a symbol sometimes shows
+  daily bars on a "1D" request
+
+### C4. Score Breakdown
+- Total, Attainable (/75), Allocated (/90) — the three-number relationship
+- Every sub-score (rvol, vol_accel, catalyst, float, vwap, breakout,
+  high52w) with its weight — **and explicitly which are zeroed and why**
+  (breakout and high52w measured inverted)
+- Missing inputs list
+- Penalties (the three: exhausted momentum, already extended, volume
+  decaying) — what each means and why it exists
+- The research caveat, verbatim, with the actual measured odds ratio
+  (0.991) explained in plain terms
+
+### C5. Technical Analysis section
+RSI(14), MACD (histogram + cross), ADX(14) (trend strength, not
+direction), Trend + slope, MA Cross (golden/death), ATR(14), BB Squeeze,
+VIX Regime (and how this differs from the market-wide VIX band — the
+known 20 vs 25 threshold mismatch is worth a footnote once it's fixed),
+Pivots (PP/R1/S1), SMC counts (FVGs, Order Blocks, Liquidity Sweeps —
+**cross-reference to the Classical Technical Signals entry**, since these
+counts feed that section).
+
+### C6. Fundamentals section
+Composite score + tier, EPS Strength, Revenue, P/E vs 5Y, FCF Yield,
+Gross Margin, Net Margin, PEG, Earnings Surprise, TTM P/E, Market Cap.
+
+### C7. Balance Sheet section
+Composite + tier, ROE, ROA, ROIC, Current Ratio, Quick Ratio, Debt/Equity,
+Net Debt/EBITDA, EV/EBITDA, Price/Book, Dividend Yield, CapEx Intensity.
+
+### C8. Correlations section
+Composite + tier, the four cluster names (Earnings Quality, Valuation vs
+Quality, Leverage & Liquidity, Operational) and what each measures, the
+five master divergence signals (Bullish Convergence, Hidden Value,
+Deterioration Warning, Value Trap, Leverage Cycle Warning) and what each
+means, Net Signal, Aligned/Divergent signal lines.
+
+### C9. Qualitative Signals section
+Moat Proxy, Insider Activity (+ the honest `insufficient_data` case and
+why), News Sentiment (7D/30D), R&D Intensity.
+
+### C10. Sentiment & News
+Headline format (title/source/link only — and why no article text, per
+the copyright practice already applied everywhere).
+
+### C11. Context vs Benchmark
+Benchmark symbol (SPY), Market Cycle (market-wide, cross-reference A3),
+Price Phase, Drawdown from Peak, Macro Correlations Regime, Relative
+Strength (20D).
+
+### C12. Classical Technical Signals — *already written*
+Chart patterns (head & shoulders, inverse H&S, flags, triangles, double
+tops/bottoms — cross-reference MasterClass Module 3 for what each *is*;
+this entry says what was *tested*), liquidity sweeps, order blocks,
+confluence score, BUY_WATCH/TRIM_WATCH, severity badges.
+
+---
+
+## Build order — realistic batches, not one pass
+
+Given the size, split into reviewable batches, same pace as everything
+else this session:
+
+| Batch | Covers | Est. entries |
+|---|---|---|
+| 1 | B1-B3 (Today's Candidates — gates, columns, page facts) | ~10 |
+| 2 | C1-C4 (Stock Detail — top block, facts, chart, score breakdown) | ~8 |
+| 3 | C5-C7 (Technical, Fundamentals, Balance Sheet grids) | ~25 (many are short, definition-only entries) |
+| 4 | C8-C11 (Correlations, Qualitative, Sentiment, Context) | ~15 |
+| 5 | A1-A7 (Daily Market Report, full) | ~20 |
+
+Batches 3 and 5 are the largest by entry count but the *shortest* per
+entry — most are single-metric definitions (e.g. "ROE," "Current Ratio")
+that don't need Handbook's fuller treatment, just a clear one-paragraph
+answer to "what is this and what does it tell me." Batches 1, 2, and
+part of the Daily Market Report (the Market Cycle split, the gates'
+upper-bound rationale) need the fuller, more explanatory treatment this
+project has already shown it can do well.
