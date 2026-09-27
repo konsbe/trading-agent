@@ -163,6 +163,9 @@ type Config struct {
 	// GPRSourceConfigured mirrors data-macro-intel's GPR_CSV_URL: without it the
 	// geopolitical-risk index is never ingested.
 	GPRSourceConfigured bool
+	// MarketReportText is shared/content/market_report_descriptions.json: the
+	// one-line descriptions, shared with the bot's Discord report.
+	MarketReportText MarketReportText
 
 	// Full stock analysis (GET /today/{symbol}/analysis). AnalysisNames are the
 	// stored indicator names (technical.NamesFor the worker's config).

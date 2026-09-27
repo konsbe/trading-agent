@@ -1,0 +1,45 @@
+{
+  "_about": "Daily Market Report one-line descriptions, keyed by the stored code. Read by momentum-api (web) and analyst-bot (Discord); edit here and nowhere else.",
+  "intermarket": {
+    "bond_equity_60d": {
+      "deflationary_hedge": "Bond prices and stocks moved in opposite directions over the window (ρ ≤ −0.25).",
+      "inflationary_positive": "Bond prices and stocks moved together over the window (ρ ≥ 0.25).",
+      "transition_neutral": "No clear link between bond prices and stocks over the window."
+    },
+    "oil_equity_60d": {
+      "decoupled": "Stocks and oil moved in opposite directions over the window (ρ ≤ −0.25).",
+      "neutral_mixed": "No clear link between stocks and oil over the window.",
+      "procyclical": "Stocks and oil moved together over the window (ρ ≥ 0.25)."
+    },
+    "vix_equity_60d": {
+      "compressed_link": "Only a weak link between stock returns and VIX changes over the window.",
+      "typical_fear_greed": "Stocks rose as the VIX fell, and fell as it rose (ρ ≤ −0.25).",
+      "unusual_positive": "Stocks and the VIX moved in the same direction (ρ ≥ 0.15)."
+    }
+  },
+  "macro_regime": {
+    "deflation_risk": "The Inflation stance is deflationary.",
+    "disinflation_soft_landing": "Growth in expansion, with inflation not hot, policy not restrictive and credit spreads contained.",
+    "global_liquidity_stress": "The Global stance is elevated stress, with a strong dollar or a yen carry unwind.",
+    "goldilocks_light": "Inflation moderate, policy not restrictive, growth in expansion and credit spreads contained.",
+    "neutral_mixed": "The stances do not match any of the listed patterns.",
+    "recession_pipeline": "Yield curve inverted or re-steepening, credit spreads elevated, and growth weak.",
+    "rising_inflation_tight_policy": "Inflation hot, Monetary Policy restrictive, and the yield curve flat, inverted or re-steepening.",
+    "stagflation_risk": "The Inflation stance is hot while the Growth stance is slowdown or contraction."
+  },
+  "market_cycle": {
+    "bear_structural": "Price phase bear: SPY's drawdown from its one-year high is in the bear band. The macro stances do not change this reading.",
+    "bull_fragile_global": "Price phase bull extended, with the Global stance elevated stress or moderate.",
+    "bull_macro_aligned": "Price phase bull, with the macro stances adding up above the aligned threshold.",
+    "bull_macro_divergent": "Price phase bull, with the macro stances adding up below the divergent threshold.",
+    "bull_overextended": "Price phase bull extended, with neither hot inflation under tight policy nor global stress.",
+    "correction_risk": "Price phase correction: SPY's drawdown from its one-year high is in the correction band.",
+    "crash_panic": "Price phase crash: SPY has fallen sharply against its recent highs. The macro stances do not change this reading.",
+    "insufficient_equity_data": "Fewer than 200 daily bars of SPY stored, so there is no reading.",
+    "late_cycle_stretched": "Price phase bull extended, with the Inflation stance hot and Monetary Policy restrictive or neutral.",
+    "neutral_mixed": "Price phase bull: above the 200-day average and near the one-year high.",
+    "pullback_healthy": "Price phase pullback: SPY is a little below its one-year high.",
+    "trend_soft": "Price phase below the 200-day average, without a deep drawdown."
+  },
+  "seasonality_disclaimer": "A fixed reference table, not computed from market data; no reading on this page uses it."
+}

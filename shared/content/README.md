@@ -7,6 +7,7 @@ Text that more than one service must render identically.
 | `momentum_caveats.json` | analyst-bot (`notifier/discord/momentum.py`) and momentum-api (`services/data-analyzer/cmd/momentum-api`) |
 | `handbook.json` | momentum-api, `GET /api/v1/education/handbook` (+ glossary) — draft content, `docs/EDUCATION_SECTION_CONTENT_SPEC.md` §1 |
 | `masterclass.json` | momentum-api, `GET /api/v1/education/masterclass` (+ glossary) — draft content, spec §2 |
+| `market_report_descriptions.json` | momentum-api (`GET /api/v1/market-report/today`, `MOMENTUM_MARKET_REPORT_TEXT_PATH`) and analyst-bot (`reports/market_text.py`, `MARKET_REPORT_TEXT_PATH`) — the Daily Market Report's one-line descriptions per stored code (market-cycle composite, macro regime, intermarket pairs, seasonality disclaimer). Both surfaces replace the stored macro-row text with these; an unknown code keeps its stored text. No fallback copy on either side; a test in momentum-api fails when a producer emits a code the file does not describe |
 
 **Education content format.** Each Handbook entry and MasterClass entry is a
 list of `blocks`: `paragraph` (`text`), `heading` (`text`), `list` (`items`), and

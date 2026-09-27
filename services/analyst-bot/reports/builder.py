@@ -18,6 +18,7 @@ from typing import Optional
 import asyncpg
 
 from db import cache as _cache
+from reports import market_text
 from db.queries import fundamental, macro_intel, news, ohlcv, sentiment, technical
 from reports.models import (
     AdditionalAnalysisSnapshot,
@@ -75,7 +76,7 @@ def _fill_roll_branch(snap: AdditionalAnalysisSnapshot, d: dict, prefix: str) ->
     r = d.get("regime")
     if isinstance(r, str):
         setattr(snap, f"{prefix}_regime", r)
-    lbl = d.get("label")
+    lbl = market_text.intermarket(f"{prefix}_60d", r if isinstance(r, str) else None, d.get("label"))
     if isinstance(lbl, str):
         setattr(snap, f"{prefix}_label", lbl)
     if prefix == "bond_equity" and d.get("observations_used") is not None:
@@ -1037,9 +1038,10 @@ class ReportBuilder:
                         composite_phase=mc_p.get("composite_phase")
                         if isinstance(mc_p.get("composite_phase"), str)
                         else None,
-                        composite_label=mc_p.get("composite_label")
-                        if isinstance(mc_p.get("composite_label"), str)
-                        else None,
+                        composite_label=market_text.cycle(
+                            mc_p.get("composite_phase") if isinstance(mc_p.get("composite_phase"), str) else None,
+                            mc_p.get("composite_label") if isinstance(mc_p.get("composite_label"), str) else None,
+                        ),
                         composite_score=_mc_f("value"),
                         gc_stance=_mc_instr("gc_stance"),
                         mp_stance=_mc_instr("mp_stance"),
@@ -1058,7 +1060,7 @@ class ReportBuilder:
                         snap.macro_corr_regime = r
                     if corr_p.get("score") is not None:
                         snap.macro_corr_score = float(corr_p["score"])
-                    lbl = corr_p.get("label")
+                    lbl = market_text.regime(r if isinstance(r, str) else None, corr_p.get("label"))
                     if isinstance(lbl, str):
                         snap.macro_corr_label = lbl
                     fl = corr_p.get("flags")
@@ -1330,7 +1332,7 @@ class ReportBuilder:
                 if corr.get("score") is not None:
                     ctx.macro_corr_score = float(corr["score"])
                     has_any = True
-                lbl = corr.get("label")
+                lbl = market_text.regime(r if isinstance(r, str) else None, corr.get("label"))
                 if isinstance(lbl, str):
                     ctx.macro_corr_label = lbl
                     has_any = True

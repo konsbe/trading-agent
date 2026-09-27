@@ -139,6 +139,7 @@ func (s *Server) handleMarketReport(w http.ResponseWriter, r *http.Request) {
 	body, err := json.Marshal(buildMarketReport(in, now, reportOpts{
 		earningsCovered: toSet(s.cfg.EarningsCoveredSymbols),
 		gprConfigured:   s.cfg.GPRSourceConfigured,
+		text:            s.cfg.MarketReportText,
 	}))
 	if err != nil {
 		s.cfg.Log.Error("momentum-api: encode market report", "err", err)
@@ -153,6 +154,7 @@ func (s *Server) handleMarketReport(w http.ResponseWriter, r *http.Request) {
 type reportOpts struct {
 	earningsCovered map[string]bool
 	gprConfigured   bool
+	text            MarketReportText
 }
 
 func toSet(xs []string) map[string]bool {
@@ -207,14 +209,14 @@ func buildMarketReport(in store.MarketReportInputs, now time.Time, opts reportOp
 	for _, sec := range stanceSections {
 		global[sec.key] = buildStance(in.Macro, sec.prefix, sec.stance)
 	}
-	global["macro_correlations_regime"] = macroPayloadText(in.Macro, "mc_macro_correlation", "regime", "label", regimeText)
-	global["market_cycle_composite"] = macroPayloadText(in.Macro, "mc_market_cycle", "composite_phase", "composite_label", cycleText)
+	global["macro_correlations_regime"] = macroPayloadText(in.Macro, "mc_macro_correlation", "regime", "label", opts.text.MacroRegime)
+	global["market_cycle_composite"] = macroPayloadText(in.Macro, "mc_market_cycle", "composite_phase", "composite_label", opts.text.MarketCycle)
 	aa, hasAA := in.Macro["aa_reference_snapshot"]
 	for _, k := range []string{"seasonality", "presidential_cycle", "intermarket"} {
 		global[k] = pick(aa.Payload, k, hasAA)
 	}
-	global["seasonality"] = rewriteSeasonality(global["seasonality"].(json.RawMessage))
-	global["intermarket"] = rewriteIntermarket(global["intermarket"].(json.RawMessage))
+	global["seasonality"] = rewriteSeasonality(global["seasonality"].(json.RawMessage), opts.text.SeasonalityDisclaimer)
+	global["intermarket"] = rewriteIntermarket(global["intermarket"].(json.RawMessage), opts.text.Intermarket)
 	// automation_status is the snapshot's reference_modules list, unchanged —
 	// including every not_automated / needs_data / partial entry.
 	global["automation_status"] = pick(aa.Payload, "reference_modules", hasAA)

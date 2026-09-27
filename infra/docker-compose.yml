@@ -287,6 +287,7 @@ services:
       MOMENTUM_BACKTEST_REPORT_PATH: /shared/content/backtest_lab_report.json
       MOMENTUM_EDUCATION_HANDBOOK_PATH: /shared/content/handbook.json
       MOMENTUM_EDUCATION_MASTERCLASS_PATH: /shared/content/masterclass.json
+      MOMENTUM_MARKET_REPORT_TEXT_PATH: /shared/content/market_report_descriptions.json
     volumes:
       - ../shared/content:/shared/content:ro
     ports:
@@ -311,6 +312,8 @@ services:
       REDIS_URL: redis://redis:6379/0
       # EVIDENCE_CAVEAT / RESEARCH_SCORE_CAVEAT, shared with momentum-api.
       MOMENTUM_CAVEATS_PATH: /shared/content/momentum_caveats.json
+      # Daily-report descriptions, shared with momentum-api (web).
+      MARKET_REPORT_TEXT_PATH: /shared/content/market_report_descriptions.json
     volumes:
       - ../shared/content:/shared/content:ro
     depends_on:

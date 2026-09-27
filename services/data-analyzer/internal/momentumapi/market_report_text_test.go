@@ -2,6 +2,7 @@ package momentumapi
 
 import (
 	"encoding/json"
+	"os"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -61,7 +62,20 @@ func firstReturnLiterals(t *testing.T, path, fn string) map[string]bool {
 	return out
 }
 
+// sharedText loads the real shared/content/market_report_descriptions.json —
+// the file analyst-bot reads too.
+func sharedText(t *testing.T) MarketReportText {
+	t.Helper()
+	txt, err := LoadMarketReportText(sharedContentPath(t, "market_report_descriptions.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return txt
+}
+
 func TestMarketReportTextCoversEveryCode(t *testing.T) {
+	txt := sharedText(t)
+	cycleText, regimeText, intermarketText := txt.MarketCycle, txt.MacroRegime, txt.Intermarket
 	check := func(what string, codes map[string]bool, table map[string]string) {
 		if len(codes) < 3 {
 			t.Fatalf("%s: found %d codes; the parser no longer finds them", what, len(codes))
@@ -96,6 +110,8 @@ func TestMarketReportTextCoversEveryCode(t *testing.T) {
 // Live payloads on 2026-09-27 (trimmed): the stored lines are replaced by the
 // description of the code; other fields and unknown codes are untouched.
 func TestMarketReportTextRewritesStoredLines(t *testing.T) {
+	txt := sharedText(t)
+	cycleText, intermarketText := txt.MarketCycle, txt.Intermarket
 	cycle := rewriteText(json.RawMessage(`{"composite_phase": "late_cycle_stretched", "composite_label": "Price extended vs 200DMA with tight macro (policy/inflation) — late-cycle playbook; tighten stops.", "tone": "neutral"}`),
 		"composite_phase", "composite_label", cycleText)
 	var c map[string]any
@@ -107,7 +123,7 @@ func TestMarketReportTextRewritesStoredLines(t *testing.T) {
 	if got := rewriteText(unknown, "composite_phase", "composite_label", cycleText); string(got) != string(unknown) {
 		t.Errorf("unknown code rewritten: %s", got)
 	}
-	im := rewriteIntermarket(json.RawMessage(`{"bond_equity_60d": {"regime": "inflationary_positive", "label": "Positive correlation — bonds may not hedge equity drawdowns (inflation / rates shock pattern).", "correlation_60d": 0.528}, "oil_equity_60d": {"regime": "decoupled", "label": "Negative correlation — possible supply-shock or defensive equity phase vs energy."}}`))
+	im := rewriteIntermarket(json.RawMessage(`{"bond_equity_60d": {"regime": "inflationary_positive", "label": "Positive correlation — bonds may not hedge equity drawdowns (inflation / rates shock pattern).", "correlation_60d": 0.528}, "oil_equity_60d": {"regime": "decoupled", "label": "Negative correlation — possible supply-shock or defensive equity phase vs energy."}}`), intermarketText)
 	var p map[string]map[string]any
 	_ = json.Unmarshal(im, &p)
 	if p["bond_equity_60d"]["label"] != intermarketText["bond_equity_60d"]["inflationary_positive"] || p["bond_equity_60d"]["correlation_60d"] != 0.528 {
@@ -116,8 +132,21 @@ func TestMarketReportTextRewritesStoredLines(t *testing.T) {
 	if p["oil_equity_60d"]["label"] != intermarketText["oil_equity_60d"]["decoupled"] {
 		t.Errorf("oil pair = %v", p["oil_equity_60d"])
 	}
-	s := rewriteSeasonality(json.RawMessage(`{"month": 9, "disclaimer": "Static almanac from reference doc — tie-breaker only; do not trade in isolation."}`))
-	if !strings.Contains(string(s), seasonalityDisclaimer) || strings.Contains(string(s), "do not trade") {
+	s := rewriteSeasonality(json.RawMessage(`{"month": 9, "disclaimer": "Static almanac from reference doc — tie-breaker only; do not trade in isolation."}`), txt.SeasonalityDisclaimer)
+	if !strings.Contains(string(s), txt.SeasonalityDisclaimer) || strings.Contains(string(s), "do not trade") {
 		t.Errorf("seasonality = %s", s)
+	}
+}
+
+func TestLoadMarketReportText_RefusesMissingOrIncomplete(t *testing.T) {
+	if _, err := LoadMarketReportText(t.TempDir() + "/absent.json"); err == nil {
+		t.Error("a missing file loaded")
+	}
+	p := t.TempDir() + "/partial.json"
+	if err := os.WriteFile(p, []byte(`{"market_cycle": {"x": "y"}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := LoadMarketReportText(p); err == nil {
+		t.Error("a file without the regime, intermarket and disclaimer sections loaded")
 	}
 }
