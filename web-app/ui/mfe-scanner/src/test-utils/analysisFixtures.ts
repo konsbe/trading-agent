@@ -7,6 +7,9 @@ export const COMPUTING_MESSAGE = 'Computing analysis for this symbol -- first vi
 
 export const FAILED_MESSAGE = 'Computing the analysis for this symbol failed; it will be retried on a later request.';
 
+/** `correlations.labels` as momentum-api serves it from shared/content/correlation_labels.json. */
+export const CORRELATION_TEXT_LABELS = { patterns_heading: 'Combined patterns', net_count: 'Net count', met: 'met' } as const;
+
 /** A §2.1-shaped ready body (TSM example), with RSI flagged overbought and VIX elevated. */
 export const makeAnalysis = (overrides: Partial<StockAnalysis> = {}): StockAnalysis => ({
     symbol: 'TSM',
@@ -49,20 +52,38 @@ export const makeAnalysis = (overrides: Partial<StockAnalysis> = {}): StockAnaly
         roic: { value: 28.4, band: 'excellent' },
     },
     correlations: {
-        composite: { score: 0.25, tier: 'neutral' },
+        composite: { score: 0.25, tier: 'mixed_positive' },
+        composite_label: 'mixed, leaning agree',
         clusters: [
             {
                 name: 'earnings_quality',
+                name_label: 'Earnings Quality',
                 score: 0.6,
                 tier: 'healthy',
+                tier_label: 'mostly agree',
                 checks_run: 4,
                 positives: ['Revenue and EPS growing together — genuine organic quality growth'],
                 warnings: [],
             },
-            { name: 'leverage_liquidity', score: -0.2, tier: 'weak', checks_run: 3, positives: [], warnings: ['Debt rising faster than cash flow'] },
+            {
+                name: 'leverage_liquidity',
+                name_label: 'Leverage & Liquidity',
+                score: -0.2,
+                tier: 'mixed_negative',
+                tier_label: 'mixed, leaning conflict',
+                checks_run: 3,
+                positives: [],
+                warnings: ['Debt rising faster than cash flow'],
+            },
         ],
         aligned_signals: ['Revenue and EPS growing together — genuine organic quality growth'],
-        master_signals: { net_signal: 'bullish', fired: ['quality_growth'] },
+        master_signals: {
+            net_signal: 'bearish',
+            net_label: '−1',
+            fired: ['deterioration_warning'],
+            fired_labels: ['strong EPS with weak cash signs'],
+        },
+        labels: { ...CORRELATION_TEXT_LABELS },
     },
     qualitative: {
         moat_proxy: { value: 0.82, tier: 'wide' },
@@ -154,7 +175,14 @@ export const makeEmptyAnalysis = (): StockAnalysis => {
             net_debt_ebitda: vb,
             roic: vb,
         },
-        correlations: { composite: { score: null, tier: null }, clusters: [], aligned_signals: [], master_signals: { net_signal: null, fired: [] } },
+        correlations: {
+            composite: { score: null, tier: null },
+            composite_label: null,
+            clusters: [],
+            aligned_signals: [],
+            master_signals: { net_signal: null, net_label: null, fired: [], fired_labels: [] },
+            labels: { ...CORRELATION_TEXT_LABELS },
+        },
         qualitative: {
             moat_proxy: { value: null, tier: null },
             insider_signal: { value: null, tier: null },

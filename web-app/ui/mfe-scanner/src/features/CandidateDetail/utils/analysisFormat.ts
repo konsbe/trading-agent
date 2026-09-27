@@ -5,21 +5,13 @@
  * here compares a number to a threshold. Null renders as EMPTY_VALUE.
  */
 
-import { ScoreTier } from '@/api';
+import { CorrelationCluster, CorrelationLabels, CorrelationMasterSignals, ScoreTier } from '@/api';
 import { EMPTY_VALUE, formatNumber } from '@/common/format/format';
 
 /** `strong_trend` → "strong trend"; null stays null. */
 export const bandLabel = (band: string | null | undefined): string | null => (band ? band.replace(/_/g, ' ').trim() : null);
 
 const capitalizeFirst = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
-
-/** `earnings_quality` → "Earnings Quality". */
-export const titleCaseCode = (code: string): string =>
-    code
-        .split('_')
-        .filter(Boolean)
-        .map(capitalizeFirst)
-        .join(' ');
 
 /** `bear_flag` → "Bear flag". */
 export const sentenceCaseCode = (code: string): string => capitalizeFirst(bandLabel(code) ?? code);
@@ -55,32 +47,6 @@ export const GROSS_MARGIN_TIER_LABELS: BandDisplayMap = { strong_moat: 'high' };
 
 export const NET_DEBT_OPERATING_INCOME_BAND_LABELS: BandDisplayMap = { negative_ebitda: 'operating loss' };
 
-/** Correlation cluster tiers and the correlations composite tier. */
-export const CORRELATION_TIER_LABELS: BandDisplayMap = {
-    healthy: 'mostly agree',
-    mixed_positive: 'mixed, leaning agree',
-    mixed_negative: 'mixed, leaning conflict',
-    alert: 'mostly conflict',
-};
-
-/** Master-signal `net_signal` codes as the net count of combined patterns met. */
-export const NET_SIGNAL_LABELS: BandDisplayMap = {
-    strongly_bullish: '+2 or more',
-    bullish: '+1',
-    neutral: '0',
-    bearish: '−1',
-    strongly_bearish: '−2 or less',
-};
-
-/** Master-signal `fired` pattern codes. */
-export const COMBINED_PATTERN_LABELS: BandDisplayMap = {
-    bullish_convergence: 'low P/E with quality conditions',
-    hidden_value: 'cash strength with flat EPS',
-    deterioration_warning: 'strong EPS with weak cash signs',
-    value_trap: 'low P/E with weak conditions',
-    leverage_cycle_warning: 'debt and liquidity strain',
-};
-
 export const MOAT_PROXY_TIER_LABELS: BandDisplayMap = {
     strong_moat_proxy: '3 of 3 conditions',
     moderate_moat_proxy: '2 of 3 conditions',
@@ -113,22 +79,30 @@ export const withBand = (valueText: string, band: string | null | undefined, lab
     return label ? `${valueText} (${label})` : valueText;
 };
 
-/** Composite header line: "0.70 · strong"; either part may be missing. */
-export const compositeText = ({ score, tier }: ScoreTier, labels?: BandDisplayMap): string => {
-    const parts = [score === null ? null : formatNumber(score, 2), displayBand(tier, labels)].filter(Boolean);
+/** "0.70 · strong" from a score and ready-made text; either part may be missing. */
+export const scoreWithText = (score: number | null, text: string | null): string => {
+    const parts = [score === null ? null : formatNumber(score, 2), text].filter(Boolean);
     return parts.length > 0 ? parts.join(' · ') : EMPTY_VALUE;
 };
 
-/** A correlation cluster (or composite) that ran no comparisons. */
-export const NOT_EVALUATED = 'not evaluated';
+/** Composite header line: "0.70 · strong"; either part may be missing. */
+export const compositeText = ({ score, tier }: ScoreTier): string => scoreWithText(score, bandLabel(tier));
+
+/** "Leverage & Liquidity — mostly agree" from the served labels; a null tier label is "—". */
+export const servedClusterLine = ({ name_label, tier_label }: Pick<CorrelationCluster, 'name_label' | 'tier_label'>): string =>
+    `${name_label} — ${tier_label ?? EMPTY_VALUE}`;
 
 /**
- * "Earnings Quality — healthy"; a null tier is "—". A cluster that ran no
- * checks (`checksRun === 0`) is "not evaluated", never a lean.
+ * "Net count: −1 · met: strong EPS with weak cash signs" from the served
+ * labels; a label text an older API omits is left out rather than invented.
  */
-export const clusterLine = (name: string, tier: string | null, labels?: BandDisplayMap, checksRun: number | null = null): string =>
-    `${titleCaseCode(name)} — ${checksRun === 0 ? NOT_EVALUATED : (displayBand(tier, labels) ?? EMPTY_VALUE)}`;
-
-/** True when there is at least one cluster and none of them ran a check. */
-export const noClusterEvaluated = (clusters: readonly { checks_run: number | null }[]): boolean =>
-    clusters.length > 0 && clusters.every(cluster => cluster.checks_run === 0);
+export const servedMasterSignalText = (
+    { net_label, fired_labels }: Pick<CorrelationMasterSignals, 'net_label' | 'fired_labels'>,
+    { net_count, met }: Pick<CorrelationLabels, 'net_count' | 'met'>,
+): string => {
+    const net = net_label ?? EMPTY_VALUE;
+    const netText = net_count ? `${net_count}: ${net}` : net;
+    if (fired_labels.length === 0) return netText;
+    const fired = fired_labels.join(', ');
+    return `${netText} · ${met ? `${met}: ${fired}` : fired}`;
+};

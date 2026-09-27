@@ -122,10 +122,13 @@ const parseBalanceSheet = (value: unknown, path = 'balance_sheet'): BalanceSheet
 
 const parseCluster = (value: unknown, path: string): CorrelationCluster => {
     const o = obj(value, path);
+    const name = str(o.name, `${path}.name`);
     return {
-        name: str(o.name, `${path}.name`),
+        name,
+        name_label: optStr(o.name_label, `${path}.name_label`) ?? name,
         score: optNum(o.score, `${path}.score`),
         tier: optStr(o.tier, `${path}.tier`),
+        tier_label: optStr(o.tier_label, `${path}.tier_label`),
         checks_run: optCount(o.checks_run),
         positives: strList(o.positives, `${path}.positives`),
         warnings: strList(o.warnings, `${path}.warnings`),
@@ -135,13 +138,22 @@ const parseCluster = (value: unknown, path: string): CorrelationCluster => {
 const parseCorrelations = (value: unknown, path = 'correlations'): CorrelationsAnalysis => {
     const o = section(value, path);
     const master = section(o.master_signals, `${path}.master_signals`);
+    const labels = section(o.labels, `${path}.labels`);
     return {
         composite: scoreTier(o.composite, `${path}.composite`),
+        composite_label: optStr(o.composite_label, `${path}.composite_label`),
         clusters: array(o.clusters ?? [], `${path}.clusters`, parseCluster),
         aligned_signals: strList(o.aligned_signals, `${path}.aligned_signals`),
         master_signals: {
             net_signal: optStr(master.net_signal, `${path}.master_signals.net_signal`),
+            net_label: optStr(master.net_label, `${path}.master_signals.net_label`),
             fired: strList(master.fired, `${path}.master_signals.fired`),
+            fired_labels: strList(master.fired_labels, `${path}.master_signals.fired_labels`),
+        },
+        labels: {
+            patterns_heading: optStr(labels.patterns_heading, `${path}.labels.patterns_heading`),
+            net_count: optStr(labels.net_count, `${path}.labels.net_count`),
+            met: optStr(labels.met, `${path}.labels.met`),
         },
     };
 };

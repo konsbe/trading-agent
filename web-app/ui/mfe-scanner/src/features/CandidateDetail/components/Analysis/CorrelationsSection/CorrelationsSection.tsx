@@ -1,14 +1,5 @@
 import { CollapsibleCard } from '@trading-agent/shared-components';
-import { EMPTY_VALUE } from '@/common/format/format';
-import {
-    clusterLine,
-    COMBINED_PATTERN_LABELS,
-    CORRELATION_TIER_LABELS,
-    displayBand,
-    NET_SIGNAL_LABELS,
-    noClusterEvaluated,
-    NOT_EVALUATED,
-} from '../../../utils/analysisFormat';
+import { scoreWithText, servedClusterLine, servedMasterSignalText } from '../../../utils/analysisFormat';
 import CompositeLine from '../CompositeLine';
 import { CorrelationsSectionProps } from './types';
 import '@/styles/scanner-global.css';
@@ -28,12 +19,13 @@ const SentenceList = ({ items, empty, testId }: { items: string[]; empty: string
     );
 
 /**
- * Section 4 — composite tier, each cluster's health as plain text, the master
- * signal (as "Combined patterns": net count and patterns met), and the aligned (cluster positives) / divergent (cluster warnings)
- * lines as the stored sentences.
+ * Section 4 — composite tier, each cluster's health, the master signal (net
+ * count and patterns met) and the aligned (cluster positives) / divergent
+ * (cluster warnings) lines. Tier, cluster, pattern and heading text is the
+ * API's served labels, shown verbatim.
  */
 const CorrelationsSection = ({ correlations }: CorrelationsSectionProps) => {
-    const { clusters, aligned_signals: aligned, master_signals: master } = correlations;
+    const { clusters, aligned_signals: aligned, master_signals: master, labels } = correlations;
     const divergent = clusters.flatMap(cluster => cluster.warnings);
 
     return (
@@ -45,25 +37,19 @@ const CorrelationsSection = ({ correlations }: CorrelationsSectionProps) => {
         >
             <CompositeLine
                 composite={correlations.composite}
-                labels={CORRELATION_TIER_LABELS}
-                valueText={noClusterEvaluated(clusters) ? NOT_EVALUATED : undefined}
+                valueText={scoreWithText(correlations.composite.score, correlations.composite_label)}
                 data-testid="correlations-composite"
             />
 
             <div className="scanner-analysis__group">
                 <h3 className="scanner-analysis__group-title">Cluster health</h3>
-                <SentenceList
-                    items={clusters.map(c => clusterLine(c.name, c.tier, CORRELATION_TIER_LABELS, c.checks_run))}
-                    empty="No correlation clusters stored."
-                    testId="correlation-clusters"
-                />
+                <SentenceList items={clusters.map(servedClusterLine)} empty="No correlation clusters stored." testId="correlation-clusters" />
             </div>
 
             <div className="scanner-analysis__group">
-                <h3 className="scanner-analysis__group-title">Combined patterns</h3>
+                {labels.patterns_heading && <h3 className="scanner-analysis__group-title">{labels.patterns_heading}</h3>}
                 <p className="scanner-analysis__note" data-testid="master-signal">
-                    Net count: {displayBand(master.net_signal, NET_SIGNAL_LABELS) ?? EMPTY_VALUE}
-                    {master.fired.length > 0 && ` · met: ${master.fired.map(name => displayBand(name, COMBINED_PATTERN_LABELS)).join(', ')}`}
+                    {servedMasterSignalText(master, labels)}
                 </p>
             </div>
 

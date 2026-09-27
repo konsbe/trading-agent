@@ -118,6 +118,45 @@ describe('parseStockAnalysis', () => {
         expect(parseStockAnalysis(body).correlations.clusters[0].checks_run).toBeNull();
     });
 
+    it('reads the served correlation labels', () => {
+        const { correlations } = parseStockAnalysis(clone(makeAnalysis()));
+
+        expect(correlations.composite_label).toBe('mixed, leaning agree');
+        expect(correlations.clusters.map(c => [c.name_label, c.tier_label])).toEqual([
+            ['Earnings Quality', 'mostly agree'],
+            ['Leverage & Liquidity', 'mixed, leaning conflict'],
+        ]);
+        expect(correlations.master_signals).toMatchObject({ net_label: '−1', fired_labels: ['strong EPS with weak cash signs'] });
+        expect(correlations.labels).toEqual({ patterns_heading: 'Combined patterns', net_count: 'Net count', met: 'met' });
+    });
+
+    it('reads absent correlation labels (older API) as null / empty, keeping the cluster code as its name', () => {
+        const body = clone(makeAnalysis());
+        delete body.correlations.composite_label;
+        delete body.correlations.clusters[0].name_label;
+        delete body.correlations.clusters[0].tier_label;
+        delete body.correlations.master_signals.net_label;
+        delete body.correlations.master_signals.fired_labels;
+        delete body.correlations.labels;
+        const { correlations } = parseStockAnalysis(body);
+
+        expect(correlations.composite_label).toBeNull();
+        expect(correlations.clusters[0]).toMatchObject({ name_label: 'earnings_quality', tier_label: null });
+        expect(correlations.master_signals).toMatchObject({ net_label: null, fired: ['deterioration_warning'], fired_labels: [] });
+        expect(correlations.labels).toEqual({ patterns_heading: null, net_count: null, met: null });
+    });
+
+    it.each([
+        ['composite_label', (b: any) => (b.correlations.composite_label = 3)],
+        ['name_label', (b: any) => (b.correlations.clusters[0].name_label = 3)],
+        ['fired_labels', (b: any) => (b.correlations.master_signals.fired_labels = 'x')],
+        ['labels', (b: any) => (b.correlations.labels = 'x')],
+    ])('rejects a malformed %s', (_field, corrupt) => {
+        const body = clone(makeAnalysis());
+        corrupt(body);
+        expect(() => parseStockAnalysis(body)).toThrow();
+    });
+
     it('rejects a body whose status is not ready', () => {
         expect(() => parseStockAnalysis({ ...clone(makeAnalysis()), status: 'computing' })).toThrow(/status/);
     });

@@ -77,19 +77,42 @@ export interface BalanceSheetAnalysis {
 
 export interface CorrelationCluster {
     name: string;
+    /** Served display name ("Leverage & Liquidity"); the raw `name` when an older API omits it. */
+    name_label: string;
     score: number | null;
     tier: string | null;
+    /** Served tier text ("mostly agree", or "not evaluated" when `checks_run` is 0). */
+    tier_label: string | null;
     /** Comparisons the cluster ran; 0 means none could be evaluated (score/tier are then null). Null for older rows. */
     checks_run: number | null;
     positives: string[];
     warnings: string[];
 }
 
+export interface CorrelationMasterSignals {
+    net_signal: string | null;
+    /** Served net-count text ("−1", "+2 or more"). */
+    net_label: string | null;
+    fired: string[];
+    /** Served pattern text, parallel to `fired`. */
+    fired_labels: string[];
+}
+
+/** Served card wording; null when an older API omits it. */
+export interface CorrelationLabels {
+    patterns_heading: string | null;
+    net_count: string | null;
+    met: string | null;
+}
+
 export interface CorrelationsAnalysis {
     composite: ScoreTier;
+    /** Served composite tier text, or "not evaluated" when no cluster was evaluated. */
+    composite_label: string | null;
     clusters: CorrelationCluster[];
     aligned_signals: string[];
-    master_signals: { net_signal: string | null; fired: string[] };
+    master_signals: CorrelationMasterSignals;
+    labels: CorrelationLabels;
 }
 
 export interface QualitativeAnalysis {
