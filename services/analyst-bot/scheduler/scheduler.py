@@ -74,6 +74,19 @@ def build_scheduler(
     )
     log.info("alert scan scheduled every %ds", cfg.bot_alert_scan_interval)
 
+    if db_pool is not None:
+        from db.queries.followed import refresh_followed
+
+        # Followed Symbols edits reach the bot without a restart.
+        scheduler.add_job(
+            refresh_followed,
+            args=[cfg, db_pool],
+            trigger=IntervalTrigger(seconds=cfg.bot_followed_refresh_interval),
+            id="followed_refresh",
+            name="Followed symbols refresh",
+            replace_existing=True,
+        )
+
     if (
         db_pool is not None
         and cfg.bot_fomc_narrative_enable

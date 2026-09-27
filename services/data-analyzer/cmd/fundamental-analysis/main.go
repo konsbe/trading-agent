@@ -31,6 +31,7 @@ import (
 	"github.com/konsbe/trading-agent/services/data-analyzer/internal/fundamental"
 	"github.com/konsbe/trading-agent/services/data-analyzer/internal/logx"
 	"github.com/konsbe/trading-agent/services/data-analyzer/internal/store"
+	symbolsets "github.com/konsbe/trading-agent/services/data-analyzer/internal/symbols"
 )
 
 func main() {
@@ -67,7 +68,7 @@ func main() {
 	}
 
 	log.Info("running initial fundamental analysis")
-	w.analyzeAll(ctx)
+	w.analyzeAll(ctx, w.symbols(ctx))
 
 	ticker := time.NewTicker(cfg.PollInterval)
 	defer ticker.Stop()
@@ -78,7 +79,7 @@ func main() {
 			log.Info("shutdown")
 			return
 		case <-ticker.C:
-			w.analyzeAll(ctx)
+			w.analyzeAll(ctx, w.symbols(ctx))
 		}
 	}
 }
@@ -89,8 +90,18 @@ type worker struct {
 	log  *slog.Logger
 }
 
-func (w *worker) analyzeAll(ctx context.Context) {
-	for _, sym := range w.cfg.Symbols {
+// symbols: followed equities and funds ∪ every one with an open computation
+// reason (watchlist, today's candidates, manual Compute); FUNDAMENTAL_SYMBOLS
+// only as the logged fallback.
+func (w *worker) symbols(ctx context.Context) []string {
+	return symbolsets.Computation(ctx, w.pool, w.log, "fundamental-analysis", "FUNDAMENTAL_SYMBOLS",
+		[]string{"equity", "etf"}, w.cfg.Symbols)
+}
+
+// analyzeAll scores syms. The caller resolves the list, so the golden test
+// can run the worker on its fixture symbols inside a transaction.
+func (w *worker) analyzeAll(ctx context.Context, syms []string) {
+	for _, sym := range syms {
 		res, err := fundamental.AnalyzeSymbol(ctx, w.pool, sym, w.cfg, w.log)
 		if err != nil && !res.Scored {
 			w.log.Error("query metrics", "symbol", sym, "err", err)

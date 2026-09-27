@@ -1,0 +1,9 @@
+.followed-table__error {
+    display: block;
+    max-width: 20rem;
+    margin-top: var(--space-xxs);
+    color: var(--color-error);
+    font-size: var(--font-size-xs);
+    white-space: normal;
+    text-align: right;
+}

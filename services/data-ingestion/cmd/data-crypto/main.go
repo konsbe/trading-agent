@@ -16,6 +16,7 @@ import (
 	"github.com/konsbe/trading-agent/services/data-ingestion/internal/fetch/coingecko"
 	"github.com/konsbe/trading-agent/services/data-ingestion/internal/logx"
 	"github.com/konsbe/trading-agent/services/data-ingestion/internal/store"
+	"github.com/konsbe/trading-agent/services/data-ingestion/internal/symbols"
 )
 
 func main() {
@@ -44,7 +45,10 @@ func main() {
 		ch := make(chan store.CryptoBar, 256)
 		go func() {
 			for {
-				err := binance.StreamKlines(ctx, cfg.BinanceSymbols, cfg.BinanceInterval, ch)
+				// Re-resolved on every (re)connect, so a newly followed pair joins
+				// the stream at the next reconnect.
+				wsSyms := symbols.Followed(ctx, pool, log, "data-crypto", "Binance websocket (BINANCE_SYMBOLS)", []string{"crypto"}, cfg.BinanceSymbols)
+				err := binance.StreamKlines(ctx, wsSyms, cfg.BinanceInterval, ch)
 				if ctx.Err() != nil {
 					return
 				}
@@ -72,7 +76,7 @@ func main() {
 	defer tCoinGecko.Stop()
 
 	runBinanceREST := func() {
-		for _, sym := range cfg.BinanceSymbols {
+		for _, sym := range symbols.Followed(ctx, pool, log, "data-crypto", "Binance REST (BINANCE_SYMBOLS)", []string{"crypto"}, cfg.BinanceSymbols) {
 			bars, err := rest.FetchLatestKlines(ctx, sym, cfg.BinanceInterval, 200)
 			if err != nil {
 				log.Error("binance rest", "symbol", sym, "err", err)

@@ -50,6 +50,40 @@ All tables are **TimescaleDB hypertables** — time-partitioned PostgreSQL table
 
 ---
 
+## Which symbols each worker fetches (migration 030)
+
+The symbol lists come from Postgres, re-read every pass, not from `.env`:
+
+- **`followed_symbols`** — the user's list (Followed Symbols screen; seeded
+  once from `.env`). Feeds the per-symbol live feeds: data-equity (Alpaca bars,
+  Finnhub quotes), data-crypto (Binance REST + websocket), data-sentiment
+  (LunarCrush by `news_alias`, Finnhub company news), data-macro-intel
+  (earnings calendar, equities only) and the Alpha Vantage passes of
+  data-fundamental (Overview, news sentiment — 25 requests/day, so followed
+  only).
+- **Computation set = `followed_symbols` ∪ open `computation_interest`**
+  (reasons watchlist / candidate / manual, see data_analyzer.md, "Computation
+  pass"). Feeds data-technical (daily bars) and data-fundamental's Finnhub
+  passes (metrics, statements, earnings, recommendations, insider,
+  institutional).
+- **Manual Compute requests** are picked up within `*_MANUAL_QUEUE_POLL_INTERVAL`
+  (2m) by data-technical and data-fundamental on their own goroutine, which
+  record `bars_fetched_at` / `fundamentals_fetched_at` (and statement coverage)
+  in `symbol_data_status`.
+- **Fallback.** Each `.env` list (`ALPACA_DATA_SYMBOLS`, `EQUITY_SYMBOLS_*`,
+  `BINANCE_SYMBOLS`, `TECHNICAL_*_SYMBOLS`, `FUNDAMENTAL_SYMBOLS`,
+  `FINNHUB_*_SYMBOLS`, `MACRO_INTEL_EARNINGS_SYMBOLS`) is used only when the
+  table is empty (WARN) or unreachable (ERROR), logged as
+  `SYMBOL LIST FALLBACK: <service> <list>` — never silently.
+- **`symbol_directory`** — data-universe also stores the full Finnhub US list
+  (`finnhub_us`, including ETFs, ADRs, OTC; mapped to equity / etf / other) and
+  Binance USDT spot pairs (`binance_spot`) on each symbol refresh
+  (`data-universe -directory-once` for a one-off). Upsert only, never deleted.
+  It backs the "all symbols" search; foreign exchanges are not included yet
+  (backlog in data_analyzer.md).
+
+---
+
 ## Database Tables
 
 | Table | Written by | Primary key |
@@ -219,6 +253,7 @@ Same tables as the other price workers:
 | `TECHNICAL_CRYPTO_INTERVALS` | `1d` | Comma-separated crypto intervals (`1d`, `1w`) |
 | `TECHNICAL_BACKFILL_BARS` | `500` | Target history depth per symbol × interval |
 | `DATA_TECHNICAL_POLL_INTERVAL` | `6h` | How often to refresh the latest bars after initial backfill |
+| `DATA_TECHNICAL_MANUAL_QUEUE_POLL_INTERVAL` | `2m` | How often to fetch bars for open manual Compute requests (own goroutine) |
 | `DATA_POLL_INTERVAL` | `60s` | Global fallback interval |
 
 ---
@@ -395,7 +430,7 @@ Tall/narrow format — one row per `(symbol, period, metric)`. This mirrors the 
 
 | Variable | Default | Description |
 |---|---|---|
-| `FUNDAMENTAL_SYMBOLS` | falls back to `ALPACA_DATA_SYMBOLS`, then `AAPL,MSFT,SPY` | Equity symbols to fetch fundamentals for |
+| `FUNDAMENTAL_SYMBOLS` | falls back to `ALPACA_DATA_SYMBOLS`, then `AAPL,MSFT,SPY` | Fallback only: the fetched set is `followed_symbols` (Alpha Vantage passes) or the computation set (Finnhub passes), see "Which symbols each worker fetches" |
 
 #### Poll intervals
 
@@ -405,6 +440,7 @@ Tall/narrow format — one row per `(symbol, period, metric)`. This mirrors the 
 | `DATA_FUNDAMENTAL_FINANCIALS_POLL_INTERVAL` | `168h` (7 days) | How often to re-fetch financial statements |
 | `DATA_FUNDAMENTAL_EARNINGS_POLL_INTERVAL` | `24h` | How often to refresh earnings history |
 | `DATA_FUNDAMENTAL_OVERVIEW_POLL_INTERVAL` | `168h` (7 days) | How often to call Alpha Vantage (free: 25/day limit) |
+| `DATA_FUNDAMENTAL_MANUAL_QUEUE_POLL_INTERVAL` | `2m` | How often to fetch metrics, statements and earnings for open manual Compute requests (own goroutine; Finnhub only) |
 
 #### Feature toggles
 

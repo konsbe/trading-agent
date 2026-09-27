@@ -1,16 +1,22 @@
 # mfe-watchlist
 
-Watchlist remote micro frontend for trading-agent: the shared watchlist with
-each symbol's current price data, plus symbol search for adding symbols. Backed by
-`momentum-api` (`docs/MOMENTUM_SCANNER_API.md` §2.5). Loaded by the spog shell
-(`web-app/spog`) under `/watchlist`.
+Watchlist remote micro frontend for trading-agent. One container, three screens,
+all under the sidebar's **Tracking** group:
 
-The screen is still a placeholder. The typed API layer and hooks below are done.
+- **Watchlist** (`/watchlist`): the shared watchlist with each symbol's current
+  price data, symbol search for adding, and a Compute button per row.
+- **Followed Symbols** (`/followed-symbols`): what the pipeline fetches and
+  computes every day, with two separate searches (scanner universe, and all
+  symbols incl. ETFs / ADRs / OTC / crypto), Follow, Compute and Unfollow.
+- **Computed Symbols** (`/computed-symbols`): every symbol with an open
+  computation reason, its state, and Stop computing for manual requests.
+
+Backed by `momentum-api` (`docs/MOMENTUM_SCANNER_API.md` §2.5 and §2.5a).
 
 | | |
 |---|---|
 | Module Federation name / scope | `mfe_watchlist` |
-| Exposed module | `./Watchlist` → `src/app/app-root.tsx` |
+| Exposed modules | `./Watchlist` → `src/app/app-root.tsx`, `./FollowedSymbols` → `src/app/followed-root.tsx`, `./ComputedSymbols` → `src/app/computed-root.tsx` |
 | Dev server | http://localhost:3002 (`remoteEntry.js` at `/remoteEntry.js`) |
 | Shell remote | `shellSpog` → `shell_spog@http://localhost:3000/remoteEntry.js` (dev); resolved from `window.__APP_CONFIG__.shell_spog` in production |
 | API | `momentum-api`, default http://localhost:8090 |
@@ -34,8 +40,16 @@ already shows. `bootstrap` (standalone) uses its own router and the OS theme.
 | `PUT /api/v1/watchlist/{symbol}` | `addToWatchlist` | Updated list (201 added / 200 already present); `404 unknown_symbol`, `400 invalid_symbol` |
 | `DELETE /api/v1/watchlist/{symbol}` | `removeFromWatchlist` | Updated list (idempotent) |
 | `GET /api/v1/symbols?q=` | `searchSymbols` | `{query, results: [{symbol, company_name, exchange, is_eligible}]}` (≤20); `400 invalid_query` for blank or >40 chars |
+| `GET /api/v1/followed-symbols` | `fetchFollowedSymbols` | `{items: [{symbol, name, asset_type, listing, news_alias, source, added_at}]}`, newest first |
+| `PUT /api/v1/followed-symbols/{symbol}` | `followSymbol` | Updated list (201 / 200); `404 unknown_symbol`, `422 not_computable`, `400 invalid_symbol` |
+| `DELETE /api/v1/followed-symbols/{symbol}` | `unfollowSymbol` | Updated list |
+| `GET /api/v1/symbols/directory?q=` | `searchDirectory` | `{query, results: [{symbol, name, type, mic, asset_type, source, in_universe, followed}]}` (≤20); `400 invalid_query` |
+| `GET /api/v1/computed-symbols` | `fetchComputedSymbols` | `{data_timeout_minutes, items: [{symbol, name, asset_type, reasons, manual_requested_at, state, …, computed_at, last_error}]}` |
+| `PUT /api/v1/computed-symbols/{symbol}` | `requestCompute` | 202 with the computed-symbols body; same 404 / 422 / 400 as follow. Idempotent: an open request is kept, not restarted |
+| `DELETE /api/v1/computed-symbols/{symbol}` | `stopCompute` | Closes only the manual reason; 200 with the computed-symbols body |
 
-All responses go through strict parsers (`src/api/watchlist/parsers.ts`). A shape
+All responses go through strict parsers (`src/api/watchlist/parsers.ts`,
+`src/api/tracking/parsers.ts`, shared readers in `src/api/parse.ts`). A shape
 mismatch (including an `as_of` that isn't `YYYY-MM-DD` or an unparseable
 `added_at`) surfaces as `invalid_response` rather than rendering wrong data.
 `change_pct` is a raw ratio (0.12 = +12%). Errors are `ApiError {status, code}`,
@@ -52,7 +66,18 @@ Hooks:
   market data yet (`is_stale: true`).
 - `useSymbolSearch(query, {debounceMs = 250})` → `{query, results, isLoading, error, retry}`.
   A blank query is idle and never hits the API, and a superseded request is
-  aborted. The server stays the authority on query length.
+  aborted. The server stays the authority on query length. `useDirectorySearch`
+  is the same over `/symbols/directory`; both are `useQuerySearch` underneath.
+- `useFollowedSymbols({onChange})` → `{items, isLoading, loadError, isFollowed, saving, errors, follow, unfollow, reload}`.
+  Follow / unfollow wait for the server (a follow can be refused) and keep a
+  failure per symbol with its action.
+- `ComputeStatusProvider` / `useComputeStatus()` — one computed-symbols list per
+  screen: `{items, dataTimeoutMinutes, isPolling, getItem, requesting, errors, compute, stop, refresh}`.
+  It polls every 12 s only while a manual request is `waiting_for_data` or
+  `computing`, and never after unmount. `ComputeButton` (Watchlist rows,
+  Followed rows, both search lists) and the Computed Symbols table read it;
+  `ComputeState` renders a state in words (queued, computing, computed,
+  data not arrived with the queue time and timeout, failed with its error).
 
 ## Configuration
 
@@ -105,20 +130,26 @@ cd web-app/ui/mfe-watchlist && make run    # :3002
 cd web-app/spog && npm run start-dev:all   # :3000 → http://localhost:3000/watchlist
 ```
 
-spog loads the remote from `mfes.mfe_watchlist` in `web-app/spog/public/config.json`.
+spog loads the three modules from `mfes.mfe_watchlist`, `mfes.mfe_watchlist_followed`
+and `mfes.mfe_watchlist_computed` in `web-app/spog/public/config.json` (one scope,
+`mfe_watchlist`). Standalone, `AppRouter` serves the same screens at `/`,
+`/followed-symbols` and `/computed-symbols`. A running dev server must be restarted
+after `exposes` in `webpack.config.js` changes.
 
 ## Layout
 
 ```
 src/
-  api/            fetch-client (GET/PUT/DELETE, ApiError {status, code}), watchlist/{types, parsers, watchlistApi}
-  app/            app-root (exposed, hosted), bootstrap (standalone), wrapper (ThemeProvider + host mode)
-  common/         error copy, webpack MF helper
-  components/     PageLayout (pill when standalone), ApiErrorState
+  api/            fetch-client (GET/PUT/DELETE, ApiError {status, code}), parse, watchlist/…, tracking/{types, parsers, trackingApi}
+  app/            app-root / followed-root / computed-root (exposed, hosted), bootstrap (standalone), wrapper
+  common/         error copy, formatters and tracking labels, webpack MF helper
+  components/     PageLayout, ApiErrorState, ComputeButton, ComputeState, Tag
   config/         api.config.ts
-  hooks/          useApiResource, watchlist/{useWatchlist, useSymbolSearch}
-  pages/          WatchlistPage (placeholder)
-  providers/      HostModeContext (hosted vs standalone)
+  features/       Watchlist/…, FollowedSymbols/{SearchPanel, UniverseSearch, DirectorySearch, FollowedTable, …}, ComputedSymbols/ComputedTable
+  hooks/          useApiResource, useQuerySearch, watchlist/{useWatchlist, useSymbolSearch}, tracking/{useFollowedSymbols, useDirectorySearch}
+  pages/          WatchlistPage, FollowedSymbolsPage, ComputedSymbolsPage
+  providers/      HostModeContext (hosted vs standalone), ComputeStatusContext
+  styles/         tracking-table.css (Followed / Computed tables)
   router/         AppRouter (relative routes)
   types/          MF remote declarations, constants
 ```

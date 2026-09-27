@@ -23,6 +23,7 @@ import sys
 
 import config as _config
 from db import cache, pool
+from db.queries.followed import refresh_followed
 from reports.builder import ReportBuilder
 from scheduler.scheduler import build_scheduler
 from bot.client import TradingBot
@@ -65,6 +66,8 @@ async def start() -> None:
 
     log.info("initialising DB pool")
     db_pool = await pool.init(cfg.database_url)
+
+    await refresh_followed(cfg, db_pool)
 
     log.info("initialising Redis cache")
     await cache.init(cfg.redis_url)

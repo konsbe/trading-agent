@@ -2,6 +2,7 @@ import { Button, Skeleton } from '@trading-agent/shared-components';
 import ApiErrorState from '@/components/ApiErrorState';
 import StatusNotice from '@/components/StatusNotice';
 import BalanceSheetSection from '../BalanceSheetSection';
+import CashFlowSection from '../CashFlowSection';
 import ContextSection from '../ContextSection';
 import CorrelationsSection from '../CorrelationsSection';
 import FundamentalsSection from '../FundamentalsSection';
@@ -78,6 +79,7 @@ const AnalysisSections = ({ analysis, focusSignals = false }: AnalysisSectionsPr
                         state={data.sections.fundamentals}
                     />
                     <BalanceSheetSection balanceSheet={data.balance_sheet} />
+                    <CashFlowSection cashFlow={data.cash_flow} />
                     <CorrelationsSection correlations={data.correlations} />
                     <NewsSection headlines={data.sentiment.headlines} />
                     <QualitativeSection qualitative={data.qualitative} />

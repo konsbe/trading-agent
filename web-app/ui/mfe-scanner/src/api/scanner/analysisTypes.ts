@@ -75,6 +75,34 @@ export interface BalanceSheetAnalysis {
     roic: ValueBand;
 }
 
+export type CashFlowLineKey = 'operating' | 'investing' | 'financing' | 'capex' | 'buybacks' | 'dividends' | (string & {});
+
+export interface CashFlowLine {
+    key: CashFlowLineKey;
+    /** The API's label, shown verbatim. */
+    label: string;
+    /** USD as filed; capex / buybacks / dividends are positive amounts paid. Null when the filing has no such line. */
+    value: number | null;
+}
+
+/**
+ * The latest annual (10-K) cash-flow statement as filed — never a quarter,
+ * since a 10-Q's cash-flow figures are year-to-date. When `available` is
+ * false, `lines` is [] and `unavailable_reason` says why.
+ */
+export interface CashFlowStatement {
+    available: boolean;
+    /** e.g. "10-K". */
+    form: string | null;
+    /** Fiscal period end, `YYYY-MM-DD`. */
+    period_end: string | null;
+    /** Filing date, `YYYY-MM-DD`. */
+    filed: string | null;
+    lines: CashFlowLine[];
+    /** A full sentence starting "No cash-flow statement available: …". */
+    unavailable_reason: string | null;
+}
+
 export interface CorrelationCluster {
     name: string;
     /** Served display name ("Leverage & Liquidity"); the raw `name` when an older API omits it. */
@@ -187,6 +215,7 @@ export interface StockAnalysis {
     technical: TechnicalAnalysis;
     fundamentals: FundamentalsAnalysis;
     balance_sheet: BalanceSheetAnalysis;
+    cash_flow: CashFlowStatement;
     correlations: CorrelationsAnalysis;
     qualitative: QualitativeAnalysis;
     sentiment: { headlines: Headline[] };

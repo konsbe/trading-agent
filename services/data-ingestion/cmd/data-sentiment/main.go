@@ -19,6 +19,7 @@ import (
 	"github.com/konsbe/trading-agent/services/data-ingestion/internal/logx"
 	"github.com/konsbe/trading-agent/services/data-ingestion/internal/ratelimit"
 	"github.com/konsbe/trading-agent/services/data-ingestion/internal/store"
+	symbolsets "github.com/konsbe/trading-agent/services/data-ingestion/internal/symbols"
 )
 
 func main() {
@@ -53,7 +54,7 @@ func main() {
 			log.Debug("LUNARCRUSH_API_KEY missing; skipping lunarcrush")
 			return
 		}
-		for _, sym := range cfg.NewsSymbols {
+		for _, sym := range symbolsets.CryptoNewsAliases(ctx, pool, log, "data-sentiment", "LunarCrush coins (FINNHUB_SYMBOLS_FOR_NEWS)", cfg.NewsSymbols) {
 			raw, err := lc.FetchCoin(ctx, strings.ToUpper(sym))
 			if err != nil {
 				log.Error("lunarcrush", "symbol", sym, "err", err)
@@ -97,7 +98,7 @@ func main() {
 		}
 
 		// Equity company news — fetch per configured symbol so headlines are linked.
-		for _, sym := range cfg.EquityNewsSymbols {
+		for _, sym := range symbolsets.Followed(ctx, pool, log, "data-sentiment", "company news (FINNHUB_EQUITY_NEWS_SYMBOLS)", []string{"equity", "etf"}, cfg.EquityNewsSymbols) {
 			compNews, err := fh.CompanyNews(ctx, sym)
 			if err != nil {
 				log.Error("finnhub company news", "symbol", sym, "err", err)

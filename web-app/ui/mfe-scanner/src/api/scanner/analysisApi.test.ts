@@ -1,5 +1,12 @@
 import { mockResponse } from '@/test-utils/fixtures';
-import { COMPUTING_MESSAGE, FAILED_MESSAGE, makeAnalysis, makeEmptyAnalysis } from '@/test-utils/analysisFixtures';
+import {
+    COMPUTING_MESSAGE,
+    FAILED_MESSAGE,
+    makeAnalysis,
+    makeEmptyAnalysis,
+    makeUnavailableCashFlow,
+    SHEL_CASH_FLOW_REASON,
+} from '@/test-utils/analysisFixtures';
 import { parseStockAnalysis } from './analysisParsers';
 import { DEFAULT_ANALYSIS_RETRY_MS, fetchStockAnalysis } from './scannerApi';
 
@@ -93,6 +100,54 @@ describe('parseStockAnalysis', () => {
         expect(parsed.correlations.clusters).toEqual([]);
         expect(parsed.sentiment.headlines).toEqual([]);
         expect(parsed.heuristic_signals.chart_patterns).toEqual([]);
+    });
+
+    it('reads an available annual cash-flow statement, with a null line kept as null', () => {
+        const body = clone(makeAnalysis());
+        body.cash_flow.lines[4].value = null;
+        const { cash_flow } = parseStockAnalysis(body);
+
+        expect(cash_flow).toMatchObject({ available: true, form: '10-K', period_end: '2025-12-31', filed: '2026-02-18', unavailable_reason: null });
+        expect(cash_flow.lines.map(line => [line.key, line.value])).toEqual([
+            ['operating', 51_970_000_000],
+            ['investing', -25_927_000_000],
+            ['financing', -39_081_000_000],
+            ['capex', 28_358_000_000],
+            ['buybacks', null],
+            ['dividends', 17_231_000_000],
+        ]);
+        expect(cash_flow.lines[3].label).toBe('Capital spending (property, plant & equipment)');
+    });
+
+    it('reads an unavailable cash-flow statement with its reason', () => {
+        const body = clone(makeAnalysis({ cash_flow: makeUnavailableCashFlow() }));
+
+        expect(parseStockAnalysis(body).cash_flow).toEqual({
+            available: false,
+            form: null,
+            period_end: null,
+            filed: null,
+            lines: [],
+            unavailable_reason: SHEL_CASH_FLOW_REASON,
+        });
+    });
+
+    it('reads a body without cash_flow (older API) as unavailable with no reason', () => {
+        const body = clone(makeAnalysis());
+        delete body.cash_flow;
+
+        expect(parseStockAnalysis(body).cash_flow).toEqual(makeUnavailableCashFlow(null));
+    });
+
+    it.each([
+        ['a non-array lines', (b: any) => (b.cash_flow.lines = {}), 'cash_flow.lines'],
+        ['a line without a label', (b: any) => delete b.cash_flow.lines[0].label, 'cash_flow.lines[0].label'],
+        ['a string value', (b: any) => (b.cash_flow.lines[0].value = '51970000000'), 'cash_flow.lines[0].value'],
+        ['a string available', (b: any) => (b.cash_flow.available = 'yes'), 'cash_flow.available'],
+    ])('rejects a cash_flow with %s', (_label, mutate, path) => {
+        const body = clone(makeAnalysis());
+        mutate(body);
+        expect(() => parseStockAnalysis(body)).toThrow(path);
     });
 
     it('reads a cluster checks_run count when present', () => {

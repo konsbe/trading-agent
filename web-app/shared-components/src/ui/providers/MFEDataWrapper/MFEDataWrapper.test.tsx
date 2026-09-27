@@ -108,18 +108,27 @@ describe('MFEDataWrapper', () => {
     expect(screen.getByTestId('child')).toBeInTheDocument();
   });
 
-  it('shows no data when first array row has empty name (topology-style)', () => {
+  it('renders children when the first row has no name', () => {
     render(
       <MFEDataWrapper
         dataLoading={false}
         dataError={null}
-        data={[{ name: '', id: 'n1' }]}
+        data={[{ symbol: '2222.SR', name: null }, { symbol: 'AMZN', name: 'AMAZON.COM INC' }]}
       >
         <span data-testid="child">content</span>
       </MFEDataWrapper>
     );
-    expect(screen.getByText('No data available')).toBeInTheDocument();
-    expect(screen.queryByTestId('child')).not.toBeInTheDocument();
+    expect(screen.getByTestId('child')).toBeInTheDocument();
+    expect(screen.queryByText('No data available')).not.toBeInTheDocument();
+  });
+
+  it('renders children when the first row has an empty name', () => {
+    render(
+      <MFEDataWrapper dataLoading={false} dataError={null} data={[{ name: '', id: 'n1' }]}>
+        <span data-testid="child">content</span>
+      </MFEDataWrapper>
+    );
+    expect(screen.getByTestId('child')).toBeInTheDocument();
   });
 
   it('maps deprecated isLoading to dataLoading', () => {

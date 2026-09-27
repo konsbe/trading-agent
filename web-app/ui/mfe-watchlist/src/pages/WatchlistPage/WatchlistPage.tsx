@@ -7,6 +7,7 @@ import InlineError from '@/features/Watchlist/components/InlineError';
 import WatchlistSkeleton from '@/features/Watchlist/components/WatchlistSkeleton';
 import WatchlistTable from '@/features/Watchlist/components/WatchlistTable';
 import useWatchlistScreen from '@/features/Watchlist/hooks/useWatchlistScreen';
+import { ComputeStatusProvider } from '@/providers/ComputeStatusContext';
 import './WatchlistPage-styles.css';
 
 export const EMPTY_WATCHLIST_MESSAGE = 'Your watchlist is empty.';
@@ -19,7 +20,7 @@ const EMPTY_STATE_STYLE = { padding: 'var(--space-lg) 0' };
  * (with a neutral "as of" note when it's not current), and remove per row.
  * Descriptive only — no score or signal framing, as on the candidates screen.
  */
-const WatchlistPage = () => {
+const WatchlistScreen = () => {
     const {
         items,
         saving,
@@ -79,5 +80,12 @@ const WatchlistPage = () => {
         </PageLayout>
     );
 };
+
+/** Each row's Compute state comes from one computed-symbols list per screen. */
+const WatchlistPage = () => (
+    <ComputeStatusProvider>
+        <WatchlistScreen />
+    </ComputeStatusProvider>
+);
 
 export default WatchlistPage;

@@ -1,0 +1,138 @@
+/*
+ * Shared by the Followed Symbols and Computed Symbols tables: the watchlist
+ * table's look (row surface, header, pinned symbol column) without its market
+ * columns. `contain: inline-size` keeps a wide table from widening spog's grid cell.
+ */
+.tracking-table__wrap {
+    contain: inline-size;
+    min-width: 0;
+    max-width: 100%;
+    overflow-x: auto;
+    border: 1px solid var(--color-outline-variant);
+    border-radius: var(--radius-md);
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-outline) transparent;
+}
+
+.tracking-table__wrap:focus-visible {
+    outline: 2px solid var(--color-focus-ring);
+    outline-offset: 2px;
+}
+
+.tracking-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: var(--font-size-sm);
+    color: var(--color-on-surface);
+}
+
+.tracking-table__caption,
+.tracking-table__sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+}
+
+.tracking-table th,
+.tracking-table td {
+    padding: var(--space-xs) var(--space-sm);
+    border-bottom: 1px solid var(--color-outline-variant);
+    text-align: left;
+    vertical-align: middle;
+    font-weight: var(--font-weight-regular);
+}
+
+.tracking-table tr > :first-child {
+    padding-left: var(--space-md);
+}
+
+.tracking-table tr > :last-child {
+    padding-right: var(--space-md);
+}
+
+.tracking-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    padding-top: var(--space-sm);
+    padding-bottom: var(--space-sm);
+    background: var(--color-surface-container);
+    color: var(--color-on-surface-variant);
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-medium);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+    vertical-align: bottom;
+}
+
+.tracking-table__row > th,
+.tracking-table__row > td {
+    background: var(--color-surface-container-low);
+    transition: background var(--transition-fast);
+}
+
+.tracking-table__row:last-child > th,
+.tracking-table__row:last-child > td {
+    border-bottom: 0;
+}
+
+.tracking-table__row:hover > th,
+.tracking-table__row:hover > td {
+    background: var(--color-surface-container-high);
+}
+
+.tracking-table thead th[data-column='symbol'],
+.tracking-table__row > th[data-column='symbol'] {
+    position: sticky;
+    left: 0;
+    border-right: 1px solid var(--color-outline-variant);
+}
+
+.tracking-table thead th[data-column='symbol'] {
+    z-index: 2;
+}
+
+.tracking-table__row > th[data-column='symbol'] {
+    z-index: 1;
+}
+
+.tracking-table__ticker {
+    font-family: var(--font-family-label);
+    font-weight: var(--font-weight-bold);
+    white-space: nowrap;
+}
+
+.tracking-table__name {
+    display: block;
+    max-width: 22rem;
+    overflow: hidden;
+    color: var(--color-on-surface-variant);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.tracking-table__muted {
+    color: var(--color-on-surface-variant);
+    white-space: nowrap;
+}
+
+.tracking-table__chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-xxs);
+}
+
+.tracking-table td[data-column='actions'] {
+    width: 1%;
+    text-align: right;
+    white-space: nowrap;
+}
+
+.tracking-table__action {
+    gap: var(--space-xs);
+}

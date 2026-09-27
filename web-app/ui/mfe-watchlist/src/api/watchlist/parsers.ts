@@ -1,47 +1,7 @@
+import { array, bool, nullable, obj, oneOf, optBool, optNum, optStr, str, timestamp, tradingDay } from '../parse';
 import { CatalystTier, SymbolSearchResponse, SymbolSearchResult, WatchlistItem, WatchlistResponse } from './types';
 
-type Json = Record<string, unknown>;
-
-const fail = (path: string, expected: string, value: unknown): never => {
-    throw new Error(`Invalid watchlist response at ${path}: expected ${expected}, got ${value === null ? 'null' : typeof value}`);
-};
-
-const obj = (value: unknown, path: string): Json =>
-    value !== null && typeof value === 'object' && !Array.isArray(value) ? (value as Json) : fail(path, 'object', value);
-
-const str = (value: unknown, path: string): string => (typeof value === 'string' ? value : fail(path, 'string', value));
-
-const num = (value: unknown, path: string): number =>
-    typeof value === 'number' && Number.isFinite(value) ? value : fail(path, 'number', value);
-
-const bool = (value: unknown, path: string): boolean => (typeof value === 'boolean' ? value : fail(path, 'boolean', value));
-
-const nullable = <T>(read: (value: unknown, path: string) => T) =>
-    (value: unknown, path: string): T | null => (value === null || value === undefined ? null : read(value, path));
-
-const array = <T>(value: unknown, path: string, read: (item: unknown, itemPath: string) => T): T[] =>
-    Array.isArray(value) ? value.map((item, i) => read(item, `${path}[${i}]`)) : fail(path, 'array', value);
-
-const TRADING_DAY = /^\d{4}-\d{2}-\d{2}$/;
-
-const tradingDay = (value: unknown, path: string): string => {
-    const s = str(value, path);
-    return TRADING_DAY.test(s) ? s : fail(path, 'YYYY-MM-DD', value);
-};
-
-const timestamp = (value: unknown, path: string): string => {
-    const s = str(value, path);
-    return Number.isNaN(Date.parse(s)) ? fail(path, 'RFC 3339 timestamp', value) : s;
-};
-
-const CATALYST_TIERS: readonly CatalystTier[] = ['A', 'B', 'none'];
-
-const catalystTier = (value: unknown, path: string): CatalystTier =>
-    CATALYST_TIERS.includes(value as CatalystTier) ? (value as CatalystTier) : fail(path, 'A|B|none', value);
-
-const optStr = nullable(str);
-const optNum = nullable(num);
-const optBool = nullable(bool);
+const catalystTier = oneOf<CatalystTier>(['A', 'B', 'none']);
 
 const parseWatchlistItem = (value: unknown, path: string): WatchlistItem => {
     const o = obj(value, path);

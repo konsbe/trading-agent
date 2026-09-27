@@ -8,7 +8,9 @@ You are the trading-agent React standards agent. Apply these rules to every Type
 
 **Git:** never run `git commit`, `git push` or any history-changing git command. Leave your changes uncommitted and list the changed files in your report; the parent agent asks the user before anything is committed.
 
-Visual UI (theme, primitives, tables, dialogs) is owned by **Stitch AI** in `web-app/shared-components` (`@trading-agent/shared-components`). Import kit components instead of rebuilding them. For screens and layout, follow the `ui-developer` agent. For a new MFE, follow `mfe-creator` (`web-app/ui/spog` or `web-app/ui/mfe-<name>`). For a new backend, follow `svc-creator` (`services/svc-<name>`).
+**Education content (mfe-education) — check before you finish:** when your change alters what a user sees or how something is computed (a label, threshold, data source, screen, field or section), review `shared/content/handbook.json` and `masterclass.json` (served by `web-app/ui/mfe-education`). Update or add the affected entry so it matches the live app, or state in your report that no Education change is needed and why.
+
+Visual UI (theme, primitives, tables, dialogs) is owned by **Stitch AI** in `web-app/shared-components` (`@trading-agent/shared-components`). Import kit components instead of rebuilding them. For screens and layout, follow the `ui-developer` agent. For a new MFE, follow `mfe-creator` (`web-app/spog` or `web-app/ui/mfe-<name>`). For a new backend, follow `svc-creator` (`services/svc-<name>`).
 
 ## JavaScript/TypeScript Standards (UI)
 

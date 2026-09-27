@@ -27,6 +27,9 @@ type OHLCVBars struct {
 	BackfillBars int
 	// PollInterval is how often to pull the latest bars.
 	PollInterval time.Duration
+	// ManualQueuePoll is how often to fetch bars for manual "Compute" requests
+	// (computation_interest reason manual). Default 2m.
+	ManualQueuePoll time.Duration
 }
 
 func LoadOHLCVBars() (OHLCVBars, error) {
@@ -71,5 +74,6 @@ func LoadOHLCVBars() (OHLCVBars, error) {
 		CryptoIntervals: cryptoIvs,
 		BackfillBars:    intEnv("TECHNICAL_BACKFILL_BARS", 500),
 		PollInterval:    pollFor("DATA_TECHNICAL_POLL_INTERVAL", 6*time.Hour),
+		ManualQueuePoll: pollFor("DATA_TECHNICAL_MANUAL_QUEUE_POLL_INTERVAL", 2*time.Minute),
 	}, nil
 }

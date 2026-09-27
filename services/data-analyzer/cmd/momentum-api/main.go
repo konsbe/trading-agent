@@ -39,6 +39,7 @@ import (
 	"github.com/konsbe/trading-agent/services/data-analyzer/internal/fundamental"
 	"github.com/konsbe/trading-agent/services/data-analyzer/internal/logx"
 	"github.com/konsbe/trading-agent/services/data-analyzer/internal/momentumapi"
+	symbolsets "github.com/konsbe/trading-agent/services/data-analyzer/internal/symbols"
 	"github.com/konsbe/trading-agent/services/data-analyzer/internal/technical"
 	"github.com/konsbe/trading-agent/services/data-analyzer/internal/technical/runner"
 )
@@ -171,14 +172,16 @@ func main() {
 	}
 
 	srv := momentumapi.NewServer(momentumapi.Config{
-		Store:             momentumapi.DBStore{Q: pool, PingFn: pool.Ping},
-		Caveats:           caveats,
-		BacktestReport:    report,
-		Education:         education,
-		Log:               log,
-		SessionReadyAfter: scanGrace,
-		CacheTTL:          cacheTTL,
-		CORSOrigins:       origins,
+		Store:              momentumapi.DBStore{Q: pool, PingFn: pool.Ping},
+		Follow:             momentumapi.DBStore{Q: pool, PingFn: pool.Ping},
+		ComputeDataTimeout: duration(log, "MOMENTUM_API_COMPUTE_DATA_TIMEOUT", 30*time.Minute),
+		Caveats:            caveats,
+		BacktestReport:     report,
+		Education:          education,
+		Log:                log,
+		SessionReadyAfter:  scanGrace,
+		CacheTTL:           cacheTTL,
+		CORSOrigins:        origins,
 
 		StatusCacheTTL:     statusTTL,
 		ChainGiveUpAfter:   giveUpAfter,
@@ -186,12 +189,15 @@ func main() {
 		SessionsShown:      7,
 		BarSource:          env("MOMENTUM_DAILY_BAR_SOURCE", "tiingo"),
 
-		MarketReportCacheTTL:   reportTTL,
-		EarningsCoveredSymbols: earningsSymbols(),
-		GPRSourceConfigured:    strings.TrimSpace(os.Getenv("GPR_CSV_URL")) != "",
-		MarketReportText:       marketText,
-		CorrelationText:        corrText,
-		CorrelationLabels:      corrLabels,
+		MarketReportCacheTTL: reportTTL,
+		EarningsCovered: func(ctx context.Context) []string {
+			return symbolsets.Followed(ctx, pool, log, "momentum-api",
+				"earnings calendar (MACRO_INTEL_EARNINGS_SYMBOLS)", []string{"equity"}, earningsSymbols())
+		},
+		GPRSourceConfigured: strings.TrimSpace(os.Getenv("GPR_CSV_URL")) != "",
+		MarketReportText:    marketText,
+		CorrelationText:     corrText,
+		CorrelationLabels:   corrLabels,
 
 		AnalysisNames: technical.NamesFor(technical.Emitter{Cfg: taCfg}),
 		AnalysisCompute: func(ctx context.Context, symbol string, parts momentumapi.AnalysisParts) error {
@@ -268,7 +274,7 @@ func csv(raw string) []string {
 	return out
 }
 
-// earningsSymbols mirrors data-macro-intel's precedence (data-ingestion
+// earningsSymbols is the .env fallback, mirroring data-macro-intel's precedence (data-ingestion
 // internal/config: MACRO_INTEL_EARNINGS_SYMBOLS, else ALPACA_DATA_SYMBOLS,
 // else EQUITY_SYMBOLS_STOCKS + _ETFS + _COMMODITY_ETFS) — the symbols it
 // actually fetches earnings for. Both read the shared .env.

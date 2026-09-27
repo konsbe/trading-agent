@@ -5,7 +5,7 @@ export interface MFEDataWrapperProps {
   children: React.ReactNode;
   dataLoading?: boolean;
   dataError?: Error | null;
-  /** Used for empty-state detection when `noDataDeactivated` is false (aligned with mfe-topology-groups). */
+  /** Empty-state detection when `noDataDeactivated` is false: an empty array, `false` or null/undefined. */
   data?: unknown[] | boolean | null;
   noDataMessage?: string;
   /** Typo alias from mfe-topology-groups — prefer `noDataMessage`. */
@@ -30,14 +30,7 @@ export interface MFEDataWrapperProps {
 function isNoData(data: unknown): boolean {
   if (data == null) return true;
   if (typeof data === 'boolean') return !data;
-  if (Array.isArray(data)) {
-    if (data.length === 0) return true;
-    const first = data[0] as Record<string, unknown> | undefined;
-    if (first && typeof first === 'object' && 'name' in first) {
-      return !first.name;
-    }
-    return false;
-  }
+  if (Array.isArray(data)) return data.length === 0;
   return false;
 }
 

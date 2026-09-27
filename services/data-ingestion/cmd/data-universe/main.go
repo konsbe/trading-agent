@@ -27,6 +27,7 @@ import (
 	"github.com/konsbe/trading-agent/services/data-ingestion/internal/config"
 	"github.com/konsbe/trading-agent/services/data-ingestion/internal/db"
 	"github.com/konsbe/trading-agent/services/data-ingestion/internal/fetch/barsource"
+	"github.com/konsbe/trading-agent/services/data-ingestion/internal/fetch/binance"
 	"github.com/konsbe/trading-agent/services/data-ingestion/internal/fetch/finnhub"
 	"github.com/konsbe/trading-agent/services/data-ingestion/internal/logx"
 	"github.com/konsbe/trading-agent/services/data-ingestion/internal/ratelimit"
@@ -68,6 +69,19 @@ func main() {
 	defer pool.Close()
 
 	fh := finnhub.NewWithLimiter(cfg.FinnhubKey, ratelimit.SharedFinnhub(ctx, pool, log))
+
+	// -directory-once: fetch the Finnhub US list (one call) and Binance's spot
+	// pairs, store symbol_directory, and exit — no universe upsert, pricing or
+	// bars. For filling the directory without restarting the weekly pass.
+	if len(os.Args) > 1 && os.Args[1] == "-directory-once" {
+		syms, err := fh.StockSymbols(ctx, cfg.Exchange)
+		if err != nil || len(syms) == 0 {
+			log.Error("directory-once: fetch symbol list", "exchange", cfg.Exchange, "rows", len(syms), "err", err)
+			os.Exit(1)
+		}
+		(&worker{cfg: cfg, pool: pool, fh: fh, log: log}).storeDirectory(ctx, syms)
+		return
+	}
 	if cfg.EnableSymbols && !fh.HasToken() {
 		// Consistent with the other workers: a missing key disables the pass and
 		// logs, it never crashes the service.
@@ -238,6 +252,8 @@ func (w *worker) runSymbols(ctx context.Context) {
 		return
 	}
 
+	w.storeDirectory(ctx, syms)
+
 	recs := make([]universe.Record, 0, len(syms))
 	meta := make(map[string]finnhub.StockSymbol, len(syms))
 	for _, s := range syms {
@@ -332,5 +348,42 @@ func sleepCtx(ctx context.Context, d time.Duration) bool {
 		return false
 	case <-t.C:
 		return true
+	}
+}
+
+// storeDirectory keeps the full provider directories for the "all symbols"
+// search (migration 030 symbol_directory): every row of the Finnhub list just
+// fetched — before §3.1 drops off-venue listings (NYSE Arca ETFs, OTC, foreign
+// MICs) and non-common types — plus Binance's USDT spot pairs. It never
+// affects universe_symbols; a failure is logged and the universe pass goes on.
+func (w *worker) storeDirectory(ctx context.Context, syms []finnhub.StockSymbol) {
+	rows := make([]store.DirectoryRow, 0, len(syms))
+	for _, s := range syms {
+		rows = append(rows, store.DirectoryRow{
+			Symbol: s.Symbol, DisplaySymbol: s.DisplaySymbol, Name: s.Description, Type: s.Type,
+			MIC: s.MIC, Currency: s.Currency, AssetType: store.DirectoryAssetType(s.Type),
+		})
+	}
+	if n, err := store.UpsertDirectory(ctx, w.pool, "finnhub_us", rows); err != nil {
+		w.log.Error("store finnhub directory", "err", err)
+	} else {
+		w.log.Info("symbol directory stored", "source", "finnhub_us", "rows", n)
+	}
+	pairs, err := binance.NewREST().SpotPairs(ctx, "USDT")
+	if err != nil {
+		w.log.Error("fetch binance spot pairs", "err", err)
+		return
+	}
+	crows := make([]store.DirectoryRow, 0, len(pairs))
+	for _, p := range pairs {
+		crows = append(crows, store.DirectoryRow{
+			Symbol: p.Symbol, DisplaySymbol: p.BaseAsset + "/" + p.QuoteAsset, Name: p.BaseAsset,
+			Type: "spot", Currency: p.QuoteAsset, AssetType: "crypto",
+		})
+	}
+	if n, err := store.UpsertDirectory(ctx, w.pool, "binance_spot", crows); err != nil {
+		w.log.Error("store binance directory", "err", err)
+	} else {
+		w.log.Info("symbol directory stored", "source", "binance_spot", "rows", n)
 	}
 }

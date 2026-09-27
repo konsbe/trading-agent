@@ -1,4 +1,35 @@
-import { AnalysisPending, StockAnalysis } from '@/api';
+import { AnalysisPending, CashFlowStatement, StockAnalysis } from '@/api';
+
+/** Live XOM (2026-09-27): the 10-K for FY2025 as momentum-api serves it. */
+export const makeCashFlow = (overrides: Partial<CashFlowStatement> = {}): CashFlowStatement => ({
+    available: true,
+    form: '10-K',
+    period_end: '2025-12-31',
+    filed: '2026-02-18',
+    lines: [
+        { key: 'operating', label: 'Net cash from operating activities', value: 51_970_000_000 },
+        { key: 'investing', label: 'Net cash from investing activities', value: -25_927_000_000 },
+        { key: 'financing', label: 'Net cash from financing activities', value: -39_081_000_000 },
+        { key: 'capex', label: 'Capital spending (property, plant & equipment)', value: 28_358_000_000 },
+        { key: 'buybacks', label: 'Share buybacks', value: 20_273_000_000 },
+        { key: 'dividends', label: 'Dividends paid', value: 17_231_000_000 },
+    ],
+    unavailable_reason: null,
+    ...overrides,
+});
+
+/** Live SHEL (2026-09-27): a 20-F filer. */
+export const SHEL_CASH_FLOW_REASON =
+    'No cash-flow statement available: Finnhub returned no 10-K/10-Q filings (companies filing 20-F annual reports, such as many foreign issuers, are not covered).';
+
+export const makeUnavailableCashFlow = (reason: string | null = SHEL_CASH_FLOW_REASON): CashFlowStatement => ({
+    available: false,
+    form: null,
+    period_end: null,
+    filed: null,
+    lines: [],
+    unavailable_reason: reason,
+});
 
 export const HEURISTIC_CAVEAT =
     'Classical pattern signals (head & shoulders, liquidity sweeps, order blocks, BUY/TRIM labels) were tested against this project\'s own history -- no hypothesis confirmed.';
@@ -51,6 +82,7 @@ export const makeAnalysis = (overrides: Partial<StockAnalysis> = {}): StockAnaly
         net_debt_ebitda: { value: null, band: null },
         roic: { value: 28.4, band: 'excellent' },
     },
+    cash_flow: makeCashFlow(),
     correlations: {
         composite: { score: 0.25, tier: 'mixed_positive' },
         composite_label: 'mixed, leaning agree',
@@ -175,6 +207,7 @@ export const makeEmptyAnalysis = (): StockAnalysis => {
             net_debt_ebitda: vb,
             roic: vb,
         },
+        cash_flow: makeUnavailableCashFlow(),
         correlations: {
             composite: { score: null, tier: null },
             composite_label: null,

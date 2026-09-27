@@ -2,6 +2,8 @@ import {
     ActionSignal,
     AnalysisPending,
     BalanceSheetAnalysis,
+    CashFlowLine,
+    CashFlowStatement,
     ChartPattern,
     ContextVsBenchmark,
     CorrelationCluster,
@@ -117,6 +119,28 @@ const parseBalanceSheet = (value: unknown, path = 'balance_sheet'): BalanceSheet
         debt_to_equity: vb('debt_to_equity'),
         net_debt_ebitda: vb('net_debt_ebitda'),
         roic: vb('roic'),
+    };
+};
+
+const parseCashFlowLine = (value: unknown, path: string): CashFlowLine => {
+    const o = obj(value, path);
+    return {
+        key: str(o.key, `${path}.key`),
+        label: str(o.label, `${path}.label`),
+        value: optNum(o.value, `${path}.value`),
+    };
+};
+
+/** A body without `cash_flow` (an older server) reads as unavailable with no reason, so the card still renders. */
+const parseCashFlow = (value: unknown, path = 'cash_flow'): CashFlowStatement => {
+    const o = section(value, path);
+    return {
+        available: optBool(o.available, `${path}.available`) ?? false,
+        form: optStr(o.form, `${path}.form`),
+        period_end: optStr(o.period_end, `${path}.period_end`),
+        filed: optStr(o.filed, `${path}.filed`),
+        lines: array(o.lines ?? [], `${path}.lines`, parseCashFlowLine),
+        unavailable_reason: optStr(o.unavailable_reason, `${path}.unavailable_reason`),
     };
 };
 
@@ -248,6 +272,7 @@ export const parseStockAnalysis = (value: unknown): StockAnalysis => {
         technical: parseTechnical(o.technical),
         fundamentals: parseFundamentals(o.fundamentals),
         balance_sheet: parseBalanceSheet(o.balance_sheet),
+        cash_flow: parseCashFlow(o.cash_flow),
         correlations: parseCorrelations(o.correlations),
         qualitative: parseQualitative(o.qualitative),
         sentiment: { headlines: array(sentiment.headlines ?? [], 'sentiment.headlines', parseHeadline) },

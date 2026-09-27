@@ -1,0 +1,32 @@
+.computed-table__stop {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: var(--space-xxs);
+}
+
+.computed-table__hint {
+    max-width: 10rem;
+    color: var(--color-on-surface-variant);
+    font-size: var(--font-size-xs);
+    white-space: normal;
+    text-align: right;
+}
+
+.computed-table__error {
+    display: block;
+    max-width: 20rem;
+    margin-top: var(--space-xxs);
+    color: var(--color-error);
+    font-size: var(--font-size-xs);
+    white-space: normal;
+    text-align: right;
+}
+
+.tracking-table td[data-column='state'] {
+    min-width: 12rem;
+}
+
+.computed-table .tracking-table__name {
+    max-width: 16rem;
+}

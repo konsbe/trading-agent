@@ -119,7 +119,7 @@ func TestAnalyzeMatchesGolden(t *testing.T) {
 	tx := testdb.Tx(t)
 	seedFixture(t, ctx, tx)
 	w := &worker{cfg: cfg, pool: tx, log: slog.New(slog.NewTextHandler(io.Discard, nil))}
-	w.analyzeAll(ctx)
+	w.analyzeAll(ctx, cfg.Symbols)
 
 	rows, err := tx.Query(ctx, `SELECT symbol, metric, period, value, payload::text
 		FROM equity_fundamentals
@@ -188,7 +188,7 @@ func TestFCFEPSDivergenceReachesCorrelations(t *testing.T) {
 	tx := testdb.Tx(t)
 	seedFixture(t, ctx, tx)
 	w := &worker{cfg: cfg, pool: tx, log: slog.New(slog.NewTextHandler(io.Discard, nil))}
-	w.analyzeAll(ctx)
+	w.analyzeAll(ctx, cfg.Symbols)
 
 	payload := func(metric string) map[string]any {
 		var raw []byte

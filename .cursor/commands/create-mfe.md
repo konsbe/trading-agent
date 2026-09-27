@@ -2,7 +2,7 @@ Create a new trading-agent micro frontend using the `mfe-creator` subagent and `
 
 Ask for any missing identity: `name`, `displayName`, `port`, `exposedModule`.
 
-- Host: `web-app/ui/spog`
+- Host: `web-app/spog`
 - Remote MFE: `web-app/ui/mfe-<name>`
 
 Use `@trading-agent/shared-components` (Stitch, `web-app/shared-components`). Webpack remote: `spog@http://localhost:3000/remoteEntry.js`.

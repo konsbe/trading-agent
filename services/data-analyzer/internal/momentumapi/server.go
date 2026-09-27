@@ -156,10 +156,10 @@ type Config struct {
 	// MarketReportCacheTTL: the report is regenerated every 6h, so it is not
 	// held to the 5-minute data TTL; watchlist writes drop it early.
 	MarketReportCacheTTL time.Duration
-	// EarningsCoveredSymbols is the list data-macro-intel fetches earnings for
-	// (read by main from the same env vars, same precedence), so the report can
-	// tell "not ingested" from "no earnings in the window".
-	EarningsCoveredSymbols []string
+	// EarningsCovered resolves the list data-macro-intel fetches earnings for
+	// (followed equities, the same .env fallback), so the report can tell
+	// "not ingested" from "no earnings in the window". Called per report build.
+	EarningsCovered func(ctx context.Context) []string
 	// GPRSourceConfigured mirrors data-macro-intel's GPR_CSV_URL: without it the
 	// geopolitical-risk index is never ingested.
 	GPRSourceConfigured bool
@@ -172,6 +172,12 @@ type Config struct {
 	// CorrelationLabels is shared/content/correlation_labels.json: the
 	// correlation card's labels, shared with the bot's Discord embed.
 	CorrelationLabels CorrelationLabels
+
+	// Follow backs the followed-symbols / computed-symbols endpoints
+	// (followed.go); nil answers 501. ComputeDataTimeout: a manual Compute
+	// request whose data has not arrived after this long reads data_not_arrived.
+	Follow             FollowStore
+	ComputeDataTimeout time.Duration
 
 	// Full stock analysis (GET /today/{symbol}/analysis). AnalysisNames are the
 	// stored indicator names (technical.NamesFor the worker's config).
@@ -269,6 +275,13 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/data-sources/status", s.handleDataSourcesStatus)
 	mux.HandleFunc("GET /api/v1/market-report/today", s.handleMarketReport)
 	mux.HandleFunc("GET /api/v1/alerts", s.handleAlerts)
+	mux.HandleFunc("GET /api/v1/followed-symbols", s.handleFollowedList)
+	mux.HandleFunc("PUT /api/v1/followed-symbols/{symbol}", s.handleFollowedAdd)
+	mux.HandleFunc("DELETE /api/v1/followed-symbols/{symbol}", s.handleFollowedRemove)
+	mux.HandleFunc("GET /api/v1/symbols/directory", s.handleDirectorySearch)
+	mux.HandleFunc("GET /api/v1/computed-symbols", s.handleComputedList)
+	mux.HandleFunc("PUT /api/v1/computed-symbols/{symbol}", s.handleComputeRequest)
+	mux.HandleFunc("DELETE /api/v1/computed-symbols/{symbol}", s.handleComputeStop)
 	return s.cors(mux)
 }
 

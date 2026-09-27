@@ -30,7 +30,7 @@ describe('Sidebar', () => {
 
         const main = screen.getByTestId('app-sidebar-main');
         expect(linkLabels(main)).toEqual([
-            'Daily Market Report', 'Momentum Scanner', 'Backtest Lab', 'Watchlist',
+            'Daily Market Report', 'Momentum Scanner', 'Backtest Lab', 'Watchlist', 'Followed Symbols', 'Computed Symbols',
             'Handbook', 'MasterClass', 'Glossary',
             'Stock Detail', 'Alarm History', 'Tracked Positions', 'Settings',
         ]);

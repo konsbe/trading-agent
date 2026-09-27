@@ -1,6 +1,7 @@
 package momentumapi
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -137,7 +138,7 @@ func (s *Server) handleMarketReport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	body, err := json.Marshal(buildMarketReport(in, now, reportOpts{
-		earningsCovered: toSet(s.cfg.EarningsCoveredSymbols),
+		earningsCovered: toSet(s.earningsCovered(r.Context())),
 		gprConfigured:   s.cfg.GPRSourceConfigured,
 		text:            s.cfg.MarketReportText,
 	}))
@@ -489,4 +490,11 @@ func sign(v float64) float64 {
 		return -1
 	}
 	return 1
+}
+
+func (s *Server) earningsCovered(ctx context.Context) []string {
+	if s.cfg.EarningsCovered == nil {
+		return nil
+	}
+	return s.cfg.EarningsCovered(ctx)
 }

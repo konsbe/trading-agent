@@ -16,6 +16,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -32,6 +33,7 @@ import (
 	"github.com/konsbe/trading-agent/services/data-ingestion/internal/fetch/yahoo"
 	"github.com/konsbe/trading-agent/services/data-ingestion/internal/logx"
 	"github.com/konsbe/trading-agent/services/data-ingestion/internal/store"
+	"github.com/konsbe/trading-agent/services/data-ingestion/internal/symbols"
 )
 
 func main() {
@@ -62,8 +64,24 @@ func main() {
 		log:   log,
 	}
 
+	// Manual "Compute" requests poll on their own goroutine so their bars land
+	// in minutes even while a backfill / latest-bars pass is running.
+	go func() {
+		manual := time.NewTicker(cfg.ManualQueuePoll)
+		defer manual.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-manual.C:
+				w.runManualQueue(ctx)
+			}
+		}
+	}()
+
 	log.Info("backfilling historical bars")
-	w.backfill(ctx)
+	eq, cr := w.equitySymbols(ctx), w.cryptoSymbols(ctx)
+	w.backfill(ctx, eq, cr)
 
 	ticker := time.NewTicker(cfg.PollInterval)
 	defer ticker.Stop()
@@ -74,7 +92,51 @@ func main() {
 			log.Info("shutdown")
 			return
 		case <-ticker.C:
-			w.fetchLatest(ctx)
+			// Re-resolved every pass: a symbol that joined the sets since the last
+			// pass is backfilled (backfill skips symbols that already have enough
+			// bars), then every symbol gets its latest bars.
+			eq, cr := w.equitySymbols(ctx), w.cryptoSymbols(ctx)
+			w.backfill(ctx, eq, cr)
+			w.fetchLatest(ctx, eq, cr)
+		}
+	}
+}
+
+// equitySymbols: followed equities and funds ∪ every one with an open
+// computation reason (watchlist, today's candidates, manual Compute).
+func (w *worker) equitySymbols(ctx context.Context) []string {
+	return symbols.Computation(ctx, w.pool, w.log, "data-technical", "equity bars (TECHNICAL_EQUITY_SYMBOLS)",
+		[]string{"equity", "etf"}, w.cfg.EquitySymbols)
+}
+
+func (w *worker) cryptoSymbols(ctx context.Context) []string {
+	return symbols.Computation(ctx, w.pool, w.log, "data-technical", "crypto bars (TECHNICAL_CRYPTO_SYMBOLS)",
+		[]string{"crypto"}, w.cfg.CryptoSymbols)
+}
+
+// runManualQueue backfills bars for Compute requests not fetched since they
+// were made, and records the fetch so the request can move on to computing.
+func (w *worker) runManualQueue(ctx context.Context) {
+	for _, kind := range []struct {
+		types  []string
+		crypto bool
+	}{{[]string{"equity", "etf"}, false}, {[]string{"crypto"}, true}} {
+		pending, err := store.PendingManual(ctx, w.pool, "bars", kind.types)
+		if err != nil {
+			w.log.Warn("manual compute queue", "err", err)
+			return
+		}
+		for _, sym := range pending {
+			var ferr error
+			if kind.crypto {
+				ferr = w.backfillCrypto(ctx, sym)
+			} else {
+				ferr = w.backfillEquity(ctx, sym)
+			}
+			if err := store.MarkFetched(ctx, w.pool, sym, "bars", ferr); err != nil {
+				w.log.Warn("mark bars fetched", "symbol", sym, "err", err)
+			}
+			w.log.Info("manual compute: bars fetched", "symbol", sym, "err", ferr)
 		}
 	}
 }
@@ -90,8 +152,20 @@ type worker struct {
 
 // backfill ensures each symbol × interval has at least BackfillBars rows.
 // Existing rows are preserved via ON CONFLICT DO UPDATE.
-func (w *worker) backfill(ctx context.Context) {
-	for _, sym := range w.cfg.EquitySymbols {
+func (w *worker) backfill(ctx context.Context, equities, cryptos []string) {
+	for _, sym := range equities {
+		_ = w.backfillEquity(ctx, sym)
+	}
+	for _, sym := range cryptos {
+		_ = w.backfillCrypto(ctx, sym)
+	}
+}
+
+// backfillEquity tops one symbol up to BackfillBars per interval; the error is
+// the last fetch/store failure, nil when it has bars (or already had enough).
+func (w *worker) backfillEquity(ctx context.Context, sym string) error {
+	var lastErr error
+	{
 		for _, iv := range w.cfg.EquityIntervals {
 			n, err := store.CountEquityBars(ctx, w.pool, sym, iv)
 			if err != nil {
@@ -117,17 +191,24 @@ func (w *worker) backfill(ctx context.Context) {
 			}
 			if len(bars) == 0 {
 				w.log.Warn("equity backfill: no bars from any source", "symbol", sym, "interval", iv)
+				lastErr = errNoBars
 				continue
 			}
 			if err := store.UpsertEquityOHLCV(ctx, w.pool, bars); err != nil {
 				w.log.Error("equity backfill upsert", "symbol", sym, "err", err)
+				lastErr = err
 			} else {
 				w.log.Info("equity backfill done", "symbol", sym, "interval", iv, "bars", len(bars))
 			}
 		}
 	}
+	return lastErr
+}
 
-	for _, sym := range w.cfg.CryptoSymbols {
+// backfillCrypto is backfillEquity for a Binance pair.
+func (w *worker) backfillCrypto(ctx context.Context, sym string) error {
+	var lastErr error
+	{
 		for _, iv := range w.cfg.CryptoIntervals {
 			n, err := store.CountCryptoBars(ctx, w.pool, sym, iv)
 			if err != nil {
@@ -146,22 +227,27 @@ func (w *worker) backfill(ctx context.Context) {
 			bars, err := w.bin.FetchLatestKlines(ctx, sym, iv, limit)
 			if err != nil {
 				w.log.Error("binance backfill fetch", "symbol", sym, "interval", iv, "err", err)
+				lastErr = err
 				continue
 			}
 			if err := store.UpsertCryptoOHLCV(ctx, w.pool, bars); err != nil {
 				w.log.Error("binance backfill upsert", "symbol", sym, "err", err)
+				lastErr = err
 			} else {
 				w.log.Info("crypto backfill done", "symbol", sym, "interval", iv, "bars", len(bars))
 			}
 		}
 	}
+	return lastErr
 }
 
+var errNoBars = errors.New("no bars from any source")
+
 // fetchLatest pulls the most recent bars to keep the DB current between polls.
-func (w *worker) fetchLatest(ctx context.Context) {
+func (w *worker) fetchLatest(ctx context.Context, equities, cryptos []string) {
 	const latestN = 20
 
-	for _, sym := range w.cfg.EquitySymbols {
+	for _, sym := range equities {
 		for _, iv := range w.cfg.EquityIntervals {
 			bars, err := w.yahoo.FetchBars(ctx, sym, iv, latestN)
 			if err != nil {
@@ -184,7 +270,7 @@ func (w *worker) fetchLatest(ctx context.Context) {
 		}
 	}
 
-	for _, sym := range w.cfg.CryptoSymbols {
+	for _, sym := range cryptos {
 		for _, iv := range w.cfg.CryptoIntervals {
 			bars, err := w.bin.FetchLatestKlines(ctx, sym, iv, latestN)
 			if err != nil {

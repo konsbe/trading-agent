@@ -187,6 +187,7 @@ type analysisResponse struct {
 	Sentiment          sentimentOut    `json:"sentiment"`
 	ContextVsBenchmark contextOut      `json:"context_vs_benchmark"`
 	HeuristicSignals   heuristicOut    `json:"heuristic_signals"`
+	CashFlow           cashFlowOut     `json:"cash_flow"`
 }
 
 type valueBand struct {
@@ -475,6 +476,7 @@ func buildAnalysis(symbol string, in store.AnalysisInputs, fr store.AnalysisFres
 	}
 	out.ContextVsBenchmark = buildContext(symbol, in.Macro)
 	out.HeuristicSignals = buildHeuristics(in, n, caveats)
+	out.CashFlow = buildCashFlow(in)
 	return out
 }
 

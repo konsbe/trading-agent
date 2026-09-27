@@ -37,7 +37,10 @@ and writes exactly the rows those workers would
 | `GET /api/v1/education/handbook` | Handbook (`shared/content/handbook.json`) with each caveat block's `text` resolved from the shared caveats file; `Cache-Control: public, max-age=86400` |
 | `GET /api/v1/education/masterclass` | MasterClass (`shared/content/masterclass.json`) as authored; same 24h cache |
 | `GET /api/v1/education/glossary` | `{handbook_version, masterclass_version, terms[]}`, extracted from both files' `terms` and alphabetised; same 24h cache |
-| `GET /api/v1/watchlist` · `PUT` / `DELETE /api/v1/watchlist/{symbol}` | The watchlist — the service's only write path (table `watchlist_items`, migration 024). Unauthenticated list until auth exists |
+| `GET /api/v1/watchlist` · `PUT` / `DELETE /api/v1/watchlist/{symbol}` | The watchlist — a write path (table `watchlist_items`, migration 024). Unauthenticated list until auth exists |
+| `GET /api/v1/followed-symbols` · `PUT` / `DELETE /api/v1/followed-symbols/{symbol}` | Followed symbols — the pipeline's symbol list (`followed_symbols`, migration 030); follow / unfollow opens / closes the `followed` computation reason |
+| `GET /api/v1/symbols/directory?q=` | "All symbols" search over `symbol_directory` (Finnhub US incl. ETFs / ADRs / OTC, Binance spot); `/api/v1/symbols` stays the universe search |
+| `GET /api/v1/computed-symbols` · `PUT` / `DELETE /api/v1/computed-symbols/{symbol}` | Symbols with an open computation reason, their state (`waiting_for_data`, `computing`, `computed`, `failed`, `data_not_arrived`, `scheduled`); PUT = Compute (manual reason), DELETE = Stop computing. The workers fetch and compute; this service never calls a provider. See `docs/MOMENTUM_SCANNER_API.md` §2.5a |
 
 | Condition | Response |
 |-----------|----------|
@@ -97,6 +100,8 @@ never `0`. The detail view returns both shared caveats: `evidence_note`
 | `MOMENTUM_API_ANALYSIS_RETRY_AFTER` | `3s` | Poll interval suggested with `computing` |
 | `MOMENTUM_API_ANALYSIS_FAILED_RETRY_AFTER` | `1m` | How long a failure is reported before a request retries |
 | `MOMENTUM_API_FUNDAMENTALS_MAX_AGE` | `26h` | Derived fundamentals older than this are recomputed |
+| `MOMENTUM_API_COMPUTE_DATA_TIMEOUT` | `30m` | A manual Compute request whose data has not arrived after this long reads `data_not_arrived` |
+| `MACRO_INTEL_EARNINGS_SYMBOLS` etc. | as data-macro-intel | Fallback only for the market report's earnings coverage; the list is followed equities (`followed_symbols`), logged loudly when the fallback is used |
 | `TECHNICAL_*`, `FUNDAMENTAL_*`, `QUAL_*` | as the workers | Read so on-demand rows equal the workers' |
 | `LOG_LEVEL` | `info` | `debug`, `info`, `warn`, `error` |
 

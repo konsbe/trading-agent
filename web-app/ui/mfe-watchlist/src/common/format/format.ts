@@ -25,3 +25,56 @@ export const formatTradingDay = (
         year: 'numeric',
     });
 };
+
+const parseIso = (iso: string | null | undefined): Date | null => {
+    if (!iso) return null;
+    const date = new Date(iso);
+    return Number.isNaN(date.getTime()) ? null : date;
+};
+
+const sameLocalDay = (a: Date, b: Date) =>
+    a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+
+/**
+ * A timestamp as a local clock time — "5:12 PM" today, "Sep 26, 5:12 PM"
+ * on another day, so a queue time never reads as today's when it isn't.
+ */
+export const formatClockTime = (iso: string | null | undefined, now: Date = new Date()): string => {
+    const date = parseIso(iso);
+    if (!date) return iso ? iso : EMPTY_VALUE;
+    const time = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+    if (sameLocalDay(date, now)) return time;
+    const day = date.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        ...(date.getFullYear() === now.getFullYear() ? {} : { year: 'numeric' }),
+    });
+    return `${day}, ${time}`;
+};
+
+/** Local date and time with the zone name, e.g. "Sep 27, 2026, 5:12 PM GMT+3" (as on Stock Detail). */
+export const formatDateTime = (iso: string | null | undefined): string => {
+    const date = parseIso(iso);
+    if (!date) return iso ? iso : EMPTY_VALUE;
+    return date.toLocaleString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        timeZoneName: 'short',
+    });
+};
+
+/** Local calendar date of a timestamp: "Sep 27, 2026". */
+export const formatDate = (iso: string | null | undefined): string => {
+    const date = parseIso(iso);
+    if (!date) return iso ? iso : EMPTY_VALUE;
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+};
+
+/** Whole minutes elapsed since `iso` (never negative). */
+export const minutesSince = (iso: string, now: Date = new Date()): number => {
+    const date = parseIso(iso);
+    return date ? Math.max(0, Math.floor((now.getTime() - date.getTime()) / 60_000)) : 0;
+};

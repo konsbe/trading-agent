@@ -229,6 +229,15 @@
     }
 }
 
+.watchlist-table td[data-column='compute'] {
+    min-width: 9rem;
+    white-space: normal;
+}
+
+.watchlist-table__row.is-linked > td[data-column='compute'] {
+    cursor: default;
+}
+
 .watchlist-table td[data-column='actions'] {
     width: 1%;
     text-align: right;

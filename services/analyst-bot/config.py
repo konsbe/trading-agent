@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from pydantic import field_validator
+from pydantic import PrivateAttr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -67,8 +67,19 @@ class BotConfig(BaseSettings):
     # Same env as macro-analysis MARKET_CYCLE_SYMBOL — benchmark for cycle + /analyze RS context
     market_cycle_symbol: str = "SPY"
 
+    # followed_symbols (db/queries/followed.py refresh_followed) wins; the .env
+    # lists below are the fallback when the table is empty or unreachable.
+    _followed_equity: Optional[list[str]] = PrivateAttr(default=None)
+    _followed_crypto: Optional[list[str]] = PrivateAttr(default=None)
+
+    def set_followed(self, equity: Optional[list[str]], crypto: Optional[list[str]]) -> None:
+        self._followed_equity = list(equity) if equity else None
+        self._followed_crypto = list(crypto) if crypto else None
+
     @property
     def equity_symbols(self) -> list[str]:
+        if self._followed_equity:
+            return list(self._followed_equity)
         if self.bot_equity_symbols.strip():
             return _csv(self.bot_equity_symbols)
         merged = _merge_unique_csv(
@@ -82,6 +93,8 @@ class BotConfig(BaseSettings):
 
     @property
     def crypto_symbols(self) -> list[str]:
+        if self._followed_crypto:
+            return list(self._followed_crypto)
         return _csv(self.bot_crypto_symbols)
 
     # ── Discord ───────────────────────────────────────────────────────────────
@@ -164,6 +177,7 @@ class BotConfig(BaseSettings):
     bot_daily_report_cron: str = "0 7 * * *"    # 07:00 UTC every day
     bot_weekly_digest_cron: str = "0 8 * * 1"   # Monday 08:00 UTC
     bot_alert_scan_interval: int = 300           # seconds between alert scans
+    bot_followed_refresh_interval: int = 600     # seconds between followed_symbols reloads
 
     # Send the daily report automatically whenever the bot starts up.
     # Useful after restarts/deploys so the channel always has a fresh report.

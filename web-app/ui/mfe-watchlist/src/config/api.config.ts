@@ -20,3 +20,11 @@ export const WATCHLIST_ENDPOINTS = {
     watchlistItem: (symbol: string) => `/api/v1/watchlist/${encodeURIComponent(symbol)}`,
     symbols: (query: string) => `/api/v1/symbols?q=${encodeURIComponent(query)}`,
 } as const;
+
+export const TRACKING_ENDPOINTS = {
+    followedSymbols: '/api/v1/followed-symbols',
+    followedSymbol: (symbol: string) => `/api/v1/followed-symbols/${encodeURIComponent(symbol)}`,
+    directory: (query: string) => `/api/v1/symbols/directory?q=${encodeURIComponent(query)}`,
+    computedSymbols: '/api/v1/computed-symbols',
+    computedSymbol: (symbol: string) => `/api/v1/computed-symbols/${encodeURIComponent(symbol)}`,
+} as const;

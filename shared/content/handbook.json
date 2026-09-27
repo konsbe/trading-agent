@@ -577,7 +577,7 @@
       "id": "stock-detail",
       "spec_ref": "1.3",
       "title": "Stock Detail — full analysis",
-      "intro": "*What this part of the app is for:* Stock Detail is the full picture of one symbol. For a symbol the scanner covers, the top of the page shows which of the scanner's gates it passed or failed, its primary facts, and its score, marked unvalidated; a symbol the scanner has never covered shows \"No scanner data for this symbol\" there instead, and everything below still works. Below that comes the full analysis — technical readings, fundamentals, balance sheet, correlations, news, qualitative signals, and context against the market benchmark (SPY) — each a plain, neutral reading of stored data, not a signal. The first time a symbol's analysis is opened it may take a few seconds to compute, and the page says so instead of showing a spinner. Last comes Classical Technical Signals, the one section with its own accent colour, because it is pattern-matching rather than a reading of data; its entry below explains what it shows and what testing found.",
+      "intro": "*What this part of the app is for:* Stock Detail is the full picture of one symbol. For a symbol the scanner covers, the top of the page shows which of the scanner's gates it passed or failed, its primary facts, and its score, marked unvalidated; a symbol the scanner has never covered shows \"No scanner data for this symbol\" there instead, and everything below still works. Below that comes the full analysis — technical readings, fundamentals, balance sheet, cash flow, correlations, news, qualitative signals, and context against the market benchmark (SPY) — each a plain, neutral reading of stored data, not a signal. The first time a symbol's analysis is opened it may take a few seconds to compute, and the page says so instead of showing a spinner. Last comes Classical Technical Signals, the one section with its own accent colour, because it is pattern-matching rather than a reading of data; its entry below explains what it shows and what testing found.",
       "entries": [
         {
           "id": "detail-top-block",
@@ -717,7 +717,7 @@
           "blocks": [
             {
               "type": "paragraph",
-              "text": "The **Fundamentals** card shows the company's financial figures and the tier the app puts each one in. The figures come from the app's fundamentals data provider, and the header says when they were **computed** (\"· stale\" is added when newer raw figures have arrived since, or the computation has passed its maximum age). The app follows a fixed list of 26 symbols in full, storing their reported financial statements and earnings history as well; for any other symbol it has only the provider's summary figures, so fields that need the statements show \"—\". That list is set in the app's configuration — adding a stock to your Watchlist does not add it. \"—\" always means not available, never zero."
+              "text": "The **Fundamentals** card shows the company's financial figures and the tier the app puts each one in. The figures come from the app's fundamentals data provider, and the header says when they were **computed** (\"· stale\" is added when newer raw figures have arrived since, or the computation has passed its maximum age). The app stores reported financial statements and earnings history for the equities on **Followed Symbols** and for every equity it currently computes for another reason — on your Watchlist, one of today's candidates, or a Compute request (see **Computed Symbols**); for any other symbol it has only the provider's summary figures, so fields that need the statements show \"—\". \"—\" always means not available, never zero."
             },
             {
               "type": "paragraph",
@@ -729,12 +729,12 @@
                 "**EPS strength** — growth in earnings per share over the last twelve months against the twelve months before: **strong** at 15% or more, **neutral** from 5% up to 15%, **weak** below 5% (including any decline). When the provider has no growth figure, it falls back to whether trailing EPS is positive: positive reads **neutral**; zero or negative reads **weak**.",
                 "**Revenue** — revenue growth on the same basis: **strong** at 10% or more, **neutral** from 2% up to 10%, **weak** below 2%. It includes growth that came from acquisitions; organic growth is not available.",
                 "**P/E band (trailing)** — a band on the company's trailing twelve-month P/E: **value** under 15, **growth fair** from 15 up to 25, **expensive** at 25 or more, and **loss making** when the P/E is zero or negative. The data provider supplies no genuine five-year average P/E, so the page makes no comparison with the company's own history.",
-                "**FCF yield** — free cash flow (cash from operations minus capital spending) from the company's latest annual report, divided by market cap: **attractive** at 5% or more, **fair** from 2% up to 5%, **avoid** below 2%, including negative free cash flow. It needs reported financial statements, so it shows only for the fully followed symbols, and because it uses the latest annual report rather than the last twelve months it can be up to a year behind.",
+                "**FCF yield** — free cash flow (cash from operations minus capital spending) from the company's latest annual report, divided by market cap: **attractive** at 5% or more, **fair** from 2% up to 5%, **avoid** below 2%, including negative free cash flow. It needs reported financial statements, so it shows only for symbols with stored statements, and because it uses the latest annual report rather than the last twelve months it can be up to a year behind.",
                 "**Gross margin** — gross profit as a share of revenue over the last twelve months: **high** at 40% or more, **average** from 20% up to 40%, **margin pressure** below 20%. Normal gross margins differ widely between industries, and the band does not adjust for that.",
                 "**Net margin** — net income as a share of revenue over the last twelve months: **strong** at 15% or more, **average** from 5% up to 15%, **pressure** below 5% (including losses).",
-                "**Trend** (beneath Gross and Net margin) — **expanding**, **stable** or **compressing**: the margin across the company's latest eight quarterly reports (at least four are needed), comparing the average of the two newest with the two oldest. More than 2 percentage points up reads expanding, more than 2 down compressing. Only the fully followed symbols have it.",
+                "**Trend** (beneath Gross and Net margin) — **expanding**, **stable** or **compressing**: the margin across the company's latest eight quarterly reports (at least four are needed), comparing the average of the two newest with the two oldest. More than 2 percentage points up reads expanding, more than 2 down compressing. Only symbols with stored statements have it.",
                 "**PEG** — always \"—\", with the note \"Not served by the analysis API\". The app does store a PEG ratio (P/E divided by earnings growth) for the symbols whose provider supplies one, and it counts toward the composite — **undervalued growth** below 1, **fairly valued growth** from 1 up to 2, **expensive growth** at 2 or more — but this page does not show it yet.",
-                "**Earnings surprise** — always \"—\", with the same note. For the 26 fully followed symbols the app does compute an average earnings surprise — how far reported EPS beat or missed analysts' estimates, averaged over up to the last four quarters — but this page does not show it yet, and it does not count toward the composite.",
+                "**Earnings surprise** — always \"—\", with the same note. For symbols with stored earnings history the app does compute an average earnings surprise — how far reported EPS beat or missed analysts' estimates, averaged over up to the last four quarters — but this page does not show it yet, and it does not count toward the composite.",
                 "**TTM P/E** — the trailing twelve-month price-to-earnings ratio as supplied by the provider: the same number the P/E band is judged on. \"—\" when the provider has no P/E for the company.",
                 "**Market cap** — the provider's latest market capitalisation for the company. It is not the value the scanner's market-cap gate uses (see the Today's Candidates entry), so the two can differ. It shows \"—\" when the provider reports it in a currency other than the US dollar — for example companies listed in Toronto, London, Tel Aviv or Taiwan — rather than a wrongly converted figure."
               ]
@@ -748,11 +748,11 @@
           "blocks": [
             {
               "type": "paragraph",
-              "text": "The **Balance sheet** card shows how much profit the company makes on its capital, how much it owes, and whether it can cover its short-term bills, each with the tier the app puts it in. It has no date line of its own: it is computed together with the Fundamentals card, at the time shown there, and the same limit applies — for a symbol outside the 26 the app follows in full, figures that need reported financial statements show \"—\"."
+              "text": "The **Balance sheet** card shows how much profit the company makes on its capital, how much it owes, and whether it can cover its short-term bills, each with the tier the app puts it in. It has no date line of its own: it is computed together with the Fundamentals card, at the time shown there, and the same limit applies — for a symbol without stored financial statements, figures that need them show \"—\"."
             },
             {
               "type": "paragraph",
-              "text": "**Composite** averages four tiered readings — ROE, ROIC, Debt / equity and Current ratio — each scored +1 for its best tier, 0 for its middle tier and −1 for its worst. It reads **healthy** at 0.5 or above, **stressed** at −0.5 or below, and **neutral** in between. Only available readings count: today ROIC and Debt / equity come only from reported statements, so for a symbol outside the 26 the composite rests on ROE and Current ratio alone. ROA, Quick ratio and Net debt / EBITDA are shown but do not count."
+              "text": "**Composite** averages four tiered readings — ROE, ROIC, Debt / equity and Current ratio — each scored +1 for its best tier, 0 for its middle tier and −1 for its worst. It reads **healthy** at 0.5 or above, **stressed** at −0.5 or below, and **neutral** in between. Only available readings count: today ROIC and Debt / equity come only from reported statements, so for a symbol without stored statements the composite rests on ROE and Current ratio alone. ROA, Quick ratio and Net debt / EBITDA are shown but do not count."
             },
             {
               "type": "list",
@@ -770,12 +770,35 @@
           "terms": []
         },
         {
+          "id": "cash-flow",
+          "title": "Cash flow",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "The **Cash flow** card shows the company's latest **annual** cash-flow statement as filed — the 10-K — with a header naming the form, the end of the fiscal year it covers and the filing date, for example \"10-K · fiscal year ended 31 Dec 2025 · filed 18 Feb 2026\". It never shows a single quarter: the cash-flow figures in a quarterly report (10-Q) are totals for the fiscal year so far, not the quarter's own, so the card notes \"Annual figures only — quarterly cash-flow figures are year-to-date.\""
+            },
+            {
+              "type": "list",
+              "items": [
+                "**Net cash from operating activities**, **Net cash from investing activities** and **Net cash from financing activities** — the statement's three totals, in US dollars as filed and shortened (for example $51.97B). A negative figure, shown with a minus sign, is cash that went out.",
+                "**Capital spending (property, plant & equipment)**, **Share buybacks** and **Dividends paid** — amounts the company paid, shown as positive figures and marked \"amount paid\".",
+                "A line the filing does not contain shows \"—\" with \"not in filing\" — never zero."
+              ]
+            },
+            {
+              "type": "paragraph",
+              "text": "These are plain facts from the filing: no tier and no green or red. When there is no statement the card still appears and says why, in a sentence starting \"No cash-flow statement available:\" — a crypto pair, a fund (funds file no company cash-flow statement), a foreign listing (the app's filings source covers US 10-K/10-Q filers only), a company for which the filings source returned no 10-K or 10-Q (many foreign issuers, such as Shell, file a 20-F instead), or a symbol whose filings have not been fetched yet."
+            }
+          ],
+          "terms": []
+        },
+        {
           "id": "correlations",
           "title": "Correlations",
           "blocks": [
             {
               "type": "paragraph",
-              "text": "The **Correlations** card checks whether figures that ought to agree actually do — for example, whether a low P/E comes with strong earnings growth, or heavy debt with thin margins. It reads the tiers already worked out for the Fundamentals and Balance sheet cards, plus a few the page does not show (interest coverage, free cash flow against net income, goodwill, price-to-book, capital spending and dividend yield). It is computed together with the Fundamentals card, at the time shown there, and the same limit applies: for a symbol outside the 26 the app follows in full, most comparisons have nothing to compare. A figure the app cannot work out from the company's latest reports — for example interest coverage when the latest annual report has no interest-expense line — is left empty, and every comparison that needs it is skipped rather than run on an older figure. The score does not use this card."
+              "text": "The **Correlations** card checks whether figures that ought to agree actually do — for example, whether a low P/E comes with strong earnings growth, or heavy debt with thin margins. It reads the tiers already worked out for the Fundamentals and Balance sheet cards, plus a few the page does not show (interest coverage, free cash flow against net income, goodwill, price-to-book, capital spending and dividend yield). It is computed together with the Fundamentals card, at the time shown there, and the same limit applies: for a symbol without stored financial statements, most comparisons have nothing to compare. A figure the app cannot work out from the company's latest reports — for example interest coverage when the latest annual report has no interest-expense line — is left empty, and every comparison that needs it is skipped rather than run on an older figure. The score does not use this card."
             },
             {
               "type": "paragraph",
@@ -862,8 +885,8 @@
               "type": "list",
               "items": [
                 "**Moat proxy** — a rough, numbers-only stand-in for a durable competitive advantage (a \"moat\"); it knows nothing of brands, patents or network effects. It gives a point for each of three: a gross margin of 40% or more (the provider's last-twelve-month figure, or without it the average of the quarterly margins below); a steady gross margin across the company's latest quarterly reports (up to eight, at least four needed), meaning a standard deviation under 5 percentage points; and return on equity of 15% or more over the last twelve months. Three points read **1.00 (3 of 3 conditions)**, two **0.50 (2 of 3 conditions)**, one or none **0.00 (0–1 of 3 conditions)**. A company with fewer than four quarterly reports that include both revenue and a gross-profit line reads **Insufficient data** — for several large companies the app's data has no separate gross-profit line at all; a symbol with no reported statements in the app's data shows \"—\".",
-                "**Insider activity** — share purchases and sales by company insiders (officers, directors and large holders), from the SEC Form 4 filings the app's data provider supplies. Since March 2026 the officers and directors of most foreign companies whose shares are registered in the US file Form 4 too (those of companies from some countries, such as the UK and Canada, are exempt), so such a company can have insider rows from that month on. They are collected only for the 26 symbols the app follows in full, and only a symbol with at least one stored transaction is classified: any other symbol reads **Insufficient data**, which is not the same as \"no insider trading\". Over the last 90 days, by transaction date, it counts the distinct people who bought (transaction code P) and who sold (code S): 3 or more buyers read **1.00 (cluster buy)**; 1 or 2 buyers **0.50 (single buy)**; with no buyers, 3 or more sellers **−1.00 (cluster sell)**; anything else **0.00 (neutral)**. Any purchase outranks sales, so one buyer among ten sellers reads single buy. It counts people, not shares or dollars, and it does not ask why: small regular purchases and pre-planned sales count the same as any other. TSM's rows, for example, are mostly purchases the company's employee stock purchase plan makes on the officers' behalf once a month, about thirty people at one price, on terms the company set in advance; they read as cluster buy.",
-                "**News sentiment (7d)** and **News sentiment (30d)** — the average sentiment score of the company's news over the last 7 and 30 days, from Alpha Vantage's per-company scores: **positive** at 0.15 or more, **negative** at −0.15 or less, **neutral** in between. Today both read **Insufficient data** for every symbol, because no scored headlines are stored: the download runs once a day, only for the 26 fully followed symbols, and it shares the provider's free-plan limit of 25 requests a day with the company-overview download, which runs first and uses the limit up, so the news requests are turned away.",
+                "**Insider activity** — share purchases and sales by company insiders (officers, directors and large holders), from the SEC Form 4 filings the app's data provider supplies. Since March 2026 the officers and directors of most foreign companies whose shares are registered in the US file Form 4 too (those of companies from some countries, such as the UK and Canada, are exempt), so such a company can have insider rows from that month on. They are collected only for the equities the app stores financial statements for (see the Fundamentals entry), and only a symbol with at least one stored transaction is classified: any other symbol reads **Insufficient data**, which is not the same as \"no insider trading\". Over the last 90 days, by transaction date, it counts the distinct people who bought (transaction code P) and who sold (code S): 3 or more buyers read **1.00 (cluster buy)**; 1 or 2 buyers **0.50 (single buy)**; with no buyers, 3 or more sellers **−1.00 (cluster sell)**; anything else **0.00 (neutral)**. Any purchase outranks sales, so one buyer among ten sellers reads single buy. It counts people, not shares or dollars, and it does not ask why: small regular purchases and pre-planned sales count the same as any other. TSM's rows, for example, are mostly purchases the company's employee stock purchase plan makes on the officers' behalf once a month, about thirty people at one price, on terms the company set in advance; they read as cluster buy.",
+                "**News sentiment (7d)** and **News sentiment (30d)** — the average sentiment score of the company's news over the last 7 and 30 days, from Alpha Vantage's per-company scores: **positive** at 0.15 or more, **negative** at −0.15 or less, **neutral** in between. Today both read **Insufficient data** for every symbol, because no scored headlines are stored: the download runs once a day, only for the stocks and funds on Followed Symbols, and it shares the provider's free-plan limit of 25 requests a day with the company-overview download, which runs first and uses the limit up, so the news requests are turned away.",
                 "**R&D intensity** — research and development spending as a share of revenue (the sub-line reads \"R&D as % of revenue\"), both from the company's latest annual report: **high** at 10% or more, **moderate** from 3% up to 10%, **low** below 3%. Normal R&D spending differs widely between industries — a chip designer and an oil producer are not comparable — and the bands do not adjust for that. A company that reports no separate R&D line, or has no reported statements in the app's data, shows \"—\"."
               ]
             }
@@ -947,6 +970,84 @@
             {
               "type": "paragraph",
               "text": "Everything here is still shown, exactly as built, because a visible, labelled null result is more useful than a hidden signal. Read it as a description of what the chart looks like, not as a forecast."
+            }
+          ],
+          "terms": []
+        }
+      ]
+    },
+    {
+      "id": "tracking",
+      "title": "Followed Symbols and Computed Symbols",
+      "intro": "*What this part of the app is for:* these two screens, under Tracking next to the Watchlist, show and change which symbols the data pipeline works on. **Followed Symbols** is the list the pipeline fetches and computes every day. **Computed Symbols** lists every symbol it is computing right now and why, including your own **Compute** requests. The app itself never fetches data when you press a button here: it records the request, the data workers fetch on their own schedule, and the daily computation picks the symbol up.",
+      "entries": [
+        {
+          "id": "followed-symbols",
+          "title": "Followed Symbols",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "The table lists every followed symbol, newest first: its name, **type** (equity, ETF or crypto), **listing** (US, foreign or crypto), **source** — \"Seeded from .env\" for the starting list taken from the app's configuration once, when the list was created, or \"Added by you\" — and the date it was added. For each of them the pipeline fetches and computes daily bars, technical readings, fundamentals, financial statements for equities, and news where the news source supports the symbol."
+            },
+            {
+              "type": "paragraph",
+              "text": "Two separate searches add a symbol, and they search different sets. **Search the scanner universe** covers the US common stocks the momentum scanner works from; a match the scanner's eligibility filters leave out is marked \"not scanned\". **Search all symbols — ETFs, ADRs, OTC and crypto** covers every US-listed symbol in the app's symbol directory plus Binance spot pairs, and shows the provider's type (for example ETP or ADR), the asset type, the venue, and \"In scanner universe\" when the scanner also covers it. Foreign listings (such as 2222.SR) cannot be found by either search yet."
+            },
+            {
+              "type": "list",
+              "items": [
+                "**Follow** adds the symbol; a symbol already followed reads \"Following\". Some listing types (warrants, units and similar) cannot be computed and are refused with \"This listing type (warrants, units, …) can't be computed.\"",
+                "**Compute** on a result or a row asks for the symbol to be fetched and computed now — see the Compute entry.",
+                "**Unfollow** stops the daily fetching. Anything already computed is kept. A seeded symbol that is unfollowed leaves the list; following it again lists it as \"Added by you\"."
+              ]
+            }
+          ],
+          "terms": []
+        },
+        {
+          "id": "computed-symbols",
+          "title": "Computed Symbols",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "Every symbol with at least one open reason to be computed, shown as tags: **Followed** (on Followed Symbols), **Watchlist**, **Today's candidate** (in today's scanner list) and **Manual** (you pressed Compute). The first three are automatic and come and go with those lists. Computed history is never deleted when a reason closes."
+            },
+            {
+              "type": "list",
+              "items": [
+                "**State** — for a Compute request, where it stands (see the Compute entry); otherwise **Computed**, or **Scheduled · next daily pass** when the symbol has not been computed yet.",
+                "**Last computed** — when the daily computation last ran for the symbol, or \"not yet\".",
+                "**Stop computing** — shown only for a Manual reason. It closes only your request: a symbol with another reason stays computed (\"Other reasons keep it computed\"); one with none leaves the list, and its computed history is kept."
+              ]
+            },
+            {
+              "type": "paragraph",
+              "text": "While a request is waiting for data or computing, the screen checks again every 12 seconds and says so above the table; otherwise it does not refresh on its own."
+            }
+          ],
+          "terms": []
+        },
+        {
+          "id": "compute",
+          "title": "The Compute button",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "**Compute** appears on each Watchlist row, each Followed Symbols row and each result of both searches. It queues the symbol: the data workers fetch its data, then it is computed, usually within two to five minutes. The button is then replaced by the request's state, in your local time:"
+            },
+            {
+              "type": "list",
+              "items": [
+                "**Waiting for data · requested 5:45 PM** — queued; the data has not been fetched yet.",
+                "**Computing analysis** — the data has arrived and the computation picks it up within about a minute.",
+                "**Computed 5:49 PM** — done, with a link to Stock Detail for a stock or fund.",
+                "**Data hasn't arrived — requested …, waited … min** — the data was still missing after 30 minutes, so the app stops waiting instead of showing a request as in progress forever. **Check again** looks at the same open request once more; it does not start a new fetch.",
+                "**Computation failed** — the computation raised an error; open it to read the stored message."
+              ]
+            },
+            {
+              "type": "paragraph",
+              "text": "A symbol already computed automatically (followed, on the Watchlist or a candidate) can still be computed: the request asks for a fresh fetch and computation. Pressing Compute again while your request is open keeps that same request; to ask again, use Stop computing on Computed Symbols first."
             }
           ],
           "terms": []

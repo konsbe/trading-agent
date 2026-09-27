@@ -51,6 +51,36 @@
       "nav_icon": "mdi-bookmark-outline",
       "router_path": "/watchlist"
     },
+    "mfe_watchlist_followed": {
+      "label": "Followed Symbols",
+      "version": "1.0.0",
+      "endpoint": "http://localhost:3002/remoteEntry.js",
+      "module": "./FollowedSymbols",
+      "scope": "mfe_watchlist",
+      "description": "Symbols the pipeline fetches and computes every day, with universe and all-symbols search",
+      "roles": [],
+      "enabled": true,
+      "nav_group": "Tracking",
+      "nav_order": 3,
+      "nav_sub_order": 2,
+      "nav_icon": "mdi-eye",
+      "router_path": "/followed-symbols"
+    },
+    "mfe_watchlist_computed": {
+      "label": "Computed Symbols",
+      "version": "1.0.0",
+      "endpoint": "http://localhost:3002/remoteEntry.js",
+      "module": "./ComputedSymbols",
+      "scope": "mfe_watchlist",
+      "description": "Every symbol being computed, why, and the state of each Compute request",
+      "roles": [],
+      "enabled": true,
+      "nav_group": "Tracking",
+      "nav_order": 3,
+      "nav_sub_order": 3,
+      "nav_icon": "mdi-format-list-checks",
+      "router_path": "/computed-symbols"
+    },
     "mfe_backtest_lab": {
       "label": "Backtest Lab",
       "version": "1.0.0",

@@ -14,6 +14,12 @@ jest.mock('@/api/watchlist/watchlistApi', () => ({
     searchSymbols: jest.fn(),
 }));
 
+jest.mock('@/api/tracking/trackingApi', () => ({
+    fetchComputedSymbols: jest.fn(() => Promise.resolve({ data_timeout_minutes: 30, items: [] })),
+    requestCompute: jest.fn(),
+    stopCompute: jest.fn(),
+}));
+
 const fetchMock = fetchWatchlist as jest.MockedFunction<typeof fetchWatchlist>;
 const addMock = addToWatchlist as jest.MockedFunction<typeof addToWatchlist>;
 const removeMock = removeFromWatchlist as jest.MockedFunction<typeof removeFromWatchlist>;

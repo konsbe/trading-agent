@@ -1,0 +1,29 @@
+.compute-control {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-xxs);
+    min-width: 0;
+    max-width: 18rem;
+    white-space: normal;
+    text-align: left;
+}
+
+.compute-control__retry {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-xxs);
+}
+
+.compute-control__hint {
+    color: var(--color-on-surface-variant);
+    font-size: var(--font-size-xs);
+    line-height: 1.3;
+}
+
+.compute-control__error {
+    color: var(--color-error);
+    font-size: var(--font-size-xs);
+    line-height: 1.3;
+}

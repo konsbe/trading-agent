@@ -15,6 +15,7 @@ package main
 
 import (
 	"context"
+	symbolsets "github.com/konsbe/trading-agent/services/data-analyzer/internal/symbols"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -66,7 +67,7 @@ func main() {
 	}
 
 	log.Info("running initial indicator computation")
-	w.computeAll(ctx)
+	w.computeAll(ctx, w.equitySymbols(ctx), w.cryptoSymbols(ctx))
 
 	ticker := time.NewTicker(cfg.PollInterval)
 	defer ticker.Stop()
@@ -77,7 +78,7 @@ func main() {
 			log.Info("shutdown")
 			return
 		case <-ticker.C:
-			w.computeAll(ctx)
+			w.computeAll(ctx, w.equitySymbols(ctx), w.cryptoSymbols(ctx))
 		}
 	}
 }
@@ -97,13 +98,25 @@ type worker struct {
 // call in Python. When migrating, keep the indicator name strings identical
 // (e.g. "rsi_14", "macd_12_26_9") so the technical_indicators schema and
 // downstream consumers need no changes.
-func (w *worker) computeAll(ctx context.Context) {
-	for _, sym := range w.cfg.EquitySymbols {
+// equitySymbols / cryptoSymbols: followed ∪ every symbol with an open
+// computation reason; the TECHNICAL_* lists only as the logged fallback.
+func (w *worker) equitySymbols(ctx context.Context) []string {
+	return symbolsets.Computation(ctx, w.pool, w.log, "technical-analysis", "TECHNICAL_EQUITY_SYMBOLS",
+		[]string{"equity", "etf"}, w.cfg.EquitySymbols)
+}
+
+func (w *worker) cryptoSymbols(ctx context.Context) []string {
+	return symbolsets.Computation(ctx, w.pool, w.log, "technical-analysis", "TECHNICAL_CRYPTO_SYMBOLS",
+		[]string{"crypto"}, w.cfg.CryptoSymbols)
+}
+
+func (w *worker) computeAll(ctx context.Context, equities, cryptos []string) {
+	for _, sym := range equities {
 		for _, iv := range w.cfg.EquityIntervals {
 			w.computeOne(ctx, sym, "equity", iv)
 		}
 	}
-	for _, sym := range w.cfg.CryptoSymbols {
+	for _, sym := range cryptos {
 		for _, iv := range w.cfg.CryptoIntervals {
 			w.computeOne(ctx, sym, "binance", iv)
 		}

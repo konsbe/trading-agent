@@ -330,6 +330,18 @@ poll. Measured on the live DB: a scanner candidate outside the watchlist
 (`{value, band}` or `{score, tier}`), including `adx_14`, `fcf_yield`, `roa` and
 `quick_ratio`, which §2.1 showed as bare numbers. Arrays are `[]`, never null.
 
+`cash_flow` (added 2026-09-27): the latest **annual** (10-K) cash-flow statement
+as filed — never a single quarter, because a 10-Q's cash-flow figures are
+fiscal-year-to-date. `{available, form, period_end, filed, lines:
+[{key, label, value}], unavailable_reason}` with `key` one of `operating`,
+`investing`, `financing`, `capex`, `buybacks`, `dividends` (USD as filed;
+payments are positive amounts paid; `value` null when the filing has no such
+line). When `available` is false, `lines` is `[]` and `unavailable_reason`
+says why — crypto, a fund, a foreign listing, the filings source returned no
+10-K/10-Q (e.g. 20-F filers: SHEL, TTE, TSM, GFS), or nothing fetched yet —
+never an empty card. Source: the newest `annual_%` `report_raw` in
+`equity_fundamentals`; coverage from `symbol_data_status` (migration 030).
+
 #### Field mapping (doc field → stored source)
 
 | Field | Source |

@@ -1,4 +1,16 @@
-import { SymbolSearchResponse, SymbolSearchResult, WatchlistItem, WatchlistResponse } from '@/api';
+import {
+    ComputedSymbol,
+    ComputedSymbolsResponse,
+    ComputeState,
+    DirectoryResult,
+    DirectorySearchResponse,
+    FollowedSymbol,
+    FollowedSymbolsResponse,
+    SymbolSearchResponse,
+    SymbolSearchResult,
+    WatchlistItem,
+    WatchlistResponse,
+} from '@/api';
 
 /** A symbol that is a candidate in the latest scan, so it carries a score. */
 export const makeWatchlistItem = (overrides: Partial<WatchlistItem> = {}): WatchlistItem => ({
@@ -86,6 +98,75 @@ export const makeSearchResult = (overrides: Partial<SymbolSearchResult> = {}): S
 export const makeSymbolSearch = (query = 'vg', symbols: string[] = ['VG', 'VGZ']): SymbolSearchResponse => ({
     query,
     results: symbols.map(symbol => makeSearchResult({ symbol })),
+});
+
+/** Live IWM row (2026-09-27), followed from the app. */
+export const makeFollowedSymbol = (overrides: Partial<FollowedSymbol> = {}): FollowedSymbol => ({
+    symbol: 'IWM',
+    name: 'ISHARES RUSSELL 2000 ETF',
+    asset_type: 'etf',
+    listing: 'us',
+    news_alias: null,
+    source: 'user',
+    added_at: '2026-09-27T13:31:25Z',
+    ...overrides,
+});
+
+export const makeFollowedSymbols = (items: Partial<FollowedSymbol>[] = [{}]): FollowedSymbolsResponse => ({
+    items: items.map(makeFollowedSymbol),
+});
+
+/** Live DIA directory match: an ETF outside the scanner universe. */
+export const makeDirectoryResult = (overrides: Partial<DirectoryResult> = {}): DirectoryResult => ({
+    symbol: 'DIA',
+    name: 'SS SPDR DOW JONES INDUS AVG',
+    type: 'ETP',
+    mic: 'ARCX',
+    asset_type: 'etf',
+    source: 'finnhub_us',
+    in_universe: false,
+    followed: false,
+    ...overrides,
+});
+
+export const makeDirectorySearch = (query = 'dia', results: Partial<DirectoryResult>[] = [{}]): DirectorySearchResponse => ({
+    query,
+    results: results.map(makeDirectoryResult),
+});
+
+/** A symbol computed automatically (followed), no manual request. */
+export const makeComputedSymbol = (overrides: Partial<ComputedSymbol> = {}): ComputedSymbol => ({
+    symbol: 'AMZN',
+    name: 'AMAZON.COM INC',
+    asset_type: 'equity',
+    reasons: ['followed'],
+    manual_requested_at: null,
+    state: 'computed',
+    bars_fetched_at: null,
+    fundamentals_fetched_at: null,
+    computed_at: '2026-09-27T14:12:07Z',
+    last_error: null,
+    statements_status: 'available',
+    statements_reason: null,
+    ...overrides,
+});
+
+/** An open manual request in `state` (live DIA shape). */
+export const makeManualComputed = (state: ComputeState, overrides: Partial<ComputedSymbol> = {}): ComputedSymbol =>
+    makeComputedSymbol({
+        symbol: 'DIA',
+        name: 'SS SPDR DOW JONES INDUS AVG',
+        asset_type: 'etf',
+        reasons: ['manual'],
+        manual_requested_at: '2026-09-27T13:57:46Z',
+        state,
+        computed_at: state === 'computed' ? '2026-09-27T14:12:10Z' : null,
+        ...overrides,
+    });
+
+export const makeComputedSymbols = (items: ComputedSymbol[] = [makeComputedSymbol()], data_timeout_minutes = 30): ComputedSymbolsResponse => ({
+    data_timeout_minutes,
+    items,
 });
 
 /** Minimal `fetch` Response stand-in (jsdom has no Response). */

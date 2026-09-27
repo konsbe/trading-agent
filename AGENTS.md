@@ -4,7 +4,7 @@ When a prompt matches a row below, **launch that subagent**. Playbooks live in `
 
 | User intent | Subagent | `subagent_type` |
 |-------------|----------|-----------------|
-| Create / scaffold an MFE, remote, or `web-app/ui/spog` | MFE creator | `mfe-creator` |
+| Create / scaffold an MFE, remote, or `web-app/spog` | MFE creator | `mfe-creator` |
 | Build or restyle screens, components, tables, forms, layout, theme, CSS | UI developer | `ui-developer` |
 | Write or review React/TypeScript (hooks, types, tests, imports) | React standards | `react` |
 | Create / scaffold a microservice under `services/svc-*` | Service creator | `svc-creator` |
@@ -18,14 +18,14 @@ trading-agent/
 │   └── svc-<service-name>/       # one folder per microservice
 └── web-app/
     ├── shared-components/        # Stitch theme + components (@trading-agent/shared-components)
+    ├── spog/                     # host / shell MFE (sibling of ui/, not inside it)
     └── ui/
-        ├── spog/                 # host / shell MFE
         └── mfe-<mfe-name>/       # remote MFEs
 ```
 
 ## Package contract
 
-Every **MFE** (`web-app/ui/spog`, `web-app/ui/mfe-*`) and every **service** (`services/svc-*`) must have, at its own root:
+Every **MFE** (`web-app/spog`, `web-app/ui/mfe-*`) and every **service** (`services/svc-*`) must have, at its own root:
 
 - `README.md` — purpose plus how to build, test, run, and docker-build
 - `Makefile` — at least `build`, `test`, `run`, `docker`
@@ -43,6 +43,10 @@ Every **MFE** (`web-app/ui/spog`, `web-app/ui/mfe-*`) and every **service** (`se
 - `nvm use 22` before npm install/start/test
 
 Slash commands: `/create-mfe`, `/create-svc`, `/implement-ui`
+
+## Education content: review mfe-education at the end of every change
+
+When a change alters what a user sees or how something is computed (a label, threshold, data source, screen, field or section), check `shared/content/handbook.json` / `masterclass.json` (served by `web-app/ui/mfe-education`) before calling the work done: update or add the affected Handbook entry so it matches the live app, or state explicitly in the report that no Education change is needed and why. Every subagent playbook in `.cursor/agents/` carries the same rule.
 
 ## Git: never commit or push without permission
 

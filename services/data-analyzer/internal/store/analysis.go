@@ -89,6 +89,10 @@ type AnalysisInputs struct {
 	// VIX is the newest VIXCLS in macro_fred, what the bot's actions engine
 	// classifies its own regime from. Nil when none is stored.
 	VIX *float64
+	// CashFlow is the latest stored annual cash-flow statement (nil when none);
+	// Coverage says why there is none.
+	CashFlow *CashFlowStatement
+	Coverage StatementCoverage
 }
 
 func LoadAnalysis(ctx context.Context, q Querier, symbol, interval string, headlines int) (AnalysisInputs, error) {
@@ -147,6 +151,12 @@ LIMIT $2`, symbol, headlines)
 	}
 	rows.Close()
 	if err := rows.Err(); err != nil {
+		return in, err
+	}
+	if in.CashFlow, err = LatestAnnualCashFlow(ctx, q, symbol); err != nil {
+		return in, err
+	}
+	if in.Coverage, err = LoadStatementCoverage(ctx, q, symbol); err != nil {
 		return in, err
 	}
 	macro, err := LatestMacroDerived(ctx, q, []string{"mc_market_cycle", "mc_macro_correlation", "mc_price_phase:" + symbol})

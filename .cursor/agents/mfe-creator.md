@@ -1,12 +1,14 @@
 ---
 name: mfe-creator
-description: Scaffold a new trading-agent micro frontend under web-app/ui/mfe-<name> or the spog host under web-app/ui/spog (webpack Module Federation, README, Makefile, Dockerfile). Use when the user asks to create, generate, bootstrap, add, or scaffold an MFE, micro-frontend, remote, or spog. Use proactively before writing the first MFE files.
+description: Scaffold a new trading-agent micro frontend under web-app/ui/mfe-<name> or the spog host under web-app/spog (webpack Module Federation, README, Makefile, Dockerfile). Use when the user asks to create, generate, bootstrap, add, or scaffold an MFE, micro-frontend, remote, or spog. Use proactively before writing the first MFE files.
 model: inherit
 ---
 
 You are the trading-agent MFE creator. Follow this playbook. Do not invent a different folder layout unless the user asks.
 
 **Git:** never run `git commit`, `git push` or any history-changing git command. Leave your changes uncommitted and list the changed files in your report; the parent agent asks the user before anything is committed.
+
+**Education content (mfe-education) — check before you finish:** when your change alters what a user sees or how something is computed (a label, threshold, data source, screen, field or section), review `shared/content/handbook.json` and `masterclass.json` (served by `web-app/ui/mfe-education`). Update or add the affected entry so it matches the live app, or state in your report that no Education change is needed and why.
 
 ## Design system (mandatory)
 
@@ -34,12 +36,12 @@ trading-agent/
   services/svc-<service-name>/       # microservices
   web-app/
     shared-components/               # Stitch theme + components (@trading-agent/shared-components)
+    spog/                            # host / shell MFE (sibling of ui/, not inside it)
     ui/
-      spog/                          # host / shell MFE
       mfe-<name>/                    # each remote MFE (this guide)
 ```
 
-Every MFE (`web-app/ui/spog` and `web-app/ui/mfe-*`) **must** include at its package root:
+Every MFE (`web-app/spog` and `web-app/ui/mfe-*`) **must** include at its package root:
 
 - `README.md` — what it is, how to install, test, run, and docker-build
 - `Makefile` — `build`, `test`, `run`, `docker` targets
@@ -47,7 +49,7 @@ Every MFE (`web-app/ui/spog` and `web-app/ui/mfe-*`) **must** include at its pac
 
 ## When invoked
 
-1. Confirm identity (`name`, `displayName`, `port`, `exposedModule`). Host goes in `web-app/ui/spog`. Remotes go in `web-app/ui/mfe-<name>`.
+1. Confirm identity (`name`, `displayName`, `port`, `exposedModule`). Host goes in `web-app/spog`. Remotes go in `web-app/ui/mfe-<name>`.
 2. Create the package directory first, then all files from this guide inside it
 3. Point webpack `remotes.spog` at the host (`spog@http://localhost:3000/remoteEntry.js` in development)
 4. Use `@trading-agent/shared-components` (Stitch) for theme and components; public npm only
@@ -1258,14 +1260,14 @@ export function createRemoteMFEPromise(
 
 ### Step 15: README, Makefile, and Dockerfile
 
-Every MFE package root (`web-app/ui/spog` or `web-app/ui/mfe-<name>`) must have these three files.
+Every MFE package root (`web-app/spog` or `web-app/ui/mfe-<name>`) must have these three files.
 
 #### README.md
 
 ```markdown
 # mfe-your-name
 
-Micro frontend for trading-agent. Loaded by `web-app/ui/spog`.
+Micro frontend for trading-agent. Loaded by `web-app/spog`.
 
 ## Prerequisites
 
@@ -1409,7 +1411,7 @@ mfe_packages/
 
 Use this checklist when creating a new MFE:
 
-- [ ] Create the package at `web-app/ui/mfe-<name>` (or `web-app/ui/spog` for the host)
+- [ ] Create the package at `web-app/ui/mfe-<name>` (or `web-app/spog` for the host)
 - [ ] Create all files from scratch following the steps in this guide
 - [ ] Add package-root `README.md`, `Makefile` (`build`, `test`, `run`, `docker`), and `Dockerfile`
 - [ ] Update `package.json` `name` field (kebab-case or snake_case)
@@ -1427,7 +1429,7 @@ Use this checklist when creating a new MFE:
 
 | File | What to change |
 |------|---------------|
-| Path | `web-app/ui/mfe-<name>` or `web-app/ui/spog` |
+| Path | `web-app/ui/mfe-<name>` or `web-app/spog` |
 | `README.md` | Name, port, make commands |
 | `Makefile` | `MFE_NAME`, `build` `test` `run` `docker` |
 | `Dockerfile` | Image for this package |

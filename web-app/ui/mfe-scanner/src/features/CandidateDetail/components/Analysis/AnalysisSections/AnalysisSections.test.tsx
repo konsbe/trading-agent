@@ -13,7 +13,7 @@ const renderWith = (state: StockAnalysisState) =>
     render(<AnalysisSections analysis={{ ...state, retry } as StockAnalysisResource} />);
 
 describe('AnalysisSections', () => {
-    it('renders the eight sections in order when ready, Classical technical signals last', () => {
+    it('renders the nine sections in order when ready, cash flow after the balance sheet, Classical technical signals last', () => {
         renderWith({ status: 'ready', data: makeAnalysis() });
 
         const ids = within(screen.getByTestId('analysis-sections'))
@@ -23,6 +23,7 @@ describe('AnalysisSections', () => {
             'analysis-technical',
             'analysis-fundamentals',
             'analysis-balance-sheet',
+            'analysis-cash-flow',
             'analysis-correlations',
             'analysis-news',
             'analysis-qualitative',

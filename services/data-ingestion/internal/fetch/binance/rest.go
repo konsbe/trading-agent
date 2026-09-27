@@ -88,3 +88,44 @@ func (r *REST) FetchLatestKlines(ctx context.Context, symbol, interval string, l
 	}
 	return out, nil
 }
+
+// SpotPair is one Binance spot trading pair from /api/v3/exchangeInfo.
+type SpotPair struct {
+	Symbol     string `json:"symbol"`
+	Status     string `json:"status"`
+	BaseAsset  string `json:"baseAsset"`
+	QuoteAsset string `json:"quoteAsset"`
+}
+
+// SpotPairs returns Binance's spot pairs currently TRADING against quote (e.g.
+// USDT, the quote every crypto pipeline here uses). Public endpoint, no key.
+func (r *REST) SpotPairs(ctx context.Context, quote string) ([]SpotPair, error) {
+	if err := r.Limiter.Wait(ctx); err != nil {
+		return nil, err
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, restBase+"/api/v3/exchangeInfo?permissions=SPOT", nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := r.HTTP.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("binance exchangeInfo: %s", resp.Status)
+	}
+	var raw struct {
+		Symbols []SpotPair `json:"symbols"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
+		return nil, err
+	}
+	var out []SpotPair
+	for _, p := range raw.Symbols {
+		if p.Status == "TRADING" && p.QuoteAsset == quote {
+			out = append(out, p)
+		}
+	}
+	return out, nil
+}

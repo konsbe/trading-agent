@@ -63,20 +63,25 @@ From `GET /api/v1/scanner/today/{symbol}/analysis`
 2. **Fundamentals** (`fundamentals`) — composite line, then tiers/readings. PEG and
    earnings surprise are not served by the API and always read "—".
 3. **Balance sheet** (`balance-sheet`) — composite line, ROE/ROA/ROIC, ratios.
-4. **Correlations** (`correlations`) — composite, cluster health, master signal, aligned/divergent sentences.
-5. **Sentiment & news** (`news`) — title + source + link only.
-6. **Qualitative signals** (`scanner.detail.qualitative`) — moat proxy, insider
+4. **Cash flow** (`cash-flow`) — the latest annual (10-K) cash-flow statement as
+   filed (`cash_flow`): header "10-K · fiscal year ended 31 Dec 2025 · filed …",
+   the six served lines in compact USD (outflows "−$25.93B", payments marked
+   "amount paid", a missing line "—" / "not in filing"), no red/green, and the
+   annual-only note. When `available` is false the card shows `unavailable_reason`.
+5. **Correlations** (`correlations`) — composite, cluster health, master signal, aligned/divergent sentences.
+6. **Sentiment & news** (`news`) — title + source + link only.
+7. **Qualitative signals** (`scanner.detail.qualitative`) — moat proxy, insider
    activity, news sentiment 7d/30d, R&D intensity; tiers as plain-text bands.
-7. **Context vs benchmark** (`scanner.detail.context`) — benchmark, market-cycle
+8. **Context vs benchmark** (`scanner.detail.context`) — benchmark, market-cycle
    composite and macro correlations regime (stored label verbatim plus the Daily
    Market Report's tone icon, `--color-status-*`), price phase, drawdown from
    peak, relative strength (always "—" today: not stored).
-8. **Classical technical signals** (`classical-signals`) — primary-accent framing;
+9. **Classical technical signals** (`classical-signals`) — primary-accent framing;
    the heuristic caveat verbatim first, then every technical reading the API
    gave a `severity` (e.g. RSI, VIX, BB squeeze), chart patterns and the action
    signal (label as-is, confluence as "3/4" text), each with a severity badge.
 
-Sections 1–7 never show severity badges; section 8 is the one place that lists
+Sections 1–8 never show severity badges; section 9 is the one place that lists
 what is currently flagged, and only what the API flagged. Every band, tier and
 severity is the API's — nothing is re-derived client-side; null is "—".
 

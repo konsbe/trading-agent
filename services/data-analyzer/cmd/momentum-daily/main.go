@@ -44,6 +44,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
 
+	appconfig "github.com/konsbe/trading-agent/services/data-analyzer/internal/config"
 	"github.com/konsbe/trading-agent/services/data-analyzer/internal/db"
 	"github.com/konsbe/trading-agent/services/data-analyzer/internal/logx"
 	"github.com/konsbe/trading-agent/services/data-analyzer/internal/momentumapi"
@@ -99,9 +100,25 @@ func main() {
 	log.Info("momentum-daily: started", "grace", cfg.grace.String(), "poll", cfg.poll.String(),
 		"min_coverage", cfg.minCoverage, "give_up_after", cfg.giveUpAfter.String(), "bin_dir", cfg.binDir)
 
+	ta, err := appconfig.LoadTechnicalAnalysis()
+	if err != nil {
+		log.Error("momentum-daily: technical config", "err", err)
+		os.Exit(1)
+	}
+	fa, err := appconfig.LoadFundamentalAnalysis()
+	if err != nil {
+		log.Error("momentum-daily: fundamental config", "err", err)
+		os.Exit(1)
+	}
+	comp := &computer{pool: pool, ta: ta, fa: fa, log: log}
+	if !*once {
+		go comp.manualLoop(ctx, durationEnv("MOMENTUM_DAILY_MANUAL_POLL", time.Minute))
+	}
+
 	st := &logState{}
 	for {
 		done := tick(ctx, log, pool, cfg, st, time.Now())
+		comp.dailyPass(ctx)
 		if *once && done {
 			return
 		}

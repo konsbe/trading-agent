@@ -16,6 +16,7 @@ import (
 	"github.com/konsbe/trading-agent/services/data-ingestion/internal/fetch/finnhub"
 	"github.com/konsbe/trading-agent/services/data-ingestion/internal/ratelimit"
 	"github.com/konsbe/trading-agent/services/data-ingestion/internal/store"
+	"github.com/konsbe/trading-agent/services/data-ingestion/internal/symbols"
 )
 
 func main() {
@@ -57,6 +58,12 @@ func main() {
 	}
 
 	w := &worker{cfg: cfg, pool: pool, fh: fh, av: av, log: log}
+
+	// Manual "Compute" requests (computation_interest reason manual) poll on
+	// their own goroutine: the passes below block for minutes (Alpha Vantage
+	// pacing) to hours (the widened metrics pass), and a request queued behind
+	// them would read "data not arrived". Finnhub pacing is a shared limiter.
+	go w.manualQueueLoop(context.Background(), cfg.PollManualQueue)
 
 	// Run immediately on startup, then on ticker cadence.
 	//
@@ -354,15 +361,39 @@ func (w *worker) fetchMetricsForSymbol(ctx context.Context, sym string, ts time.
 // tags (e.g. Apple uses RevenueFromContractWithCustomerExcludingAssessedTax).
 
 func (w *worker) runFinancials(ctx context.Context) {
-	w.storeFinancials(context.Background(), w.cfg.FinancialsFreq, w.cfg.FinancialsLimit)
+	w.runFinancialsFor(ctx, w.computationEquities(ctx, "financials-reported"))
+}
+
+// runFinancialsFor fetches both filing frequencies for syms and records each
+// symbol's statement coverage from what Finnhub returned.
+func (w *worker) runFinancialsFor(ctx context.Context, syms []string) {
+	got := w.storeFinancials(ctx, syms, w.cfg.FinancialsFreq, w.cfg.FinancialsLimit)
 	if w.cfg.EnableAnnualFinancials && w.cfg.FinancialsFreq != "annual" {
-		w.storeFinancials(context.Background(), "annual", w.cfg.AnnualFinancialsLimit)
+		for sym, ok := range w.storeFinancials(ctx, syms, "annual", w.cfg.AnnualFinancialsLimit) {
+			got[sym] = got[sym] || ok
+		}
+	}
+	for _, sym := range syms {
+		ok, fetched := got[sym]
+		if !fetched {
+			continue // every request failed; nothing learned about coverage
+		}
+		status, reason := store.StatementsAvailable, ""
+		if !ok {
+			status, reason = store.StatementsNoneReturned, "Finnhub returned no 10-K/10-Q filings"
+		}
+		if err := store.MarkStatements(ctx, w.pool, sym, status, reason); err != nil {
+			w.log.Warn("mark statements", "symbol", sym, "err", err)
+		}
 	}
 }
 
-func (w *worker) storeFinancials(ctx context.Context, freq string, limit int) {
+// storeFinancials returns, per symbol whose request succeeded, whether any
+// filing was stored.
+func (w *worker) storeFinancials(ctx context.Context, syms []string, freq string, limit int) map[string]bool {
 	ts := time.Now().UTC()
-	for _, sym := range w.cfg.Symbols {
+	got := map[string]bool{}
+	for _, sym := range syms {
 		raw, err := w.fh.FinancialsReported(ctx, sym, freq)
 		if err != nil {
 			w.log.Error("finnhub financials-reported", "symbol", sym, "freq", freq, "err", err)
@@ -370,6 +401,7 @@ func (w *worker) storeFinancials(ctx context.Context, freq string, limit int) {
 		}
 
 		reports, _ := raw["data"].([]any)
+		got[sym] = got[sym] || len(reports) > 0
 		if len(reports) == 0 {
 			w.log.Warn("finnhub financials-reported: no reports", "symbol", sym, "freq", freq)
 			continue
@@ -575,13 +607,18 @@ func (w *worker) storeFinancials(ctx context.Context, freq string, limit int) {
 
 		w.log.Info("fundamentals financials stored", "symbol", sym, "freq", freq, "count", stored)
 	}
+	return got
 }
 
 // ─── Earnings history (EPS actuals vs estimates) ──────────────────────────────
 
 func (w *worker) runEarnings(ctx context.Context) {
+	w.runEarningsFor(ctx, w.computationEquities(ctx, "earnings"))
+}
+
+func (w *worker) runEarningsFor(ctx context.Context, syms []string) {
 	ts := time.Now().UTC()
-	for _, sym := range w.cfg.Symbols {
+	for _, sym := range syms {
 		items, err := w.fh.Earnings(ctx, sym)
 		if err != nil {
 			w.log.Error("finnhub earnings", "symbol", sym, "err", err)
@@ -651,7 +688,7 @@ func (w *worker) runOverview(ctx context.Context) {
 	ts := time.Now().UTC()
 	source := "alphavantage_overview"
 
-	for _, sym := range w.cfg.Symbols {
+	for _, sym := range w.followedEquitiesETFs(ctx, "overview") {
 		data, err := w.av.Overview(ctx, sym)
 		if err != nil {
 			w.log.Warn("alpha vantage overview", "symbol", sym, "err", err)
@@ -736,7 +773,7 @@ func (w *worker) runOverview(ctx context.Context) {
 
 func (w *worker) runRecommendations(ctx context.Context) {
 	ts := time.Now().UTC()
-	for _, sym := range w.cfg.Symbols {
+	for _, sym := range w.computationEquities(ctx, "recommendations") {
 		items, err := w.fh.Recommendation(ctx, sym)
 		if err != nil {
 			w.log.Warn("finnhub recommendation", "symbol", sym, "err", err)
@@ -811,7 +848,7 @@ func (w *worker) runRecommendations(ctx context.Context) {
 //	M = option exercise       (often followed by S, not informational on its own)
 
 func (w *worker) runInsiderTransactions(ctx context.Context) {
-	for _, sym := range w.cfg.Symbols {
+	for _, sym := range w.computationEquities(ctx, "insider-transactions") {
 		items, err := w.fh.InsiderTransactions(ctx, sym)
 		if err != nil {
 			w.log.Warn("finnhub insider-transactions", "symbol", sym, "err", err)
@@ -884,7 +921,7 @@ func (w *worker) runNewsSentiment(ctx context.Context) {
 	}
 	ts := time.Now().UTC()
 	_ = ts
-	for _, sym := range w.cfg.Symbols {
+	for _, sym := range w.followedEquitiesETFs(ctx, "news-sentiment") {
 		articles, err := w.av.NewsSentiment(ctx, sym)
 		if err != nil {
 			w.log.Warn("alpha vantage news_sentiment", "symbol", sym, "err", err)
@@ -920,7 +957,7 @@ func (w *worker) runNewsSentiment(ctx context.Context) {
 
 func (w *worker) runInstitutionalOwnership(ctx context.Context) {
 	ts := time.Now().UTC()
-	for _, sym := range w.cfg.Symbols {
+	for _, sym := range w.computationEquities(ctx, "institutional-ownership") {
 		holders, err := w.fh.InvestorOwnership(ctx, sym, w.cfg.InstitutionalOwnershipLimit)
 		if err != nil {
 			w.log.Warn("finnhub investor-ownership", "symbol", sym, "err", err)
@@ -1191,4 +1228,60 @@ func (w *worker) storeProfileForSymbol(ctx context.Context, sym string, ts time.
 		return fmt.Errorf("upsert shares_outstanding %s: %w", sym, err)
 	}
 	return nil
+}
+
+// ─── Symbol sets (followed_symbols / computation_interest, migration 030) ─────
+
+// computationEquities: followed equities ∪ every equity with an open
+// computation reason (watchlist, today's candidates, manual Compute).
+// Statements, earnings, insider and ownership data only exist for equities.
+func (w *worker) computationEquities(ctx context.Context, pass string) []string {
+	return symbols.Computation(ctx, w.pool, w.log, "data-fundamental", pass+" (FUNDAMENTAL_SYMBOLS)", []string{"equity"}, w.cfg.Symbols)
+}
+
+// computationEquitiesETFs adds funds, which do get Finnhub metrics.
+func (w *worker) computationEquitiesETFs(ctx context.Context, pass string) []string {
+	return symbols.Computation(ctx, w.pool, w.log, "data-fundamental", pass+" (FUNDAMENTAL_SYMBOLS)", []string{"equity", "etf"}, w.cfg.Symbols)
+}
+
+// followedEquitiesETFs: followed only. The Alpha Vantage passes (overview,
+// news sentiment) share a 25-requests/day key, so they stay on the followed
+// list instead of every computed symbol.
+func (w *worker) followedEquitiesETFs(ctx context.Context, pass string) []string {
+	return symbols.Followed(ctx, w.pool, w.log, "data-fundamental", pass+" (FUNDAMENTAL_SYMBOLS)", []string{"equity", "etf"}, w.cfg.Symbols)
+}
+
+// runManualQueue fetches fundamentals for symbols a user asked to Compute that
+// have not been fetched since the request: metrics (equities and funds), then
+// statements and earnings (equities). Runs on a short poll so a request does
+// not wait for the daily or weekly pass.
+func (w *worker) manualQueueLoop(ctx context.Context, every time.Duration) {
+	t := time.NewTicker(every)
+	defer t.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+			w.runManualQueue(ctx)
+		}
+	}
+}
+
+func (w *worker) runManualQueue(ctx context.Context) {
+	pending, err := store.PendingManual(ctx, w.pool, "fundamentals", []string{"equity", "etf"})
+	if err != nil {
+		w.log.Warn("manual compute queue", "err", err)
+		return
+	}
+	for _, sym := range pending {
+		ts := time.Now().UTC()
+		ferr := w.fetchMetricsForSymbol(ctx, sym, ts)
+		w.runFinancialsFor(ctx, []string{sym})
+		w.runEarningsFor(ctx, []string{sym})
+		if err := store.MarkFetched(ctx, w.pool, sym, "fundamentals", ferr); err != nil {
+			w.log.Warn("mark fundamentals fetched", "symbol", sym, "err", err)
+		}
+		w.log.Info("manual compute: fundamentals fetched", "symbol", sym, "metrics_err", ferr)
+	}
 }

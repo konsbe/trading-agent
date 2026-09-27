@@ -40,7 +40,7 @@ func (w *worker) runMetricsUniverse(ctx context.Context) int {
 		w.log.Error("seed fundamental fetch state", "err", err)
 		return 0
 	}
-	if n, err := store.SeedFundamentalFetchStateSymbols(ctx, w.pool, store.TaskMetrics, cfg.Symbols); err != nil {
+	if n, err := store.SeedFundamentalFetchStateSymbols(ctx, w.pool, store.TaskMetrics, w.computationEquitiesETFs(ctx, "metrics")); err != nil {
 		w.log.Warn("seed configured symbols into the metrics fetch rotation", "err", err)
 	} else {
 		seeded += n
@@ -127,26 +127,27 @@ func (w *worker) runMetricsUniverse(ctx context.Context) int {
 // configured list rather than to an empty pass — never fail closed into
 // fetching nothing.
 func (w *worker) metricsSymbolsForStaticPass(ctx context.Context) []string {
+	configured := w.computationEquitiesETFs(ctx, "metrics")
 	if !w.cfg.MetricsUseUniverse {
-		return w.cfg.Symbols
+		return configured
 	}
 	scope := store.MetricsScope(w.cfg.MetricsScope)
-	syms, err := store.ResolveMetricsSymbols(ctx, w.pool, w.cfg.Symbols, scope)
+	syms, err := store.ResolveMetricsSymbols(ctx, w.pool, configured, scope)
 	if err != nil {
 		// Includes an unrecognised scope. Degrading to the configured list is the
 		// right failure here for the same reason as a database error: the pass
 		// keeps working on the symbols it is sure about instead of fetching
 		// nothing, and the warning names the cause.
 		w.log.Warn("could not resolve the universe symbol list; falling back to the configured symbol list",
-			"scope", w.cfg.MetricsScope, "configured", len(w.cfg.Symbols), "err", err)
-		return w.cfg.Symbols
+			"scope", w.cfg.MetricsScope, "configured", len(configured), "err", err)
+		return configured
 	}
 	w.log.Info("metrics symbol source resolved",
-		"scope", scope, "configured", len(w.cfg.Symbols), "total", len(syms),
+		"scope", scope, "configured", len(configured), "total", len(syms),
 		"note", "scope=selected covers the pilot draw only; scope=eligible covers the full §3.1 universe")
 	if len(syms) == 0 {
 		w.log.Warn("symbol resolution produced nothing; falling back to the configured list")
-		return w.cfg.Symbols
+		return configured
 	}
 	return syms
 }

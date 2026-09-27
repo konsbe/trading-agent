@@ -97,11 +97,14 @@ module.exports = (env, argv) => {
         plugins: [
             new HtmlWebpackPlugin({ template: "./public/index.html" }),
             new ModuleFederationPlugin({
-                // Must equal `mfes.mfe_watchlist.scope` in web-app/spog/public/config.json.
+                // Must equal the `scope` of mfes.mfe_watchlist{,_followed,_computed}
+                // in web-app/spog/public/config.json (three entries, one container).
                 name: "mfe_watchlist",
                 filename: "remoteEntry.js",
                 exposes: {
                     "./Watchlist": "./src/app/app-root",
+                    "./FollowedSymbols": "./src/app/followed-root",
+                    "./ComputedSymbols": "./src/app/computed-root",
                 },
                 remotes: {
                     // `shellSpog` is the request prefix used by useAuthMFE in shared-components.

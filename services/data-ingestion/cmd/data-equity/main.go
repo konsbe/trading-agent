@@ -18,6 +18,7 @@ import (
 	"github.com/konsbe/trading-agent/services/data-ingestion/internal/logx"
 	"github.com/konsbe/trading-agent/services/data-ingestion/internal/ratelimit"
 	"github.com/konsbe/trading-agent/services/data-ingestion/internal/store"
+	"github.com/konsbe/trading-agent/services/data-ingestion/internal/symbols"
 )
 
 func main() {
@@ -56,7 +57,7 @@ func main() {
 			log.Debug("alpaca market data keys missing; skipping bars")
 			return
 		}
-		for _, sym := range cfg.Symbols {
+		for _, sym := range symbols.Followed(ctx, pool, log, "data-equity", "Alpaca hourly bars (ALPACA_DATA_SYMBOLS)", []string{"equity", "etf"}, cfg.Symbols) {
 			bars, err := alp.FetchLatestBars(ctx, sym, "1Hour", 200)
 			if err != nil {
 				log.Error("alpaca bars", "symbol", sym, "err", err)
@@ -75,7 +76,7 @@ func main() {
 			log.Debug("finnhub token missing; skipping quotes")
 			return
 		}
-		for _, sym := range cfg.Symbols {
+		for _, sym := range symbols.Followed(ctx, pool, log, "data-equity", "Finnhub quotes (ALPACA_DATA_SYMBOLS)", []string{"equity", "etf"}, cfg.Symbols) {
 			q, err := fh.Quote(ctx, sym)
 			if err != nil {
 				log.Error("finnhub quote", "symbol", sym, "err", err)

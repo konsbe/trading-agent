@@ -1,0 +1,85 @@
+/* Neutral status text: only a failed computation (a system alert) uses the error colour. */
+.compute-state {
+    display: block;
+    min-width: 0;
+    color: var(--color-on-surface);
+    font-size: var(--font-size-xs);
+    line-height: 1.35;
+    white-space: normal;
+}
+
+.compute-state.is-waiting,
+.compute-state.is-computed {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--space-xs);
+}
+
+/* The pulse stays on the first line of the text instead of wrapping onto its own. */
+.compute-state.is-waiting {
+    flex-wrap: nowrap;
+    align-items: flex-start;
+}
+
+.compute-state.is-computed,
+.compute-state.is-scheduled {
+    color: var(--color-on-surface-variant);
+}
+
+.compute-state__title {
+    font-weight: var(--font-weight-medium);
+}
+
+.compute-state__muted,
+.compute-state__detail {
+    color: var(--color-on-surface-variant);
+}
+
+/* A queued request: a slow pulse, deliberately not a spinner. */
+.compute-state__pulse {
+    flex: 0 0 auto;
+    margin-top: 0.3em;
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: var(--radius-full);
+    background: var(--color-primary);
+    animation: compute-state-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes compute-state-pulse {
+    0%,
+    100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.25;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .compute-state__pulse {
+        animation: none;
+    }
+}
+
+.compute-state__link {
+    color: var(--color-primary);
+    text-decoration: none;
+}
+
+.compute-state__link:hover {
+    text-decoration: underline;
+}
+
+.compute-state.is-failed summary {
+    color: var(--color-error);
+    cursor: pointer;
+}
+
+.compute-state.is-failed .compute-state__detail {
+    display: block;
+    max-width: 32ch;
+    margin-top: var(--space-xxs);
+    overflow-wrap: anywhere;
+}

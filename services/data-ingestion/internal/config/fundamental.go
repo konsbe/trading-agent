@@ -58,6 +58,9 @@ type Fundamental struct {
 	// Populates news_headlines.sentiment with per-article numeric scores (-1 to +1).
 	EnableNewsSentiment bool
 	PollNewsSentiment   time.Duration // default 24h
+	// PollManualQueue: how often to fetch fundamentals for manual "Compute"
+	// requests (computation_interest reason manual). Default 2m.
+	PollManualQueue time.Duration
 
 	// Institutional ownership (Finnhub /stock/investor-ownership).
 	// Tracks top-holder share changes quarter-over-quarter.
@@ -178,6 +181,7 @@ func LoadFundamental() (Fundamental, error) {
 		PollInsiderTransactions:      pollFor("DATA_FUNDAMENTAL_INSIDER_POLL_INTERVAL", 24*time.Hour),
 		EnableNewsSentiment:          env("FUNDAMENTAL_ENABLE_NEWS_SENTIMENT", "true") == "true",
 		PollNewsSentiment:            pollFor("DATA_FUNDAMENTAL_NEWS_SENTIMENT_POLL_INTERVAL", 24*time.Hour),
+		PollManualQueue:              pollFor("DATA_FUNDAMENTAL_MANUAL_QUEUE_POLL_INTERVAL", 2*time.Minute),
 		EnableInstitutionalOwnership: env("FUNDAMENTAL_ENABLE_INSTITUTIONAL_OWNERSHIP", "true") == "true",
 		PollInstitutionalOwnership:   pollFor("DATA_FUNDAMENTAL_INSTITUTIONAL_POLL_INTERVAL", 7*24*time.Hour),
 		InstitutionalOwnershipLimit:  instLimit,

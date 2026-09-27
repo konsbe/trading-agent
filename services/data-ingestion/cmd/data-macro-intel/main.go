@@ -34,6 +34,7 @@ import (
 	"github.com/konsbe/trading-agent/services/data-ingestion/internal/logx"
 	"github.com/konsbe/trading-agent/services/data-ingestion/internal/ratelimit"
 	"github.com/konsbe/trading-agent/services/data-ingestion/internal/store"
+	symbolsets "github.com/konsbe/trading-agent/services/data-ingestion/internal/symbols"
 )
 
 func main() {
@@ -81,7 +82,9 @@ func runAll(ctx context.Context, log *slog.Logger, pool *pgxpool.Pool, cfg confi
 		runEconomicCalendar(ctx, log, pool, fh)
 	}
 	if cfg.EnableEarningsCalendar && fh.HasToken() {
-		runEarningsCalendar(ctx, log, pool, fh, cfg.EarningsSymbols)
+		// Followed equities; the earnings calendar has no dates for funds.
+		runEarningsCalendar(ctx, log, pool, fh, symbolsets.Followed(ctx, pool, log, "data-macro-intel",
+			"earnings calendar (MACRO_INTEL_EARNINGS_SYMBOLS)", []string{"equity"}, cfg.EarningsSymbols))
 	}
 	if cfg.EnableFinnhubGeneralNews && fh.HasToken() {
 		runFinnhubGeneral(ctx, log, pool, fh)

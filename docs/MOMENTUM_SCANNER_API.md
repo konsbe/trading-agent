@@ -378,6 +378,31 @@ The one **write path**, designed separately from the read-only scanner routes
 - Never cached. Same no-auth, loopback-only constraint as the rest of the
   service (§3) — anyone who can reach the port can edit the unauthenticated list.
 
+### 2.5a Followed symbols and computation tracking (added 2026-09-27, migration 030)
+
+A second designed write path, next to the watchlist (which is unchanged).
+momentum-api only writes `followed_symbols` and `computation_interest`; the
+ingestion workers read them from Postgres and momentum-daily computes.
+momentum-api never calls a data provider. Never cached.
+
+| Route | Result |
+|---|---|
+| `GET /api/v1/followed-symbols` | `200 {"items": [{symbol, name, asset_type, listing, news_alias, source, added_at}]}`. `asset_type` equity / etf / crypto; `listing` us / foreign / crypto; `source` `env_seed` (seeded from `.env`) or `user` |
+| `PUT /api/v1/followed-symbols/{symbol}` | Idempotent follow; opens the `followed` computation reason in the same transaction. `201` added / `200` already followed; body is the updated list. The symbol must be followed already, in `universe_symbols`, or in `symbol_directory`: `404 unknown_symbol` otherwise, `422 not_computable` for a directory type that cannot be computed (warrants, units, …), `400 invalid_symbol` |
+| `DELETE /api/v1/followed-symbols/{symbol}` | Idempotent unfollow; closes the `followed` reason (the row is kept). `200` with the updated list |
+| `GET /api/v1/symbols/directory?q=` | "All symbols" search over `symbol_directory` (Finnhub US incl. ETFs / ADRs / OTC, Binance USDT spot). `200 {"query", "results": [{symbol, name, type, mic, asset_type, source, in_universe, followed}]}`, at most 20; type "other" excluded. `400 invalid_query` as `/symbols`. `/symbols` (§2.5) stays the universe search |
+| `GET /api/v1/computed-symbols` | `200 {"data_timeout_minutes", "items": [{symbol, name, asset_type, reasons, manual_requested_at, state, bars_fetched_at, fundamentals_fetched_at, computed_at, last_error, statements_status, statements_reason}]}` — every symbol with at least one open reason (`followed`, `watchlist`, `candidate`, `manual`) |
+| `PUT /api/v1/computed-symbols/{symbol}` | Compute: opens a `manual` reason (idempotent). `202` with the computed-symbols body. Same `404` / `422` / `400` as follow |
+| `DELETE /api/v1/computed-symbols/{symbol}` | Stop computing: closes the `manual` reason only; other reasons stay. `200` with the computed-symbols body |
+
+`state`: with an open manual request — `waiting_for_data` (queued, not
+fetched yet), `computing` (data fetched since the request; the next compute
+poll picks it up), `computed` (computed since the request), `failed` (the
+computation errored, `last_error`), `data_not_arrived` (older than
+`MOMENTUM_API_COMPUTE_DATA_TIMEOUT`, 30m, and the data is still missing — it
+never waits indefinitely). Without one — `computed` or `scheduled` (the next
+daily pass).
+
 ### 2.6 Price history — `GET /api/v1/scanner/symbols/{symbol}/bars?range=...`
 
 For the detail chart. `range` ∈ `1D`, `5D`, `1M`, `6M`, `1Y`, `ALL` (required).
@@ -441,9 +466,12 @@ end of this file:
   cache hiding a corrected re-run would be exactly the kind of
   silent-wrongness bug this project has spent two months eliminating
   elsewhere.
-- **Write path: watchlist only.** The scanner endpoints never issue
-  `INSERT`/`UPDATE`. The watchlist (§2.5) is the one explicitly-designed write
-  path, added 2026-09-24; it touches only `watchlist_items`.
+- **Write paths: watchlist and followed / computed symbols.** The scanner
+  endpoints never issue `INSERT`/`UPDATE`. The watchlist (§2.5, 2026-09-24)
+  touches only `watchlist_items`; followed / computed symbols (§2.5a,
+  2026-09-27) touch only `followed_symbols` and `computation_interest`.
+  (The on-demand analysis path writes computed rows, as specified in its
+  addendum.)
 - **Health check:** `GET /healthz` returning 200 once the DB pool is up —
   standard for the container/orchestration layer, matches the pattern other
   services in this repo already use.

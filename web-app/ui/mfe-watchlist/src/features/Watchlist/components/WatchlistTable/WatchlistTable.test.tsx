@@ -1,11 +1,22 @@
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
+import { fetchComputedSymbols, requestCompute } from '@/api';
+import { ComputeStatusProvider } from '@/providers/ComputeStatusContext';
 import { HostModeProvider } from '@/providers/HostModeContext';
 import { findAsciiMinus } from '@/test-utils/asciiMinus';
-import { makeNonCandidateItem, makeUncoveredItem, makeWatchlistItem } from '@/test-utils/fixtures';
+import { makeComputedSymbols, makeManualComputed, makeNonCandidateItem, makeUncoveredItem, makeWatchlistItem } from '@/test-utils/fixtures';
 import WatchlistTable from './WatchlistTable';
 import { WatchlistTableProps } from './types';
+
+jest.mock('@/api/tracking/trackingApi', () => ({
+    fetchComputedSymbols: jest.fn(),
+    requestCompute: jest.fn(),
+    stopCompute: jest.fn(),
+}));
+
+const fetchComputedMock = fetchComputedSymbols as jest.MockedFunction<typeof fetchComputedSymbols>;
+const requestComputeMock = requestCompute as jest.MockedFunction<typeof requestCompute>;
 
 const Location = () => <span data-testid="location">{useLocation().pathname}</span>;
 
@@ -21,17 +32,23 @@ const renderTable = (overrides: Partial<WatchlistTableProps> = {}, { hosted = fa
     };
     render(
         <HostModeProvider hosted={hosted}>
-            <MemoryRouter initialEntries={['/watchlist']}>
-                <Location />
-                <Routes>
-                    <Route path="/watchlist/*" element={<WatchlistTable {...props} />} />
-                    <Route path="/candidates/:symbol" element={<>detail</>} />
-                </Routes>
-            </MemoryRouter>
+            <ComputeStatusProvider>
+                <MemoryRouter initialEntries={['/watchlist']}>
+                    <Location />
+                    <Routes>
+                        <Route path="/watchlist/*" element={<WatchlistTable {...props} />} />
+                        <Route path="/candidates/:symbol" element={<>detail</>} />
+                    </Routes>
+                </MemoryRouter>
+            </ComputeStatusProvider>
         </HostModeProvider>
     );
     return props;
 };
+
+beforeEach(() => {
+    fetchComputedMock.mockResolvedValue(makeComputedSymbols([]));
+});
 
 const location = () => screen.getByTestId('location');
 
@@ -170,7 +187,7 @@ describe('WatchlistTable', () => {
     });
 
     describe('market columns (same as the candidates table)', () => {
-        it("shows the candidates table's columns, labels and tooltips in its order, between Symbol and Remove", () => {
+        it("shows the candidates table's columns, labels and tooltips in its order, between Symbol and Compute / Remove", () => {
             renderTable();
 
             const headers = screen.getAllByRole('columnheader');
@@ -186,6 +203,7 @@ describe('WatchlistTable', () => {
                 '% of 52w high',
                 'Catalyst',
                 'Score',
+                'Compute',
                 'Actions',
             ]);
             const header = (column: string) => headers.find(th => th.getAttribute('data-column') === column)!;
@@ -353,5 +371,32 @@ describe('WatchlistTable', () => {
         expect(screen.getByTestId('watchlist-row-VGZ')).not.toHaveAttribute('tabindex');
         await userEvent.click(cell('VGZ', 'rvol_20'));
         expect(location()).toHaveTextContent(/^\/watchlist$/);
+    });
+
+    describe('Compute', () => {
+        it('has a Compute button per row', () => {
+            renderTable({ rows: [makeWatchlistItem({ symbol: 'VGZ' }), makeNonCandidateItem()] });
+
+            expect(row('VGZ').getByRole('button', { name: 'Compute VGZ' })).toBeEnabled();
+            expect(row('NVDA').getByRole('button', { name: 'Compute NVDA' })).toBeEnabled();
+        });
+
+        it('requests a computation without opening the detail page, then shows the queued state', async () => {
+            requestComputeMock.mockResolvedValue(makeComputedSymbols([makeManualComputed('waiting_for_data', { symbol: 'VGZ' })]));
+            renderTable({}, { hosted: true });
+
+            await userEvent.click(row('VGZ').getByRole('button', { name: 'Compute VGZ' }));
+
+            expect(requestComputeMock).toHaveBeenCalledWith('VGZ');
+            expect(await row('VGZ').findByTestId('compute-state-VGZ')).toHaveTextContent(/^Waiting for data · requested/);
+            expect(location()).toHaveTextContent(/^\/watchlist$/);
+        });
+
+        it("doesn't open the detail page when the compute cell itself is clicked", async () => {
+            renderTable({}, { hosted: true });
+
+            await userEvent.click(cell('VGZ', 'compute'));
+            expect(location()).toHaveTextContent(/^\/watchlist$/);
+        });
     });
 });

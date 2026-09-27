@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Button, CloseIcon, EMPTY_VALUE, formatPrice, MARKET_COLUMNS, MarketRow } from '@trading-agent/shared-components';
 import { WatchlistItem } from '@/api';
 import { formatTradingDay } from '@/common/format/format';
+import ComputeButton from '@/components/ComputeButton';
 import { scannerDetailPath } from '@/config/routes';
 import { useIsHosted } from '@/providers/HostModeContext';
 import { WatchlistTableProps } from './types';
@@ -78,8 +79,8 @@ const WatchlistTable = ({ id, caption, rows, saving, onRemove }: WatchlistTableP
 
     const handleRowClick = useCallback(
         (event: MouseEvent<HTMLTableRowElement>, symbol: string) => {
-            // The ticker link navigates on its own; Remove must never navigate.
-            if ((event.target as HTMLElement).closest('a, button')) return;
+            // The ticker link navigates on its own; Remove and Compute must never navigate.
+            if ((event.target as HTMLElement).closest('a, button, summary, [data-column="compute"]')) return;
             navigate(scannerDetailPath(symbol));
         },
         [navigate]
@@ -120,6 +121,9 @@ const WatchlistTable = ({ id, caption, rows, saving, onRemove }: WatchlistTableP
                                 {column.label}
                             </th>
                         ))}
+                        <th scope="col" data-column="compute" title="Ask the pipeline to fetch and compute this symbol now">
+                            Compute
+                        </th>
                         <th scope="col" data-column="actions">
                             <span className="watchlist-table__sr-only">Actions</span>
                         </th>
@@ -154,6 +158,9 @@ const WatchlistTable = ({ id, caption, rows, saving, onRemove }: WatchlistTableP
                                         {column.key === 'close' ? <PriceCell item={item} isSaving={isSaving} /> : column.render(values)}
                                     </td>
                                 ))}
+                                <td data-column="compute">
+                                    <ComputeButton symbol={item.symbol} />
+                                </td>
                                 <td data-column="actions">
                                     <Button
                                         variant="ghost"
