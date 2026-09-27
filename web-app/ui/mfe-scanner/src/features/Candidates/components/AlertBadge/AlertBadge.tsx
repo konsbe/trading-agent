@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
+import { SeverityBadge } from '@trading-agent/shared-components';
 import { formatDateTime } from '@/common/format/format';
 import { humanizeCode } from '@/common/format/humanize';
-import SeverityBadge from '@/components/SeverityBadge';
 import { CLASSICAL_SIGNALS_ID } from '@/types/constants';
 import { AlertBadgeProps } from './types';
 import './AlertBadge-styles.css';

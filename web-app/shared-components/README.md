@@ -41,6 +41,7 @@ Light/dark is applied only by a ThemeProvider: the shell's provider calls
 - `Button` – `variant` (`primary`, `secondary`, `danger`, `ghost`), `size`, `iconOnly`, `fullWidth`
 - `Dialog` – portal modal with `title`, `footer`, `onClose` (Escape / overlay click)
 - `Spinner`, `Skeleton`, `FullSizeSkeleton`
+- `SeverityBadge` – API alert `severity` (info / notice / warning) as a dot + word tag; `SEVERITY_LEVELS`
 - `SplitScreen` + `Pane` – two-pane resizable layout (ratio or pixel sizing)
 - Icons – `MenuIcon`, `ArrowLeftIcon`, `CloseIcon`, `ChevronDownIcon`, `LogoutIcon`,
   `CheckCircleIcon`, `MinusCircleIcon`, `AlertTriangleIcon`, `CircleDashedIcon`, …

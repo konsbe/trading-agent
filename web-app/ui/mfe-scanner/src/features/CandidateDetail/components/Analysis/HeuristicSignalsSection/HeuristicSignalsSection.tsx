@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
-import { COLLAPSIBLE_STORAGE_PREFIX, CollapsibleCard } from '@trading-agent/shared-components';
+import { COLLAPSIBLE_STORAGE_PREFIX, CollapsibleCard, SeverityBadge } from '@trading-agent/shared-components';
 import { ActionSignal } from '@/api';
-import SeverityBadge from '@/components/SeverityBadge';
 import { CLASSICAL_SIGNALS_ID } from '@/types/constants';
 import { chartPatternLabel, labelText, sentenceCaseCode } from '../../../utils/analysisFormat';
 import { flaggedReadings } from './flaggedReadings';

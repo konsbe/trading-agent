@@ -5,8 +5,8 @@
     text-decoration: none;
 }
 
-.scanner-alert-badge:hover .scanner-severity {
-    border-color: var(--scanner-severity);
+.scanner-alert-badge:hover .ta-severity {
+    border-color: var(--ta-severity);
 }
 
 .scanner-alert-badge:focus-visible {

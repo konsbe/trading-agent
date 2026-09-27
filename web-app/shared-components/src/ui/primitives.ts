@@ -8,6 +8,8 @@ export { default as CollapsibleCard, useCollapsibleState, COLLAPSIBLE_STORAGE_PR
 export type { CollapsibleCardProps } from './components/CollapsibleCard';
 export { default as DisclaimerPill, DISCLAIMER_TEXT } from './components/DisclaimerPill';
 export type { DisclaimerPillProps } from './components/DisclaimerPill';
+export { default as SeverityBadge, SEVERITY_LEVELS } from './components/SeverityBadge';
+export type { SeverityBadgeProps, SeverityLevel } from './components/SeverityBadge';
 export { Skeleton } from './components/Skeleton';
 export type { SkeletonProps } from './components/Skeleton';
 export { default as SplitScreen, Pane } from './components/SplitScreen';

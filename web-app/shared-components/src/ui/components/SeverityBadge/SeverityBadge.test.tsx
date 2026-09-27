@@ -1,5 +1,6 @@
+import React from 'react';
 import { render, screen } from '@testing-library/react';
-import SeverityBadge from './SeverityBadge';
+import SeverityBadge, { SEVERITY_LEVELS } from './index';
 
 describe('SeverityBadge', () => {
     it.each(['info', 'notice', 'warning'])('renders the %s word with its level class', severity => {
@@ -7,7 +8,7 @@ describe('SeverityBadge', () => {
 
         const badge = screen.getByTestId('severity-badge');
         expect(badge).toHaveTextContent(severity);
-        expect(badge).toHaveClass(`is-${severity}`);
+        expect(badge).toHaveClass('ta-severity', `is-${severity}`);
         expect(badge).toHaveAttribute('data-severity', severity);
     });
 
@@ -23,5 +24,15 @@ describe('SeverityBadge', () => {
         const badge = screen.getByTestId('severity-badge');
         expect(badge).toHaveTextContent('critical');
         expect(badge).toHaveClass('is-info');
+    });
+
+    it('accepts a custom class and test id', () => {
+        render(<SeverityBadge severity="info" className="extra" data-testid="sev" />);
+
+        expect(screen.getByTestId('sev')).toHaveClass('ta-severity', 'extra');
+    });
+
+    it('exports the API scale in order', () => {
+        expect(SEVERITY_LEVELS).toEqual(['info', 'notice', 'warning']);
     });
 });

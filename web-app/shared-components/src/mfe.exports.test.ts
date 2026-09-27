@@ -17,6 +17,8 @@ describe('mfe barrel exports', () => {
         expect(mfeExports.Dialog).toBeDefined();
         expect(mfeExports.Spinner).toBeDefined();
         expect(mfeExports.Skeleton).toBeDefined();
+        expect(mfeExports.SeverityBadge).toBeDefined();
+        expect(mfeExports.SEVERITY_LEVELS).toEqual(['info', 'notice', 'warning']);
         expect(mfeExports.SplitScreen).toBeDefined();
         expect(mfeExports.Pane).toBeDefined();
         expect(mfeExports.MenuIcon).toBeDefined();
