@@ -174,8 +174,9 @@ func TestAnalyzeMatchesGolden(t *testing.T) {
 // ZZFAFULL is MSFT: fcf_eps_divergence stores "warning_eps_growing_fcf_low"
 // under "quality" (EPS growth 31.56%, FCF yield 1.95%). scoreCorrelations read
 // "tier" and matched values the worker never writes ("accruals_concern"), so
-// live MSFT's earnings quality ran 1 check and read "healthy", and the
-// deterioration warning never saw the condition.
+// live MSFT's earnings quality ran 1 check and read "healthy". The low FCF
+// yield is MSFT's price (FCF conversion 0.70), so the deterioration warning's
+// FCF condition, which needs cash weak against earnings, stays unmet.
 func TestFCFEPSDivergenceReachesCorrelations(t *testing.T) {
 	ctx := context.Background()
 	t.Setenv("DATABASE_URL", "postgres://unused")
@@ -209,12 +210,10 @@ func TestFCFEPSDivergenceReachesCorrelations(t *testing.T) {
 	}
 	det, _ := payload("corr_master_signals")["deterioration_warning"].(map[string]any)
 	conds, _ := det["conditions_met"].([]any)
-	found := false
 	for _, c := range conds {
-		found = found || c == "fcf_accruals_concern"
-	}
-	if !found {
-		t.Errorf("deterioration_warning conditions %v, want fcf_accruals_concern", conds)
+		if c == "fcf_accruals_concern" {
+			t.Errorf("deterioration_warning conditions %v: fcf_accruals_concern met on FCF yield alone (conversion 0.70)", conds)
+		}
 	}
 }
 

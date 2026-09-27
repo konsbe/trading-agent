@@ -57,9 +57,9 @@
   "symbol": "ZZFAFULL",
   "metric": "corr_master_signals",
   "period": "derived",
-  "value": 0,
+  "value": 1,
   "payload": {
-   "net_signal": "neutral",
+   "net_signal": "bullish",
    "value_trap": {
     "fired": false,
     "score": 0,
@@ -70,7 +70,7 @@
     "score": 0,
     "conditions_met": null
    },
-   "bearish_count": 1,
+   "bearish_count": 0,
    "bullish_count": 1,
    "bullish_convergence": {
     "fired": true,
@@ -82,11 +82,10 @@
     ]
    },
    "deterioration_warning": {
-    "fired": true,
-    "score": 2,
+    "fired": false,
+    "score": 1,
     "conditions_met": [
-     "eps_strong",
-     "fcf_accruals_concern"
+     "eps_strong"
     ]
    },
    "leverage_cycle_warning": {
@@ -130,13 +129,13 @@
     "value_trap": false,
     "hidden_value": false,
     "bullish_convergence": true,
-    "deterioration_warning": true,
+    "deterioration_warning": false,
     "leverage_cycle_warning": false
    },
    "overall_score": 0.08,
    "warnings_count": 2,
    "positives_count": 3,
-   "master_net_signal": "neutral"
+   "master_net_signal": "bullish"
   }
  },
  {

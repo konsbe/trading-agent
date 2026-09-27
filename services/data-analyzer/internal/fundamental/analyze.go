@@ -2196,7 +2196,12 @@ func (w *analyzer) scoreCorrelations(ctx context.Context, symbol string, rows []
 		if epsTier == "strong" {
 			met = append(met, "eps_strong")
 		}
-		if epsFCFTier == "warning_eps_growing_fcf_low" {
+		// The divergence flag is FCF *yield* < FCFDivYieldLow, which a high
+		// share price alone satisfies. It counts only with cash actually
+		// weak against earnings: FCF conversion below FCFConversionLow, or
+		// negative FCF (conversion is not computed then).
+		cashWeak := fcfConvTier == "accrual_concern" || (hasFCFY && fcfYieldPct < 0)
+		if epsFCFTier == "warning_eps_growing_fcf_low" && cashWeak {
 			met = append(met, "fcf_accruals_concern")
 		}
 		// Compare receivables growth to revenue growth via XBRL series.
