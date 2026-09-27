@@ -36,15 +36,15 @@ already shows. `bootstrap` (standalone) uses its own router and the OS theme.
 
 | Endpoint | Function | Result |
 |---|---|---|
-| `GET /api/v1/watchlist` | `fetchWatchlist` | `{owner, items: [{symbol, company_name, exchange, added_at, as_of, is_stale, close, change_pct, rvol_20}]}`, newest first |
-| `PUT /api/v1/watchlist/{symbol}` | `addToWatchlist` | Updated list (201 added / 200 already present); `404 unknown_symbol`, `400 invalid_symbol` |
+| `GET /api/v1/watchlist` | `fetchWatchlist` | `{owner, items: [{symbol, company_name, exchange, added_at, as_of, is_stale, close, change_pct, rvol_20, volume, data_source, sources, market_cap_note, …}]}`, newest first. `data_source` `daily_bars` = outside the scanner's universe, computed from the symbol's own daily bars (marked "from daily bars", never scored; a non-USD market cap stays null with its note) |
+| `PUT /api/v1/watchlist/{symbol}` | `addToWatchlist` | Updated list (201 added / 200 already present); `404 unknown_symbol`, `400 invalid_symbol`. Also queues the symbol's data fetch (its compute state is re-read after the add) |
 | `DELETE /api/v1/watchlist/{symbol}` | `removeFromWatchlist` | Updated list (idempotent) |
 | `GET /api/v1/symbols?q=` | `searchSymbols` | `{query, results: [{symbol, company_name, exchange, is_eligible}]}` (≤20); `400 invalid_query` for blank or >40 chars |
 | `GET /api/v1/followed-symbols` | `fetchFollowedSymbols` | `{items: [{symbol, name, asset_type, listing, news_alias, source, added_at}]}`, newest first |
 | `PUT /api/v1/followed-symbols/{symbol}` | `followSymbol` | Updated list (201 / 200); `404 unknown_symbol`, `422 not_computable`, `400 invalid_symbol` |
 | `DELETE /api/v1/followed-symbols/{symbol}` | `unfollowSymbol` | Updated list |
 | `GET /api/v1/symbols/directory?q=` | `searchDirectory` | `{query, results: [{symbol, name, type, mic, asset_type, source, in_universe, followed}]}` (≤20); `400 invalid_query` |
-| `GET /api/v1/computed-symbols` | `fetchComputedSymbols` | `{data_timeout_minutes, items: [{symbol, name, asset_type, reasons, manual_requested_at, state, …, computed_at, last_error}]}` |
+| `GET /api/v1/computed-symbols` | `fetchComputedSymbols` | `{data_timeout_minutes, items: [{symbol, name, asset_type, reasons, manual_requested_at, queued_at, state, …, computed_at, last_error}]}`. `queued_at` = newest open manual or watchlist reason |
 | `PUT /api/v1/computed-symbols/{symbol}` | `requestCompute` | 202 with the computed-symbols body; same 404 / 422 / 400 as follow. Idempotent: an open request is kept, not restarted |
 | `DELETE /api/v1/computed-symbols/{symbol}` | `stopCompute` | Closes only the manual reason; 200 with the computed-symbols body |
 
@@ -73,11 +73,15 @@ Hooks:
   failure per symbol with its action.
 - `ComputeStatusProvider` / `useComputeStatus()` — one computed-symbols list per
   screen: `{items, dataTimeoutMinutes, isPolling, getItem, requesting, errors, compute, stop, refresh}`.
-  It polls every 12 s only while a manual request is `waiting_for_data` or
-  `computing`, and never after unmount. `ComputeButton` (Watchlist rows,
+  It polls every 12 s only while a queued fetch (a Compute press or a watchlist
+  addition) is `waiting_for_data` or `computing`, and never after unmount. The
+  Watchlist screen reloads its list when one of its rows goes from waiting /
+  computing to computed (`useReloadOnComputed`, no extra timer). `ComputeButton` (Watchlist rows,
   Followed rows, both search lists) and the Computed Symbols table read it;
   `ComputeState` renders a state in words (queued, computing, computed,
-  data not arrived with the queue time and timeout, failed with its error).
+  data not arrived with the queue time and timeout, failed with its error);
+  the time reads "requested" for a Compute press and "queued … (added to
+  watchlist)" for a watchlist addition.
 
 ## Configuration
 

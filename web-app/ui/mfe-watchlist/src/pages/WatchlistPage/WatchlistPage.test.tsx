@@ -1,10 +1,26 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { COLLAPSIBLE_STORAGE_PREFIX } from '@trading-agent/shared-components';
-import { addToWatchlist, ApiError, fetchWatchlist, removeFromWatchlist, searchSymbols, WatchlistResponse } from '@/api';
+import {
+    addToWatchlist,
+    ApiError,
+    fetchComputedSymbols,
+    fetchWatchlist,
+    removeFromWatchlist,
+    searchSymbols,
+    WatchlistResponse,
+} from '@/api';
+import { COMPUTE_POLL_MS } from '@/providers/ComputeStatusContext';
 import { HostModeProvider } from '@/providers/HostModeContext';
-import { makeUncoveredItem, makeWatchlist, makeWatchlistItem } from '@/test-utils/fixtures';
+import {
+    makeComputedSymbols,
+    makeDailyBarsItem,
+    makeUncoveredItem,
+    makeWatchlist,
+    makeWatchlistItem,
+    makeWatchlistQueued,
+} from '@/test-utils/fixtures';
 import WatchlistPage from './WatchlistPage';
 
 jest.mock('@/api/watchlist/watchlistApi', () => ({
@@ -24,6 +40,7 @@ const fetchMock = fetchWatchlist as jest.MockedFunction<typeof fetchWatchlist>;
 const addMock = addToWatchlist as jest.MockedFunction<typeof addToWatchlist>;
 const removeMock = removeFromWatchlist as jest.MockedFunction<typeof removeFromWatchlist>;
 const searchMock = searchSymbols as jest.MockedFunction<typeof searchSymbols>;
+const computedMock = fetchComputedSymbols as jest.MockedFunction<typeof fetchComputedSymbols>;
 
 const deferred = <T,>() => {
     let resolve!: (value: T) => void;
@@ -43,7 +60,12 @@ const renderLoaded = async (list: WatchlistResponse) => {
     await screen.findByRole('combobox', { name: 'Add symbol' });
 };
 
-beforeEach(() => searchMock.mockResolvedValue({ query: '', results: [] }));
+beforeEach(() => {
+    searchMock.mockResolvedValue({ query: '', results: [] });
+    computedMock.mockResolvedValue(makeComputedSymbols([]));
+});
+
+afterEach(() => jest.useRealTimers());
 
 describe('WatchlistPage', () => {
     it('shows a skeleton while the list loads, without the add flow', () => {
@@ -206,6 +228,87 @@ describe('WatchlistPage', () => {
 
             await userEvent.type(input, 'dvy');
             expect(await screen.findByTestId('symbol-option-DVY')).toHaveTextContent('Added');
+        });
+
+        it("re-reads the compute states after an add, so the new row shows its queued fetch", async () => {
+            await renderLoaded(makeWatchlist(['VGZ']));
+            expect(computedMock).toHaveBeenCalledTimes(1);
+            computedMock.mockResolvedValue(makeComputedSymbols([makeWatchlistQueued('waiting_for_data')]));
+            addMock.mockResolvedValue({ owner: 'unauthenticated', items: [makeUncoveredItem('BP'), makeWatchlistItem()] });
+
+            await userEvent.type(screen.getByRole('combobox', { name: 'Add symbol' }), 'bp{Enter}');
+
+            expect(await within(screen.getByTestId('watchlist-row-BP')).findByTestId('compute-state-BP')).toHaveTextContent(
+                /^Waiting for data · queued .+ \(added to watchlist\)$/
+            );
+            expect(computedMock).toHaveBeenCalledTimes(2);
+        });
+
+        it('does not re-read the compute states after a failed add', async () => {
+            await renderLoaded(makeWatchlist([]));
+            addMock.mockRejectedValue(new ApiError(404, 'unknown_symbol'));
+
+            await userEvent.type(screen.getByRole('combobox', { name: 'Add symbol' }), 'zzzz{Enter}');
+            await screen.findByTestId('add-symbol-error');
+
+            expect(computedMock).toHaveBeenCalledTimes(1);
+        });
+    });
+
+    describe('reload when a computation finishes', () => {
+        const advancePoll = () =>
+            act(async () => {
+                jest.advanceTimersByTime(COMPUTE_POLL_MS);
+            });
+
+        it('reloads the watchlist once when a row goes from waiting / computing to computed, showing its new values', async () => {
+            jest.useFakeTimers();
+            fetchMock.mockResolvedValue({ owner: 'unauthenticated', items: [makeUncoveredItem('BP')] });
+            computedMock.mockResolvedValue(makeComputedSymbols([makeWatchlistQueued('waiting_for_data')]));
+            render(<WatchlistPage />, { wrapper: MemoryRouter });
+            await screen.findByTestId('compute-state-BP');
+            expect(fetchMock).toHaveBeenCalledTimes(1);
+
+            computedMock.mockResolvedValue(makeComputedSymbols([makeWatchlistQueued('computing')]));
+            await advancePoll();
+            expect(screen.getByTestId('compute-state-BP')).toHaveAttribute('data-state', 'computing');
+            expect(fetchMock).toHaveBeenCalledTimes(1);
+
+            fetchMock.mockResolvedValue({ owner: 'unauthenticated', items: [makeDailyBarsItem({ symbol: 'BP', close: 44.15 })] });
+            computedMock.mockResolvedValue(makeComputedSymbols([makeWatchlistQueued('computed')]));
+            await advancePoll();
+
+            await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+            expect(await within(screen.getByTestId('watchlist-row-BP')).findByTestId('price-value')).toHaveTextContent('$44.15');
+            expect(screen.getByTestId('daily-bars-BP')).toBeInTheDocument();
+
+            await advancePoll();
+            await advancePoll();
+            expect(fetchMock).toHaveBeenCalledTimes(2);
+        });
+
+        it('does not reload for a symbol that was already computed on load', async () => {
+            fetchMock.mockResolvedValue(makeWatchlist(['VGZ']));
+            computedMock.mockResolvedValue(makeComputedSymbols([makeWatchlistQueued('computed', { symbol: 'VGZ' })]));
+            render(<WatchlistPage />, { wrapper: MemoryRouter });
+            await screen.findByRole('button', { name: 'Compute VGZ' });
+
+            expect(fetchMock).toHaveBeenCalledTimes(1);
+        });
+
+        it('does not reload for a symbol that is not on the watchlist', async () => {
+            jest.useFakeTimers();
+            fetchMock.mockResolvedValue(makeWatchlist(['VGZ']));
+            computedMock.mockResolvedValue(makeComputedSymbols([makeWatchlistQueued('waiting_for_data', { symbol: 'DIA' })]));
+            render(<WatchlistPage />, { wrapper: MemoryRouter });
+            await screen.findByTestId('watchlist-row-VGZ');
+            await waitFor(() => expect(computedMock).toHaveBeenCalledTimes(1));
+
+            computedMock.mockResolvedValue(makeComputedSymbols([makeWatchlistQueued('computed', { symbol: 'DIA' })]));
+            await advancePoll();
+            await waitFor(() => expect(computedMock).toHaveBeenCalledTimes(2));
+
+            expect(fetchMock).toHaveBeenCalledTimes(1);
         });
     });
 });

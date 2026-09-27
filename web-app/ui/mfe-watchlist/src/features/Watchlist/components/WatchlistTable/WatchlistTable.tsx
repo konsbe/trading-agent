@@ -2,6 +2,7 @@ import { KeyboardEvent, MouseEvent, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button, CloseIcon, EMPTY_VALUE, formatPrice, MARKET_COLUMNS, MarketRow } from '@trading-agent/shared-components';
 import { WatchlistItem } from '@/api';
+import { DAILY_BARS_LABEL, dailyBarsTooltip, isDailyBarsRow, marketCapNoteLabel } from '@/common/format/dataSource';
 import { formatTradingDay } from '@/common/format/format';
 import ComputeButton from '@/components/ComputeButton';
 import { scannerDetailPath } from '@/config/routes';
@@ -24,8 +25,35 @@ const SymbolCell = ({ item, linked }: { item: WatchlistItem; linked: boolean }) 
             </span>
             <span className="watchlist-table__exchange">{item.exchange ?? EMPTY_VALUE}</span>
         </span>
+        {isDailyBarsRow(item) && (
+            <span className="watchlist-table__source" title={dailyBarsTooltip(item)} data-testid={`daily-bars-${item.symbol}`}>
+                {DAILY_BARS_LABEL}
+            </span>
+        )}
     </div>
 );
+
+/** A daily-bars row's null market cap with the API's reason; the figure is never converted. */
+const MarketCapNote = ({ item }: { item: WatchlistItem }) => {
+    const [reason, ...rest] = marketCapNoteLabel(item.market_cap_note ?? '').split(' — ');
+    return (
+        <span className="watchlist-table__cap-note">
+            <span data-testid="market-cap-value">{EMPTY_VALUE}</span>
+            <span className="watchlist-table__hint" title={item.market_cap_note ?? undefined} data-testid={`market-cap-note-${item.symbol}`}>
+                <span className="watchlist-table__nowrap">{reason}</span>
+                {rest.length > 0 && (
+                    <>
+                        {' '}
+                        <span className="watchlist-table__nowrap">— {rest.join(' — ')}</span>
+                    </>
+                )}
+            </span>
+        </span>
+    );
+};
+
+const hasMarketCapNote = (item: WatchlistItem) =>
+    isDailyBarsRow(item) && item.market_cap === null && item.market_cap_est === null && Boolean(item.market_cap_note);
 
 /** Neutral note so an old price never reads as current, or why there is none. */
 const priceHint = (item: WatchlistItem, isSaving: boolean): string | null => {
@@ -71,6 +99,8 @@ const marketValues = (item: WatchlistItem): MarketRow => (item.as_of === null ? 
  * and the row activates on click or Enter, like the candidates table. A symbol
  * without data (`as_of` null) isn't linked — its detail page would be a 404 —
  * and neither is anything standalone, where the detail route doesn't exist.
+ * A row computed from the symbol's own daily bars (outside the scanner's
+ * universe) carries a "from daily bars" marker and never a score.
  */
 const WatchlistTable = ({ id, caption, rows, saving, onRemove }: WatchlistTableProps) => {
     const isHosted = useIsHosted();
@@ -155,7 +185,13 @@ const WatchlistTable = ({ id, caption, rows, saving, onRemove }: WatchlistTableP
                                         className={column.numeric ? 'is-numeric' : undefined}
                                         data-column={column.key}
                                     >
-                                        {column.key === 'close' ? <PriceCell item={item} isSaving={isSaving} /> : column.render(values)}
+                                        {column.key === 'close' ? (
+                                            <PriceCell item={item} isSaving={isSaving} />
+                                        ) : column.key === 'market_cap' && hasMarketCapNote(item) ? (
+                                            <MarketCapNote item={item} />
+                                        ) : (
+                                            column.render(values)
+                                        )}
                                     </td>
                                 ))}
                                 <td data-column="compute">

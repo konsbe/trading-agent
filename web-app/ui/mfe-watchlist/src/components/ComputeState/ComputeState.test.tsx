@@ -4,7 +4,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { ComputedSymbol } from '@/api';
 import { formatClockTime } from '@/common/format/format';
 import { HostModeProvider } from '@/providers/HostModeContext';
-import { makeComputedSymbol, makeManualComputed } from '@/test-utils/fixtures';
+import { makeComputedSymbol, makeManualComputed, makeWatchlistQueued } from '@/test-utils/fixtures';
 import ComputeState, { COMPUTING_LABEL } from '.';
 
 interface RenderOptions {
@@ -60,12 +60,43 @@ describe('ComputeState', () => {
 
     it("says data hasn't arrived with the queue time, the wait and the timeout, without animating", () => {
         const requestedAt = new Date(Date.now() - 42 * 60_000).toISOString();
-        renderState(makeManualComputed('data_not_arrived', { manual_requested_at: requestedAt }));
+        renderState(makeManualComputed('data_not_arrived', { manual_requested_at: requestedAt, queued_at: requestedAt }));
 
         expect(state()).toHaveTextContent(
             `Data hasn't arrived — requested ${formatClockTime(requestedAt)}, waited 42 min (gives up waiting after 30 min)`
         );
         expect(state().querySelector('.compute-state__pulse')).not.toBeInTheDocument();
+    });
+
+    it('says "queued (added to watchlist)" for a fetch queued by a watchlist addition, not "requested"', () => {
+        renderState(makeWatchlistQueued('waiting_for_data'));
+
+        const queued = formatClockTime('2026-09-27T17:56:04Z');
+        expect(state('BP')).toHaveTextContent(`Waiting for data · queued ${queued} (added to watchlist)`);
+        expect(state('BP')).not.toHaveTextContent('requested');
+        expect(state('BP').querySelector('time')).toHaveAttribute('dateTime', '2026-09-27T17:56:04Z');
+    });
+
+    it('uses the newest queue: a watchlist addition after a Compute press reads "queued"', () => {
+        renderState(
+            makeWatchlistQueued('computing', {
+                reasons: ['watchlist', 'manual'],
+                manual_requested_at: '2026-09-27T17:50:00Z',
+                queued_at: '2026-09-27T17:56:04Z',
+            })
+        );
+        expect(state('BP')).toHaveTextContent(`· queued ${formatClockTime('2026-09-27T17:56:04Z')} (added to watchlist)`);
+    });
+
+    it('reads "requested" when the Compute press is the newest queue', () => {
+        renderState(makeManualComputed('waiting_for_data', { reasons: ['watchlist', 'manual'] }));
+        expect(state()).toHaveTextContent(`Waiting for data · requested ${requested}`);
+    });
+
+    it('says "queued" without "added to watchlist" when no watchlist reason is open', () => {
+        renderState(makeWatchlistQueued('waiting_for_data', { reasons: ['followed'] }));
+        expect(state('BP')).toHaveTextContent(/queued \S+ \S+$/);
+        expect(state('BP')).not.toHaveTextContent('added to watchlist');
     });
 
     it('omits the timeout when it is unknown', () => {

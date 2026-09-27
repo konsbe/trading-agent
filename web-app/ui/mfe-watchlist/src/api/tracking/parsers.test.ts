@@ -7,6 +7,7 @@ import {
     makeFollowedSymbol,
     makeFollowedSymbols,
     makeManualComputed,
+    makeWatchlistQueued,
 } from '@/test-utils/fixtures';
 
 const clone = <T,>(value: T): any => JSON.parse(JSON.stringify(value));
@@ -109,7 +110,25 @@ describe('parseComputedSymbols', () => {
         });
     });
 
+    it('reads queued_at for a watchlist-queued fetch without a manual request', () => {
+        const body = makeComputedSymbols([makeWatchlistQueued('waiting_for_data')]);
+        expect(parseComputedSymbols(clone(body)).items[0]).toMatchObject({
+            reasons: ['watchlist'],
+            manual_requested_at: null,
+            queued_at: '2026-09-27T17:56:04Z',
+        });
+    });
+
+    it('reads an older body without queued_at as queued at the manual request', () => {
+        const body = clone(makeComputedSymbols([makeManualComputed('waiting_for_data'), makeComputedSymbol()]));
+        body.items.forEach((item: any) => delete item.queued_at);
+        const items = parseComputedSymbols(body).items;
+        expect(items[0].queued_at).toBe('2026-09-27T13:57:46Z');
+        expect(items[1].queued_at).toBeNull();
+    });
+
     it.each([
+        ['an unparseable queued_at', (b: any) => (b.items[0].queued_at = 'later'), 'items[0].queued_at'],
         ['a missing data_timeout_minutes', (b: any) => delete b.data_timeout_minutes, 'data_timeout_minutes'],
         ['an unknown state', (b: any) => (b.items[0].state = 'queued'), 'items[0].state'],
         ['an unknown reason', (b: any) => (b.items[0].reasons = ['followed', 'alert']), 'items[0].reasons[1]'],

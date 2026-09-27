@@ -1,7 +1,7 @@
 import { ReactNode } from 'react';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { ApiError, ComputedSymbolsResponse, fetchComputedSymbols, requestCompute, stopCompute } from '@/api';
-import { makeComputedSymbol, makeComputedSymbols, makeManualComputed } from '@/test-utils/fixtures';
+import { makeComputedSymbol, makeComputedSymbols, makeManualComputed, makeWatchlistQueued } from '@/test-utils/fixtures';
 import { COMPUTE_POLL_MS, ComputeStatusProvider, isPending, useComputeStatus } from '.';
 
 jest.mock('@/api/tracking/trackingApi', () => ({
@@ -88,6 +88,19 @@ describe('ComputeStatusProvider', () => {
             jest.advanceTimersByTime(COMPUTE_POLL_MS * 2);
         });
         expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('polls for a fetch queued by a watchlist addition, with no manual request', async () => {
+        jest.useFakeTimers();
+        const { result } = await loaded(makeComputedSymbols([makeWatchlistQueued('waiting_for_data')]));
+        expect(result.current.isPolling).toBe(true);
+
+        fetchMock.mockResolvedValue(makeComputedSymbols([makeWatchlistQueued('computed')]));
+        await act(async () => {
+            jest.advanceTimersByTime(COMPUTE_POLL_MS);
+        });
+        expect(fetchMock).toHaveBeenCalledTimes(2);
+        expect(result.current.isPolling).toBe(false);
     });
 
     it('stops polling on unmount', async () => {
@@ -183,10 +196,13 @@ describe('ComputeStatusProvider', () => {
 });
 
 describe('isPending', () => {
-    it('is true only for an open manual request that is waiting or computing', () => {
+    it('is true only for a queued fetch (manual or watchlist) that is waiting or computing', () => {
         expect(isPending(makeManualComputed('waiting_for_data'))).toBe(true);
         expect(isPending(makeManualComputed('computing'))).toBe(true);
         expect(isPending(makeManualComputed('data_not_arrived'))).toBe(false);
+        expect(isPending(makeWatchlistQueued('waiting_for_data'))).toBe(true);
+        expect(isPending(makeWatchlistQueued('computing'))).toBe(true);
+        expect(isPending(makeWatchlistQueued('computed'))).toBe(false);
         expect(isPending(makeComputedSymbol({ state: 'scheduled' }))).toBe(false);
     });
 });

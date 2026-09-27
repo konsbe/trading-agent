@@ -66,12 +66,15 @@ export const parseDirectorySearch = (value: unknown): DirectorySearchResponse =>
 
 const parseComputedSymbol = (value: unknown, path: string): ComputedSymbol => {
     const o = obj(value, path);
+    const manualRequestedAt = optTimestamp(o.manual_requested_at, `${path}.manual_requested_at`);
     return {
         symbol: str(o.symbol, `${path}.symbol`),
         name: optStr(o.name, `${path}.name`),
         asset_type: assetType(o.asset_type, `${path}.asset_type`),
         reasons: array(o.reasons, `${path}.reasons`, computeReason),
-        manual_requested_at: optTimestamp(o.manual_requested_at, `${path}.manual_requested_at`),
+        manual_requested_at: manualRequestedAt,
+        // An older server queued fetches only for manual requests.
+        queued_at: o.queued_at === undefined ? manualRequestedAt : optTimestamp(o.queued_at, `${path}.queued_at`),
         state: computeState(o.state, `${path}.state`),
         bars_fetched_at: optTimestamp(o.bars_fetched_at, `${path}.bars_fetched_at`),
         fundamentals_fetched_at: optTimestamp(o.fundamentals_fetched_at, `${path}.fundamentals_fetched_at`),

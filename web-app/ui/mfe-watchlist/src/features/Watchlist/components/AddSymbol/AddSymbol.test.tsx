@@ -65,7 +65,7 @@ describe('AddSymbol', () => {
         const { input } = renderAdd();
         await typeAndWait(input, 'on');
 
-        expect(screen.getByTestId('symbol-option-ONFD')).toHaveTextContent('not scanned — no price data');
+        expect(screen.getByTestId('symbol-option-ONFD')).toHaveTextContent('not scanned — from daily bars');
         expect(screen.getByTestId('symbol-option-ONCO')).not.toHaveTextContent('not scanned');
     });
 

@@ -9,6 +9,7 @@ import {
     requestCompute,
     stopCompute,
 } from '@/api';
+import { isPending } from '@/common/compute/queue';
 
 /** How often GET /computed-symbols is repeated while a request is pending. */
 export const COMPUTE_POLL_MS = 12_000;
@@ -22,7 +23,7 @@ export interface ComputeStatus {
     isLoading: boolean;
     /** The latest load failure (first load or a poll); cleared by the next success. */
     loadError: ApiError | null;
-    /** True while some manual request is `waiting_for_data` or `computing`. */
+    /** True while some queued fetch (Compute or a watchlist addition) is `waiting_for_data` or `computing`. */
     isPolling: boolean;
     getItem: (symbol: string) => ComputedSymbol | undefined;
     /** Symbols with a Compute / Stop computing call in flight. */
@@ -43,9 +44,7 @@ const normalize = (symbol: string) => symbol.trim().toUpperCase();
 const toApiError = (err: unknown): ApiError =>
     isApiError(err) ? err : new ApiError(0, 'unknown_error', (err as Error)?.message ?? String(err));
 
-/** A manual request that is still moving; `data_not_arrived` and `failed` are final until the user acts. */
-export const isPending = (item: ComputedSymbol): boolean =>
-    item.manual_requested_at !== null && (item.state === 'waiting_for_data' || item.state === 'computing');
+export { isPending };
 
 const ComputeStatusContext = createContext<ComputeStatus | null>(null);
 
@@ -56,7 +55,7 @@ interface ComputeStatusProviderProps {
 
 /**
  * The computed-symbols list for one screen. Loaded once on mount; polled every
- * `pollMs` only while a manual request is pending, and never after unmount.
+ * `pollMs` only while a queued fetch is pending, and never after unmount.
  * A Compute / Stop response replaces the list, and a load that started before
  * the latest write is dropped so it can't overwrite a newer state.
  */

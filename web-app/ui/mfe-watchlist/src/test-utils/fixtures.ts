@@ -23,6 +23,10 @@ export const makeWatchlistItem = (overrides: Partial<WatchlistItem> = {}): Watch
     close: 1.2,
     change_pct: 12,
     rvol_20: 6.45,
+    volume: 6_450_000,
+    data_source: 'scanner',
+    sources: null,
+    market_cap_note: null,
     dollar_volume: 7_740_000,
     rsi_14: 68.2,
     breakout_state: 'breakout',
@@ -61,6 +65,46 @@ export const makeNonCandidateItem = (overrides: Partial<WatchlistItem> = {}): Wa
         ...overrides,
     });
 
+export const TSM_MARKET_CAP_NOTE =
+    'market_cap is null: Finnhub marketCapitalization is not in USD (reporting currency TWD) and no FX conversion is available';
+
+export const BP_MARKET_CAP_NOTE =
+    'market_cap is null: Finnhub marketCapitalization is not in USD (priced on a non-US listing and does not reconcile with the USD close) and no FX conversion is available';
+
+const YAHOO_SOURCES: Record<string, string> = Object.fromEntries(
+    ['breakout_state', 'change_pct', 'close', 'dollar_volume', 'pct_of_52w_high', 'rsi_14', 'rvol_20', 'volume'].map(key => [
+        key,
+        'daily_bars:yahoo_finance',
+    ])
+);
+
+/** Live TSM (2026-09-27): outside the scanner's universe, computed from its own daily bars; cap not in USD. */
+export const makeDailyBarsItem = (overrides: Partial<WatchlistItem> = {}): WatchlistItem =>
+    makeWatchlistItem({
+        symbol: 'TSM',
+        company_name: 'TAIWAN SEMICONDUCTOR-SP ADR',
+        exchange: 'NYSE',
+        as_of: '2026-09-25',
+        close: 450.6099853515625,
+        change_pct: 1.2,
+        rvol_20: 0.83,
+        volume: 11_200_000,
+        data_source: 'daily_bars',
+        sources: YAHOO_SOURCES,
+        market_cap_note: TSM_MARKET_CAP_NOTE,
+        dollar_volume: 5_046_000_000,
+        rsi_14: 62.2,
+        breakout_state: 'approaching',
+        pct_of_52w_high: 0.95,
+        market_cap: null,
+        market_cap_est: null,
+        market_cap_is_proxy: false,
+        momentum_score_100: null,
+        score_attainable: null,
+        is_candidate_today: false,
+        ...overrides,
+    });
+
 /** A symbol with no features row: market fields null, no score, always stale. */
 export const makeUncoveredItem = (symbol = 'VGI'): WatchlistItem =>
     makeWatchlistItem({
@@ -70,6 +114,8 @@ export const makeUncoveredItem = (symbol = 'VGI'): WatchlistItem =>
         close: null,
         change_pct: null,
         rvol_20: null,
+        volume: null,
+        data_source: null,
         dollar_volume: null,
         rsi_14: null,
         breakout_state: null,
@@ -141,6 +187,7 @@ export const makeComputedSymbol = (overrides: Partial<ComputedSymbol> = {}): Com
     asset_type: 'equity',
     reasons: ['followed'],
     manual_requested_at: null,
+    queued_at: null,
     state: 'computed',
     bars_fetched_at: null,
     fundamentals_fetched_at: null,
@@ -159,8 +206,21 @@ export const makeManualComputed = (state: ComputeState, overrides: Partial<Compu
         asset_type: 'etf',
         reasons: ['manual'],
         manual_requested_at: '2026-09-27T13:57:46Z',
+        queued_at: '2026-09-27T13:57:46Z',
         state,
         computed_at: state === 'computed' ? '2026-09-27T14:12:10Z' : null,
+        ...overrides,
+    });
+
+/** A fetch queued by adding the symbol to the watchlist, no Compute press (live BP shape). */
+export const makeWatchlistQueued = (state: ComputeState, overrides: Partial<ComputedSymbol> = {}): ComputedSymbol =>
+    makeComputedSymbol({
+        symbol: 'BP',
+        name: 'BP PLC-SPONS ADR',
+        reasons: ['watchlist'],
+        queued_at: '2026-09-27T17:56:04Z',
+        state,
+        computed_at: state === 'computed' ? '2026-09-27T17:58:40Z' : null,
         ...overrides,
     });
 

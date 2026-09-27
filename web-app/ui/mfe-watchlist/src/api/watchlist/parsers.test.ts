@@ -1,5 +1,13 @@
 import { parseSymbolSearch, parseWatchlist } from './parsers';
-import { makeNonCandidateItem, makeSymbolSearch, makeUncoveredItem, makeWatchlist, makeWatchlistItem } from '@/test-utils/fixtures';
+import {
+    makeDailyBarsItem,
+    makeNonCandidateItem,
+    makeSymbolSearch,
+    makeUncoveredItem,
+    makeWatchlist,
+    makeWatchlistItem,
+    TSM_MARKET_CAP_NOTE,
+} from '@/test-utils/fixtures';
 
 const clone = <T,>(value: T): any => JSON.parse(JSON.stringify(value));
 
@@ -66,6 +74,35 @@ describe('parseWatchlist', () => {
         });
     });
 
+    it('accepts a daily-bars row with its sources and market-cap note', () => {
+        const body = { owner: 'unauthenticated', items: [makeDailyBarsItem(), makeWatchlistItem()] };
+        const items = parseWatchlist(clone(body)).items;
+        expect(items).toEqual(body.items);
+        expect(items[0]).toMatchObject({
+            data_source: 'daily_bars',
+            market_cap: null,
+            market_cap_note: TSM_MARKET_CAP_NOTE,
+            momentum_score_100: null,
+        });
+        expect(items[0].sources?.close).toBe('daily_bars:yahoo_finance');
+        expect(items[1]).toMatchObject({ data_source: 'scanner', sources: null, market_cap_note: null });
+    });
+
+    it('reads an older body without the provenance fields as scanner (with data) or no data', () => {
+        const body = { owner: 'unauthenticated', items: [makeWatchlistItem(), makeUncoveredItem()] };
+        const raw = clone(body);
+        raw.items.forEach((item: any) => ['volume', 'data_source', 'sources', 'market_cap_note'].forEach(key => delete item[key]));
+        const items = parseWatchlist(raw).items;
+        expect(items[0]).toMatchObject({ volume: null, data_source: 'scanner', sources: null, market_cap_note: null });
+        expect(items[1]).toMatchObject({ data_source: null, sources: null });
+    });
+
+    it('keeps an explicit null data_source (no data at all)', () => {
+        const body = clone(makeWatchlist(['VGZ']));
+        body.items[0].data_source = null;
+        expect(parseWatchlist(body).items[0].data_source).toBeNull();
+    });
+
     it('keeps change_pct as served (a percentage)', () => {
         expect(parseWatchlist(clone(makeWatchlist(['VGZ']))).items[0].change_pct).toBe(12);
     });
@@ -93,6 +130,11 @@ describe('parseWatchlist', () => {
         ['an unknown catalyst tier', (b: any) => (b.items[0].catalyst_tier = 'C'), 'items[0].catalyst_tier'],
         ['a string market_cap_is_proxy', (b: any) => (b.items[0].market_cap_is_proxy = 'yes'), 'items[0].market_cap_is_proxy'],
         ['a numeric is_candidate_today', (b: any) => (b.items[0].is_candidate_today = 1), 'items[0].is_candidate_today'],
+        ['an unknown data_source', (b: any) => (b.items[0].data_source = 'guess'), 'items[0].data_source'],
+        ['a string volume', (b: any) => (b.items[0].volume = '100'), 'items[0].volume'],
+        ['a non-string source', (b: any) => (b.items[0].sources = { close: 1 }), 'items[0].sources.close'],
+        ['an array sources', (b: any) => (b.items[0].sources = []), 'items[0].sources'],
+        ['a numeric market_cap_note', (b: any) => (b.items[0].market_cap_note = 5), 'items[0].market_cap_note'],
     ])('rejects %s', (_label, mutate, path) => {
         const body = clone(makeWatchlist(['VGZ']));
         mutate(body);

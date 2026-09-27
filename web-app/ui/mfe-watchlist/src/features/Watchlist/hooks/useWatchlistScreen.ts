@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ApiError } from '@/api';
 import useWatchlist, { UseWatchlist, WatchlistSeed } from '@/hooks/watchlist/useWatchlist';
 
@@ -22,15 +22,22 @@ export interface UseWatchlistScreen extends Pick<UseWatchlist, 'items' | 'saving
     remove: (symbol: string) => void;
 }
 
+export interface UseWatchlistScreenOptions {
+    /** Called after the server accepted an add (which also queues the symbol's data fetch). */
+    onAdded?: (symbol: string) => void;
+}
+
 /**
  * Screen state over `useWatchlist`, whose single `error` covers both loads and
  * saves: once the list has loaded, an error can only come from a save, so it
  * is attributed to the save that returned null.
  */
-const useWatchlistScreen = (): UseWatchlistScreen => {
+const useWatchlistScreen = ({ onAdded }: UseWatchlistScreenOptions = {}): UseWatchlistScreen => {
     const { items, isLoading, error, saving, isWatched, add, remove, reload } = useWatchlist();
     const [hasLoaded, setHasLoaded] = useState(false);
     const [failedOp, setFailedOp] = useState<Omit<FailedSave, 'error'> | null>(null);
+    const onAddedRef = useRef(onAdded);
+    onAddedRef.current = onAdded;
 
     const loadedNow = !isLoading && !error;
     useEffect(() => {
@@ -41,8 +48,10 @@ const useWatchlistScreen = (): UseWatchlistScreen => {
     const save = useCallback(
         (kind: FailedSave['kind'], symbol: string, call: () => Promise<unknown>) => {
             setFailedOp(null);
+            const key = symbol.trim().toUpperCase();
             call().then(result => {
-                if (result === null) setFailedOp({ kind, symbol: symbol.trim().toUpperCase() });
+                if (result === null) setFailedOp({ kind, symbol: key });
+                else if (kind === 'add') onAddedRef.current?.(key);
             });
         },
         []

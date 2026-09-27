@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { ComputedSymbol } from '@/api';
+import { isQueuedByRequest, queuedTime } from '@/common/compute/queue';
 import { formatClockTime, formatDateTime, minutesSince } from '@/common/format/format';
 import { scannerDetailPath } from '@/config/routes';
 import { useIsHosted } from '@/providers/HostModeContext';
@@ -18,6 +19,19 @@ const Time = ({ iso }: { iso: string }) => (
     </time>
 );
 
+/** "requested 5:45 PM" for a Compute press; "queued 5:56 PM (added to watchlist)" for a watchlist addition. */
+const QueuedAt = ({ item, iso }: { item: ComputedSymbol; iso: string }) =>
+    isQueuedByRequest(item) ? (
+        <>
+            requested <Time iso={iso} />
+        </>
+    ) : (
+        <>
+            queued <Time iso={iso} />
+            {item.reasons.includes('watchlist') && ' (added to watchlist)'}
+        </>
+    );
+
 /**
  * One symbol's computation state in plain words. `waiting_for_data` is a
  * queued state (a slow pulse, not a spinner); `computing` reads like Stock
@@ -27,7 +41,7 @@ const Time = ({ iso }: { iso: string }) => (
  */
 const ComputeState = ({ item, dataTimeoutMinutes, variant = 'inline' }: ComputeStateProps) => {
     const linkable = useDetailLinkable(item);
-    const requestedAt = item.manual_requested_at;
+    const queuedAt = queuedTime(item);
     const testId = `compute-state-${item.symbol}`;
 
     switch (item.state) {
@@ -37,10 +51,10 @@ const ComputeState = ({ item, dataTimeoutMinutes, variant = 'inline' }: ComputeS
                     <span className="compute-state__pulse" aria-hidden="true" />
                     <span>
                         Waiting for data
-                        {requestedAt && (
+                        {queuedAt && (
                             <span className="compute-state__muted">
                                 {' '}
-                                · requested <Time iso={requestedAt} />
+                                · <QueuedAt item={item} iso={queuedAt} />
                             </span>
                         )}
                     </span>
@@ -52,10 +66,10 @@ const ComputeState = ({ item, dataTimeoutMinutes, variant = 'inline' }: ComputeS
                     <span className="compute-state__title">{COMPUTING_LABEL}</span>{' '}
                     <span className="compute-state__muted">
                         · data fetched, picked up within a minute
-                        {requestedAt && (
+                        {queuedAt && (
                             <>
                                 {' '}
-                                · requested <Time iso={requestedAt} />
+                                · <QueuedAt item={item} iso={queuedAt} />
                             </>
                         )}
                     </span>
@@ -81,14 +95,14 @@ const ComputeState = ({ item, dataTimeoutMinutes, variant = 'inline' }: ComputeS
                 </span>
             );
         case 'data_not_arrived': {
-            const waited = requestedAt ? minutesSince(requestedAt) : null;
+            const waited = queuedAt ? minutesSince(queuedAt) : null;
             return (
                 <span className="compute-state is-not-arrived" role="status" data-testid={testId} data-state={item.state}>
                     <span className="compute-state__title">Data hasn&apos;t arrived</span>{' '}
                     <span className="compute-state__muted">
-                        {requestedAt && (
+                        {queuedAt && (
                             <>
-                                — requested <Time iso={requestedAt} />, waited {waited} min
+                                — <QueuedAt item={item} iso={queuedAt} />, waited {waited} min
                             </>
                         )}
                         {dataTimeoutMinutes !== null && ` (gives up waiting after ${dataTimeoutMinutes} min)`}

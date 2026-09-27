@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import { Button } from '@trading-agent/shared-components';
 import { ComputedSymbol } from '@/api';
 import { getTrackingErrorMessage } from '@/common/errors/errorMessages';
+import { isPending, queuedTime } from '@/common/compute/queue';
 import ComputeState from '@/components/ComputeState';
 import { useComputeStatus } from '@/providers/ComputeStatusContext';
 import { ComputeButtonProps } from './types';
@@ -16,6 +17,10 @@ const REASON_WORDS: Record<string, string> = {
 const hasOpenManualRequest = (item: ComputedSymbol | undefined): item is ComputedSymbol =>
     Boolean(item && item.manual_requested_at !== null && item.reasons.includes('manual'));
 
+/** A fetch queued without a Compute press (a watchlist addition) that is moving or has timed out. */
+const hasAutomaticQueue = (item: ComputedSymbol | undefined): item is ComputedSymbol =>
+    Boolean(item && queuedTime(item) !== null && (isPending(item) || item.state === 'data_not_arrived'));
+
 /** Tooltip for a symbol without a manual request. */
 const computeHint = (item: ComputedSymbol | undefined): string => {
     const automatic = item?.reasons.filter(reason => reason !== 'manual').map(reason => REASON_WORDS[reason] ?? reason) ?? [];
@@ -27,7 +32,9 @@ const computeHint = (item: ComputedSymbol | undefined): string => {
 /**
  * Compute for one symbol, used by every table and search list. Without an open
  * manual request it's a button; once requested it shows the request's state
- * instead, kept current by the screen's ComputeStatusProvider. A repeat PUT
+ * instead, kept current by the screen's ComputeStatusProvider. A fetch queued
+ * by adding the symbol to the watchlist shows its state the same way while it
+ * moves; if its data never arrives, Compute is offered next to it. A repeat PUT
  * keeps the same open request, so only `data_not_arrived` offers "Check again",
  * and it says so. 404 / 422 are shown inline in plain words.
  */
@@ -42,12 +49,14 @@ const ComputeButton = ({ symbol, label }: ComputeButtonProps) => {
     }, [compute, key]);
 
     const manual = hasOpenManualRequest(item) ? item : null;
+    const queued = !manual && hasAutomaticQueue(item) ? item : null;
     const name = label ?? key;
+    const shown = manual ?? queued;
 
     return (
         <div className="compute-control" data-testid={`compute-control-${key}`}>
-            {manual && <ComputeState item={manual} dataTimeoutMinutes={dataTimeoutMinutes} />}
-            {!manual && (
+            {shown && <ComputeState item={shown} dataTimeoutMinutes={dataTimeoutMinutes} />}
+            {!manual && !(queued && isPending(queued)) && (
                 <Button
                     variant="secondary"
                     size="sm"

@@ -1,7 +1,7 @@
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ApiError, ComputedSymbolsResponse, fetchComputedSymbols, requestCompute } from '@/api';
-import { makeComputedSymbol, makeComputedSymbols, makeManualComputed } from '@/test-utils/fixtures';
+import { makeComputedSymbol, makeComputedSymbols, makeManualComputed, makeWatchlistQueued } from '@/test-utils/fixtures';
 import { renderWithCompute } from '@/test-utils/renderWithCompute';
 import ComputeButton from '.';
 
@@ -75,6 +75,32 @@ describe('ComputeButton', () => {
         expect(computeMock).toHaveBeenCalledWith('DIA');
         expect(await screen.findByTestId('compute-state-DIA')).toHaveAttribute('data-state', 'computing');
         expect(screen.queryByRole('button', { name: 'Check again for DIA' })).not.toBeInTheDocument();
+    });
+
+    it.each(['waiting_for_data', 'computing'] as const)(
+        'shows a watchlist-queued fetch that is %s instead of the button, without a Compute press',
+        async state => {
+            await renderButton(makeComputedSymbols([makeWatchlistQueued(state)]), 'BP');
+
+            expect(await screen.findByTestId('compute-state-BP')).toHaveAttribute('data-state', state);
+            expect(screen.getByTestId('compute-state-BP')).toHaveTextContent('queued');
+            expect(screen.queryByRole('button')).not.toBeInTheDocument();
+        }
+    );
+
+    it('offers Compute (not "Check again") next to a watchlist-queued fetch whose data has not arrived', async () => {
+        await renderButton(makeComputedSymbols([makeWatchlistQueued('data_not_arrived')]), 'BP');
+
+        expect(await screen.findByTestId('compute-state-BP')).toHaveAttribute('data-state', 'data_not_arrived');
+        expect(screen.getByRole('button', { name: 'Compute BP' })).toBeEnabled();
+        expect(screen.queryByRole('button', { name: 'Check again for BP' })).not.toBeInTheDocument();
+    });
+
+    it('is a plain Compute button once a watchlist-queued fetch is computed', async () => {
+        await renderButton(makeComputedSymbols([makeWatchlistQueued('computed')]), 'BP');
+
+        expect(await screen.findByRole('button', { name: 'Compute BP' })).toBeEnabled();
+        expect(screen.queryByTestId('compute-state-BP')).not.toBeInTheDocument();
     });
 
     it.each([

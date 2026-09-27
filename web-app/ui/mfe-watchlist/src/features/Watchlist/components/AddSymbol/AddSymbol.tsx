@@ -1,6 +1,7 @@
 import { ChangeEvent, KeyboardEvent, useCallback, useEffect, useId, useState } from 'react';
 import { EMPTY_VALUE } from '@trading-agent/shared-components';
 import { SymbolSearchResult } from '@/api';
+import { DAILY_BARS_LABEL } from '@/common/format/dataSource';
 import { getErrorMessage } from '@/common/errors/errorMessages';
 import useSymbolSearch from '@/hooks/watchlist/useSymbolSearch';
 import InlineError from '../InlineError';
@@ -8,6 +9,9 @@ import { AddSymbolProps } from './types';
 import './AddSymbol-styles.css';
 
 const seedOf = (result: SymbolSearchResult) => ({ company_name: result.company_name, exchange: result.exchange });
+
+/** Outside the scanner's filters: once added, its row is computed from its own daily bars. */
+const NOT_SCANNED_NOTE = `not scanned — ${DAILY_BARS_LABEL}`;
 
 /**
  * "Add symbol" combobox (ARIA 1.2 pattern): typing searches, arrows move
@@ -192,7 +196,7 @@ const AddSymbol = ({ isWatched, onAdd, error, onDismissError }: AddSymbolProps) 
                                         <span className="watchlist-add__company">{result.company_name ?? EMPTY_VALUE}</span>
                                         <span className="watchlist-add__exchange">{result.exchange ?? EMPTY_VALUE}</span>
                                         <span className="watchlist-add__option-note">
-                                            {added ? 'Added' : result.is_eligible ? '' : 'not scanned — no price data'}
+                                            {added ? 'Added' : result.is_eligible ? '' : NOT_SCANNED_NOTE}
                                         </span>
                                     </li>
                                 );
@@ -202,7 +206,7 @@ const AddSymbol = ({ isWatched, onAdd, error, onDismissError }: AddSymbolProps) 
                 )}
             </div>
             <p id={helpId} className="watchlist-add__help">
-                Pick a match, or type a ticker and press Enter. Saved to the shared watchlist (no sign-in yet).
+                Pick a match, or type a ticker and press Enter. Saved to the shared watchlist (no sign-in yet); its data is fetched within a few minutes.
             </p>
             <div className="watchlist-add__live" aria-live="polite">
                 {notice && (

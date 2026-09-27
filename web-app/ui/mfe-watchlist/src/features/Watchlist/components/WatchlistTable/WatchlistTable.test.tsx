@@ -5,7 +5,17 @@ import { fetchComputedSymbols, requestCompute } from '@/api';
 import { ComputeStatusProvider } from '@/providers/ComputeStatusContext';
 import { HostModeProvider } from '@/providers/HostModeContext';
 import { findAsciiMinus } from '@/test-utils/asciiMinus';
-import { makeComputedSymbols, makeManualComputed, makeNonCandidateItem, makeUncoveredItem, makeWatchlistItem } from '@/test-utils/fixtures';
+import {
+    BP_MARKET_CAP_NOTE,
+    makeComputedSymbols,
+    makeDailyBarsItem,
+    makeManualComputed,
+    makeNonCandidateItem,
+    makeUncoveredItem,
+    makeWatchlistItem,
+    makeWatchlistQueued,
+    TSM_MARKET_CAP_NOTE,
+} from '@/test-utils/fixtures';
 import WatchlistTable from './WatchlistTable';
 import { WatchlistTableProps } from './types';
 
@@ -397,6 +407,73 @@ describe('WatchlistTable', () => {
 
             await userEvent.click(cell('VGZ', 'compute'));
             expect(location()).toHaveTextContent(/^\/watchlist$/);
+        });
+
+        it('shows the pending state of a fetch queued by adding the symbol, without a Compute press', async () => {
+            fetchComputedMock.mockResolvedValue(makeComputedSymbols([makeWatchlistQueued('waiting_for_data')]));
+            renderTable({ rows: [makeDailyBarsItem({ symbol: 'BP' })] });
+
+            expect(await row('BP').findByTestId('compute-state-BP')).toHaveTextContent(/^Waiting for data · queued .+ \(added to watchlist\)$/);
+            expect(row('BP').queryByRole('button', { name: 'Compute BP' })).not.toBeInTheDocument();
+        });
+    });
+
+    describe('rows from daily bars (outside the scanner universe)', () => {
+        it('marks the row "from daily bars" with the provider named in the tooltip', () => {
+            renderTable({ rows: [makeDailyBarsItem()] });
+
+            const marker = row('TSM').getByTestId('daily-bars-TSM');
+            expect(marker).toHaveTextContent(/^from daily bars$/);
+            expect(marker).toHaveAttribute(
+                'title',
+                "Outside the scanner's universe: computed from this symbol's own daily bars (source: Yahoo Finance) with the scanner's formulas. Not a scanner reading — no score."
+            );
+        });
+
+        it('shows its values with the scanner formatters, and no score', () => {
+            renderTable({ rows: [makeDailyBarsItem()] });
+
+            expect(row('TSM').getByTestId('price-value')).toHaveTextContent('$450.61');
+            expect(cell('TSM', 'rsi_14')).toHaveTextContent(/^62$/);
+            expect(row('TSM').getByTestId('score-value')).toHaveTextContent(/^—$/);
+        });
+
+        it('shows a non-USD market cap as "—" with the currency, the full note as tooltip, never a converted number', () => {
+            renderTable({ rows: [makeDailyBarsItem()] });
+
+            const marketCap = cell('TSM', 'market_cap');
+            expect(within(marketCap).getByTestId('market-cap-value')).toHaveTextContent(/^—$/);
+            const note = within(marketCap).getByTestId('market-cap-note-TSM');
+            expect(note).toHaveTextContent(/^Not in USD \(TWD\) — not converted$/);
+            expect(note).toHaveAttribute('title', TSM_MARKET_CAP_NOTE);
+            expect(marketCap).not.toHaveTextContent('$');
+        });
+
+        it('says "Not in USD" without a currency when the note names none (live BP)', () => {
+            renderTable({ rows: [makeDailyBarsItem({ symbol: 'BP', market_cap_note: BP_MARKET_CAP_NOTE })] });
+
+            expect(row('BP').getByTestId('market-cap-note-BP')).toHaveTextContent(/^Not in USD — not converted$/);
+            expect(row('BP').getByTestId('market-cap-note-BP')).toHaveAttribute('title', BP_MARKET_CAP_NOTE);
+        });
+
+        it('shows a reported market cap normally, and no note, when a daily-bars row has one', () => {
+            renderTable({ rows: [makeDailyBarsItem({ market_cap: 20e9, market_cap_note: null })] });
+
+            expect(within(cell('TSM', 'market_cap')).getByTestId('market-cap-value')).toHaveTextContent(/^\$20B$/);
+            expect(row('TSM').queryByTestId('market-cap-note-TSM')).not.toBeInTheDocument();
+        });
+
+        it('leaves scanner rows exactly as before: no marker, no note', () => {
+            renderTable({ rows: [makeWatchlistItem(), makeNonCandidateItem({ market_cap: null, market_cap_note: 'x' })] });
+
+            expect(screen.queryByTestId(/^daily-bars-/)).not.toBeInTheDocument();
+            expect(screen.queryByTestId(/^market-cap-note-/)).not.toBeInTheDocument();
+        });
+
+        it('links a daily-bars row to Stock Detail when hosted (it has data)', () => {
+            renderTable({ rows: [makeDailyBarsItem()] }, { hosted: true });
+
+            expect(row('TSM').getByRole('link', { name: 'TSM' })).toHaveAttribute('href', '/candidates/TSM');
         });
     });
 });

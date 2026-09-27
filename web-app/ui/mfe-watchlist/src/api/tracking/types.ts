@@ -51,9 +51,10 @@ export type ComputeReason = 'followed' | 'watchlist' | 'candidate' | 'manual';
 export const COMPUTE_REASONS: readonly ComputeReason[] = ['followed', 'watchlist', 'candidate', 'manual'];
 
 /**
- * With an open manual request: `waiting_for_data` → `computing` → `computed`,
- * or `failed` / `data_not_arrived` (older than `data_timeout_minutes`, data
- * still missing). Without one: `computed` or `scheduled` (next daily pass).
+ * With a queued fetch (a manual request or a watchlist addition):
+ * `waiting_for_data` → `computing` → `computed`, or `failed` /
+ * `data_not_arrived` (older than `data_timeout_minutes`, data still missing).
+ * Without one: `computed` or `scheduled` (next daily pass).
  */
 export type ComputeState = 'waiting_for_data' | 'computing' | 'computed' | 'failed' | 'data_not_arrived' | 'scheduled';
 
@@ -74,6 +75,12 @@ export interface ComputedSymbol {
     reasons: ComputeReason[];
     /** Set exactly while a manual (Compute) request is open. */
     manual_requested_at: string | null;
+    /**
+     * Newest open manual or watchlist reason: when a fetch was queued (adding
+     * to the watchlist queues one too). An older body without it reads as
+     * `manual_requested_at`.
+     */
+    queued_at: string | null;
     state: ComputeState;
     bars_fetched_at: string | null;
     fundamentals_fetched_at: string | null;
