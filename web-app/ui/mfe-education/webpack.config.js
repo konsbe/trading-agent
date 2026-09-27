@@ -12,7 +12,7 @@ const DEFAULT_MOMENTUM_API_URL = "http://localhost:8090";
 module.exports = (env, argv) => {
     const isProduction = argv.mode === "production";
 
-    const MFE_PORT = 3006;
+    const MFE_PORT = 3008;
     const MFE_PUBLIC_PATH = isProduction ? "auto" : `http://localhost:${MFE_PORT}/`;
     const SPOG_DEV_REMOTE = "shell_spog@http://localhost:3000/remoteEntry.js";
 

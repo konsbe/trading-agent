@@ -99,7 +99,7 @@
     "mfe_education_handbook": {
       "label": "Handbook",
       "version": "1.0.0",
-      "endpoint": "http://localhost:3006/remoteEntry.js",
+      "endpoint": "http://localhost:3008/remoteEntry.js",
       "module": "./Handbook",
       "scope": "mfe_education",
       "description": "How each part of the app works and what its readings mean",
@@ -114,7 +114,7 @@
     "mfe_education_masterclass": {
       "label": "MasterClass",
       "version": "1.0.0",
-      "endpoint": "http://localhost:3006/remoteEntry.js",
+      "endpoint": "http://localhost:3008/remoteEntry.js",
       "module": "./MasterClass",
       "scope": "mfe_education",
       "description": "Standards-based trading concepts, independent of this app",
@@ -129,7 +129,7 @@
     "mfe_education_glossary": {
       "label": "Glossary",
       "version": "1.0.0",
-      "endpoint": "http://localhost:3006/remoteEntry.js",
+      "endpoint": "http://localhost:3008/remoteEntry.js",
       "module": "./Glossary",
       "scope": "mfe_education",
       "description": "Terms used across the Handbook and MasterClass",

@@ -4,7 +4,7 @@ import '@trading-agent/shared-components/theme.css';
 import AppRouter from '@/router/AppRouter';
 import { AppWrapper } from './wrapper';
 
-/** Standalone dev mode (http://localhost:3006): own router, OS theme, no shell. */
+/** Standalone dev mode (http://localhost:3008): own router, OS theme, no shell. */
 export const StandaloneApp = () => (
     <BrowserRouter>
         <AppWrapper>

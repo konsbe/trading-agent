@@ -27,7 +27,7 @@ one remote.
 | Module Federation name / scope | `mfe_education` |
 | Exposed modules | `./Handbook` → `src/app/handbook-root.tsx`, `./MasterClass` → `src/app/masterclass-root.tsx`, `./Glossary` → `src/app/glossary-root.tsx` |
 | spog config keys | `mfe_education_handbook` (`/handbook`), `mfe_education_masterclass` (`/masterclass`), `mfe_education_glossary` (`/glossary`) |
-| Dev server | http://localhost:3006 (`remoteEntry.js` at `/remoteEntry.js`) |
+| Dev server | http://localhost:3008 (`remoteEntry.js` at `/remoteEntry.js`) |
 | Shell remote | `shellSpog` → `shell_spog@http://localhost:3000/remoteEntry.js` (dev); resolved from `window.__APP_CONFIG__.shell_spog` in production |
 | API | `momentum-api`, default http://localhost:8090 |
 
@@ -65,8 +65,10 @@ API base URL (`src/config/api.config.ts`), resolved per request:
 2. Otherwise: build-time `MOMENTUM_API_URL` env var, default `http://localhost:8090`
 
 Browser requests come from the page origin: `http://localhost:3000` when hosted,
-`http://localhost:3006` standalone. Both must be in `MOMENTUM_API_CORS_ORIGINS`
-for momentum-api (repo-root `.env`); `:3006` is already listed.
+`http://localhost:3008` standalone. Both must be in `MOMENTUM_API_CORS_ORIGINS`
+for momentum-api (repo-root `.env`, and `.env.example`); both list `:3008`.
+After changing the list, recreate momentum-api (`--force-recreate`): it reads
+`.env` only when the container is created.
 
 ## Prerequisites
 
@@ -82,14 +84,14 @@ for momentum-api (repo-root `.env`); `:3006` is already listed.
 | `make test` | Jest unit tests |
 | `make coverage` | Jest with coverage |
 | `make typecheck` | `tsc --noEmit` |
-| `make run` | Dev server on :3006 |
+| `make run` | Dev server on :3008 |
 | `make docker` | Build the nginx image (context `web-app/`) |
 
 ```bash
 nvm use 22
 make build
 make test
-make run                                   # http://localhost:3006 (standalone)
+make run                                   # http://localhost:3008 (standalone)
 make docker                                # trading-agent-mfe-education:latest
 MOMENTUM_API_URL=http://api:8090 make build
 ```
@@ -98,7 +100,7 @@ MOMENTUM_API_URL=http://api:8090 make build
 
 ```bash
 # 1. this MFE
-cd web-app/ui/mfe-education && make run   # :3006
+cd web-app/ui/mfe-education && make run   # :3008
 # 2. the shell
 cd web-app/spog && npm run start-dev:all  # :3000 → http://localhost:3000/handbook
 ```

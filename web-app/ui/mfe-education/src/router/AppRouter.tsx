@@ -4,7 +4,7 @@ import HandbookPage from '@/pages/HandbookPage';
 import MasterClassPage from '@/pages/MasterClassPage';
 
 /**
- * Standalone only (http://localhost:3006). Hosted, spog mounts each exposed root
+ * Standalone only (http://localhost:3008). Hosted, spog mounts each exposed root
  * directly under its own `/handbook`, `/masterclass` or `/glossary` route.
  */
 const AppRouter = () => (
