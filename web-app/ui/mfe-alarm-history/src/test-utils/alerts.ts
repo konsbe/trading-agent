@@ -2,6 +2,16 @@ import { AlertGroup, AlertsResponse, FiredAlert } from '@/api';
 
 export const CAVEAT = 'These pattern signals were tested … not a demonstrated edge.';
 
+/** momentum-api's `type_labels` (shared/content/alert_messages.json). */
+export const TYPE_LABELS: Record<string, string> = {
+    rsi_overbought: 'RSI overbought',
+    rsi_oversold: 'RSI oversold',
+    bb_squeeze: 'Bollinger squeeze',
+    liquidity_sweep: 'Liquidity sweep',
+    vix_elevated: 'VIX elevated',
+    fa_tier_flip: 'Fundamental tier flip',
+};
+
 export const makeAlert = (overrides: Partial<FiredAlert> = {}): FiredAlert => ({
     id: 100,
     symbol: 'XOM',
@@ -12,6 +22,7 @@ export const makeAlert = (overrides: Partial<FiredAlert> = {}): FiredAlert => ({
     severity: 'notice',
     message: 'Liquidity sweep detected (4 sweeps)',
     fired_at: '2026-09-27T18:32:22Z',
+    bar_date: null,
     ...overrides,
 });
 
@@ -42,6 +53,8 @@ export const makeResponse = (overrides: Partial<AlertsResponse> = {}): AlertsRes
     groups: [],
     types: ['bb_squeeze', 'fa_tier_flip', 'liquidity_sweep', 'rsi_overbought'],
     records_start: '2026-09-25T20:13:32Z',
+    type_labels: TYPE_LABELS,
+    onsets_since: null,
     caveat: CAVEAT,
     ...overrides,
 });

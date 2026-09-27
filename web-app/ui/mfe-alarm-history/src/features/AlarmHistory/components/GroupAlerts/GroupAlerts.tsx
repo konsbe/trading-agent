@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { AlertsResponse } from '@/api';
-import { alertTypeLabel } from '@/common/format/alertTypes';
 import usePagedAlerts from '../../hooks/usePagedAlerts';
+import { useTypeLabel } from '../../providers/TypeLabelsContext';
 import { groupKey, RAW_SHAPE } from '../../utils/paging';
 import AlertsTable from '../AlertsTable';
 import ListFooter from '../ListFooter';
@@ -23,6 +23,7 @@ const GroupAlerts = ({ group, query, refreshToken }: GroupAlertsProps) => {
         [query, group.symbol, group.alert_type]
     );
     const list = usePagedAlerts({ query: groupQuery, pick: pickAlerts, shape: RAW_SHAPE, refreshToken, pageSize: GROUP_PAGE_SIZE });
+    const typeLabel = useTypeLabel();
     const testId = `group-alerts-${groupKey(group)}`;
 
     return (
@@ -37,7 +38,7 @@ const GroupAlerts = ({ group, query, refreshToken }: GroupAlertsProps) => {
             >
                 <AlertsTable
                     id={`${testId}-table`}
-                    caption={`${group.symbol} ${alertTypeLabel(group.alert_type)} alerts, newest first`}
+                    caption={`${group.symbol} ${typeLabel(group.alert_type)} alerts, newest first`}
                     alerts={list.items}
                     showType={false}
                 />

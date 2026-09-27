@@ -1,7 +1,7 @@
 import { FormEvent, useCallback, useMemo } from 'react';
 import { Button, SEVERITY_LEVELS } from '@trading-agent/shared-components';
 import { DEFAULT_RANGE_DAYS } from '@/common/dates/localDays';
-import { alertTypeLabel } from '@/common/format/alertTypes';
+import { useTypeLabel } from '../../providers/TypeLabelsContext';
 import FilterChip from '../FilterChip';
 import { AlarmFiltersProps } from './types';
 import './AlarmFilters-styles.css';
@@ -27,9 +27,10 @@ const AlarmFilters = ({ filters, typeOptions }: AlarmFiltersProps) => {
         isDefaultRange,
     } = filters;
 
+    const typeLabel = useTypeLabel();
     const types = useMemo(
-        () => [...new Set([...typeOptions, ...alertTypes])].sort((a, b) => alertTypeLabel(a).localeCompare(alertTypeLabel(b))),
-        [typeOptions, alertTypes]
+        () => [...new Set([...typeOptions, ...alertTypes])].sort((a, b) => typeLabel(a).localeCompare(typeLabel(b))),
+        [typeOptions, alertTypes, typeLabel]
     );
 
     const handleSubmit = useCallback(
@@ -68,7 +69,7 @@ const AlarmFilters = ({ filters, typeOptions }: AlarmFiltersProps) => {
                         types.map(type => (
                             <FilterChip
                                 key={type}
-                                label={alertTypeLabel(type)}
+                                label={typeLabel(type)}
                                 pressed={alertTypes.includes(type)}
                                 onToggle={() => toggleAlertType(type)}
                                 data-testid={`filter-type-${type}`}

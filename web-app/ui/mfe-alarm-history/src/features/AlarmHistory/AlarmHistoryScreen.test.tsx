@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { FiredAlert } from '@/api';
 import { HostModeProvider } from '@/providers/HostModeContext';
-import { CAVEAT, makeAlert } from '@/test-utils/alerts';
+import { CAVEAT, makeAlert, TYPE_LABELS } from '@/test-utils/alerts';
 import { createAlertsServer } from '@/test-utils/alertsServer';
 import AlarmHistoryScreen from './AlarmHistoryScreen';
 
@@ -100,6 +100,100 @@ describe('AlarmHistoryScreen', () => {
         expect(screen.getByTestId('records-note')).toHaveTextContent(
             "Records start Sep 26, 2026, 1:30 AM GMT+3. Only alerts actually posted to Discord are recorded; the momentum screener's alerts are not included."
         );
+    });
+
+    describe('type labels, onsets and bar dates', () => {
+        const onsetDataset = () => [
+            makeAlert({ id: 1, symbol: 'XOM', alert_type: 'liquidity_sweep', fired_at: minutesAgo(600), bar_date: null }),
+            makeAlert({ id: 2, symbol: 'XOM', alert_type: 'liquidity_sweep', fired_at: minutesAgo(60), bar_date: '2026-09-26' }),
+            makeAlert({ id: 3, symbol: 'AAPL', alert_type: 'macd_bull_cross', fired_at: minutesAgo(30), bar_date: '2026-09-27' }),
+        ];
+        const serve = (options: Parameters<typeof createAlertsServer>[1] = {}) => {
+            server = createAlertsServer(onsetDataset(), options);
+            (global as any).fetch = server.fetch;
+        };
+        const chipLabels = () => within(screen.getByTestId('filter-types')).getAllByRole('button').map(b => b.textContent);
+
+        it('labels types only from the API, showing an unlabelled type as its id', async () => {
+            serve({ typeLabels: { ...TYPE_LABELS, liquidity_sweep: 'Sweep of liquidity' } });
+            renderScreen();
+            const xom = await screen.findByTestId('group-row-XOM|liquidity_sweep');
+
+            expect(chipLabels()).toEqual(['macd_bull_cross', 'Sweep of liquidity']);
+            expect(within(xom).getByText('Sweep of liquidity')).toHaveAttribute('data-column', 'type');
+            expect(screen.getByTestId('group-toggle-XOM|liquidity_sweep')).toHaveAccessibleName('Show the 2 XOM Sweep of liquidity alerts');
+            expect(within(screen.getByTestId('group-row-AAPL|macd_bull_cross')).getByText('macd_bull_cross')).toHaveAttribute(
+                'data-column',
+                'type'
+            );
+
+            await user.click(screen.getByTestId('group-toggle-XOM|liquidity_sweep'));
+            expect(await screen.findByRole('table', { name: 'XOM Sweep of liquidity alerts, newest first' })).toBeInTheDocument();
+
+            await user.click(screen.getByTestId('show-all-input'));
+            await waitFor(() => expect(rawRows()).toHaveLength(3));
+            expect(within(screen.getByTestId('alert-row-2')).getByText('Sweep of liquidity')).toBeInTheDocument();
+            expect(within(screen.getByTestId('alert-row-3')).getByText('macd_bull_cross')).toBeInTheDocument();
+        });
+
+        it('shows the onset bar under the fired time in raw rows, and nothing extra for alerts from before', async () => {
+            serve();
+            renderScreen();
+            await screen.findByTestId('group-row-XOM|liquidity_sweep');
+            expect(screen.queryAllByTestId(/^alert-bar-/)).toHaveLength(0);
+
+            await user.click(screen.getByTestId('show-all-input'));
+            await waitFor(() => expect(rawRows()).toHaveLength(3));
+
+            expect(screen.getByTestId('alert-bar-2')).toHaveTextContent(/^bar Sep 26$/);
+            expect(screen.getByTestId('alert-bar-3')).toHaveTextContent(/^bar Sep 27$/);
+            expect(within(screen.getByTestId('alert-bar-2')).getByText('Sep 26')).toHaveAttribute('datetime', '2026-09-26');
+            expect(screen.queryByTestId('alert-bar-1')).not.toBeInTheDocument();
+        });
+
+        it('shows the onset bar in an expanded group\'s rows', async () => {
+            serve();
+            renderScreen();
+
+            await user.click(await screen.findByTestId('group-toggle-XOM|liquidity_sweep'));
+            const table = await screen.findByTestId('group-alerts-XOM|liquidity_sweep-table');
+
+            expect(within(table).getAllByTestId(/^alert-row-/)).toHaveLength(2);
+            expect(within(table).getByTestId('alert-bar-2')).toHaveTextContent('bar Sep 26');
+            expect(within(table).queryByTestId('alert-bar-1')).not.toBeInTheDocument();
+        });
+
+        it('dates the switch to onset alerts once the API reports it', async () => {
+            serve({ onsetsSince: '2026-09-27T05:00:00Z' });
+            renderScreen();
+
+            expect(await screen.findByTestId('onsets-note')).toHaveTextContent(
+                'Until Sep 27, 2026, 8:00 AM GMT+3, alerts re-posted an ongoing condition every few hours while it stayed true. From then on, each alert marks an onset: the condition started on that bar after at least 5 sessions without it.'
+            );
+        });
+
+        it('says onset alerts are still to come while onsets_since is null', async () => {
+            serve();
+            renderScreen();
+
+            expect(await screen.findByTestId('onsets-note')).toHaveTextContent(
+                'Alerts so far re-posted an ongoing condition every few hours while it stayed true; onset-only alerts start with the next release.'
+            );
+        });
+
+        it('keeps working against an API from before labels, onsets and bar dates', async () => {
+            serve({ legacy: true });
+            renderScreen();
+            await screen.findByTestId('group-row-XOM|liquidity_sweep');
+
+            expect(chipLabels()).toEqual(['liquidity_sweep', 'macd_bull_cross']);
+            expect(screen.getByTestId('onsets-note')).toHaveTextContent('onset-only alerts start with the next release.');
+
+            await user.click(screen.getByTestId('show-all-input'));
+            await waitFor(() => expect(rawRows()).toHaveLength(3));
+            expect(screen.queryAllByTestId(/^alert-bar-/)).toHaveLength(0);
+            expect(within(screen.getByTestId('alert-row-2')).getByText('liquidity_sweep')).toBeInTheDocument();
+        });
     });
 
     it('says nothing has been recorded when records_start is null', async () => {

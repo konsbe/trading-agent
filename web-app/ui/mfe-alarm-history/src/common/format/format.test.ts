@@ -1,6 +1,5 @@
 import { EMPTY_VALUE } from '@trading-agent/shared-components';
-import { formatClockWithSeconds, formatDateTime, formatFiredAt, formatLocalDay, formatRepeats } from './format';
-import { alertTypeLabel, prettifyCode } from './alertTypes';
+import { formatBarDate, formatClockWithSeconds, formatDateTime, formatFiredAt, formatLocalDay, formatRepeats } from './format';
 
 // jest.config.js pins TZ to Europe/Athens.
 describe('format', () => {
@@ -32,29 +31,16 @@ describe('format', () => {
         expect(formatLocalDay('soon')).toBe('soon');
     });
 
+    it('formats a bar date as a calendar day, with the year only when it differs', () => {
+        expect(formatBarDate('2026-09-26', now)).toBe('Sep 26');
+        expect(formatBarDate('2025-12-31', now)).toBe('Dec 31, 2025');
+        expect(formatBarDate('later', now)).toBe('later');
+    });
+
     it('formats a repeat count with its first–last span', () => {
         expect(formatRepeats(10, '2026-09-25T20:14:40Z', '2026-09-27T18:32:22Z', now)).toBe(
             '×10 · Sep 25, 11:14 PM – Sep 27, 9:32 PM'
         );
         expect(formatRepeats(1, '2026-09-27T18:32:22Z', '2026-09-27T18:32:22Z', now)).toBe('×1');
-    });
-});
-
-describe('alert type labels', () => {
-    it.each([
-        ['liquidity_sweep', 'Liquidity sweep'],
-        ['bb_squeeze', 'Bollinger squeeze'],
-        ['rsi_overbought', 'RSI overbought'],
-        ['rsi_oversold', 'RSI oversold'],
-        ['fa_tier_flip', 'Fundamental tier flip'],
-        ['vix_elevated', 'VIX elevated'],
-    ])('%s → %s', (code, label) => {
-        expect(alertTypeLabel(code)).toBe(label);
-    });
-
-    it('prettifies an unknown type from its id', () => {
-        expect(alertTypeLabel('macd_bull_cross')).toBe('MACD bull cross');
-        expect(alertTypeLabel('new_kind')).toBe('New kind');
-        expect(prettifyCode('__')).toBe('__');
     });
 });

@@ -99,6 +99,15 @@
     line-height: 1.35;
 }
 
+/* The onset bar's date, a secondary line under the fired time. */
+.alarm-table__bar {
+    display: block;
+    color: var(--color-on-surface-variant);
+    font-family: var(--font-family-label);
+    font-size: var(--font-size-xs);
+    font-variant-numeric: tabular-nums;
+}
+
 .alarm-table__muted {
     color: var(--color-on-surface-variant);
     font-size: var(--font-size-xs);

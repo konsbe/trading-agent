@@ -16,6 +16,8 @@ export interface FiredAlert {
     message: string;
     /** RFC3339, UTC. */
     fired_at: string;
+    /** `YYYY-MM-DD` of the bar the condition started on; null for alerts from before onset-only alerts. */
+    bar_date: string | null;
 }
 
 /** Every matching alert of one symbol + alert type in the range. */
@@ -40,6 +42,10 @@ export interface AlertsResponse {
     types: string[];
     /** Earliest fired_at in the table; null when nothing is recorded. */
     records_start: string | null;
+    /** Display label per alert type (shared/content/alert_messages.json); a type missing here shows its id. */
+    type_labels: Record<string, string>;
+    /** fired_at of the first onset alert; null until one exists. */
+    onsets_since: string | null;
     /** heuristic_ta_caveat, verbatim. */
     caveat: string;
 }

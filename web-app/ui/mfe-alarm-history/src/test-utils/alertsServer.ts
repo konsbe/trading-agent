@@ -1,5 +1,5 @@
 import { AlertGroup, FiredAlert } from '@/api';
-import { CAVEAT } from './alerts';
+import { CAVEAT, TYPE_LABELS } from './alerts';
 import { mockResponse } from './fixtures';
 
 /** Newest first, ties by id (the API's order). */
@@ -28,7 +28,19 @@ export interface AlertsServer {
  * (before / next_before) and grouping, so screen tests exercise the page
  * against the API's contract rather than canned responses.
  */
-export const createAlertsServer = (initial: FiredAlert[], recordsStart: string | null = null): AlertsServer => {
+export interface AlertsServerOptions {
+    recordsStart?: string | null;
+    /** Served `type_labels` (default: every type's label). */
+    typeLabels?: Record<string, string>;
+    onsetsSince?: string | null;
+    /** Serve the body of an API from before type_labels / onsets_since / bar_date. */
+    legacy?: boolean;
+}
+
+export const createAlertsServer = (
+    initial: FiredAlert[],
+    { recordsStart = null, typeLabels = TYPE_LABELS, onsetsSince = null, legacy = false }: AlertsServerOptions = {}
+): AlertsServer => {
     const rows = [...initial];
     const requests: URLSearchParams[] = [];
     const failures: { status: number; code: string }[] = [];
@@ -88,7 +100,12 @@ export const createAlertsServer = (initial: FiredAlert[], recordsStart: string |
         const last = mode === 'grouped' ? groups[groups.length - 1]?.latest : alerts[alerts.length - 1];
         const earliest = rows.length === 0 ? null : [...rows].sort(newestFirst)[rows.length - 1].fired_at;
 
-        return mockResponse(200, {
+        const wire = (alert: FiredAlert): Record<string, unknown> => {
+            if (!legacy) return { ...alert };
+            const { bar_date: _barDate, ...rest } = alert;
+            return rest;
+        };
+        const body: Record<string, unknown> = {
             symbol: symbol ?? null,
             alert_types: types,
             severities,
@@ -99,12 +116,17 @@ export const createAlertsServer = (initial: FiredAlert[], recordsStart: string |
             mode,
             has_more: hasMore,
             next_before: hasMore ? last!.id : null,
-            alerts,
-            groups,
+            alerts: alerts.map(wire),
+            groups: groups.map(g => ({ ...g, latest: wire(g.latest) })),
             types: [...new Set(rows.map(r => r.alert_type))].sort(),
             records_start: recordsStart ?? earliest,
             caveat: CAVEAT,
-        });
+        };
+        if (!legacy) {
+            body.type_labels = typeLabels;
+            body.onsets_since = onsetsSince;
+        }
+        return mockResponse(200, body);
     };
 
     const fetch = jest.fn((url: string) => Promise.resolve(handle(url)));

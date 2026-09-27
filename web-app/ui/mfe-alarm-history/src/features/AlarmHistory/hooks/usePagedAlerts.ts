@@ -8,6 +8,8 @@ export const PAGE_SIZE = 100;
 export interface AlertsMeta {
     types: string[];
     recordsStart: string | null;
+    typeLabels: Record<string, string>;
+    onsetsSince: string | null;
     caveat: string;
 }
 
@@ -56,6 +58,8 @@ const toPage = <T>(response: AlertsResponse, pick: (response: AlertsResponse) =>
 const toMeta = (response: AlertsResponse): AlertsMeta => ({
     types: response.types,
     recordsStart: response.records_start,
+    typeLabels: response.type_labels,
+    onsetsSince: response.onsets_since,
     caveat: response.caveat,
 });
 

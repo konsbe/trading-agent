@@ -3,6 +3,7 @@ import { CollapsibleCard } from '@trading-agent/shared-components';
 import { formatClockWithSeconds, formatDateTime } from '@/common/format/format';
 import useAlarmHistory from './hooks/useAlarmHistory';
 import { AlertsMeta } from './hooks/usePagedAlerts';
+import { TypeLabelsProvider } from './providers/TypeLabelsContext';
 import AlarmFilters from './components/AlarmFilters';
 import AlertNotes from './components/AlertNotes';
 import AlertsTable from './components/AlertsTable';
@@ -11,6 +12,8 @@ import ListFooter from './components/ListFooter';
 import ListState from './components/ListState';
 import { AlarmHistoryScreenProps } from './types';
 import './AlarmHistoryScreen-styles.css';
+
+const NO_LABELS: Readonly<Record<string, string>> = {};
 
 /**
  * Why an empty period may be empty: before the first record nothing was
@@ -65,62 +68,64 @@ const AlarmHistoryScreen = ({ refreshIntervalMs, pageSize }: AlarmHistoryScreenP
     );
 
     return (
-        <div className="alarm-screen" data-testid="alarm-history-screen">
-            {meta && <AlertNotes caveat={meta.caveat} recordsStart={meta.recordsStart} />}
+        <TypeLabelsProvider labels={meta?.typeLabels ?? NO_LABELS}>
+            <div className="alarm-screen" data-testid="alarm-history-screen">
+                {meta && <AlertNotes caveat={meta.caveat} recordsStart={meta.recordsStart} onsetsSince={meta.onsetsSince} />}
 
-            <AlarmFilters filters={filters} typeOptions={meta?.types ?? []} />
+                <AlarmFilters filters={filters} typeOptions={meta?.types ?? []} />
 
-            <CollapsibleCard
-                id="alarm-history-alerts"
-                title={showAll ? 'Every alert' : 'Alerts by symbol and type'}
-                meta={cardMeta}
-                persistKey="alarm-history.page.alerts"
-                data-testid="alarm-alerts-card"
-            >
-                <ListState
-                    isLoading={active.isLoading}
-                    error={active.error}
-                    isEmpty={active.items.length === 0}
-                    onRetry={active.retry}
-                    emptyDetail={detail}
-                    data-testid="alarm-list"
+                <CollapsibleCard
+                    id="alarm-history-alerts"
+                    title={showAll ? 'Every alert' : 'Alerts by symbol and type'}
+                    meta={cardMeta}
+                    persistKey="alarm-history.page.alerts"
+                    data-testid="alarm-alerts-card"
                 >
-                    {showAll ? (
-                        <>
-                            <AlertsTable id="alarm-raw-table" caption="Every alert, newest first" alerts={raw.items} />
-                            <ListFooter
-                                count={raw.items.length}
-                                noun={raw.items.length === 1 ? 'alert' : 'alerts'}
-                                hasMore={raw.hasMore}
-                                isLoadingOlder={raw.isLoadingOlder}
-                                olderError={raw.olderError}
-                                onLoadOlder={raw.loadOlder}
-                                data-testid="raw-footer"
-                            />
-                        </>
-                    ) : (
-                        <>
-                            <GroupedAlertsTable
-                                groups={grouped.items}
-                                expanded={expanded}
-                                onToggle={toggleGroup}
-                                query={filters.query}
-                                refreshToken={refreshToken}
-                            />
-                            <ListFooter
-                                count={grouped.items.length}
-                                noun={grouped.items.length === 1 ? 'group' : 'groups'}
-                                hasMore={grouped.hasMore}
-                                isLoadingOlder={grouped.isLoadingOlder}
-                                olderError={grouped.olderError}
-                                onLoadOlder={grouped.loadOlder}
-                                data-testid="grouped-footer"
-                            />
-                        </>
-                    )}
-                </ListState>
-            </CollapsibleCard>
-        </div>
+                    <ListState
+                        isLoading={active.isLoading}
+                        error={active.error}
+                        isEmpty={active.items.length === 0}
+                        onRetry={active.retry}
+                        emptyDetail={detail}
+                        data-testid="alarm-list"
+                    >
+                        {showAll ? (
+                            <>
+                                <AlertsTable id="alarm-raw-table" caption="Every alert, newest first" alerts={raw.items} />
+                                <ListFooter
+                                    count={raw.items.length}
+                                    noun={raw.items.length === 1 ? 'alert' : 'alerts'}
+                                    hasMore={raw.hasMore}
+                                    isLoadingOlder={raw.isLoadingOlder}
+                                    olderError={raw.olderError}
+                                    onLoadOlder={raw.loadOlder}
+                                    data-testid="raw-footer"
+                                />
+                            </>
+                        ) : (
+                            <>
+                                <GroupedAlertsTable
+                                    groups={grouped.items}
+                                    expanded={expanded}
+                                    onToggle={toggleGroup}
+                                    query={filters.query}
+                                    refreshToken={refreshToken}
+                                />
+                                <ListFooter
+                                    count={grouped.items.length}
+                                    noun={grouped.items.length === 1 ? 'group' : 'groups'}
+                                    hasMore={grouped.hasMore}
+                                    isLoadingOlder={grouped.isLoadingOlder}
+                                    olderError={grouped.olderError}
+                                    onLoadOlder={grouped.loadOlder}
+                                    data-testid="grouped-footer"
+                                />
+                            </>
+                        )}
+                    </ListState>
+                </CollapsibleCard>
+            </div>
+        </TypeLabelsProvider>
     );
 };
 

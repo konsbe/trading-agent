@@ -52,6 +52,18 @@ export const formatLocalDay = (day: string): string => {
     });
 };
 
+/** A `YYYY-MM-DD` bar date as "Sep 26" (the year added when it isn't the current one, as fired times). */
+export const formatBarDate = (day: string, now: Date = new Date()): string => {
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(day);
+    if (!match) return day;
+    const year = Number(match[1]);
+    return new Date(year, Number(match[2]) - 1, Number(match[3])).toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        ...(year === now.getFullYear() ? {} : { year: 'numeric' }),
+    });
+};
+
 /** A group's repeat count and span: "×10 · Sep 25, 11:14 PM – Sep 27, 9:32 PM"; a single alert is "×1". */
 export const formatRepeats = (count: number, firstIso: string, lastIso: string, now: Date = new Date()): string => {
     if (count <= 1 || firstIso === lastIso) return `×${count}`;

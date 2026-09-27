@@ -26,6 +26,13 @@ const asArray = (value: unknown, path: string): unknown[] => (Array.isArray(valu
 const asList = <T>(value: unknown, path: string, item: (v: unknown, p: string) => T): T[] =>
     value === undefined || value === null ? [] : asArray(value, path).map((v, i) => item(v, `${path}[${i}]`));
 
+/** A missing map reads as empty; otherwise every value must be a string. */
+const asStringMap = (value: unknown, path: string): Record<string, string> => {
+    if (value === undefined || value === null) return {};
+    const o = asObject(value, path);
+    return Object.fromEntries(Object.keys(o).map(key => [key, asString(o[key], `${path}.${key}`)]));
+};
+
 export const parseFiredAlert = (value: unknown, path = 'alert'): FiredAlert => {
     const o = asObject(value, path);
     return {
@@ -38,6 +45,7 @@ export const parseFiredAlert = (value: unknown, path = 'alert'): FiredAlert => {
         severity: asString(o.severity, `${path}.severity`),
         message: asNullableString(o.message, `${path}.message`) ?? '',
         fired_at: asString(o.fired_at, `${path}.fired_at`),
+        bar_date: asNullableString(o.bar_date, `${path}.bar_date`),
     };
 };
 
@@ -59,7 +67,10 @@ const parseMode = (value: unknown): AlertsMode => {
     return fail('mode', '"raw" or "grouped"');
 };
 
-/** GET /api/v1/alerts. The echoed filters are not read: the page already knows what it asked for. */
+/**
+ * GET /api/v1/alerts. The echoed filters are not read: the page already knows what it asked for.
+ * A body without `type_labels`, `onsets_since` or `bar_date` (an older API) still parses.
+ */
 export const parseAlertsResponse = (body: unknown): AlertsResponse => {
     const o = asObject(body, 'body');
     if (typeof o.has_more !== 'boolean') fail('has_more', 'a boolean');
@@ -74,6 +85,8 @@ export const parseAlertsResponse = (body: unknown): AlertsResponse => {
         groups: asList(o.groups, 'groups', parseAlertGroup),
         types: asList(o.types, 'types', asString),
         records_start: asNullableString(o.records_start, 'records_start'),
+        type_labels: asStringMap(o.type_labels, 'type_labels'),
+        onsets_since: asNullableString(o.onsets_since, 'onsets_since'),
         caveat: asNullableString(o.caveat, 'caveat') ?? '',
     };
 };
