@@ -44,7 +44,7 @@ const normalize = (symbol: string) => symbol.trim().toUpperCase();
 const toApiError = (err: unknown): ApiError =>
     isApiError(err) ? err : new ApiError(0, 'unknown_error', (err as Error)?.message ?? String(err));
 
-export { isPending };
+export { isPending } from '@/common/compute/queue';
 
 const ComputeStatusContext = createContext<ComputeStatus | null>(null);
 
