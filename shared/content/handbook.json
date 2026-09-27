@@ -4,6 +4,340 @@
   "notes": "Education section Handbook (docs/EDUCATION_SECTION_CONTENT_SPEC.md §1). Caveat blocks reference shared/content/momentum_caveats.json by key and are resolved at load; never retype caveat text here.",
   "sections": [
     {
+      "id": "daily-market-report",
+      "spec_ref": "1.1",
+      "title": "Daily Market Report",
+      "intro": "*What this part of the app is for:* The Daily Market Report is the market-wide backdrop, the same whichever symbol you are looking at. It shows what the app's macro pass stored on its latest run (it runs every six hours): four macro stances built from public economic data, a reading of how they fit together, a market-cycle reading built on SPY, prices and price phases for a fixed list of instruments and your Watchlist, calendar context, and market-wide headlines. Every label is a fixed rule applied to stored numbers; the report describes the backdrop and does not predict what markets will do.",
+      "entries": [
+        {
+          "id": "report-top-strip",
+          "title": "Report time and the top strip",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "Under the page title, **Report generated** gives the time of the newest reading the macro pass stored, in your local time, followed by that day's date. The pass runs every six hours and the page loads the latest report once, without refreshing. If the newest reading is more than 12 hours old, a note above it reads \"This report is more than 12 hours old — showing the most recent available.\": the pass has stopped updating, and the page shows the last report rather than nothing. Before any report exists it reads \"No report has been generated yet.\""
+            },
+            {
+              "type": "paragraph",
+              "text": "The strip at the top of **Market overview** shows three market numbers, each with the date of the observation it shows, not the report's date. All three come from FRED, the St. Louis Fed's public data service, which publishes them with a delay, so they are often several days behind the market. A number with no observation in the last 60 days shows \"—\" and \"no recent observation\"."
+            },
+            {
+              "type": "list",
+              "items": [
+                "**VIX** — the CBOE Volatility Index's daily close: the S&P 500 volatility the options market expects over the next 30 days. Beside it sits the app's band for that same observation, with its icon: **normal** from 12 to 20 (circled tick), **elevated** above 20 up to 35 (circled dash), **extreme_fear** above 35 (warning triangle) and **complacency** below 12 (also a warning triangle: very low volatility is read as calm but vulnerable, not as good news). The band appears only when it was worked out for the very observation shown; otherwise the number stands alone.",
+                "**10Y yield** — the 10-year US Treasury yield, in percent. No band and no icon.",
+                "**EUR/USD** — US dollars per euro. No band and no icon."
+              ]
+            }
+          ],
+          "terms": []
+        },
+        {
+          "id": "stance-cards",
+          "title": "How the stance cards read",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "The first four cards — **Monetary Policy**, **Growth Cycle**, **Inflation** and **Global/Geopolitical Stress** — each sum up one area of the economy from public FRED data. Each shows a **stance** word with its icon, a **Score** and an as-of date. **Signals (N)** opens the rows the stance was built from, grouped under headings such as \"Tier 1 · Leading Indicators\": tier 1 is the app's primary read for that area, and the grouping is for reading only — each row's weight is set separately, as each card's entry below lists."
+            },
+            {
+              "type": "paragraph",
+              "text": "Each row shows its name, its latest value, its label and an as-of date. Values are shown without units (the Treasury yields excepted); each card's entry gives them. Stance words and labels are the stored codes, underscores included — for example tight_labor — and this page does not reword them. A stance with no data at all reads insufficient_data with the no-data icon; a card whose stance was never stored shows \"no data\"."
+            },
+            {
+              "type": "paragraph",
+              "text": "The **Score** is a weighted average of the card's scored rows. Each row's label carries a fixed score and each row a fixed weight; rows with no data are left out rather than counted as zero, and the result always lies between −1 and +1. Fixed cut-offs turn it into the stance word. **The direction differs by card**: on Monetary Policy and Growth Cycle a higher score is the easier backdrop (accommodative, expansion), while on Inflation and Global/Geopolitical Stress a higher score means more inflation pressure or more stress. Some rows are shown for context only and do not count; the card entries say which."
+            },
+            {
+              "type": "paragraph",
+              "text": "The icon beside a stance or a row comes from the tone the app stored with its label when it computed it, never from the page: a circled tick for **constructive**, a circled dash for **neutral**, a warning triangle for **stressed**, a dashed circle for **no data**. The Treasury yields row, which shows levels rather than a classification, has no icon. The tone is a fixed reading of each label, looked up in a table kept per row, so the same word can carry different icons on different rows. A row's icon reads that row on its own terms, not the way it moves the card's score: on the Inflation card, a copper price up 10% or more on the year reads global_expansion with a tick, while adding to the inflation score. These icons, in the Market overview card, are the only status colours on the page."
+            },
+            {
+              "type": "paragraph",
+              "text": "The **as of** date on a stance and on each row is the day the app last worked the reading out — it does so on every six-hourly run — not the date of the data behind it. Monthly and quarterly figures keep the value of their latest release between releases, so a row can read \"as of\" today while its figure is weeks or months old."
+            }
+          ],
+          "terms": []
+        },
+        {
+          "id": "monetary-policy",
+          "title": "Monetary Policy",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "How loose or tight financial conditions are, from the Federal Reserve's policy rate to credit markets. Stance: **accommodative** above 0.40 (tick), **neutral** above −0.40 up to 0.40 (dash), **restrictive** at −0.40 or below (warning triangle); a score of exactly 0.40 reads neutral. Weights: Rate, Yield curve and Credit spread 2 each, Real rate 1.5, Balance sheet and Breakeven inflation 1 each, M2 supply 0.5."
+            },
+            {
+              "type": "list",
+              "items": [
+                "**Balance sheet** — the Federal Reserve's total assets, in billions of dollars (6,747.7 is about $6.7 trillion): **qe** when they grew by more than $100 billion over the last four weeks, **qt** when they shrank by more than $100 billion, otherwise **neutral**.",
+                "**Credit spread** — the extra yield on US high-yield (\"junk\") corporate bonds over Treasuries, in basis points (280 is 2.80 percentage points): **benign** up to 300, **elevated** above 300, **crisis** above 600.",
+                "**Rate** — the effective federal funds rate, in percent. The label compares it with twelve months earlier: **hiking** after a rise of more than 0.25 points, **cutting** after a fall of more than 0.25 points, otherwise **neutral**.",
+                "**Real rate** — the 10-year inflation-protected Treasury (TIPS) yield, in percent: **deeply_negative** below −2, **balanced** from −2 up to 2, **headwind** at 2 or above.",
+                "**Yield curve** — the 10-year Treasury yield minus the 2-year, in percentage points: **steep** above 1.0, **normal** above 0 up to 1.0, **flat** above −0.5 up to 0, **inverted** at −0.5 or below. It reads **re_steepening** instead when, within the last 90 daily readings, the curve fell below −0.5 and it is now above 0 and more than 0.5 points above that low.",
+                "**Breakeven inflation** — the yearly inflation rate the bond market is pricing in over ten years, in percent: **anchored** up to 2.5, **rising** above 2.5, **unanchored** above 3.0. Rising is a level, not a trend.",
+                "**M2 supply** — growth of the M2 money supply over twelve months, in percent: **inflationary** above 15, **normal** from 4 to 15, **slow** from 0 to 4, **deflationary** below 0.",
+                "**Treasury yields** — the 2-, 10- and 30-year Treasury yields as plain levels, with no label and no icon. They do not count toward the score."
+              ]
+            }
+          ],
+          "terms": []
+        },
+        {
+          "id": "growth-cycle",
+          "title": "Growth Cycle",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "Whether the US economy is expanding or slowing, from jobs, output, spending and business data. Stance: **expansion** at 0.40 or above (tick), **slowdown** in between (dash), **contraction** at −0.40 or below (warning triangle). Weights: PMI 0.15, GDP and Employment 0.14 each, LEI 0.12, Consumer 0.10, Claims and Housing 0.08 each, Capex and Consumer sentiment 0.05 each, averaged over the rows that have data. **PMI**, the ISM manufacturing survey, always reads no_data: its FRED series is not available to the app, so it never counts."
+            },
+            {
+              "type": "list",
+              "items": [
+                "**Claims** — initial jobless claims, averaged over the last four weeks: **tight_labor** below 225,000, **normal** below 300,000, **normalizing** below 500,000, **crisis** from 500,000.",
+                "**Housing** — housing starts, in thousands of homes a year at the current pace: **strong** from 1,500, **moderate** from 800, **weak** below 800.",
+                "**Consumer** — real (inflation-adjusted) retail sales against a year earlier, in percent: **healthy** from 3, **slowing** from 0, **contraction** below 0.",
+                "**Employment** — the month's change in nonfarm payrolls, in thousands of jobs: **strong** from 200, **moderate** from 75, **slowing** from 0, **contraction** below 0 — unless the Sahm rule indicator has reached 0.5, which overrides them all with **recession_confirmed**.",
+                "**GDP** — real GDP growth in the latest quarter, at an annual rate, in percent: **strong** from 3, **moderate** from 1, **stall_speed** from 0, **recession** below 0.",
+                "**Capex** — new orders for core capital goods (non-defence, excluding aircraft), the last three months against the three before, in percent: **expanding** from 3, **stable** from 0, **slowing** from −3, **warning** below −3.",
+                "**Consumer sentiment** — the University of Michigan consumer sentiment index, read the contrary way: **near_bottom** below 60 carries a tick and counts slightly in growth's favour, **complacency** above 100 carries a warning triangle; otherwise **pessimistic** below 80, or **normal**."
+              ]
+            }
+          ],
+          "terms": []
+        },
+        {
+          "id": "inflation",
+          "title": "Inflation",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "How strong price pressure is. **Here a higher score means more inflation pressure.** Stance: **hot** at 0.40 or above (warning triangle), **moderate** in between (dash), **deflationary** at −0.40 or below (also a warning triangle). This card has no constructive stance, so its header never shows a tick. Weights: Core PCE and CPI 0.20 each, Oil and Wages 0.15 each, Core CPI, PPI and Copper 0.10 each; Shelter and the PPI CPI spread are shown for context and do not count."
+            },
+            {
+              "type": "paragraph",
+              "text": "Every value is the change against a year earlier, in percent, except Oil (dollars a barrel) and the PPI CPI spread (percentage points). Several labels are levels even though they sound like trends: CPI reads **rising** anywhere from 2.5% to 4%, whichever way it is moving."
+            },
+            {
+              "type": "list",
+              "items": [
+                "**Core CPI** — consumer prices excluding food and energy: **hot** from 4, **above_target** from 2.5, **at_target** from 2, **below_target** below 2.",
+                "**Core PCE** — the Federal Reserve's preferred inflation gauge, excluding food and energy: **aggressive_tightening** from 3, **hawkish_bias** from 2.2, **at_target** from 1.8, **below_target** below 1.8. The labels name the policy response the level is associated with, not anything the Fed has done.",
+                "**CPI** — headline consumer prices: **hot** from 5, **above_target** from 4, **rising** from 2.5, **goldilocks** from 1.5, **below_target** from 0, **deflation_risk** below 0.",
+                "**Shelter** — the housing component of CPI: **hot** from 5, **elevated** from 3.5, **moderating** from 2.5, **normalizing** below 2.5. Not scored.",
+                "**Oil** — WTI crude, in dollars a barrel: **inflationary_risk** from 100, **elevated** from 80, **goldilocks** from 60, **low** from 50, **energy_sector_stress** below 50.",
+                "**PPI** — producer prices for final demand: **surge** from 8, **elevated** from 4, **moderate** from 2, **stable** from 0, **deflationary** below 0.",
+                "**PPI CPI spread** — PPI growth minus CPI growth: **margin_pressure** from 3 (producers' prices rising faster than consumer prices), **margin_expansion** at −3 or below, otherwise **neutral**. Not scored.",
+                "**Copper** — the copper price: **global_expansion** from 10, **stable** from 0, **slowing** from −10, **global_contraction** below −10.",
+                "**Wages** — average hourly earnings: **spiral_risk** from 5, **elevated** from 4.5, **above_target** from 3.5, **target_consistent** from 2, **soft** below 2."
+              ]
+            }
+          ],
+          "terms": []
+        },
+        {
+          "id": "global-geopolitical-stress",
+          "title": "Global/Geopolitical Stress",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "Stress from outside the US economy's own cycle: the dollar, the yen, China and US government borrowing. **Here too a higher score means more stress.** Stance: **elevated_stress** at 0.35 or above (warning triangle), **moderate** in between (dash), **benign** at −0.15 or below (tick). Weights: Broad dollar and USD/JPY 0.28 each, China GDP 0.24, Fiscal 0.20. Despite the card's name, no news or geopolitical-event data feeds it: every row is a FRED economic series."
+            },
+            {
+              "type": "list",
+              "items": [
+                "**Broad dollar** — the Federal Reserve's trade-weighted index of the dollar against a broad basket of currencies, for goods trade; it is not the ICE dollar index (DXY) usually quoted. A stronger dollar reads as more stress: **major_global_stress** from 110, **em_commodity_headwind** from 105, **neutral** from 100, **supportive_equities** from 95, **dollar_weak_risk_on** below 95.",
+                "**USD/JPY** — yen per US dollar. The label comes from its change over the last 22 daily readings (about a month), which is not shown: **systemic_carry_unwind** after a fall of 10% or more, **early_carry_unwind** after a fall of 5% or more, otherwise **carry_intact**. A falling USD/JPY is a strengthening yen, which squeezes trades funded by borrowing in yen.",
+                "**Fiscal** — the US federal deficit for the latest fiscal year as a share of GDP, in percent: **high_deficit_stress** above 6, **elevated_supply_risk** above 3 (more Treasury borrowing for markets to absorb), **manageable** up to 3. It sets a fiscal-year deficit against the latest quarter's annualised GDP, so it is approximate."
+              ]
+            }
+          ],
+          "terms": []
+        },
+        {
+          "id": "macro-correlations-regime",
+          "title": "Macro Correlations Regime",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "Despite its name, this card computes no statistical correlation — the measured correlations are under Seasonality & cycle context. It reads the four stances together with seven of their rows (Yield curve, Real rate, Credit spread, GDP, Oil, Broad dollar and USD/JPY) and shows the first pattern in a fixed list that fits. **Details** opens that pattern's fixed one-line description and the **flags** that are on. The score is fixed for each regime: it says which pattern matched, not how strongly. The patterns, in the order they are checked:"
+            },
+            {
+              "type": "list",
+              "items": [
+                "**recession_pipeline** (score −0.82, warning triangle) — Yield curve inverted or re_steepening, Credit spread elevated or crisis, and weak growth: GDP stall_speed or recession, or the Growth stance contraction.",
+                "**stagflation_risk** (−0.58, warning triangle) — Inflation hot while Growth reads slowdown or contraction.",
+                "**rising_inflation_tight_policy** (−0.48, warning triangle) — Inflation hot, Monetary Policy restrictive and the Yield curve flat, inverted or re_steepening.",
+                "**global_liquidity_stress** (−0.52, warning triangle) — Global/Geopolitical Stress elevated_stress with a strong dollar (Broad dollar em_commodity_headwind or major_global_stress) or USD/JPY systemic_carry_unwind.",
+                "**deflation_risk** (−0.18, warning triangle) — Inflation deflationary.",
+                "**goldilocks_light** (+0.48, tick) — Inflation moderate, Monetary Policy accommodative or neutral, Growth expansion, and Credit spread neither elevated nor crisis.",
+                "**disinflation_soft_landing** (+0.32, tick) — Inflation not hot, Growth expansion, Monetary Policy not restrictive, Credit spread neither elevated nor crisis. Because goldilocks_light is checked first, this is reached only when the Inflation or Monetary Policy stance has no reading.",
+                "**neutral_mixed** (0, dash) — none of the above."
+              ]
+            },
+            {
+              "type": "paragraph",
+              "text": "The flags are set independently of the regime:"
+            },
+            {
+              "type": "list",
+              "items": [
+                "**real_rates_headwind** — Real rate reads headwind.",
+                "**curve_flat_or_inverted** — Yield curve flat, inverted or re_steepening.",
+                "**credit_stress** — Credit spread elevated or crisis.",
+                "**inflation_hot** — the Inflation stance is hot.",
+                "**growth_soft** — the Growth stance is slowdown or contraction.",
+                "**usd_strong_em_headwind** — Broad dollar em_commodity_headwind or major_global_stress.",
+                "**global_stress** — the Global/Geopolitical Stress stance is elevated_stress.",
+                "**jpy_carry_stress** — USD/JPY systemic_carry_unwind.",
+                "**energy_price_pressure** — Oil elevated, inflationary_risk or energy_sector_stress. Energy_sector_stress is oil below $50 a barrel, so a low oil price raises this flag too."
+              ]
+            }
+          ],
+          "terms": []
+        },
+        {
+          "id": "market-cycle",
+          "title": "Market Cycle (market-wide)",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "This card bundles two different things. Its header — a phase code, a score and a one-line description — is the **composite**, a market-wide reading that combines SPY's price picture with the four stances. **Inputs & index** opens what it was built from: **Blended inputs**, the four stance words it used (Growth, Policy, Inflation, Global), each with the icon stored for that word, and **Index**, the plain price facts of a single instrument, SPY (the fund that tracks the S&P 500). The Index facts describe SPY alone, carry no icon, and are the same numbers as SPY's card under Tracked."
+            },
+            {
+              "type": "paragraph",
+              "text": "**Index** lists **Symbol**; **Price phase**, by the rules below; **Drawdown**, how far the latest close is below the highest high of the last 252 sessions; **vs 200DMA**, that close against the average close of the last 200 sessions; **SMA200**, that average; **Close**; and **Crash warning**, yes or no."
+            },
+            {
+              "type": "paragraph",
+              "text": "The price phase is checked in this order: **crash** when the close is 12% or more below the highest high of the last 10 sessions, or 10% or more below the close 5 sessions earlier (the same test sets Crash warning); **bear** at a drawdown of −20% or worse; **correction** at −10% or worse; **pullback** at −3% or worse; then **bull_extended** at 5% or more above the 200-session average, **bull** at or above it, **below_sma** below it. With fewer than 200 daily bars it is **insufficient_data**. Because drawdown is checked first, an instrument 20% below its one-year high reads bear even while it is far above its 200-session average. Stock Detail's Price phase uses the same rules."
+            },
+            {
+              "type": "paragraph",
+              "text": "The composite is not an average. The price phase decides first; the stances only choose the code above the 200-session average, and elsewhere they nudge the score:"
+            },
+            {
+              "type": "list",
+              "items": [
+                "**crash_panic** (score −0.95, warning triangle) — price phase crash, whatever the stances.",
+                "**bear_structural** (−0.78, warning triangle) — price phase bear, whatever the stances; the description gains a sentence when Growth is contraction.",
+                "**correction_risk** (warning triangle) — price phase correction. Score −0.45, lowered by 0.10 when Inflation is hot and by 0.08 when Policy is restrictive.",
+                "**pullback_healthy** (dash) — price phase pullback. Score −0.12, raised by 0.08 when Growth is expansion or slowdown, lowered by 0.05 when Inflation is hot.",
+                "**late_cycle_stretched** (0.15, dash) — price phase bull_extended, with Inflation hot and Policy restrictive or neutral.",
+                "**bull_fragile_global** (0.22, dash) — bull_extended otherwise, with Global elevated_stress or moderate.",
+                "**bull_overextended** (0.48, dash) — bull_extended with neither.",
+                "**trend_soft** (warning triangle) — price phase below_sma. Score −0.18, lowered by 0.20 when Growth is contraction.",
+                "**neutral_mixed** (dash) — price phase bull. The score starts at 0.35 and moves with the stances: Growth expansion +0.12, slowdown +0.02, contraction −0.25; Inflation hot −0.08; Policy accommodative +0.05, restrictive −0.06. Two more codes belong to this branch — **bull_macro_aligned** (tick) above 0.55 and **bull_macro_divergent** (warning triangle) below −0.35 — but those adjustments can only move the score between −0.04 and 0.52, so as the rules stand a bull phase always reads neutral_mixed and this card never shows a tick.",
+                "**insufficient_equity_data** (0, dashed circle) — fewer than 200 daily bars of SPY stored."
+              ]
+            },
+            {
+              "type": "paragraph",
+              "text": "The score says which branch applied; it measures nothing further. Each description is fixed text for its branch, sometimes with a clause added (for example when Inflation is hot), written for the app's Discord report and the same every time that code appears. Some are phrased as trading instructions, such as \"tighten stops\"; they are text attached to the code, not advice worked out for you. The as-of date is the day the composite was computed, not the date of SPY's close, which SPY's own card shows."
+            }
+          ],
+          "terms": []
+        },
+        {
+          "id": "report-instruments",
+          "title": "Tracked and Watchlist instruments",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "**Tracked** is a fixed list of eight: S&P 500 (SPY), Gold (GLD), Oil (WTI) (USO), the US 10-, 5- and 2-year Treasury yields (DGS10, DGS5, DGS2), Shell (SHEL) and Bitcoin (BTCUSDT). SPY, GLD and USO are exchange-traded funds, so their prices are fund share prices: Oil (WTI) is the USO fund's price, not dollars a barrel — the barrel price is the Oil row on the Inflation card. **Watchlist** lists each symbol on your Watchlist that is not already tracked, under its company name, or reads \"No symbols on your watchlist.\""
+            },
+            {
+              "type": "paragraph",
+              "text": "A priced instrument shows its latest daily close, the change from the close before it (green for a rise, red for a fall) and that bar's date. \"Today's session still forming\" means the newest bar is today's and the New York session has not yet closed at 4 pm New York time, so that price is still moving. Below come its market-cycle facts: **Market-cycle phase** (the price-phase rules in the Market Cycle entry, applied to this instrument alone — no macro input), **Drawdown from peak**, **vs 200-day average**, a \"Crash-velocity flag set\" line when the crash test fired, and a **Basis** line with the date of the bars they were computed from and the windows used. The phase is shown as its stored code, for example bull_extended."
+            },
+            {
+              "type": "paragraph",
+              "text": "For stocks and funds the windows are trading sessions — \"Windows: peak lookback 252 · crash 10/5 · SMA 200\": a one-year peak, crash tests over 10 and 5 sessions, and a 200-session average. Bitcoin trades every day, so its windows are calendar days (365, 14/7 and 200) and its prices are daily candles that close at 00:00 UTC, closed candles only (\"Basis: 00:00 UTC daily close (closed candles only)\"); its date can therefore differ from the stock market's."
+            },
+            {
+              "type": "paragraph",
+              "text": "The market-cycle facts come from the macro pass's last run and the price from the latest stored bar, so their dates can differ; each line carries its own. With fewer than 200 daily bars stored there is no phase, and the card says so in a line such as \"154 1Day bars stored for …; need at least 200\" (1Day is the app's name for daily bars). A newly added Watchlist symbol has no market-cycle reading until the next run, and its card says that too."
+            },
+            {
+              "type": "paragraph",
+              "text": "The three Treasury yields show only the yield, in percent, and its date. They have no phase by design: the phase rules are written for prices, and a yield is an interest rate — a yield falling from its high means bond prices rising, the opposite of a drawdown."
+            }
+          ],
+          "terms": []
+        },
+        {
+          "id": "seasonality-and-cycle-context",
+          "title": "Seasonality & cycle context",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "The panel is labelled \"Static reference, not predictive.\" Its first two tiles come from fixed tables in the app, not from market data, and nothing in the panel feeds any stance, score or phase on the page."
+            },
+            {
+              "type": "list",
+              "items": [
+                "**Month seasonality** — the current month (by UTC date), the table's tilt for it and the average S&P 500 monthly return the table quotes, for example \"September · weak bear · historical average ~−0.7%\", with a one-line note and the table's own disclaimer. From most to least favourable the tilts are strong bull (April, November, December), mild bull (January, March, July, October), neutral (February, May, June), mild bear (August) and weak bear (September): despite its name, weak bear is the most negative. The averages are the reference table's figures, not computed from the app's own price history.",
+                "**Presidential cycle** — the year of the US presidential term, counted from the calendar year with 2021 as year 1: Year 1 · post election · moderate constructive, Year 2 · midterm · choppy, Year 3 · pre election · strong historical, Year 4 · election · positive volatile, each with the table's one-line note."
+              ]
+            },
+            {
+              "type": "paragraph",
+              "text": "**Intermarket correlations (60-day ρ vs equity)** are the app's measured correlations. Each row gives ρ, the correlation from −1 to +1 between SPY's daily return and the daily change in a second series over the latest 60 sessions (the second series' values are carried forward onto SPY's trading days), then the label for that ρ and the label's fixed one-line description. With fewer than 40 usable days a row reads insufficient data."
+            },
+            {
+              "type": "list",
+              "items": [
+                "**VIX vs equity (60d)** — against the change in the VIX: **typical fear greed** at −0.25 or below (stocks rising as expected volatility falls), **unusual positive** at 0.15 or above, **compressed link** in between.",
+                "**Oil vs equity (60d)** — against the change in the WTI oil price: **procyclical** at 0.25 or above, **decoupled** at −0.25 or below, **neutral mixed** in between. Despite its name, decoupled means a clear negative link — stocks and oil moving in opposite directions — not the absence of one.",
+                "**Bond vs equity (60d)** — against the daily change in the 10-year Treasury **yield**, in percentage points, not a bond price. Labels: **deflationary hedge** at −0.25 or below, **inflationary positive** at 0.25 or above, **transition neutral** in between."
+              ]
+            }
+          ],
+          "terms": []
+        },
+        {
+          "id": "calendar-and-news",
+          "title": "Calendar & news",
+          "blocks": [
+            {
+              "type": "list",
+              "items": [
+                "**Economic calendar** — scheduled economic releases in the next 14 days, grouped by date, each with its time (your local time), country, name, impact and the actual, estimated and previous figures when known. \"Economic calendar unavailable\" means no events are stored for those 14 days; when none at all have been stored in the last 30 days, a note gives the known cause. At present the provider (Finnhub) refuses the request on the app's current plan, so this block is empty in every report: a data gap, not a quiet fortnight.",
+                "**Earnings (next 14 days)** — one line per stock on the page: Shell and each Watchlist symbol (funds, yields and Bitcoin report no earnings). It shows the date, quarter and the provider's time-of-day code (for example BMO, before the open, or AMC, after the close) when a date falls in the window; \"No earnings date in the next 14 days.\" when the symbol is on the list the app fetches earnings dates for and no date in the window is stored; or \"Earnings data not available for this symbol — data-macro-intel does not fetch it.\" when it is not on that list (data-macro-intel is the app's service that collects calendars and headlines). The last means missing data, not that no report is coming.",
+                "**News** — the eight newest market-wide headlines the app has collected, newest first, each as its title linked to the article (it opens in a new tab), followed by the stored name of the feed it came from — at present always finnhub_macro_general, Finnhub's general market-news feed. There is no article text — the app stores and shows only the headline, the feed and the link, as a copyright practice — no publication time and no sentiment score. The list is not de-duplicated, so the same story often appears more than once. These headlines are not tied to any symbol; they are the market-wide headlines that Stock Detail's Sentiment & news entry points to."
+              ]
+            }
+          ],
+          "terms": []
+        },
+        {
+          "id": "data-coverage",
+          "title": "Data coverage",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "The footer lists the analysis areas in the app's reference material and how far each is built, then the known data gaps. It reads like a list of faults, but it is a disclosure: it states plainly what this report does not cover, so that a missing area is not mistaken for a quiet reading. Each line is the area, its status and a short note; the statuses are fixed text in the app, not live checks."
+            },
+            {
+              "type": "list",
+              "items": [
+                "**partial** — partly covered elsewhere in the app, with no pipeline of its own (factor: quality and value overlap the fundamentals analysis, momentum and volatility come from price data).",
+                "**partial_live** — part of it is computed live and the rest exists only as reference (intermarket: the three correlations above are live).",
+                "**live_static** — on every report, but read from a fixed table rather than computed from data (seasonality and the presidential cycle).",
+                "**needs_data** — would need data feeds the app does not have (sentiment: put/call ratios, options skew, short interest, margin; flow microstructure: options flow, dark pools).",
+                "**not_automated** — not built (event driven, relative value, alternative data)."
+              ]
+            },
+            {
+              "type": "paragraph",
+              "text": "Below the list, each known data gap is stated with its cause — at present that the geopolitical risk index (GPR) is not ingested because its source is not configured, and why the economic calendar is empty. A gap line appears only while that gap exists."
+            }
+          ],
+          "terms": []
+        }
+      ]
+    },
+    {
       "id": "todays-candidates",
       "spec_ref": "1.2",
       "title": "Today's Candidates (Momentum Scanner)",
@@ -540,7 +874,7 @@
           "blocks": [
             {
               "type": "paragraph",
-              "text": "The **Context vs benchmark** card sets the symbol against the market as a whole. Most of it is market-wide and reads the same on every symbol's page; only Price phase and Drawdown from peak are about this symbol. Labels are the stored codes with the underscores shown as spaces — for example late cycle stretched. The two market-wide classifications carry the same status icon as the Daily Market Report: a circled tick for constructive, a circled dash for neutral, a warning triangle for stressed, a dashed circle for no data, taken from the tone the app stored with the label, never re-judged by the page. What each market-wide label means is explained in the Daily Market Report's own Handbook section."
+              "text": "The **Context vs benchmark** card sets the symbol against the market as a whole. Most of it is market-wide and reads the same on every symbol's page; only Price phase and Drawdown from peak are about this symbol. Labels are the stored codes with the underscores shown as spaces — for example late cycle stretched. The two market-wide classifications carry the same status icon as the Daily Market Report: a circled tick for constructive, a circled dash for neutral, a warning triangle for stressed, a dashed circle for no data, taken from the tone the app stored with the label, never re-judged by the page. What each market-wide label means is explained in this Handbook's Daily Market Report section, under Market Cycle (market-wide) and Macro Correlations Regime; that page itself shows the labels as stored codes, underscores included (late_cycle_stretched)."
             },
             {
               "type": "list",
