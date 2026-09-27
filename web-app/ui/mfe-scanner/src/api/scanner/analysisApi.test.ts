@@ -5,7 +5,10 @@ import {
     makeAnalysis,
     makeEmptyAnalysis,
     makeUnavailableCashFlow,
-    SHEL_CASH_FLOW_REASON,
+    FUND_CASH_FLOW_REASON,
+    makeShelCashFlow,
+    makeTsmCashFlow,
+    NOT_COMPARABLE_NOTE,
 } from '@/test-utils/analysisFixtures';
 import { parseStockAnalysis } from './analysisParsers';
 import { DEFAULT_ANALYSIS_RETRY_MS, fetchStockAnalysis } from './scannerApi';
@@ -127,9 +130,36 @@ describe('parseStockAnalysis', () => {
             form: null,
             period_end: null,
             filed: null,
+            fiscal_year: null,
+            currency: null,
+            source: null,
+            newer_filing: null,
             lines: [],
-            unavailable_reason: SHEL_CASH_FLOW_REASON,
+            unavailable_reason: FUND_CASH_FLOW_REASON,
         });
+    });
+
+    it('reads a 20-F statement: fiscal year, reporting currency, source, newer filing and missing notes as served', () => {
+        const tsm = parseStockAnalysis(clone(makeAnalysis({ cash_flow: makeTsmCashFlow() }))).cash_flow;
+        expect(tsm).toEqual(makeTsmCashFlow());
+        expect(tsm).toMatchObject({ form: '20-F', fiscal_year: 2024, currency: 'TWD', source: '20-F via SEC EDGAR' });
+        expect(tsm.newer_filing).toEqual({ form: '20-F', filed: '2026-04-16', period_end: '2025-12-31' });
+        expect(tsm.lines[4]).toEqual({ key: 'buybacks', label: 'Share buybacks', value: null, missing_note: NOT_COMPARABLE_NOTE });
+
+        const shel = parseStockAnalysis(clone(makeAnalysis({ cash_flow: makeShelCashFlow() }))).cash_flow;
+        expect(shel).toEqual(makeShelCashFlow());
+        expect(shel.newer_filing).toBeNull();
+    });
+
+    it('reads an older body without the currency / source fields as null, so it still renders', () => {
+        const body = clone(makeAnalysis());
+        ['fiscal_year', 'currency', 'source', 'newer_filing'].forEach(key => delete body.cash_flow[key]);
+        body.cash_flow.lines.forEach((line: any) => delete line.missing_note);
+        const { cash_flow } = parseStockAnalysis(body);
+
+        expect(cash_flow).toMatchObject({ available: true, form: '10-K', fiscal_year: null, currency: null, source: null, newer_filing: null });
+        expect(cash_flow.lines.every(line => line.missing_note === null)).toBe(true);
+        expect(cash_flow.lines[0].value).toBe(51_970_000_000);
     });
 
     it('reads a body without cash_flow (older API) as unavailable with no reason', () => {
@@ -144,6 +174,10 @@ describe('parseStockAnalysis', () => {
         ['a line without a label', (b: any) => delete b.cash_flow.lines[0].label, 'cash_flow.lines[0].label'],
         ['a string value', (b: any) => (b.cash_flow.lines[0].value = '51970000000'), 'cash_flow.lines[0].value'],
         ['a string available', (b: any) => (b.cash_flow.available = 'yes'), 'cash_flow.available'],
+        ['a string fiscal_year', (b: any) => (b.cash_flow.fiscal_year = '2025'), 'cash_flow.fiscal_year'],
+        ['a numeric currency', (b: any) => (b.cash_flow.currency = 840), 'cash_flow.currency'],
+        ['a string newer_filing', (b: any) => (b.cash_flow.newer_filing = '20-F'), 'cash_flow.newer_filing'],
+        ['a numeric missing_note', (b: any) => (b.cash_flow.lines[0].missing_note = 1), 'cash_flow.lines[0].missing_note'],
     ])('rejects a cash_flow with %s', (_label, mutate, path) => {
         const body = clone(makeAnalysis());
         mutate(body);

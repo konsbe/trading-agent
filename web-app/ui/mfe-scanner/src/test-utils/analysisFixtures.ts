@@ -6,27 +6,80 @@ export const makeCashFlow = (overrides: Partial<CashFlowStatement> = {}): CashFl
     form: '10-K',
     period_end: '2025-12-31',
     filed: '2026-02-18',
+    fiscal_year: 2025,
+    currency: 'USD',
+    source: '10-K via Finnhub',
+    newer_filing: null,
     lines: [
-        { key: 'operating', label: 'Net cash from operating activities', value: 51_970_000_000 },
-        { key: 'investing', label: 'Net cash from investing activities', value: -25_927_000_000 },
-        { key: 'financing', label: 'Net cash from financing activities', value: -39_081_000_000 },
-        { key: 'capex', label: 'Capital spending (property, plant & equipment)', value: 28_358_000_000 },
-        { key: 'buybacks', label: 'Share buybacks', value: 20_273_000_000 },
-        { key: 'dividends', label: 'Dividends paid', value: 17_231_000_000 },
+        { key: 'operating', label: 'Net cash from operating activities', value: 51_970_000_000, missing_note: null },
+        { key: 'investing', label: 'Net cash from investing activities', value: -25_927_000_000, missing_note: null },
+        { key: 'financing', label: 'Net cash from financing activities', value: -39_081_000_000, missing_note: null },
+        { key: 'capex', label: 'Capital spending (property, plant & equipment)', value: 28_358_000_000, missing_note: null },
+        { key: 'buybacks', label: 'Share buybacks', value: 20_273_000_000, missing_note: null },
+        { key: 'dividends', label: 'Dividends paid', value: 17_231_000_000, missing_note: null },
     ],
     unavailable_reason: null,
     ...overrides,
 });
 
-/** Live SHEL (2026-09-27): a 20-F filer. */
-export const SHEL_CASH_FLOW_REASON =
-    'No cash-flow statement available: Finnhub returned no 10-K/10-Q filings (companies filing 20-F annual reports, such as many foreign issuers, are not covered).';
+export const NOT_COMPARABLE_NOTE = 'not reported as a comparable line';
 
-export const makeUnavailableCashFlow = (reason: string | null = SHEL_CASH_FLOW_REASON): CashFlowStatement => ({
+/** Live TSM (2026-09-27): a 20-F in New Taiwan dollars, FY2024; SEC lists a newer 20-F not in companyfacts yet. */
+export const makeTsmCashFlow = (overrides: Partial<CashFlowStatement> = {}): CashFlowStatement => ({
+    available: true,
+    form: '20-F',
+    period_end: '2024-12-31',
+    filed: '2025-04-17',
+    fiscal_year: 2024,
+    currency: 'TWD',
+    source: '20-F via SEC EDGAR',
+    newer_filing: { form: '20-F', filed: '2026-04-16', period_end: '2025-12-31' },
+    lines: [
+        { key: 'operating', label: 'Net cash from operating activities', value: 1_826_177_100_000, missing_note: null },
+        { key: 'investing', label: 'Net cash from investing activities', value: -864_842_800_000, missing_note: null },
+        { key: 'financing', label: 'Net cash from financing activities', value: -346_301_000_000, missing_note: null },
+        { key: 'capex', label: 'Capital spending (property, plant & equipment)', value: 956_006_500_000, missing_note: null },
+        { key: 'buybacks', label: 'Share buybacks', value: null, missing_note: NOT_COMPARABLE_NOTE },
+        { key: 'dividends', label: 'Dividends paid', value: 363_055_200_000, missing_note: null },
+    ],
+    unavailable_reason: null,
+    ...overrides,
+});
+
+/** Live SHEL (2026-09-27): a 20-F in USD, FY2025, whose capital expenditure is tagged with Shell's own concept. */
+export const makeShelCashFlow = (overrides: Partial<CashFlowStatement> = {}): CashFlowStatement => ({
+    available: true,
+    form: '20-F',
+    period_end: '2025-12-31',
+    filed: '2026-03-12',
+    fiscal_year: 2025,
+    currency: 'USD',
+    source: '20-F via SEC EDGAR',
+    newer_filing: null,
+    lines: [
+        { key: 'operating', label: 'Net cash from operating activities', value: 42_863_000_000, missing_note: null },
+        { key: 'investing', label: 'Net cash from investing activities', value: -16_811_000_000, missing_note: null },
+        { key: 'financing', label: 'Net cash from financing activities', value: -35_812_000_000, missing_note: null },
+        { key: 'capex', label: 'Capital spending (property, plant & equipment)', value: null, missing_note: NOT_COMPARABLE_NOTE },
+        { key: 'buybacks', label: 'Share buybacks', value: 13_879_000_000, missing_note: null },
+        { key: 'dividends', label: 'Dividends paid', value: 8_472_000_000, missing_note: null },
+    ],
+    unavailable_reason: null,
+    ...overrides,
+});
+
+/** Live SPY (2026-09-27): a fund. */
+export const FUND_CASH_FLOW_REASON = 'No cash-flow statement available: funds file no company cash-flow statement.';
+
+export const makeUnavailableCashFlow = (reason: string | null = FUND_CASH_FLOW_REASON): CashFlowStatement => ({
     available: false,
     form: null,
     period_end: null,
     filed: null,
+    fiscal_year: null,
+    currency: null,
+    source: null,
+    newer_filing: null,
     lines: [],
     unavailable_reason: reason,
 });

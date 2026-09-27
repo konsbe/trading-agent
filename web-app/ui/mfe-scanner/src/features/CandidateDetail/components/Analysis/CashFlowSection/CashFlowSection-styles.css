@@ -1,0 +1,8 @@
+/* Filing on the first line, currency under it, both right-aligned beside the title. */
+.cash-flow__meta {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    text-align: right;
+    line-height: 1.4;
+}

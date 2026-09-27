@@ -4,7 +4,7 @@
  * @trading-agent/shared-components; the scanner-only ones are below.
  */
 
-import { EMPTY_VALUE, formatNumber, formatSignedNumber, signOf } from '@trading-agent/shared-components';
+import { EMPTY_VALUE, formatCompactUsd, formatNumber, formatSignedNumber, signOf } from '@trading-agent/shared-components';
 
 export {
     EMPTY_VALUE,
@@ -33,6 +33,24 @@ const isNum = (value: number | null | undefined): value is number =>
 /** 0.48 → "+$0.48", -0.48 → "−$0.48"; pass 4 digits for sub-dollar names (-0.0048 → "−$0.0048"). */
 export const formatSignedUsd = (value: number | null | undefined, fractionDigits = 2): string =>
     isNum(value) ? `${signOf(value, true)}$${formatNumber(Math.abs(value), fractionDigits)}` : EMPTY_VALUE;
+
+/** formatCompactUsd's scale without the currency: 1826177100000 → "1,826.18B". */
+const compactAmountBody = (abs: number): string => {
+    if (abs >= 1e9) return `${formatNumber(abs / 1e9, 2)}B`;
+    if (abs >= 1e6) return `${formatNumber(abs / 1e6, 2)}M`;
+    if (abs >= 1e3) return `${formatNumber(abs / 1e3, 1)}K`;
+    return formatNumber(abs, 0);
+};
+
+/**
+ * A reported amount in its own currency, never converted. USD (or an older
+ * body without a currency, which was always USD) keeps "$51.97B"; any other
+ * ISO code is named, not guessed as a symbol: "TWD 1,826.18B", "−TWD 864.84B".
+ */
+export const formatCompactAmount = (value: number | null | undefined, currency: string | null | undefined): string => {
+    if (!currency || currency.toUpperCase() === 'USD') return formatCompactUsd(value);
+    return isNum(value) ? `${signOf(value)}${currency.toUpperCase()} ${compactAmountBody(Math.abs(value))}` : EMPTY_VALUE;
+};
 
 export const formatPercent = (value: number | null | undefined, fractionDigits = 1): string =>
     isNum(value) ? `${formatNumber(value, fractionDigits)}%` : EMPTY_VALUE;

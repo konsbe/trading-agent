@@ -63,11 +63,15 @@ From `GET /api/v1/scanner/today/{symbol}/analysis`
 2. **Fundamentals** (`fundamentals`) — composite line, then tiers/readings. PEG and
    earnings surprise are not served by the API and always read "—".
 3. **Balance sheet** (`balance-sheet`) — composite line, ROE/ROA/ROIC, ratios.
-4. **Cash flow** (`cash-flow`) — the latest annual (10-K) cash-flow statement as
-   filed (`cash_flow`): header "10-K · fiscal year ended 31 Dec 2025 · filed …",
-   the six served lines in compact USD (outflows "−$25.93B", payments marked
-   "amount paid", a missing line "—" / "not in filing"), no red/green, and the
-   annual-only note. When `available` is false the card shows `unavailable_reason`.
+4. **Cash flow** (`cash-flow`) — the latest annual cash-flow statement as
+   filed (`cash_flow`, a 10-K via Finnhub or a 20-F via SEC EDGAR): header
+   "20-F · fiscal year 2024, ended 31 Dec 2024 · filed 17 Apr 2025 · 20-F via SEC EDGAR"
+   plus "Figures in TWD, as reported — not converted" (the served `currency`),
+   the six served lines in that currency (USD "−$25.93B", others by ISO code
+   "TWD 1,826.18B"; payments marked "amount paid", a missing line "—" with its
+   served `missing_note`), no red/green, a line for a served `newer_filing`
+   ("A newer 20-F … is on SEC EDGAR but not in its companyfacts data yet."), and
+   the annual-only note. When `available` is false the card shows `unavailable_reason`.
 5. **Correlations** (`correlations`) — composite, cluster health, master signal, aligned/divergent sentences.
 6. **Sentiment & news** (`news`) — title + source + link only.
 7. **Qualitative signals** (`scanner.detail.qualitative`) — moat proxy, insider

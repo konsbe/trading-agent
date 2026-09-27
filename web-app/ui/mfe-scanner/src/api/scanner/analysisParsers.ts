@@ -13,6 +13,7 @@ import {
     Headline,
     HeuristicSignals,
     MarginReading,
+    NewerFiling,
     QualitativeAnalysis,
     ScoreTier,
     StockAnalysis,
@@ -128,10 +129,25 @@ const parseCashFlowLine = (value: unknown, path: string): CashFlowLine => {
         key: str(o.key, `${path}.key`),
         label: str(o.label, `${path}.label`),
         value: optNum(o.value, `${path}.value`),
+        missing_note: optStr(o.missing_note, `${path}.missing_note`),
     };
 };
 
-/** A body without `cash_flow` (an older server) reads as unavailable with no reason, so the card still renders. */
+const parseNewerFiling = (value: unknown, path: string): NewerFiling | null => {
+    if (value === null || value === undefined) return null;
+    const o = obj(value, path);
+    return {
+        form: optStr(o.form, `${path}.form`),
+        filed: optStr(o.filed, `${path}.filed`),
+        period_end: optStr(o.period_end, `${path}.period_end`),
+    };
+};
+
+/**
+ * A body without `cash_flow` (an older server) reads as unavailable with no
+ * reason, so the card still renders; one without the currency / source fields
+ * reads them as null.
+ */
 const parseCashFlow = (value: unknown, path = 'cash_flow'): CashFlowStatement => {
     const o = section(value, path);
     return {
@@ -139,6 +155,10 @@ const parseCashFlow = (value: unknown, path = 'cash_flow'): CashFlowStatement =>
         form: optStr(o.form, `${path}.form`),
         period_end: optStr(o.period_end, `${path}.period_end`),
         filed: optStr(o.filed, `${path}.filed`),
+        fiscal_year: optInt(o.fiscal_year, `${path}.fiscal_year`),
+        currency: optStr(o.currency, `${path}.currency`),
+        source: optStr(o.source, `${path}.source`),
+        newer_filing: parseNewerFiling(o.newer_filing, `${path}.newer_filing`),
         lines: array(o.lines ?? [], `${path}.lines`, parseCashFlowLine),
         unavailable_reason: optStr(o.unavailable_reason, `${path}.unavailable_reason`),
     };

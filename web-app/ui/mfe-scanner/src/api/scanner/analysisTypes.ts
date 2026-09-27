@@ -81,23 +81,40 @@ export interface CashFlowLine {
     key: CashFlowLineKey;
     /** The API's label, shown verbatim. */
     label: string;
-    /** USD as filed; capex / buybacks / dividends are positive amounts paid. Null when the filing has no such line. */
+    /** In the statement's `currency`, as filed; capex / buybacks / dividends are positive amounts paid. Null when the filing has no such line. */
     value: number | null;
+    /** Why `value` is null, as served: "not in filing" (10-K) or "not reported as a comparable line" (20-F). */
+    missing_note: string | null;
+}
+
+/** A newer annual filing SEC EDGAR lists but its companyfacts data doesn't carry yet. */
+export interface NewerFiling {
+    form: string | null;
+    /** `YYYY-MM-DD`. */
+    filed: string | null;
+    /** `YYYY-MM-DD`. */
+    period_end: string | null;
 }
 
 /**
- * The latest annual (10-K) cash-flow statement as filed — never a quarter,
- * since a 10-Q's cash-flow figures are year-to-date. When `available` is
- * false, `lines` is [] and `unavailable_reason` says why.
+ * The latest annual (10-K or 20-F) cash-flow statement as filed — never a
+ * quarter, since a 10-Q's cash-flow figures are year-to-date. When `available`
+ * is false, `lines` is [] and `unavailable_reason` says why.
  */
 export interface CashFlowStatement {
     available: boolean;
-    /** e.g. "10-K". */
+    /** e.g. "10-K", "20-F". */
     form: string | null;
     /** Fiscal period end, `YYYY-MM-DD`. */
     period_end: string | null;
     /** Filing date, `YYYY-MM-DD`. */
     filed: string | null;
+    fiscal_year: number | null;
+    /** ISO 4217 code of the figures as reported (e.g. "USD", "TWD"); never converted. */
+    currency: string | null;
+    /** Served verbatim: "10-K via Finnhub" | "20-F via SEC EDGAR". */
+    source: string | null;
+    newer_filing: NewerFiling | null;
     lines: CashFlowLine[];
     /** A full sentence starting "No cash-flow statement available: …". */
     unavailable_reason: string | null;
