@@ -638,6 +638,16 @@ reset to their opening state and re-tracked.)
 
 ## `momentum-daily` — the scheduled chain
 
+> **Change freeze (from the 2026-09-28 deploy).** After the onset-alerts
+> deploy on Monday 2026-09-28, make no changes to `momentum-daily`,
+> `momentum-scanner` or `momentum-tracker` until the clean-session gate clears
+> (Thursday 2026-10-01 at the earliest). That deploy rebuilds the image because
+> momentum-daily's computation pass calls `runner.ComputeAndStore`, which now
+> writes `alert_onsets`; the scanner and tracker binaries it runs are rebuilt
+> from code unchanged since 2026-09-26 14:46 (`cmd/momentum-scanner`,
+> `cmd/momentum-tracker`, `internal/momentum`, `internal/compute` and the store
+> files they call), so their behaviour is identical.
+
 Long-running daemon (Compose service `momentum-daily`, `analyzer` profile;
 locally `make run-momentum-daily`, or `ARGS=-once` for a single pass). For each
 NYSE session (same holiday calendar as momentum-api) it:
