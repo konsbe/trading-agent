@@ -149,6 +149,24 @@ func ComputeRollCorrEquityVsFredDelta(
 	}
 }
 
+// bondPriceProxy returns a yield series negated, so that its day-over-day
+// change moves with the bond's price (a bond's price moves opposite its
+// yield). regimeBondEquity's labels are written for bond prices: correlating
+// equity returns with the raw yield change read every regime backwards.
+func bondPriceProxy(yields []store.MacroObs) []store.MacroObs {
+	out := make([]store.MacroObs, len(yields))
+	for i, o := range yields {
+		out[i] = store.MacroObs{TS: o.TS, Value: -o.Value}
+	}
+	return out
+}
+
+// computeBondEquity is the bond–equity correlation: benchmark log returns vs
+// the daily change in −yield (the bond price proxy).
+func computeBondEquity(spy []store.EquityOHLCVBar, yields []store.MacroObs, window, minObs int, seriesID, insufficientNote string) RollCorrResult {
+	return ComputeRollCorrEquityVsFredDelta(spy, bondPriceProxy(yields), window, minObs, seriesID, regimeBondEquity, insufficientNote)
+}
+
 func regimeBondEquity(c float64) (string, string) {
 	switch {
 	case c <= -0.25:
@@ -184,7 +202,7 @@ func regimeVIXEquity(c float64) (string, string) {
 
 // ComputeBondEquity60d is a thin wrapper for tests and bond-specific wording.
 func ComputeBondEquity60d(spy []store.EquityOHLCVBar, dgs10 []store.MacroObs, window, minObs int) BondEquityLegacy {
-	r := ComputeRollCorrEquityVsFredDelta(spy, dgs10, window, minObs, "DGS10", regimeBondEquity,
+	r := computeBondEquity(spy, dgs10, window, minObs, "DGS10",
 		"Need more overlapping SPY bars and DGS10 observations.")
 	return BondEquityLegacy{
 		Correlation60d:   r.Correlation60d,

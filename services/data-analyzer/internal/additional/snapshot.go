@@ -101,9 +101,12 @@ func BuildSnapshot(ctx context.Context, pool *pgxpool.Pool, cfg Config) (map[str
 
 	// DGS10 — bond / equity
 	if dgs10, e := store.QueryMacroFredRangeAsc(ctx, pool, "DGS10", from, to); e == nil && len(dgs10) >= 5 {
-		be := ComputeRollCorrEquityVsFredDelta(bars, dgs10, cfg.CorrWindow, cfg.MinCorObs, "DGS10", regimeBondEquity,
+		be := computeBondEquity(bars, dgs10, cfg.CorrWindow, cfg.MinCorObs, "DGS10",
 			"Need more overlapping benchmark bars and DGS10 observations.")
-		m := packRoll(be, cfg.Symbol, map[string]any{"yield_series": "DGS10"})
+		m := packRoll(be, cfg.Symbol, map[string]any{
+			"yield_series": "DGS10",
+			"description":  "Benchmark log return vs daily change in the bond price proxy (−Δ 10Y yield; a bond's price moves opposite its yield)",
+		})
 		m["window_trading_days"] = cfg.CorrWindow
 		im["bond_equity_60d"] = m
 	} else {

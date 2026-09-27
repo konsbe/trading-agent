@@ -36,3 +36,45 @@ func TestForwardFillDGS10(t *testing.T) {
 		t.Fatalf("out = %v", out)
 	}
 }
+
+// bondEquityFixture builds 70 sessions in which the 10Y yield moves `sign`
+// times SPY's move: sign +1 is a flight to quality (stocks fall and yields
+// fall with them, i.e. bond prices rise), sign −1 a rates shock (yields rise
+// as stocks fall, so bond prices fall with stocks).
+func bondEquityFixture(sign float64) ([]store.EquityOHLCVBar, []store.MacroObs) {
+	var bars []store.EquityOHLCVBar
+	var yields []store.MacroObs
+	price, y := 500.0, 4.0
+	start := time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)
+	for i := 0; i < 70; i++ {
+		move := 0.01 * math.Sin(float64(i)*1.7) // −1% … +1%
+		price *= 1 + move
+		y += sign * move * 5 // 1% on SPY ↔ 5bp on the yield
+		ts := start.AddDate(0, 0, i)
+		bars = append(bars, store.EquityOHLCVBar{TS: ts, Close: price})
+		yields = append(yields, store.MacroObs{TS: ts, Value: y})
+	}
+	return bars, yields
+}
+
+// The correlation was taken against the raw yield change while the labels
+// describe bond prices, so each regime read backwards: on 2026-09-27 ρ −0.528
+// (stocks up as yields fell, i.e. with bond prices) read "deflationary hedge —
+// classic flight-to-quality".
+func TestBondEquityCorrelatesWithBondPricesNotYields(t *testing.T) {
+	bars, yields := bondEquityFixture(+1)
+	flight := ComputeBondEquity60d(bars, yields, 60, 40)
+	if flight.InsufficientData || flight.Correlation60d > -0.9 || flight.Regime != "deflationary_hedge" {
+		t.Errorf("flight to quality: ρ %.3f %s, want ≈ −1 deflationary_hedge (bonds rise as stocks fall)", flight.Correlation60d, flight.Regime)
+	}
+	bars, yields = bondEquityFixture(-1)
+	shock := ComputeBondEquity60d(bars, yields, 60, 40)
+	if shock.Correlation60d < 0.9 || shock.Regime != "inflationary_positive" {
+		t.Errorf("rates shock: ρ %.3f %s, want ≈ +1 inflationary_positive (bonds fall with stocks)", shock.Correlation60d, shock.Regime)
+	}
+	// The raw-yield reading had the opposite sign.
+	raw := ComputeRollCorrEquityVsFredDelta(bars, yields, 60, 40, "DGS10", regimeBondEquity, "")
+	if raw.Correlation60d != -shock.Correlation60d {
+		t.Errorf("raw-yield ρ %.3f, want the negation of %.3f", raw.Correlation60d, shock.Correlation60d)
+	}
+}
