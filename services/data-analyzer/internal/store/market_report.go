@@ -112,12 +112,16 @@ SELECT COALESCE(json_agg(t ORDER BY t.date, t.symbol), '[]'::json) FROM (
 }
 
 // MacroHeadlines: the same macro-tagged headlines the Discord report shows.
-// Headline, source, url and time only — never article text.
+// Headline, source, url and time only — never article text. The feed stores
+// an article again each time it is re-fetched, so rows are one per link (the
+// newest), and the list is the newest `limit` of those.
 func MacroHeadlines(ctx context.Context, q Querier, limit int) (json.RawMessage, error) {
 	return jsonArray(ctx, q, "macro headlines", `
 SELECT COALESCE(json_agg(t ORDER BY t.ts DESC), '[]'::json) FROM (
-  SELECT ts, source, headline, url FROM news_headlines
-  WHERE source LIKE 'rss\_macro\_%' OR source = 'finnhub_macro_general'
+  SELECT * FROM (
+    SELECT DISTINCT ON (COALESCE(url, headline)) ts, source, headline, url FROM news_headlines
+    WHERE source LIKE 'rss\_macro\_%' OR source = 'finnhub_macro_general'
+    ORDER BY COALESCE(url, headline), ts DESC) d
   ORDER BY ts DESC LIMIT $1) t`, limit)
 }
 

@@ -52,3 +52,41 @@ VALUES (current_date + 3, 'ZZMR1', '3', 'finnhub', 'zzmr1-test')`); err != nil {
 		}
 	}
 }
+
+// Live 2026-09-27: the report's 8 headlines were 4 links, each stored again
+// on every re-fetch (377 rows, 180 distinct urls), and React warned about
+// duplicate keys. One row per link, the newest.
+func TestMacroHeadlines_OneRowPerLink(t *testing.T) {
+	ctx := context.Background()
+	tx := fixtureTx(t)
+	for _, r := range []struct {
+		hoursAhead int
+		url, head  string
+	}{
+		{3, "https://zz.example/a", "A, newest copy"}, {2, "https://zz.example/a", "A, older copy"},
+		{2, "https://zz.example/b", "B"}, {1, "https://zz.example/a", "A, oldest copy"},
+	} {
+		if _, err := tx.Exec(ctx, `INSERT INTO news_headlines (ts, source, headline, url)
+			VALUES (now() + make_interval(hours => $1), 'finnhub_macro_general', $2, $3)`, r.hoursAhead, r.head, r.url); err != nil {
+			t.Fatal(err)
+		}
+	}
+	raw, err := MacroHeadlines(ctx, tx, 8)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []struct{ Headline, URL string }
+	if err := json.Unmarshal(raw, &got); err != nil {
+		t.Fatal(err)
+	}
+	seen := map[string]bool{}
+	for _, h := range got {
+		if seen[h.URL] {
+			t.Errorf("url %s listed twice: %s", h.URL, raw)
+		}
+		seen[h.URL] = true
+	}
+	if len(got) < 2 || got[0].Headline != "A, newest copy" || got[1].Headline != "B" {
+		t.Errorf("first rows = %+v, want A's newest copy then B", got[:min(len(got), 2)])
+	}
+}
