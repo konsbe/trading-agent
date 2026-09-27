@@ -1116,6 +1116,126 @@
           "terms": []
         }
       ]
+    },
+    {
+      "id": "alarm-history",
+      "title": "Alarm History",
+      "intro": "*What this part of the app is for:* Alarm History, under Tracking, lists the alerts the analyst bot's alert scan actually posted to Discord, newest first, in your local time. It is a record of what was posted, not a live scan and not a forecast. The momentum screener's alerts are not included.",
+      "entries": [
+        {
+          "id": "alarm-history-recorded",
+          "title": "What is recorded, and since when",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "An alert is recorded only once its post has gone out: the symbol, whether it is an equity or crypto, the alert type, its severity, the bot's message and the time it fired. An alert the bot detected but could not post is not recorded (it is tried again on the next scan), and the momentum screener's alerts are not recorded at all."
+            },
+            {
+              "type": "list",
+              "items": [
+                "**Liquidity sweep** — the bot's liquidity-sweep rule fired on the symbol's bars.",
+                "**Bollinger squeeze** — Bollinger Bands are unusually narrow.",
+                "**RSI overbought** / **RSI oversold** — RSI (14) is above 70 / below 30 (the bot's default thresholds).",
+                "**Fundamental tier flip** — an equity's fundamental composite tier changed to strong or weak.",
+                "**VIX elevated** — the VIX is above the bot's threshold; this one is about the whole market."
+              ]
+            },
+            {
+              "type": "paragraph",
+              "text": "Under the caveat, the page says when the **records start**: the earliest recorded alert, in your local date and time. Earlier periods have *no record*, which is not the same as no alerts. A date range before that point shows \"No alerts in this period\" with a note that nothing is recorded that far back."
+            }
+          ],
+          "terms": []
+        },
+        {
+          "id": "alarm-history-views",
+          "title": "Grouped view and Show every alert",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "By default the page shows one row per symbol and alert type in the chosen range: when it last fired, the symbol, the alert type, the latest alert's severity and message, and how many times it was posted with the first and last time, for example \"×10 · Sep 25, 11:14 PM – Sep 27, 9:32 PM\". A row with repeats opens to its individual alerts, five at a time, with **Load older** for the rest."
+            },
+            {
+              "type": "paragraph",
+              "text": "**Repeats are re-posts, not separate events.** After posting an alert the bot waits out a cooldown for that symbol and alert type (four hours by default). If the same condition still holds when the cooldown ends, it posts it again. So ×10 usually means one ongoing condition seen ten times, not ten new signals: a liquidity sweep, for instance, can keep firing for many sessions."
+            },
+            {
+              "type": "paragraph",
+              "text": "**Show every alert** switches to the plain list of every post, newest first: fired time, symbol, alert type, severity and message. Both views load 100 rows at a time, and **Load older** adds the next ones below."
+            }
+          ],
+          "terms": []
+        },
+        {
+          "id": "alarm-history-filters",
+          "title": "Filters and dates",
+          "blocks": [
+            {
+              "type": "list",
+              "items": [
+                "**Symbol** — one symbol, for example AAPL or BTCUSDT, applied as you type.",
+                "**Type** — any of the alert types that have ever been recorded; none selected means all.",
+                "**Severity** — info, notice or warning; none selected means all.",
+                "**Date range** — From and To are whole days in your local time, both included. The default is the last 7 days, today included; **Last 7 days** goes back to it."
+              ]
+            },
+            {
+              "type": "paragraph",
+              "text": "Changing a filter starts the list again from the newest rows and closes any opened groups. A filter the app rejects, such as a symbol with characters no symbol has, is explained in plain words in place of the list."
+            }
+          ],
+          "terms": []
+        },
+        {
+          "id": "alarm-history-severity",
+          "title": "Severity",
+          "blocks": [
+            {
+              "type": "list",
+              "items": [
+                "**info** — worth knowing, not urgent (a Bollinger squeeze).",
+                "**notice** — worth a second look (RSI overbought or oversold, a liquidity sweep, a fundamental tier flip to strong).",
+                "**warning** — actively flagged as elevated risk or urgency (VIX elevated, a fundamental tier flip to weak)."
+              ]
+            },
+            {
+              "type": "paragraph",
+              "text": "Severity is fixed by the alert type (for a tier flip, by its direction). It says how much attention the bot's rule asks for, not how likely anything is to happen. The badge always shows the word next to its colour."
+            }
+          ],
+          "terms": []
+        },
+        {
+          "id": "alarm-history-caveat",
+          "title": "The heuristic caveat",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "Most of these alerts are classical technical-analysis conditions, so the page opens with the same caveat as Stock Detail's Classical Technical Signals section, word for word:"
+            },
+            {
+              "type": "caveat",
+              "key": "heuristic_ta_caveat"
+            }
+          ],
+          "terms": []
+        },
+        {
+          "id": "alarm-history-links-refresh",
+          "title": "Links and refreshing",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "For an equity, the symbol links to its Stock Detail page, opened at the Classical Technical Signals section. Crypto symbols have no Stock Detail page and are not linked. Neither is a market-wide alert such as VIX elevated: it is about the whole market, even though it is recorded under the symbol whose scan noticed it (the row says \"market-wide\")."
+            },
+            {
+              "type": "paragraph",
+              "text": "Nothing is pushed to the page. It checks for new alerts when you come back to its tab and every 60 seconds while it is open and visible, and shows **Last checked** with the time of the latest successful check. A check re-reads only the newest rows and adds new ones on top; rows you loaded with Load older and groups you opened stay as they are. If a check fails, the rows stay and the page says it couldn't check."
+            }
+          ],
+          "terms": []
+        }
+      ]
     }
   ]
 }
