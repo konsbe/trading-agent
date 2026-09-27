@@ -68,6 +68,7 @@
     font-weight: var(--font-weight-medium);
     text-transform: uppercase;
     letter-spacing: 0.04em;
+    white-space: normal;
     vertical-align: bottom;
 }
 
@@ -130,7 +131,7 @@
     display: flex;
     flex-direction: column;
     line-height: 1.3;
-    width: clamp(10rem, 30cqi, 24rem);
+    width: clamp(10rem, 19cqi, 20rem);
     min-width: 10rem;
 }
 
@@ -196,13 +197,36 @@
     font-style: italic;
 }
 
-/* Price-movement colours: only for the day's change (a price delta). */
-.watchlist-table__change.is-price-up {
-    color: var(--color-price-up);
+/*
+ * Market cells (Change % colours, market cap, score) are styled by
+ * shared-components' MarketCells; these are the table-level rules the
+ * candidates table applies to the same columns.
+ */
+
+/* Long breakout labels ("breakout from consolidation") wrap instead of widening the table. */
+.watchlist-table td[data-column='breakout_state'] {
+    min-width: 9ch;
+    max-width: 14ch;
+    white-space: normal;
+    line-height: 1.25;
 }
 
-.watchlist-table__change.is-price-down {
-    color: var(--color-price-down);
+.watchlist-table td[data-column='momentum_score_100'] {
+    white-space: nowrap;
+}
+
+/* Every header fits on one line from here; narrower tables wrap headers before scrolling. */
+@container (min-width: 1190px) {
+    .watchlist-table thead th {
+        white-space: nowrap;
+    }
+}
+
+@container (min-width: 1320px) {
+    .watchlist-table td[data-column='breakout_state'] {
+        max-width: none;
+        white-space: nowrap;
+    }
 }
 
 .watchlist-table td[data-column='actions'] {

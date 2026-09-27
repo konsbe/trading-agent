@@ -230,10 +230,16 @@ describe('CandidatesPage', () => {
         });
 
         it('uses only the price aliases for the Change % colours', () => {
-            const css = readFileSync(join(__dirname, '../../features/Candidates/components/CandidatesTable/CandidatesTable-styles.css'), 'utf8');
-            expect(css).toMatch(/\.scanner-table__change\.is-price-up\s*\{\s*color:\s*var\(--color-price-up\)/);
-            expect(css).toMatch(/\.scanner-table__change\.is-price-down\s*\{\s*color:\s*var\(--color-price-down\)/);
+            // The Change % cell (and its colours) is shared-components' ChangeCell.
+            const css = readFileSync(
+                join(__dirname, '../../../../../shared-components/src/ui/components/MarketCells/MarketCells-styles.css'),
+                'utf8'
+            );
+            expect(css).toMatch(/\.market-cell__change\.is-price-up\s*\{\s*color:\s*var\(--color-price-up\)/);
+            expect(css).toMatch(/\.market-cell__change\.is-price-down\s*\{\s*color:\s*var\(--color-price-down\)/);
             expect(css).not.toMatch(/#[0-9a-f]{3,6}\b/i);
+            const tableCss = readFileSync(join(__dirname, '../../features/Candidates/components/CandidatesTable/CandidatesTable-styles.css'), 'utf8');
+            expect(tableCss).not.toMatch(/#[0-9a-f]{3,6}\b/i);
         });
 
         it('renders "—" for every null value and never 0 for a null score', () => {

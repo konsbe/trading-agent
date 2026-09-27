@@ -16,10 +16,10 @@ describe('sign', () => {
 
     it('formats grouped digits with the sign in front', () => {
         expect(formatSignedNumber(-1234.5, { minimumFractionDigits: 2, maximumFractionDigits: 2 })).toBe('−1,234.50');
-        expect(formatSignedNumber(-0.7, { minimumFractionDigits: 1, maximumFractionDigits: 1, plus: true })).toBe('−0.7');
         expect(formatSignedNumber(15.5, { minimumFractionDigits: 1, maximumFractionDigits: 1, plus: true })).toBe('+15.5');
         expect(formatSignedNumber(0, { minimumFractionDigits: 1, maximumFractionDigits: 1, plus: true })).toBe('0.0');
         expect(formatSignedNumber(-8, { maximumFractionDigits: 0 })).toBe('−8');
+        expect(formatSignedNumber(1234)).toBe('1,234');
     });
 
     it('never emits an ASCII hyphen before a digit', () => {

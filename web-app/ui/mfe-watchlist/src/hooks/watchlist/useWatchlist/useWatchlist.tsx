@@ -46,6 +46,18 @@ const optimisticItem = (symbol: string, seed: WatchlistSeed = {}): WatchlistItem
     close: null,
     change_pct: null,
     rvol_20: null,
+    dollar_volume: null,
+    rsi_14: null,
+    breakout_state: null,
+    pct_of_52w_high: null,
+    catalyst_tier: null,
+    market_cap: null,
+    market_cap_est: null,
+    market_cap_is_proxy: null,
+    momentum_score_100: null,
+    score_attainable: null,
+    score_status: 'unvalidated',
+    is_candidate_today: false,
 });
 
 /**

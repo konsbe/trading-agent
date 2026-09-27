@@ -1,4 +1,4 @@
-import { SymbolSearchResponse, SymbolSearchResult, WatchlistItem, WatchlistResponse } from './types';
+import { CatalystTier, SymbolSearchResponse, SymbolSearchResult, WatchlistItem, WatchlistResponse } from './types';
 
 type Json = Record<string, unknown>;
 
@@ -34,8 +34,14 @@ const timestamp = (value: unknown, path: string): string => {
     return Number.isNaN(Date.parse(s)) ? fail(path, 'RFC 3339 timestamp', value) : s;
 };
 
+const CATALYST_TIERS: readonly CatalystTier[] = ['A', 'B', 'none'];
+
+const catalystTier = (value: unknown, path: string): CatalystTier =>
+    CATALYST_TIERS.includes(value as CatalystTier) ? (value as CatalystTier) : fail(path, 'A|B|none', value);
+
 const optStr = nullable(str);
 const optNum = nullable(num);
+const optBool = nullable(bool);
 
 const parseWatchlistItem = (value: unknown, path: string): WatchlistItem => {
     const o = obj(value, path);
@@ -49,6 +55,19 @@ const parseWatchlistItem = (value: unknown, path: string): WatchlistItem => {
         close: optNum(o.close, `${path}.close`),
         change_pct: optNum(o.change_pct, `${path}.change_pct`),
         rvol_20: optNum(o.rvol_20, `${path}.rvol_20`),
+        dollar_volume: optNum(o.dollar_volume, `${path}.dollar_volume`),
+        rsi_14: optNum(o.rsi_14, `${path}.rsi_14`),
+        breakout_state: optStr(o.breakout_state, `${path}.breakout_state`),
+        pct_of_52w_high: optNum(o.pct_of_52w_high, `${path}.pct_of_52w_high`),
+        catalyst_tier: nullable(catalystTier)(o.catalyst_tier, `${path}.catalyst_tier`),
+        market_cap: optNum(o.market_cap, `${path}.market_cap`),
+        market_cap_est: optNum(o.market_cap_est, `${path}.market_cap_est`),
+        market_cap_is_proxy: optBool(o.market_cap_is_proxy, `${path}.market_cap_is_proxy`),
+        momentum_score_100: optNum(o.momentum_score_100, `${path}.momentum_score_100`),
+        score_attainable: optNum(o.score_attainable, `${path}.score_attainable`),
+        // A build-level fact; an older server that omits it is still unvalidated.
+        score_status: optStr(o.score_status, `${path}.score_status`) ?? 'unvalidated',
+        is_candidate_today: optBool(o.is_candidate_today, `${path}.is_candidate_today`) ?? false,
     };
 };
 

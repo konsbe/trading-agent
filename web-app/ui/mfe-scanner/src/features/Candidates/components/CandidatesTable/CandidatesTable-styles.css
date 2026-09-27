@@ -28,8 +28,7 @@
     color: var(--color-on-surface);
 }
 
-.scanner-table__caption,
-.scanner-table__sr-only {
+.scanner-table__caption {
     position: absolute;
     width: 1px;
     height: 1px;
@@ -270,20 +269,6 @@
     line-height: 1.25;
 }
 
-/* Market cap stays neutral; an estimate carries "(est.)" in its text and a tooltip. */
-.scanner-table__market-cap.is-estimate {
-    cursor: help;
-}
-
-/* Price-movement colours: only for the day's change (a price delta). */
-.scanner-table__change.is-price-up {
-    color: var(--color-price-up);
-}
-
-.scanner-table__change.is-price-down {
-    color: var(--color-price-down);
-}
-
 /*
  * Every header fits on one line from here (the auto layout would otherwise
  * still wrap one); narrower tables wrap headers before scrolling.
@@ -306,35 +291,10 @@
     }
 }
 
-/* Score: de-emphasised, always paired with its status on the same line. */
+/*
+ * Score: always paired with its status on the same line. Cell styling (and the
+ * Change % / market-cap cells) comes from shared-components' MarketCells.
+ */
 .scanner-table td[data-column='momentum_score_100'] {
     white-space: nowrap;
-}
-
-.scanner-table__score {
-    position: relative;
-    display: inline-flex;
-    color: var(--color-on-surface-variant);
-}
-
-.scanner-table__score-visual {
-    display: inline-flex;
-    align-items: baseline;
-    gap: var(--space-xs);
-}
-
-/* Mirrors the detail view: the score carries the weight, "/75" is secondary. */
-.scanner-table__score-value {
-    font-weight: var(--font-weight-medium);
-}
-
-.scanner-table__score-ceiling {
-    font-size: var(--font-size-xs);
-    font-weight: var(--font-weight-regular);
-}
-
-.scanner-table__score-status {
-    font-family: var(--font-family);
-    font-size: var(--font-size-xs);
-    font-style: italic;
 }

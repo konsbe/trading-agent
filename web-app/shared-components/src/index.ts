@@ -21,6 +21,7 @@ export { default as useFilterData } from './mfe/hooks/useFilterData';
 export type { FilterData } from './mfe/hooks/useFilterData';
 
 export * from './ui/primitives';
+export * from './format';
 
 // Content Wrapper components
 export { ContentWrapper } from './ui/components/ContentWrapper/ContentWrapper';

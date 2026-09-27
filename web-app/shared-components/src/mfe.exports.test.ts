@@ -23,4 +23,16 @@ describe('mfe barrel exports', () => {
         expect(mfeExports.GridIcon).toBeDefined();
         expect(mfeExports.DotIcon).toBeDefined();
     });
+
+    it('exports the market cells, columns and formatters', () => {
+        expect(mfeExports.ChangeCell).toBeDefined();
+        expect(mfeExports.MarketCapCell).toBeDefined();
+        expect(mfeExports.ScoreCell).toBeDefined();
+        expect(mfeExports.scoreLabel).toBeDefined();
+        expect(mfeExports.MARKET_COLUMNS).toHaveLength(10);
+        expect(mfeExports.EMPTY_VALUE).toBe('—');
+        expect(mfeExports.formatPrice(1.2)).toBe('$1.20');
+        expect(mfeExports.marketCapText).toBeDefined();
+        expect(mfeExports.formatSignedNumber).toBeDefined();
+    });
 });

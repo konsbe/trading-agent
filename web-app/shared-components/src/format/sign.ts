@@ -1,6 +1,6 @@
 /**
- * The one place a number gets its sign. Kept identical in mfe-scanner and
- * mfe-watchlist (MFEs don't import each other).
+ * The one place a number gets its sign, shared by every MFE so a value reads
+ * the same on every screen.
  *
  * Negatives always render U+2212 MINUS SIGN, never the ASCII hyphen that
  * `toLocaleString` emits, so "−0.7%" and "−14.8% from peak" match. Zero is
@@ -12,7 +12,7 @@ export const MINUS = '\u2212';
 /** "−" for a negative, "+" for a positive when `plus`, "" otherwise (including 0 and -0). */
 export const signOf = (value: number, plus = false): string => (value < 0 ? MINUS : plus && value > 0 ? '+' : '');
 
-interface SignedNumberOptions {
+export interface SignedNumberOptions {
     minimumFractionDigits?: number;
     maximumFractionDigits?: number;
     /** Prefix positives with "+". */

@@ -346,7 +346,7 @@ The one **write path**, designed separately from the read-only scanner routes
 
 | Route | Result |
 |---|---|
-| `GET /api/v1/watchlist` | `200 {"owner": "unauthenticated", "items": [{symbol, company_name, exchange, added_at, as_of, is_stale, close, change_pct, rvol_20}]}` newest first |
+| `GET /api/v1/watchlist` | `200 {"owner": "unauthenticated", "items": [{symbol, company_name, exchange, added_at, as_of, is_stale, close, change_pct, rvol_20, dollar_volume, rsi_14, breakout_state, pct_of_52w_high, catalyst_tier, market_cap, market_cap_est, market_cap_is_proxy, is_candidate_today, momentum_score_100, score_attainable, score_status}]}` newest first. The candidates list's columns (§2.2 names and null handling), all from the symbol's latest `momentum_features` row with no gate filter. `is_candidate_today`: that row is the latest scan and passed its gates; only then are `momentum_score_100` / `score_attainable` set (from `momentum_scores`, which only gate passes have), otherwise null — a missing score, not 0 (2026-09-27) |
 | `PUT /api/v1/watchlist/{symbol}` | Idempotent add. `201` when added, `200` when already present; body is the updated list. `404 unknown_symbol` if not in `universe_symbols`; `400 invalid_symbol` |
 | `DELETE /api/v1/watchlist/{symbol}` | Idempotent remove. `200` with the updated list |
 | `GET /api/v1/symbols?q=` | Symbol search for the add flow (added 2026-09-24). `200 {"query", "results": [{symbol, company_name, exchange, is_eligible}]}`, at most 20. `400 invalid_query` when `q` is blank or over 40 characters |

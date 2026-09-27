@@ -1,7 +1,7 @@
 import { ChangeEvent, KeyboardEvent, useCallback, useEffect, useId, useState } from 'react';
+import { EMPTY_VALUE } from '@trading-agent/shared-components';
 import { SymbolSearchResult } from '@/api';
 import { getErrorMessage } from '@/common/errors/errorMessages';
-import { EMPTY_VALUE } from '@/common/format/format';
 import useSymbolSearch from '@/hooks/watchlist/useSymbolSearch';
 import InlineError from '../InlineError';
 import { AddSymbolProps } from './types';

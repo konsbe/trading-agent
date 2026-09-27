@@ -1,0 +1,56 @@
+/*
+ * Market-data cells shared by the candidates and watchlist tables. Table-level
+ * layout (padding, numeric alignment, column widths) stays with each table.
+ */
+.market-cell__sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+}
+
+/* Price-movement colours: only for the day's change (a price delta). */
+.market-cell__change.is-price-up {
+    color: var(--color-price-up);
+}
+
+.market-cell__change.is-price-down {
+    color: var(--color-price-down);
+}
+
+/* Market cap stays neutral; an estimate carries "(est.)" in its text and a tooltip. */
+.market-cell__market-cap.is-estimate {
+    cursor: help;
+}
+
+/* Score: de-emphasised, always paired with its status on the same line. */
+.market-cell__score {
+    position: relative;
+    display: inline-flex;
+    color: var(--color-on-surface-variant);
+    white-space: nowrap;
+}
+
+.market-cell__score-visual {
+    display: inline-flex;
+    align-items: baseline;
+    gap: var(--space-xs);
+}
+
+/* Mirrors the detail view: the score carries the weight, "/75" is secondary. */
+.market-cell__score-value {
+    font-weight: var(--font-weight-medium);
+}
+
+.market-cell__score-ceiling {
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-regular);
+}
+
+.market-cell__score-status {
+    font-family: var(--font-family);
+    font-size: var(--font-size-xs);
+    font-style: italic;
+}

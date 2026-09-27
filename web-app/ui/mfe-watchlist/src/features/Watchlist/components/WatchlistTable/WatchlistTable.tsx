@@ -1,14 +1,8 @@
 import { KeyboardEvent, MouseEvent, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Button, CloseIcon } from '@trading-agent/shared-components';
+import { Button, CloseIcon, EMPTY_VALUE, formatPrice, MARKET_COLUMNS, MarketRow } from '@trading-agent/shared-components';
 import { WatchlistItem } from '@/api';
-import {
-    EMPTY_VALUE,
-    formatMultiple,
-    formatPrice,
-    formatSignedPercent,
-    formatTradingDay,
-} from '@/common/format/format';
+import { formatTradingDay } from '@/common/format/format';
 import { scannerDetailPath } from '@/config/routes';
 import { useIsHosted } from '@/providers/HostModeContext';
 import { WatchlistTableProps } from './types';
@@ -52,21 +46,28 @@ const PriceCell = ({ item, isSaving }: { item: WatchlistItem; isSaving: boolean 
     );
 };
 
-/** The only toned value: a price delta (zero and null stay neutral). */
-const ChangeCell = ({ item }: { item: WatchlistItem }) => {
-    const value = item.as_of === null ? null : item.change_pct;
-    const tone = value === null || !Number.isFinite(value) || value === 0 ? '' : value > 0 ? ' is-price-up' : ' is-price-down';
-    return (
-        <span className={`watchlist-table__change${tone}`} data-testid="change-value">
-            {formatSignedPercent(value)}
-        </span>
-    );
+const NO_MARKET_DATA: Partial<MarketRow> = {
+    close: null,
+    change_pct: null,
+    rvol_20: null,
+    dollar_volume: null,
+    rsi_14: null,
+    breakout_state: null,
+    pct_of_52w_high: null,
+    market_cap: null,
+    market_cap_est: null,
+    momentum_score_100: null,
+    score_attainable: null,
 };
 
+/** Without a features row (`as_of` null) no market value is shown, even if one is present. */
+const marketValues = (item: WatchlistItem): MarketRow => (item.as_of === null ? { ...item, ...NO_MARKET_DATA } : item);
+
 /**
- * The watched symbols with their latest stored price. Hosted, a symbol with
- * stored data opens the scanner's detail page: the ticker is a real link and
- * the row activates on click or Enter, like the candidates table. A symbol
+ * The watched symbols with the candidates table's market columns (same cells,
+ * formatters, labels and tooltips from shared-components). Hosted, a symbol
+ * with stored data opens the scanner's detail page: the ticker is a real link
+ * and the row activates on click or Enter, like the candidates table. A symbol
  * without data (`as_of` null) isn't linked — its detail page would be a 404 —
  * and neither is anything standalone, where the detail route doesn't exist.
  */
@@ -108,11 +109,17 @@ const WatchlistTable = ({ id, caption, rows, saving, onRemove }: WatchlistTableP
                 <thead>
                     <tr>
                         <th scope="col" data-column="symbol">Symbol</th>
-                        <th scope="col" className="is-numeric" data-column="close">Price</th>
-                        <th scope="col" className="is-numeric" data-column="change_pct">Change %</th>
-                        <th scope="col" className="is-numeric" data-column="rvol_20" title="Relative volume vs. the 20-day average">
-                            RVOL
-                        </th>
+                        {MARKET_COLUMNS.map(column => (
+                            <th
+                                key={column.key}
+                                scope="col"
+                                className={column.numeric ? 'is-numeric' : undefined}
+                                title={column.description}
+                                data-column={column.key}
+                            >
+                                {column.label}
+                            </th>
+                        ))}
                         <th scope="col" data-column="actions">
                             <span className="watchlist-table__sr-only">Actions</span>
                         </th>
@@ -122,6 +129,7 @@ const WatchlistTable = ({ id, caption, rows, saving, onRemove }: WatchlistTableP
                     {rows.map(item => {
                         const isSaving = saving.has(item.symbol);
                         const linked = isLinked(item);
+                        const values = marketValues(item);
                         return (
                             <tr
                                 key={item.symbol}
@@ -137,15 +145,15 @@ const WatchlistTable = ({ id, caption, rows, saving, onRemove }: WatchlistTableP
                                 <th scope="row" data-column="symbol">
                                     <SymbolCell item={item} linked={linked} />
                                 </th>
-                                <td className="is-numeric" data-column="close">
-                                    <PriceCell item={item} isSaving={isSaving} />
-                                </td>
-                                <td className="is-numeric" data-column="change_pct">
-                                    <ChangeCell item={item} />
-                                </td>
-                                <td className="is-numeric" data-column="rvol_20" data-testid="rvol-value">
-                                    {item.as_of === null ? EMPTY_VALUE : formatMultiple(item.rvol_20)}
-                                </td>
+                                {MARKET_COLUMNS.map(column => (
+                                    <td
+                                        key={column.key}
+                                        className={column.numeric ? 'is-numeric' : undefined}
+                                        data-column={column.key}
+                                    >
+                                        {column.key === 'close' ? <PriceCell item={item} isSaving={isSaving} /> : column.render(values)}
+                                    </td>
+                                ))}
                                 <td data-column="actions">
                                     <Button
                                         variant="ghost"

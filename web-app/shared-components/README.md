@@ -47,6 +47,13 @@ Light/dark is applied only by a ThemeProvider: the shell's provider calls
 - `ThemeProvider` – applies the Stitch light/dark tokens to an MFE subtree
 - `getThemeVariables`, `applyTheme`, `getSystemTheme` – token helpers (for ThemeProviders only)
 - `ErrorBoundary`, `ContentWrapper`, `ContentRenderer`, `MFEDataWrapper`
+- Market cells – `ChangeCell` (`value`), `MarketCapCell` (`row: MarketCapFields`), `ScoreCell`
+  (`row: ScoreFields`, "53/75 unvalidated" / "— unvalidated") and `MARKET_COLUMNS` (Close … Score
+  with the candidates table's labels, order and tooltips). Any row satisfying `MarketRow` renders
+  through them — the scanner's candidates table and the watchlist table both do.
+- Formatters – `EMPTY_VALUE`, `formatPrice`, `formatSignedPercent`, `formatMultiple`, `formatCompactUsd`,
+  `formatInteger`, `formatBreakoutState`, `formatRatioAsPercent`, `formatCatalystTier`, `formatScore`,
+  `marketCapText`, `marketCapIsEstimate`, … and `signOf` / `formatSignedNumber` (negatives use "−", U+2212)
 
 ```tsx
 import { Button, Dialog } from '@trading-agent/shared-components';

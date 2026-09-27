@@ -12,3 +12,4 @@ export type { ThemeMode } from './ui/providers/ThemeProvider/types';
 export { getThemeVariables, applyTheme, THEME_MODES } from './theme/tokens';
 export type { StitchColorToken } from './theme/tokens';
 export * from './ui/primitives';
+export * from './format';
