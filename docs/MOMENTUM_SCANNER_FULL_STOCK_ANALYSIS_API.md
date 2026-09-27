@@ -531,6 +531,37 @@ returned (narrow with `since` / `symbol` or raise `limit`); there is no cursor.
 
 ---
 
+#### Widened for Alarm History (2026-09-27)
+
+All additions are optional and combinable; the old parameters behave as
+before, so the candidates badge is unchanged.
+
+| Parameter | Meaning |
+|---|---|
+| `alert_type` | one or more (repeated or comma-separated), e.g. `liquidity_sweep,bb_squeeze`; `400 invalid_alert_type` |
+| `severity` | one or more of `info`, `notice`, `warning`; `400 invalid_severity` |
+| `since` | now also an RFC3339 timestamp (the page sends local-day bounds); a date is still 00:00 UTC; inclusive |
+| `until` | a date (then the **end** of that UTC day) or an RFC3339 timestamp; exclusive; `400 invalid_until`, `400 invalid_range` when not after `since` |
+| `before` | an alert id: keyset cursor on `(fired_at, id)` — rows (raw) or groups (grouped) strictly older than that alert; `400 invalid_before` |
+| `mode` | `raw` (default) or `grouped`; `400 invalid_mode` |
+
+`mode=grouped` returns `groups: [{symbol, exchange_type, alert_type, count,
+first_fired_at, last_fired_at, latest}]` — one per symbol + alert type among
+the rows the filters match (so `count` and the span are within the range),
+newest group first by its latest alert; `latest` is that alert (value,
+severity, message). The bot re-posts an ongoing condition after each cooldown,
+so a group is usually one condition, not separate events. Expanding a group is
+a raw request with its `symbol` + `alert_type` and the same range.
+
+Both modes: `has_more` and `next_before` (the cursor for the next page, set
+exactly when `has_more`), the filters echoed (`alert_types`, `severities`,
+`since`, `until`, `before`, `mode`), and table-wide `types` (every alert type
+that has fired, for the filter), `records_start` (the earliest `fired_at`;
+earlier periods have no record, which is not "no alerts") and `caveat` (the
+shared `heuristic_ta_caveat`, verbatim). Only alerts actually posted to
+Discord are recorded (the bot writes the row after a confirmed post); the
+momentum screener's alerts are not written to `fired_alerts`.
+
 ## 4. Candidates-page alert badge
 
 Add to the candidates list response (`GET /api/v1/scanner/today`, per

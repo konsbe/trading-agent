@@ -42,6 +42,8 @@ type Store interface {
 	AnalysisFreshness(ctx context.Context, symbol string) (store.AnalysisFreshness, error)
 	Analysis(ctx context.Context, symbol string) (store.AnalysisInputs, error)
 	ListAlerts(ctx context.Context, f store.AlertFilter) ([]store.AlertRow, error)
+	ListAlertGroups(ctx context.Context, f store.AlertFilter) ([]store.AlertGroup, error)
+	AlertMeta(ctx context.Context) (store.AlertMeta, error)
 	Ping(ctx context.Context) error
 }
 
@@ -116,6 +118,12 @@ func (s DBStore) AnalysisFreshness(ctx context.Context, sym string) (store.Analy
 }
 func (s DBStore) Analysis(ctx context.Context, sym string) (store.AnalysisInputs, error) {
 	return store.LoadAnalysis(ctx, s.Q, sym, AnalysisInterval, analysisHeadlines)
+}
+func (s DBStore) ListAlertGroups(ctx context.Context, f store.AlertFilter) ([]store.AlertGroup, error) {
+	return store.ListAlertGroups(ctx, s.Q, f)
+}
+func (s DBStore) AlertMeta(ctx context.Context) (store.AlertMeta, error) {
+	return store.LoadAlertMeta(ctx, s.Q)
 }
 func (s DBStore) ListAlerts(ctx context.Context, f store.AlertFilter) ([]store.AlertRow, error) {
 	return store.ListAlerts(ctx, s.Q, f)
