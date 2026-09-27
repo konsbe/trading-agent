@@ -27,6 +27,9 @@ type Store interface {
 	SymbolKnown(ctx context.Context, symbol string) (bool, error)
 	ListWatchlist(ctx context.Context, owner *string) ([]store.WatchlistItem, error)
 	AddToWatchlist(ctx context.Context, owner *string, symbol string) (bool, error)
+	// BarFallback: features from a symbol's own daily bars, for watchlist
+	// rows without a scanner row; nil when it has no bars.
+	BarFallback(ctx context.Context, symbol string) (*store.BarFallback, error)
 	RemoveFromWatchlist(ctx context.Context, owner *string, symbol string) (bool, error)
 	SearchSymbols(ctx context.Context, query string, limit int) ([]store.SymbolMatch, error)
 	ProviderBudgets(ctx context.Context, keys []string) ([]store.ProviderBudget, error)
@@ -94,10 +97,13 @@ func (s DBStore) SessionCoverage(ctx context.Context, sessions []time.Time, sour
 	return store.SessionCoverage(ctx, s.Q, sessions, source)
 }
 func (s DBStore) AddToWatchlist(ctx context.Context, owner *string, sym string) (bool, error) {
-	return store.AddToWatchlist(ctx, s.Q, owner, sym)
+	return store.AddToWatchlist(ctx, s.Q.(store.TxBeginner), owner, sym)
+}
+func (s DBStore) BarFallback(ctx context.Context, sym string) (*store.BarFallback, error) {
+	return store.LoadBarFallback(ctx, s.Q, sym)
 }
 func (s DBStore) RemoveFromWatchlist(ctx context.Context, owner *string, sym string) (bool, error) {
-	return store.RemoveFromWatchlist(ctx, s.Q, owner, sym)
+	return store.RemoveFromWatchlist(ctx, s.Q.(store.TxBeginner), owner, sym)
 }
 func (s DBStore) TrackedPositions(ctx context.Context, st store.TrackedStatusFilter, latest *time.Time) ([]store.TrackedPositionRow, error) {
 	return store.TrackedPositions(ctx, s.Q, st, latest)

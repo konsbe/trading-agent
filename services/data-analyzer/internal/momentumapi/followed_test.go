@@ -90,15 +90,17 @@ func TestComputeState(t *testing.T) {
 		{"automatic, never computed", store.ComputedRow{AssetType: "equity"}, computeScheduled},
 		{"automatic, computed", store.ComputedRow{AssetType: "equity", ComputedAt: at(-time.Hour)}, computeComputed},
 		{"automatic, compute failed", store.ComputedRow{AssetType: "equity", LastError: errText("compute: boom")}, computeFailed},
-		{"manual, just queued", store.ComputedRow{AssetType: "equity", ManualSince: at(-5 * time.Minute)}, computeWaitingForData},
-		{"manual, past timeout", store.ComputedRow{AssetType: "equity", ManualSince: at(-31 * time.Minute)}, computeDataNotArrived},
-		{"manual, old computation does not count", store.ComputedRow{AssetType: "equity", ManualSince: at(-5 * time.Minute), ComputedAt: at(-time.Hour)}, computeWaitingForData},
-		{"manual equity, bars only", store.ComputedRow{AssetType: "equity", ManualSince: at(-5 * time.Minute), BarsFetchedAt: at(-time.Minute)}, computeWaitingForData},
-		{"manual equity, data in", store.ComputedRow{AssetType: "equity", ManualSince: at(-5 * time.Minute), BarsFetchedAt: at(-time.Minute), FundamentalsFetchedAt: at(-time.Minute)}, computeComputing},
-		{"manual crypto, bars in", store.ComputedRow{AssetType: "crypto", ManualSince: at(-5 * time.Minute), BarsFetchedAt: at(-time.Minute)}, computeComputing},
-		{"manual, data in, compute failed", store.ComputedRow{AssetType: "crypto", ManualSince: at(-5 * time.Minute), BarsFetchedAt: at(-time.Minute), LastError: errText("compute: boom")}, computeFailed},
-		{"manual, fetch error is not a compute failure", store.ComputedRow{AssetType: "crypto", ManualSince: at(-5 * time.Minute), BarsFetchedAt: at(-time.Minute), LastError: errText("bars: no data")}, computeComputing},
-		{"manual, computed", store.ComputedRow{AssetType: "equity", ManualSince: at(-5 * time.Minute), ComputedAt: at(-time.Minute)}, computeComputed},
+		{"manual, just queued", store.ComputedRow{AssetType: "equity", QueuedSince: at(-5 * time.Minute)}, computeWaitingForData},
+		{"manual, past timeout", store.ComputedRow{AssetType: "equity", QueuedSince: at(-31 * time.Minute)}, computeDataNotArrived},
+		{"manual, old computation does not count", store.ComputedRow{AssetType: "equity", QueuedSince: at(-5 * time.Minute), ComputedAt: at(-time.Hour)}, computeWaitingForData},
+		{"manual equity, bars only", store.ComputedRow{AssetType: "equity", QueuedSince: at(-5 * time.Minute), BarsFetchedAt: at(-time.Minute)}, computeWaitingForData},
+		{"manual equity, data in", store.ComputedRow{AssetType: "equity", QueuedSince: at(-5 * time.Minute), BarsFetchedAt: at(-time.Minute), FundamentalsFetchedAt: at(-time.Minute)}, computeComputing},
+		{"manual crypto, bars in", store.ComputedRow{AssetType: "crypto", QueuedSince: at(-5 * time.Minute), BarsFetchedAt: at(-time.Minute)}, computeComputing},
+		{"manual, data in, compute failed", store.ComputedRow{AssetType: "crypto", QueuedSince: at(-5 * time.Minute), BarsFetchedAt: at(-time.Minute), LastError: errText("compute: boom")}, computeFailed},
+		{"manual, fetch error is not a compute failure", store.ComputedRow{AssetType: "crypto", QueuedSince: at(-5 * time.Minute), BarsFetchedAt: at(-time.Minute), LastError: errText("bars: no data")}, computeComputing},
+		{"watchlist addition, just queued", store.ComputedRow{AssetType: "equity", Reasons: []string{"watchlist"}, QueuedSince: at(-2 * time.Minute)}, computeWaitingForData},
+		{"watchlist addition, computed", store.ComputedRow{AssetType: "equity", Reasons: []string{"watchlist"}, QueuedSince: at(-10 * time.Minute), ComputedAt: at(-time.Minute)}, computeComputed},
+		{"manual, computed", store.ComputedRow{AssetType: "equity", QueuedSince: at(-5 * time.Minute), ComputedAt: at(-time.Minute)}, computeComputed},
 	}
 	for _, c := range cases {
 		if got := computeState(c.row, now, 30*time.Minute); got != c.want {
@@ -143,7 +145,7 @@ func TestComputeEndpoints(t *testing.T) {
 	since := now.Add(-5 * time.Minute)
 	fs := &fakeFollow{
 		classes:  map[string]store.SymbolClass{"SPY": {Symbol: "SPY", AssetType: "etf", Listing: "us"}},
-		computed: []store.ComputedRow{{Symbol: "SPY", AssetType: "etf", Reasons: []string{"manual"}, ManualSince: &since}},
+		computed: []store.ComputedRow{{Symbol: "SPY", AssetType: "etf", Reasons: []string{"manual"}, ManualSince: &since, QueuedSince: &since}},
 	}
 	srv := newFollowServer(t, fs, now)
 

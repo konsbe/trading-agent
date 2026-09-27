@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/konsbe/trading-agent/services/data-analyzer/internal/momentum"
+	"github.com/konsbe/trading-agent/services/data-analyzer/internal/store"
 )
 
 // Watchlist endpoints: the one write path in this service, designed separately
@@ -99,6 +100,7 @@ func (s *Server) writeWatchlist(w http.ResponseWriter, r *http.Request, status i
 			Close:     finite(it.Close),
 			ChangePct: finite(it.ChangePct),
 			RVol20:    finite(it.RVol20),
+			Volume:    finite(it.Volume),
 
 			DollarVolume:     finite(it.DollarVolume),
 			RSI14:            finite(it.RSI14),
@@ -116,10 +118,24 @@ func (s *Server) writeWatchlist(w http.ResponseWriter, r *http.Request, status i
 			a := momentum.Attainable(it.ScoreNullInputs)
 			item.ScoreAttainable = &a
 		}
-		if it.AsOf != nil {
-			d := it.AsOf.Format(time.DateOnly)
+		asOf := it.AsOf
+		if asOf != nil {
+			item.DataSource = strPtr("scanner")
+		} else {
+			fb, err := s.cfg.Store.BarFallback(r.Context(), it.Symbol)
+			if err != nil {
+				s.storeError(w, r, err)
+				return
+			}
+			if fb != nil {
+				applyBarFallback(&item, fb)
+				asOf = &fb.AsOf
+			}
+		}
+		if asOf != nil {
+			d := asOf.Format(time.DateOnly)
 			item.AsOf = &d
-			stale, err := IsStale(*it.AsOf, s.cfg.Now(), s.cfg.SessionReadyAfter)
+			stale, err := IsStale(*asOf, s.cfg.Now(), s.cfg.SessionReadyAfter)
 			if err != nil {
 				s.cfg.Log.Error("momentum-api: watchlist is_stale", "err", err)
 				writeJSON(w, http.StatusInternalServerError, errorResponse{Error: "session_calendar_unavailable"})
@@ -158,4 +174,37 @@ func (s *Server) handleSymbolSearch(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 	writeJSON(w, http.StatusOK, resp)
+}
+
+// applyBarFallback fills a watchlist row that has no scanner row from the
+// symbol's own daily bars (momentum.ComputeAt, the scanner's feature code) and
+// the fundamentals provider's market cap. Scanner-only fields (catalyst tier,
+// estimated market cap, score) stay null.
+func applyBarFallback(item *watchlistItem, fb *store.BarFallback) {
+	f := fb.Features
+	bars := "daily_bars:" + fb.Source
+	item.DataSource = strPtr("daily_bars")
+	item.Sources = map[string]string{}
+	set := func(field string, dst **float64, v *float64) {
+		if *dst = finite(v); *dst != nil {
+			item.Sources[field] = bars
+		}
+	}
+	set("close", &item.Close, f.Close)
+	set("change_pct", &item.ChangePct, f.ChangePct)
+	set("volume", &item.Volume, f.Volume)
+	set("dollar_volume", &item.DollarVolume, f.DollarVolume)
+	set("rvol_20", &item.RVol20, f.RVol20)
+	set("rsi_14", &item.RSI14, f.RSI14)
+	set("pct_of_52w_high", &item.PctOf52wHigh, f.PctOf52wHigh)
+	if f.BreakoutState != nil {
+		item.BreakoutState = strPtr(string(*f.BreakoutState))
+		item.Sources["breakout_state"] = bars
+	}
+	item.MarketCap = finite(fb.MarketCap)
+	if item.MarketCap != nil {
+		item.Sources["market_cap"] = "finnhub_metric"
+	} else {
+		item.MarketCapNote = fb.MarketCapNote
+	}
 }

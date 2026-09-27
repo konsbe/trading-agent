@@ -218,10 +218,13 @@ LIMIT $3`, esc, query, limit)
 
 // ComputedRow is one symbol with at least one open computation reason.
 type ComputedRow struct {
-	Symbol                string
-	AssetType             string
-	Reasons               []string
-	ManualSince           *time.Time // open manual request, if any
+	Symbol      string
+	AssetType   string
+	Reasons     []string
+	ManualSince *time.Time // open manual request, if any
+	// QueuedSince is the newest open manual or watchlist reason: both queue a
+	// fetch and a computation (data-technical / data-fundamental, momentum-daily).
+	QueuedSince           *time.Time
 	BarsFetchedAt         *time.Time
 	FundamentalsFetchedAt *time.Time
 	ComputedAt            *time.Time
@@ -235,6 +238,7 @@ func ComputedSymbols(ctx context.Context, q Querier) ([]ComputedRow, error) {
 	rows, err := q.Query(ctx, `
 SELECT ci.symbol, min(ci.asset_type), array_agg(DISTINCT ci.reason ORDER BY ci.reason),
        max(ci.active_from) FILTER (WHERE ci.reason = 'manual'),
+       max(ci.active_from) FILTER (WHERE ci.reason IN ('manual', 'watchlist')),
        s.bars_fetched_at, s.fundamentals_fetched_at, s.computed_at, s.last_error,
        s.statements_status, s.statements_reason, `+fmt.Sprintf(symbolNameSQL, "ci.symbol")+`
 FROM computation_interest ci
@@ -250,7 +254,7 @@ ORDER BY ci.symbol`)
 	out := []ComputedRow{}
 	for rows.Next() {
 		var r ComputedRow
-		if err := rows.Scan(&r.Symbol, &r.AssetType, &r.Reasons, &r.ManualSince, &r.BarsFetchedAt,
+		if err := rows.Scan(&r.Symbol, &r.AssetType, &r.Reasons, &r.ManualSince, &r.QueuedSince, &r.BarsFetchedAt,
 			&r.FundamentalsFetchedAt, &r.ComputedAt, &r.LastError, &r.StatementsStatus, &r.StatementsReason, &r.Name); err != nil {
 			return nil, fmt.Errorf("scan computed symbol: %w", err)
 		}

@@ -322,6 +322,55 @@ func TestWatchlist_ItemFactsAndStaleness(t *testing.T) {
 	}
 }
 
+// A row without a scanner row is filled from the symbol's own daily bars, each
+// field marked with its source; a scanner row is untouched.
+func TestWatchlist_BarFallback(t *testing.T) {
+	st := fixtureStore()
+	fresh := time.Date(2026, 9, 17, 0, 0, 0, 0, time.UTC)
+	bo := momentum.Breakout
+	note := "market_cap is null: not in USD (TWD)"
+	st.watchlist = []store.WatchlistItem{
+		{Symbol: "SCAN", AddedAt: scanDay, AsOf: &fresh, Close: ptr(2.5)},
+		{Symbol: "ADR", AddedAt: scanDay},
+		{Symbol: "NOBARS", AddedAt: scanDay},
+	}
+	st.fallbacks = map[string]*store.BarFallback{
+		"SCAN": {Features: momentum.Features{Close: ptr(99.0)}, AsOf: fresh, Source: "tiingo"},
+		"ADR": {
+			Features: momentum.Features{Close: ptr(180.0), ChangePct: ptr(1.5), Volume: ptr(1e6), DollarVolume: ptr(1.8e8),
+				RVol20: ptr(1.2), RSI14: ptr(61.0), PctOf52wHigh: ptr(0.97), BreakoutState: &bo},
+			AsOf: fresh, Source: "yahoo_finance", MarketCapNote: &note,
+		},
+	}
+	body := decode(t, get(t, newTestServer(t, st, freshNow), "/api/v1/watchlist"))
+	got := map[string]map[string]any{}
+	for _, it := range body["items"].([]any) {
+		m := it.(map[string]any)
+		got[m["symbol"].(string)] = m
+	}
+	if sc := got["SCAN"]; sc["data_source"] != "scanner" || sc["close"] != 2.5 || sc["sources"] != nil {
+		t.Errorf("scanner row must be unchanged: %v", sc)
+	}
+	a := got["ADR"]
+	if a["data_source"] != "daily_bars" || a["as_of"] != "2026-09-17" || a["is_stale"] != false ||
+		a["close"] != 180.0 || a["rsi_14"] != 61.0 || a["breakout_state"] != "breakout" || a["volume"] != 1e6 ||
+		a["market_cap"] != nil || a["market_cap_note"] != note || a["momentum_score_100"] != nil {
+		t.Errorf("fallback row = %v", a)
+	}
+	src, _ := a["sources"].(map[string]any)
+	for _, k := range []string{"close", "change_pct", "volume", "dollar_volume", "rvol_20", "rsi_14", "pct_of_52w_high", "breakout_state"} {
+		if src[k] != "daily_bars:yahoo_finance" {
+			t.Errorf("sources[%s] = %v", k, src[k])
+		}
+	}
+	if _, ok := src["market_cap"]; ok {
+		t.Errorf("a null market cap has no source: %v", src)
+	}
+	if nb := got["NOBARS"]; nb["data_source"] != nil || nb["close"] != nil || nb["is_stale"] != true {
+		t.Errorf("no bars = %v", nb)
+	}
+}
+
 func TestSymbolSearch(t *testing.T) {
 	st := fixtureStore()
 	st.symbols = []store.SymbolMatch{{Symbol: "VGZ", IsEligible: true}, {Symbol: "VGZX"}}

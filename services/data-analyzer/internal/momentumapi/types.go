@@ -204,6 +204,18 @@ type watchlistItem struct {
 	Close     *float64 `json:"close"`
 	ChangePct *float64 `json:"change_pct"`
 	RVol20    *float64 `json:"rvol_20"`
+	Volume    *float64 `json:"volume"`
+
+	// DataSource: "scanner" (the momentum_features row above), "daily_bars"
+	// (no scanner row: the symbol's own daily bars through the scanner's
+	// feature code, computed at read time and never stored), or null (no
+	// data). Sources names each fallback field's origin — "daily_bars:<bar
+	// source>" or "finnhub_metric" — and is null for scanner rows.
+	// MarketCapNote is the non-USD guard's reason when a fallback market cap
+	// is null.
+	DataSource    *string           `json:"data_source"`
+	Sources       map[string]string `json:"sources"`
+	MarketCapNote *string           `json:"market_cap_note"`
 
 	// The candidates list's other columns, same names and null handling as
 	// candidate. Score fields are set only when IsCandidateToday (the row is

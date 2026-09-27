@@ -40,6 +40,7 @@ type WatchlistItem struct {
 	Close     *float64
 	ChangePct *float64
 	RVol20    *float64
+	Volume    *float64
 
 	// The same features-row fields the candidates list shows.
 	DollarVolume     *float64
@@ -74,7 +75,7 @@ func ListWatchlist(ctx context.Context, q Querier, owner *string) ([]WatchlistIt
 	rows, err := q.Query(ctx, `
 WITH latest AS (SELECT max(ts) AS ts FROM momentum_features)
 SELECT w.symbol, u.name, u.exchange, w.added_at,
-       mf.ts, mf.close, mf.change_pct, mf.rvol_20,
+       mf.ts, mf.close, mf.change_pct, mf.rvol_20, mf.volume,
        mf.dollar_volume, mf.rsi_14, mf.breakout_state, mf.pct_of_52w_high, mf.catalyst_tier,
        mf.market_cap, mf.market_cap_est, COALESCE(mf.market_cap_is_proxy, false),
        COALESCE(mf.gates_passed AND mf.ts = latest.ts, false),
@@ -83,7 +84,7 @@ FROM watchlist_items w
 CROSS JOIN latest
 LEFT JOIN universe_symbols u ON u.symbol = w.symbol
 LEFT JOIN LATERAL (
-    SELECT f.ts, f.close, f.change_pct, f.rvol_20,
+    SELECT f.ts, f.close, f.change_pct, f.rvol_20, f.volume,
            f.dollar_volume, f.rsi_14, f.breakout_state, f.pct_of_52w_high, f.catalyst_tier,
            f.market_cap, f.market_cap_est, f.market_cap_is_proxy, f.gates_passed
     FROM momentum_features f
@@ -103,7 +104,7 @@ ORDER BY w.added_at DESC, w.symbol`, ownerArg(owner))
 	for rows.Next() {
 		var it WatchlistItem
 		if err := rows.Scan(&it.Symbol, &it.CompanyName, &it.Exchange, &it.AddedAt,
-			&it.AsOf, &it.Close, &it.ChangePct, &it.RVol20,
+			&it.AsOf, &it.Close, &it.ChangePct, &it.RVol20, &it.Volume,
 			&it.DollarVolume, &it.RSI14, &it.BreakoutState, &it.PctOf52wHigh, &it.CatalystTier,
 			&it.MarketCap, &it.MarketCapEst, &it.MarketCapIsProxy,
 			&it.IsCandidateToday, &it.MomentumScore, &it.ScoreNullInputs); err != nil {
@@ -130,24 +131,67 @@ func SymbolKnown(ctx context.Context, q Querier, symbol string) (bool, error) {
 	return ok, nil
 }
 
+// watchlistReasonSQL opens the watchlist computation reason (migration 030)
+// for $1 unless one is open. Its asset type follows ReconcileInterest's rule:
+// funds are etf. The open reason also queues the fetch a Compute request does
+// (data-technical / data-fundamental poll open manual and watchlist reasons),
+// so an added symbol's data arrives in minutes, not at the next daily pass.
+const watchlistReasonSQL = `
+INSERT INTO computation_interest (symbol, asset_type, reason)
+SELECT upper($1),
+       CASE WHEN (SELECT type FROM universe_symbols WHERE symbol = upper($1) LIMIT 1)
+                 IN ('ETP', 'ETF', 'Closed-End Fund') THEN 'etf' ELSE 'equity' END,
+       'watchlist'
+ON CONFLICT (symbol, reason) WHERE active_until IS NULL DO NOTHING`
+
 // AddToWatchlist is idempotent; added reports whether a new row was written.
-func AddToWatchlist(ctx context.Context, db Execer, owner *string, symbol string) (added bool, err error) {
-	tag, err := db.Exec(ctx, `
+// The watchlist computation reason is opened in the same transaction.
+func AddToWatchlist(ctx context.Context, db TxBeginner, owner *string, symbol string) (added bool, err error) {
+	symbol = strings.TrimSpace(symbol)
+	tx, err := db.Begin(ctx)
+	if err != nil {
+		return false, fmt.Errorf("add to watchlist %s: begin: %w", symbol, err)
+	}
+	defer tx.Rollback(ctx) //nolint:errcheck — no-op after Commit
+	tag, err := tx.Exec(ctx, `
 INSERT INTO watchlist_items (owner_sub, symbol) VALUES ($1, upper($2))
-ON CONFLICT (COALESCE(owner_sub, ''), symbol) DO NOTHING`, ownerArg(owner), strings.TrimSpace(symbol))
+ON CONFLICT (COALESCE(owner_sub, ''), symbol) DO NOTHING`, ownerArg(owner), symbol)
 	if err != nil {
 		return false, fmt.Errorf("add to watchlist %s: %w", symbol, err)
+	}
+	if _, err := tx.Exec(ctx, watchlistReasonSQL, symbol); err != nil {
+		return false, fmt.Errorf("add to watchlist %s: open reason: %w", symbol, err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return false, fmt.Errorf("add to watchlist %s: commit: %w", symbol, err)
 	}
 	return tag.RowsAffected() == 1, nil
 }
 
 // RemoveFromWatchlist is idempotent; removed reports whether a row existed.
-func RemoveFromWatchlist(ctx context.Context, db Execer, owner *string, symbol string) (removed bool, err error) {
-	tag, err := db.Exec(ctx, `
+// Once no list holds the symbol, its watchlist reason is closed (kept as
+// history) in the same transaction.
+func RemoveFromWatchlist(ctx context.Context, db TxBeginner, owner *string, symbol string) (removed bool, err error) {
+	symbol = strings.TrimSpace(symbol)
+	tx, err := db.Begin(ctx)
+	if err != nil {
+		return false, fmt.Errorf("remove from watchlist %s: begin: %w", symbol, err)
+	}
+	defer tx.Rollback(ctx) //nolint:errcheck — no-op after Commit
+	tag, err := tx.Exec(ctx, `
 DELETE FROM watchlist_items WHERE owner_sub IS NOT DISTINCT FROM $1 AND symbol = upper($2)`,
-		ownerArg(owner), strings.TrimSpace(symbol))
+		ownerArg(owner), symbol)
 	if err != nil {
 		return false, fmt.Errorf("remove from watchlist %s: %w", symbol, err)
+	}
+	if _, err := tx.Exec(ctx, `
+UPDATE computation_interest SET active_until = now()
+WHERE symbol = upper($1) AND reason = 'watchlist' AND active_until IS NULL
+  AND NOT EXISTS (SELECT 1 FROM watchlist_items WHERE symbol = upper($1))`, symbol); err != nil {
+		return false, fmt.Errorf("remove from watchlist %s: close reason: %w", symbol, err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return false, fmt.Errorf("remove from watchlist %s: commit: %w", symbol, err)
 	}
 	return tag.RowsAffected() > 0, nil
 }

@@ -66,7 +66,8 @@ The symbol lists come from Postgres, re-read every pass, not from `.env`:
   pass"). Feeds data-technical (daily bars) and data-fundamental's Finnhub
   passes (metrics, statements, earnings, recommendations, insider,
   institutional).
-- **Manual Compute requests** are picked up within `*_MANUAL_QUEUE_POLL_INTERVAL`
+- **Manual Compute requests and watchlist additions** (open `manual` or
+  `watchlist` reasons not fetched since they opened) are picked up within `*_MANUAL_QUEUE_POLL_INTERVAL`
   (2m) by data-technical and data-fundamental on their own goroutine, which
   record `bars_fetched_at` / `fundamentals_fetched_at` (and statement coverage)
   in `symbol_data_status`.

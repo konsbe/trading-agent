@@ -41,6 +41,7 @@ type fakeStore struct {
 	intradayAsked []string
 	known         map[string]bool
 	watchlist     []store.WatchlistItem
+	fallbacks     map[string]*store.BarFallback
 	owners        []*string
 	symbols       []store.SymbolMatch
 	searched      []string
@@ -142,6 +143,10 @@ func (f *fakeStore) ListWatchlist(_ context.Context, owner *string) ([]store.Wat
 	f.owners = append(f.owners, owner)
 	return f.watchlist, f.queryErr
 }
+func (f *fakeStore) BarFallback(_ context.Context, sym string) (*store.BarFallback, error) {
+	return f.fallbacks[sym], nil
+}
+
 func (f *fakeStore) AddToWatchlist(_ context.Context, owner *string, sym string) (bool, error) {
 	f.owners = append(f.owners, owner)
 	for _, it := range f.watchlist {

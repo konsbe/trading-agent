@@ -92,29 +92,33 @@ type directorySearchResponse struct {
 	Results []directoryMatch `json:"results"`
 }
 
-// Computation states, for the computed-symbols view and the Compute button.
+// Computation states, for the computed-symbols view and the Compute button. A
+// manual Compute request and a watchlist addition both queue a fetch; "queued"
+// below means either.
 const (
 	computeComputed       = "computed"         // computed since the reason (or request) opened
 	computeScheduled      = "scheduled"        // automatic reason, not computed yet: the next daily pass
-	computeWaitingForData = "waiting_for_data" // manual request queued; ingestion has not fetched it yet
-	computeDataNotArrived = "data_not_arrived" // manual request older than the timeout, data still missing
+	computeWaitingForData = "waiting_for_data" // queued; ingestion has not fetched it yet
+	computeDataNotArrived = "data_not_arrived" // queued longer than the timeout, data still missing
 	computeComputing      = "computing"        // data fetched; the next compute poll picks it up
 	computeFailed         = "failed"           // the last computation failed (last_error)
 )
 
 type computedItem struct {
-	Symbol                string   `json:"symbol"`
-	Name                  *string  `json:"name"`
-	AssetType             string   `json:"asset_type"`
-	Reasons               []string `json:"reasons"`
-	ManualRequestedAt     *string  `json:"manual_requested_at"`
-	State                 string   `json:"state"`
-	BarsFetchedAt         *string  `json:"bars_fetched_at"`
-	FundamentalsFetchedAt *string  `json:"fundamentals_fetched_at"`
-	ComputedAt            *string  `json:"computed_at"`
-	LastError             *string  `json:"last_error"`
-	StatementsStatus      *string  `json:"statements_status"`
-	StatementsReason      *string  `json:"statements_reason"`
+	Symbol            string   `json:"symbol"`
+	Name              *string  `json:"name"`
+	AssetType         string   `json:"asset_type"`
+	Reasons           []string `json:"reasons"`
+	ManualRequestedAt *string  `json:"manual_requested_at"`
+	// QueuedAt: newest open manual or watchlist reason — when the fetch was queued.
+	QueuedAt              *string `json:"queued_at"`
+	State                 string  `json:"state"`
+	BarsFetchedAt         *string `json:"bars_fetched_at"`
+	FundamentalsFetchedAt *string `json:"fundamentals_fetched_at"`
+	ComputedAt            *string `json:"computed_at"`
+	LastError             *string `json:"last_error"`
+	StatementsStatus      *string `json:"statements_status"`
+	StatementsReason      *string `json:"statements_reason"`
 }
 
 type computedResponse struct {
@@ -135,7 +139,7 @@ func tsPtr(t *time.Time) *string {
 // computeState derives a row's state. Pure, so the rules are testable.
 func computeState(r store.ComputedRow, now time.Time, timeout time.Duration) string {
 	failed := r.LastError != nil && strings.HasPrefix(*r.LastError, "compute:")
-	if r.ManualSince == nil {
+	if r.QueuedSince == nil {
 		switch {
 		case failed:
 			return computeFailed
@@ -144,7 +148,7 @@ func computeState(r store.ComputedRow, now time.Time, timeout time.Duration) str
 		}
 		return computeScheduled
 	}
-	since := *r.ManualSince
+	since := *r.QueuedSince
 	if r.ComputedAt != nil && !r.ComputedAt.Before(since) {
 		return computeComputed
 	}
@@ -324,7 +328,7 @@ func (s *Server) writeComputed(w http.ResponseWriter, r *http.Request, fs Follow
 	for _, c := range rows {
 		resp.Items = append(resp.Items, computedItem{
 			Symbol: c.Symbol, Name: c.Name, AssetType: c.AssetType, Reasons: c.Reasons,
-			ManualRequestedAt: tsPtr(c.ManualSince), State: computeState(c, now, timeout),
+			ManualRequestedAt: tsPtr(c.ManualSince), QueuedAt: tsPtr(c.QueuedSince), State: computeState(c, now, timeout),
 			BarsFetchedAt: tsPtr(c.BarsFetchedAt), FundamentalsFetchedAt: tsPtr(c.FundamentalsFetchedAt),
 			ComputedAt: tsPtr(c.ComputedAt), LastError: c.LastError,
 			StatementsStatus: c.StatementsStatus, StatementsReason: c.StatementsReason,

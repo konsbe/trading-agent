@@ -55,21 +55,25 @@ ON CONFLICT (symbol) DO UPDATE SET
 	return nil
 }
 
-// PendingManual returns symbols with an open manual computation_interest
-// reason, of the given asset types, whose kind ("bars" | "fundamentals") has
-// not been fetched since the request was made — the "Compute" queue.
+// PendingManual returns symbols with an open manual or watchlist
+// computation_interest reason, of the given asset types, whose kind ("bars" |
+// "fundamentals") has not been fetched since the newest such reason opened —
+// the "Compute" queue. Adding to the watchlist queues the same fetch.
 func PendingManual(ctx context.Context, pool *pgxpool.Pool, kind string, assetTypes []string) ([]string, error) {
 	col := map[string]string{"bars": "bars_fetched_at", "fundamentals": "fundamentals_fetched_at"}[kind]
 	if col == "" {
 		return nil, fmt.Errorf("pending manual: unknown kind %q", kind)
 	}
 	rows, err := pool.Query(ctx, `
-SELECT ci.symbol
-FROM computation_interest ci
-LEFT JOIN symbol_data_status s ON s.symbol = ci.symbol
-WHERE ci.reason = 'manual' AND ci.active_until IS NULL AND ci.asset_type = ANY($1)
-  AND (s.`+col+` IS NULL OR s.`+col+` < ci.active_from)
-ORDER BY ci.active_from`, assetTypes)
+SELECT q.symbol
+FROM (SELECT symbol, asset_type, max(active_from) AS since
+      FROM computation_interest
+      WHERE reason IN ('manual', 'watchlist') AND active_until IS NULL
+      GROUP BY symbol, asset_type) q
+LEFT JOIN symbol_data_status s ON s.symbol = q.symbol
+WHERE q.asset_type = ANY($1)
+  AND (s.`+col+` IS NULL OR s.`+col+` < q.since)
+ORDER BY q.since`, assetTypes)
 	if err != nil {
 		return nil, fmt.Errorf("pending manual %s: %w", kind, err)
 	}

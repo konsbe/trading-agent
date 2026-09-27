@@ -82,18 +82,20 @@ GROUP BY symbol ORDER BY symbol`)
 }
 
 // PendingManualCompute is the manual queue's second half: Compute requests
-// whose data has arrived since the request (bars; and fundamentals for
+// and watchlist additions whose data has arrived since the request (bars; and fundamentals for
 // equities and funds) and that have not been computed since.
 func PendingManualCompute(ctx context.Context, q Querier) ([]InterestSymbol, error) {
 	return interestRows(ctx, q, `
-SELECT ci.symbol, ci.asset_type
-FROM computation_interest ci
-JOIN symbol_data_status s ON s.symbol = ci.symbol
-WHERE ci.reason = 'manual' AND ci.active_until IS NULL
-  AND s.bars_fetched_at >= ci.active_from
-  AND (ci.asset_type = 'crypto' OR s.fundamentals_fetched_at >= ci.active_from)
-  AND (s.computed_at IS NULL OR s.computed_at < ci.active_from)
-ORDER BY ci.active_from`)
+SELECT q.symbol, q.asset_type
+FROM (SELECT symbol, asset_type, max(active_from) AS since
+      FROM computation_interest
+      WHERE reason IN ('manual', 'watchlist') AND active_until IS NULL
+      GROUP BY symbol, asset_type) q
+JOIN symbol_data_status s ON s.symbol = q.symbol
+WHERE s.bars_fetched_at >= q.since
+  AND (q.asset_type = 'crypto' OR s.fundamentals_fetched_at >= q.since)
+  AND (s.computed_at IS NULL OR s.computed_at < q.since)
+ORDER BY q.since`)
 }
 
 func interestRows(ctx context.Context, q Querier, sql string) ([]InterestSymbol, error) {

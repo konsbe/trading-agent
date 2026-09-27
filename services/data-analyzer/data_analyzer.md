@@ -682,8 +682,11 @@ computed while it has at least one open reason:
   `runner.ComputeAndStore`, fundamentals via `AnalyzeSymbol`; crypto technicals
   only). It has its own marker, `momentum_chain_runs.computation_pass_at`, so a
   failing pass is retried and never marks the chain unclean.
-- **Manual requests.** data-technical and data-fundamental poll open `manual`
-  rows every 2 minutes on their own goroutine (never queued behind a long pass)
+- **Manual requests and watchlist additions.** Adding to the watchlist opens
+  the `watchlist` reason in the same transaction (removing the symbol from the
+  last list closes it), and an open `watchlist` reason queues exactly what a
+  Compute request does. data-technical and data-fundamental poll open `manual`
+  and `watchlist` rows every 2 minutes on their own goroutine (never queued behind a long pass)
   and record `bars_fetched_at` / `fundamentals_fetched_at` in
   `symbol_data_status`; momentum-daily's manual loop (`MOMENTUM_DAILY_MANUAL_POLL`,
   1m) computes once the data has landed and sets `computed_at`. momentum-api

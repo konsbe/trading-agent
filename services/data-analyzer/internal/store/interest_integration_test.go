@@ -57,12 +57,13 @@ func TestReconcileInterest_OpensClosesAndKeepsHistory(t *testing.T) {
 	if opened, closed, err := ReconcileInterest(ctx, tx); err != nil || opened != 0 || closed != 0 {
 		t.Errorf("second reconcile opened %d closed %d err %v, want 0 0", opened, closed, err)
 	}
-	// Leaving the watchlist closes that reason; the row stays.
+	// Leaving the watchlist closes that reason (in RemoveFromWatchlist's own
+	// transaction, so reconcile has nothing left to close); the row stays.
 	if _, err := RemoveFromWatchlist(ctx, tx, nil, "ZZI2"); err != nil {
 		t.Fatal(err)
 	}
-	if _, closed, err := ReconcileInterest(ctx, tx); err != nil || closed != 1 {
-		t.Fatalf("reconcile after removal closed %d err %v, want 1", closed, err)
+	if _, closed, err := ReconcileInterest(ctx, tx); err != nil || closed != 0 {
+		t.Fatalf("reconcile after removal closed %d err %v, want 0", closed, err)
 	}
 	if _, still := open()["ZZI2:watchlist"]; still {
 		t.Error("watchlist reason still open after removal")
