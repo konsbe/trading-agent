@@ -288,6 +288,7 @@ services:
       MOMENTUM_EDUCATION_HANDBOOK_PATH: /shared/content/handbook.json
       MOMENTUM_EDUCATION_MASTERCLASS_PATH: /shared/content/masterclass.json
       MOMENTUM_MARKET_REPORT_TEXT_PATH: /shared/content/market_report_descriptions.json
+      MOMENTUM_CORRELATION_TEXT_PATH: /shared/content/correlation_sentences.json
     volumes:
       - ../shared/content:/shared/content:ro
     ports:
@@ -314,6 +315,8 @@ services:
       MOMENTUM_CAVEATS_PATH: /shared/content/momentum_caveats.json
       # Daily-report descriptions, shared with momentum-api (web).
       MARKET_REPORT_TEXT_PATH: /shared/content/market_report_descriptions.json
+      # Correlation aligned/divergent sentences, shared with momentum-api (web).
+      CORRELATION_TEXT_PATH: /shared/content/correlation_sentences.json
     volumes:
       - ../shared/content:/shared/content:ro
     depends_on:

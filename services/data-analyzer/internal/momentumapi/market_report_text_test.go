@@ -2,10 +2,10 @@ package momentumapi
 
 import (
 	"encoding/json"
-	"os"
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"os"
 	"strconv"
 	"strings"
 	"testing"

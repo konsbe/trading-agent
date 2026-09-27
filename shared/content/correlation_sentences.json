@@ -1,0 +1,145 @@
+{
+  "_about": "Correlation aligned/divergent sentences: each stored format string (as fundamental-analysis writes it, %.1f = a rendered number) and the text shown for it. Read by momentum-api (web) and analyst-bot (Discord); edit here and nowhere else.",
+  "sentences": [
+    {
+      "stored": "EPS growing but FCF accrual concern — possible earnings inflation via non-cash accounting",
+      "display": "Fast EPS growth with a low FCF yield"
+    },
+    {
+      "stored": "EPS growth backed by real FCF — high-quality earnings",
+      "display": "Fast EPS growth with a high FCF yield"
+    },
+    {
+      "stored": "EPS rising but revenue falling — buybacks or cost cuts masking organic deterioration",
+      "display": "Strong EPS growth with weak revenue growth"
+    },
+    {
+      "stored": "Revenue rising but EPS falling — cost structure breaking down, margins compressing at scale",
+      "display": "Strong revenue growth with weak EPS growth"
+    },
+    {
+      "stored": "Revenue and EPS growing together — genuine organic quality growth",
+      "display": "Strong revenue growth and strong EPS growth"
+    },
+    {
+      "stored": "Gross margin expanding but net margin compressing — SG&A, interest, or tax costs surging below gross line",
+      "display": "Gross margin trend expanding, net margin trend compressing"
+    },
+    {
+      "stored": "Both margins compressing — broad profitability deterioration",
+      "display": "Gross and net margin trends both compressing"
+    },
+    {
+      "stored": "Both margins expanding — improving operating leverage throughout the P&L",
+      "display": "Gross and net margin trends both expanding"
+    },
+    {
+      "stored": "Fast revenue growth (%.1f%%) with compressing gross margin — scaling without pricing power",
+      "display": "Revenue growth of %s%% with a compressing gross margin trend"
+    },
+    {
+      "stored": "Fast revenue growth (%.1f%%) with stable/expanding gross margin — quality growth combination",
+      "display": "Revenue growth of %s%% with a stable or expanding gross margin trend"
+    },
+    {
+      "stored": "Revenue declining AND gross margin compressing — double deterioration signal",
+      "display": "Revenue growth below zero with a compressing gross margin trend"
+    },
+    {
+      "stored": "High P/E %.1f× + low EPS growth %.1f%% — valuation trap risk, paying premium for deteriorating earnings",
+      "display": "High P/E (%s×) with low EPS growth (%s%%)"
+    },
+    {
+      "stored": "Low P/E %.1f× + strong EPS growth %.1f%% — potential undervaluation (check PEG)",
+      "display": "Low P/E (%s×) with strong EPS growth (%s%%)"
+    },
+    {
+      "stored": "High P/E + low ROIC — unjustified valuation premium, investors paying for quality that doesn't exist",
+      "display": "High P/E with low ROIC"
+    },
+    {
+      "stored": "Low P/E + high ROIC (moat quality) — rare value opportunity in a quality business",
+      "display": "Low P/E with high ROIC"
+    },
+    {
+      "stored": "Dividend yield %.1f%% > FCF yield %.1f%% — dividend not covered by free cash flow, cut risk elevated",
+      "display": "Dividend yield (%s%%) above FCF yield (%s%%)"
+    },
+    {
+      "stored": "FCF yield comfortably covers dividend — sustainable income with room for growth",
+      "display": "FCF yield at least 1.5× the dividend yield"
+    },
+    {
+      "stored": "Low P/B + high sustained ROE — classic deep value signal (low price for high quality capital allocation)",
+      "display": "Low P/B with high ROE"
+    },
+    {
+      "stored": "High P/B + declining/moderate ROE — multiple contraction risk, paying for quality that is eroding",
+      "display": "High P/B with ROE below its high band"
+    },
+    {
+      "stored": "High Net Debt/EBITDA AND low interest coverage — accelerating financial distress, credit event risk in rising rate environment",
+      "display": "High net debt / operating income with low interest coverage"
+    },
+    {
+      "stored": "One leverage/coverage metric at high-risk level — balance sheet vulnerable to rate rises or revenue shortfall",
+      "display": "Net debt / operating income or interest coverage in its high-risk band"
+    },
+    {
+      "stored": "Conservative net debt + very safe interest coverage — highly resilient balance sheet",
+      "display": "Low net debt / operating income with high interest coverage"
+    },
+    {
+      "stored": "Deteriorating current ratio + weak FCF conversion — cash burn accelerating, may need to raise capital or issue expensive debt",
+      "display": "Low current ratio with low FCF conversion"
+    },
+    {
+      "stored": "Strong liquidity + high-quality cash earnings — resilient in economic stress scenarios",
+      "display": "High current ratio with high FCF conversion"
+    },
+    {
+      "stored": "High D/E + thin net margin %.1f%% — any revenue shortfall can cascade to insolvency risk",
+      "display": "High debt / equity with a net margin of %s%%"
+    },
+    {
+      "stored": "Low leverage + strong net margins — excellent financial resilience across market cycles",
+      "display": "Low debt / equity with a high net margin"
+    },
+    {
+      "stored": "High goodwill exposure + weak FCF conversion — acquisitions generating reported earnings but not real cash, impairment risk",
+      "display": "Goodwill and intangibles a large share of assets, with low FCF conversion"
+    },
+    {
+      "stored": "Low goodwill exposure + high FCF conversion — organic, cash-backed growth (not acquisition-dependent)",
+      "display": "Goodwill and intangibles a small share of assets, with high FCF conversion"
+    },
+    {
+      "stored": "Strong revenue growth + low ROIC — growth is dilutive, company investing in sub-cost-of-capital projects",
+      "display": "Strong revenue growth with low ROIC"
+    },
+    {
+      "stored": "High ROIC + strong revenue growth — compounding machine, every reinvested dollar earns above cost of capital",
+      "display": "High ROIC with strong revenue growth"
+    },
+    {
+      "stored": "High ROIC + slowing revenue — mature harvest phase, strong returns on existing capital",
+      "display": "High ROIC with weak revenue growth"
+    },
+    {
+      "stored": "Gross margin compressing — pricing power weakening or input costs rising faster than selling prices",
+      "display": "Gross margin trend compressing"
+    },
+    {
+      "stored": "Gross margin expanding — pricing power intact, favourable demand/cost dynamics",
+      "display": "Gross margin trend expanding"
+    },
+    {
+      "stored": "Low CapEx intensity + attractive FCF yield — asset-light model generating strong free cash for shareholders",
+      "display": "Low capital spending relative to revenue, with a high FCF yield"
+    },
+    {
+      "stored": "High CapEx intensity + weak FCF yield — heavy reinvestment absorbing all cash, limited shareholder returns",
+      "display": "High capital spending relative to revenue, with a low FCF yield"
+    }
+  ]
+}

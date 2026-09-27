@@ -173,12 +173,13 @@ func newAnalysisHarness(t *testing.T) *analysisHarness {
 		return nil
 	}
 	h.srv = NewServer(Config{
-		Store:          h.st,
-		Caveats:        loadSharedCaveats(t),
-		BacktestReport: loadSharedReport(t),
-		Log:            slog.New(slog.NewTextHandler(io.Discard, nil)),
-		CacheTTL:       5 * time.Minute,
-		AnalysisNames:  analysisNames(t),
+		Store:           h.st,
+		Caveats:         loadSharedCaveats(t),
+		CorrelationText: loadSharedCorrelationText(t),
+		BacktestReport:  loadSharedReport(t),
+		Log:             slog.New(slog.NewTextHandler(io.Discard, nil)),
+		CacheTTL:        5 * time.Minute,
+		AnalysisNames:   analysisNames(t),
 		AnalysisCompute: func(ctx context.Context, sym string, parts AnalysisParts) error {
 			h.mu.Lock()
 			h.calls = append(h.calls, computeCall{sym, parts})
@@ -770,7 +771,7 @@ func TestCorrelations_EmptyClusterIsNotEvaluated(t *testing.T) {
 		"corr_leverage_liquidity": row(0, empty),
 		"corr_operational":        row(0, empty),
 	}
-	c := buildCorrelations(d)
+	c := buildCorrelations(d, CorrelationText{})
 	for _, cl := range c.Clusters {
 		if cl.Score != nil || cl.Tier != nil || cl.ChecksRun == nil || *cl.ChecksRun != 0 {
 			t.Errorf("%s: score %v tier %v checks %v, want null / null / 0", cl.Name, cl.Score, cl.Tier, cl.ChecksRun)
@@ -783,7 +784,7 @@ func TestCorrelations_EmptyClusterIsNotEvaluated(t *testing.T) {
 	// One evaluated cluster keeps its reading, and the stored composite stands.
 	d["corr_operational"] = row(-0.5, `{"tier": "mixed_negative", "checks_run": 2}`)
 	d["corr_summary"] = row(-0.13, `{"tier": "mixed_negative"}`)
-	c = buildCorrelations(d)
+	c = buildCorrelations(d, CorrelationText{})
 	if op := c.Clusters[3]; op.Tier == nil || *op.Tier != "mixed_negative" || *op.ChecksRun != 2 {
 		t.Errorf("operational = %+v, want mixed_negative over 2 checks", op)
 	}

@@ -166,6 +166,9 @@ type Config struct {
 	// MarketReportText is shared/content/market_report_descriptions.json: the
 	// one-line descriptions, shared with the bot's Discord report.
 	MarketReportText MarketReportText
+	// CorrelationText is shared/content/correlation_sentences.json: the
+	// correlation sentences as shown, shared with the bot's Discord report.
+	CorrelationText CorrelationText
 
 	// Full stock analysis (GET /today/{symbol}/analysis). AnalysisNames are the
 	// stored indicator names (technical.NamesFor the worker's config).

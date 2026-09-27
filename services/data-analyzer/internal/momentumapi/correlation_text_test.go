@@ -5,6 +5,7 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -52,19 +53,31 @@ func analyzerSentences(t *testing.T) []string {
 	return out
 }
 
+// loadSharedCorrelationText loads the real shared/content file — the one
+// analyst-bot reads too.
+func loadSharedCorrelationText(t *testing.T) CorrelationText {
+	t.Helper()
+	c, err := LoadCorrelationText(sharedContentPath(t, "correlation_sentences.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return c
+}
+
 func TestCorrelationSentencesCoverAnalyzer(t *testing.T) {
+	correlationSentences := loadSharedCorrelationText(t).sentences
 	source := analyzerSentences(t)
 	if len(source) < 30 {
 		t.Fatalf("found %d sentences in analyze.go; the parser no longer finds them", len(source))
 	}
 	table := map[string]bool{}
 	for _, s := range correlationSentences {
-		if table[s.stored] {
-			t.Errorf("duplicate table entry %q", s.stored)
+		if table[s.Stored] {
+			t.Errorf("duplicate table entry %q", s.Stored)
 		}
-		table[s.stored] = true
-		if want, got := strings.Count(s.stored, "%.1f"), strings.Count(s.display, "%s"); want != got {
-			t.Errorf("%q: %d numbers stored, %d in the display text", s.stored, want, got)
+		table[s.Stored] = true
+		if want, got := strings.Count(s.Stored, "%.1f"), strings.Count(s.Display, "%s"); want != got {
+			t.Errorf("%q: %d numbers stored, %d in the display text", s.Stored, want, got)
 		}
 	}
 	inSource := map[string]bool{}
@@ -89,6 +102,8 @@ func TestCorrelationSentencesCoverAnalyzer(t *testing.T) {
 // Rendered as analyze.go renders them, including live values (COHR's P/E
 // warning, NVDA's revenue growth 83.4%), every stored sentence maps.
 func TestCorrelationDisplayText(t *testing.T) {
+	ct := loadSharedCorrelationText(t)
+	correlationSentences, correlationDisplayText := ct.sentences, ct.Display
 	for _, tc := range []struct{ stored, want string }{
 		{"High D/E + thin net margin 3.1% — any revenue shortfall can cascade to insolvency risk",
 			"High debt / equity with a net margin of 3.1%"},
@@ -107,16 +122,29 @@ func TestCorrelationDisplayText(t *testing.T) {
 		}
 	}
 	for _, s := range correlationSentences {
-		rendered := s.stored
-		if n := strings.Count(s.stored, "%.1f"); n > 0 {
+		rendered := s.Stored
+		if n := strings.Count(s.Stored, "%.1f"); n > 0 {
 			args := make([]any, n)
 			for i := range args {
 				args[i] = 12.5
 			}
-			rendered = fmt.Sprintf(s.stored, args...)
+			rendered = fmt.Sprintf(s.Stored, args...)
 		}
 		if got := correlationDisplayText(rendered); got == rendered || strings.Contains(got, "%!") {
 			t.Errorf("rendered %q maps to %q", rendered, got)
 		}
+	}
+}
+
+func TestLoadCorrelationText_RefusesMissingOrEmpty(t *testing.T) {
+	if _, err := LoadCorrelationText(t.TempDir() + "/absent.json"); err == nil {
+		t.Error("a missing file loaded")
+	}
+	p := t.TempDir() + "/empty.json"
+	if err := os.WriteFile(p, []byte(`{"sentences": []}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := LoadCorrelationText(p); err == nil {
+		t.Error("a file without sentences loaded")
 	}
 }

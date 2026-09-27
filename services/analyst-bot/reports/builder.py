@@ -18,7 +18,7 @@ from typing import Optional
 import asyncpg
 
 from db import cache as _cache
-from reports import market_text
+from reports import correlation_text, market_text
 from db.queries import fundamental, macro_intel, news, ohlcv, sentiment, technical
 from reports.models import (
     AdditionalAnalysisSnapshot,
@@ -753,8 +753,8 @@ class ReportBuilder:
             for ckey in ("corr_earnings_quality", "corr_valuation_quality",
                          "corr_leverage_liquidity", "corr_operational"):
                 cp = _corr_payload(ckey)
-                snap.corr_warnings.extend(cp.get("warnings") or [])
-                snap.corr_positives.extend(cp.get("positives") or [])
+                snap.corr_warnings.extend(correlation_text.displays(cp.get("warnings") or []))
+                snap.corr_positives.extend(correlation_text.displays(cp.get("positives") or []))
 
             return snap
         except Exception as exc:

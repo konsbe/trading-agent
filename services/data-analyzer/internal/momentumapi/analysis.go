@@ -127,7 +127,7 @@ func (s *Server) handleAnalysis(w http.ResponseWriter, r *http.Request) {
 		s.storeError(w, r, err)
 		return
 	}
-	resp := buildAnalysis(symbol, in, fr, techFresh, faFresh, s.cfg.AnalysisNames, s.cfg.Caveats)
+	resp := buildAnalysis(symbol, in, fr, techFresh, faFresh, s.cfg.AnalysisNames, s.cfg.Caveats, s.cfg.CorrelationText)
 	body, err := json.Marshal(resp)
 	if err != nil {
 		s.cfg.Log.Error("momentum-api: encode analysis", "err", err)
@@ -430,7 +430,7 @@ func sectionStatus(stored, fresh bool) string {
 }
 
 func buildAnalysis(symbol string, in store.AnalysisInputs, fr store.AnalysisFreshness, techFresh, faFresh bool,
-	n technical.Names, caveats Caveats) analysisResponse {
+	n technical.Names, caveats Caveats, corrText CorrelationText) analysisResponse {
 	out := analysisResponse{
 		Symbol:      symbol,
 		Status:      analysisReady,
@@ -449,7 +449,7 @@ func buildAnalysis(symbol string, in store.AnalysisInputs, fr store.AnalysisFres
 	out.Technical = buildTechnical(in.Indicators, n)
 	out.Fundamentals = buildFundamentals(in)
 	out.BalanceSheet = buildBalance(in.Derived)
-	out.Correlations = buildCorrelations(in.Derived)
+	out.Correlations = buildCorrelations(in.Derived, corrText)
 	out.Qualitative = buildQualitative(in.Derived)
 	out.Sentiment = sentimentOut{Headlines: []headlineOut{}}
 	for _, h := range in.Headlines {
@@ -612,7 +612,7 @@ var correlationClusters = []string{"earnings_quality", "valuation_quality", "lev
 // masterSignals are corr_master_signals' patterns, each {fired, score, conditions_met}.
 var masterSignals = []string{"value_trap", "hidden_value", "bullish_convergence", "deterioration_warning", "leverage_cycle_warning"}
 
-func buildCorrelations(d map[string]store.StoredRow) correlationsOut {
+func buildCorrelations(d map[string]store.StoredRow, corrText CorrelationText) correlationsOut {
 	c := correlationsOut{Composite: derivedScoreTier(d, "corr_summary"), Clusters: []clusterOut{}, AlignedSignals: []string{}}
 	c.MasterSignals.Fired = []string{}
 	evaluated := 0
@@ -622,7 +622,7 @@ func buildCorrelations(d map[string]store.StoredRow) correlationsOut {
 			continue
 		}
 		cl := clusterOut{Name: name, Score: finite(r.Value), Tier: p.str("tier"), ChecksRun: intPtr(p.num("checks_run")),
-			Positives: correlationDisplayTexts(p.strings("positives")), Warnings: correlationDisplayTexts(p.strings("warnings"))}
+			Positives: corrText.Displays(p.strings("positives")), Warnings: corrText.Displays(p.strings("warnings"))}
 		if cl.ChecksRun != nil && *cl.ChecksRun == 0 {
 			cl.Score, cl.Tier = nil, nil
 		} else {

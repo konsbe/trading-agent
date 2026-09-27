@@ -65,11 +65,12 @@ func TestIntegration_AnalysisComputesOnDemandThenServesStoredRows(t *testing.T) 
 	}
 
 	srv := NewServer(Config{
-		Store:         DBStore{Q: tx, PingFn: pool.Ping},
-		Caveats:       loadSharedCaveats(t),
-		Log:           log,
-		CacheTTL:      5 * time.Minute,
-		AnalysisNames: technical.NamesFor(technical.Emitter{Cfg: taCfg}),
+		Store:           DBStore{Q: tx, PingFn: pool.Ping},
+		Caveats:         loadSharedCaveats(t),
+		CorrelationText: loadSharedCorrelationText(t),
+		Log:             log,
+		CacheTTL:        5 * time.Minute,
+		AnalysisNames:   technical.NamesFor(technical.Emitter{Cfg: taCfg}),
 		AnalysisCompute: func(ctx context.Context, sym string, parts AnalysisParts) error {
 			var errs []error
 			if parts.Technical {
