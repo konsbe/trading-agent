@@ -190,6 +190,10 @@ type Config struct {
 	// Follow backs the followed-symbols / computed-symbols endpoints
 	// (followed.go); nil answers 501. ComputeDataTimeout: a manual Compute
 	// request whose data has not arrived after this long reads data_not_arrived.
+	// AlertMessages is shared/content/alert_messages.json (labels served by
+	// GET /alerts as type_labels).
+	AlertMessages AlertMessages
+
 	Follow             FollowStore
 	ComputeDataTimeout time.Duration
 

@@ -290,6 +290,7 @@ services:
       MOMENTUM_MARKET_REPORT_TEXT_PATH: /shared/content/market_report_descriptions.json
       MOMENTUM_CORRELATION_TEXT_PATH: /shared/content/correlation_sentences.json
       MOMENTUM_CORRELATION_LABELS_PATH: /shared/content/correlation_labels.json
+      MOMENTUM_ALERT_MESSAGES_PATH: /shared/content/alert_messages.json
     volumes:
       - ../shared/content:/shared/content:ro
     ports:

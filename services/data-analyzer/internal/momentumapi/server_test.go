@@ -210,6 +210,15 @@ func sharedCaveatsPath(t *testing.T) string {
 	return filepath.Join(filepath.Dir(file), "..", "..", "..", "..", "shared", "content", "momentum_caveats.json")
 }
 
+func loadSharedAlertMessages(t *testing.T) AlertMessages {
+	t.Helper()
+	m, err := LoadAlertMessages(filepath.Join(filepath.Dir(sharedCaveatsPath(t)), "alert_messages.json"))
+	if err != nil {
+		t.Fatalf("load shared alert messages: %v", err)
+	}
+	return m
+}
+
 func loadSharedCaveats(t *testing.T) Caveats {
 	t.Helper()
 	c, err := LoadCaveats(sharedCaveatsPath(t))
@@ -258,6 +267,7 @@ func newTestServer(t *testing.T, st Store, now time.Time) *Server {
 	return NewServer(Config{
 		Store:             st,
 		Caveats:           loadSharedCaveats(t),
+		AlertMessages:     loadSharedAlertMessages(t),
 		BacktestReport:    loadSharedReport(t),
 		Education:         loadSharedEducation(t),
 		Log:               slog.New(slog.NewTextHandler(io.Discard, nil)),

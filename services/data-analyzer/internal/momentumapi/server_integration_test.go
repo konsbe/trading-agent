@@ -55,8 +55,8 @@ VALUES ($1, $2, 'market', $3, '{catalyst_tier}')`, day, sym, 50+i); err != nil {
 		{"ZZE05", "rsi_overbought", now.Add(-25 * time.Hour)},
 	} {
 		if _, err := tx.Exec(ctx, `
-INSERT INTO fired_alerts (symbol, exchange_type, alert_type, interval, severity, message, fired_at)
-VALUES ($1, 'equity', $2, '1Day', 'notice', $2 || ' fired', $3)`, a.sym, a.kind, a.at); err != nil {
+INSERT INTO fired_alerts (symbol, exchange_type, alert_type, interval, severity, message, fired_at, bar_date)
+VALUES ($1, 'equity', $2, '1Day', 'notice', $2 || ' fired', $3, ($3::timestamptz AT TIME ZONE 'UTC')::date)`, a.sym, a.kind, a.at); err != nil {
 			t.Fatal(err)
 		}
 	}

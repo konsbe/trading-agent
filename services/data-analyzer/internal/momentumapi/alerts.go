@@ -61,6 +61,12 @@ type alertsResponse struct {
 	Types        []string `json:"types"`
 	RecordsStart *string  `json:"records_start"`
 	Caveat       string   `json:"caveat"`
+	// TypeLabels: every alert type's display label, from
+	// shared/content/alert_messages.json. OnsetsSince: the first onset alert
+	// (null until one exists) — rows before it re-posted an ongoing condition
+	// every cooldown; rows from it mark onsets (bar_date set).
+	TypeLabels  map[string]string `json:"type_labels"`
+	OnsetsSince *string           `json:"onsets_since"`
 }
 
 type alertOut struct {
@@ -73,6 +79,7 @@ type alertOut struct {
 	Severity     string   `json:"severity"`
 	Message      string   `json:"message"`
 	FiredAt      string   `json:"fired_at"` // RFC3339, UTC
+	BarDate      *string  `json:"bar_date"` // YYYY-MM-DD of the onset bar; null before onset alerts
 }
 
 type alertGroup struct {
@@ -89,8 +96,16 @@ func toAlertOut(a store.AlertRow) alertOut {
 	return alertOut{
 		ID: a.ID, Symbol: a.Symbol, ExchangeType: a.ExchangeType, AlertType: a.AlertType,
 		Interval: a.Interval, Value: finite(a.Value), Severity: a.Severity, Message: a.Message,
-		FiredAt: a.FiredAt.UTC().Format(time.RFC3339),
+		FiredAt: a.FiredAt.UTC().Format(time.RFC3339), BarDate: dateStr(a.BarDate),
 	}
+}
+
+func dateStr(t *time.Time) *string {
+	if t == nil {
+		return nil
+	}
+	v := t.UTC().Format(time.DateOnly)
+	return &v
 }
 
 // multi collects a repeated and/or comma-separated query parameter.
@@ -129,7 +144,7 @@ func (s *Server) handleAlerts(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	var f store.AlertFilter
 	resp := alertsResponse{Alerts: []alertOut{}, Groups: []alertGroup{}, AlertTypes: []string{}, Severities: []string{},
-		Types: []string{}, Caveat: s.cfg.Caveats.HeuristicTA}
+		Types: []string{}, Caveat: s.cfg.Caveats.HeuristicTA, TypeLabels: s.cfg.AlertMessages.Labels()}
 	bad := func(code string) { writeJSON(w, http.StatusBadRequest, errorResponse{Error: code}) }
 
 	if raw := strings.TrimSpace(q.Get("symbol")); raw != "" {
@@ -220,6 +235,10 @@ func (s *Server) handleAlerts(w http.ResponseWriter, r *http.Request) {
 	if meta.EarliestFired != nil {
 		v := meta.EarliestFired.UTC().Format(time.RFC3339)
 		resp.RecordsStart = &v
+	}
+	if meta.OnsetsSince != nil {
+		v := meta.OnsetsSince.UTC().Format(time.RFC3339)
+		resp.OnsetsSince = &v
 	}
 
 	// One extra row (or group) tells has_more without a count query.

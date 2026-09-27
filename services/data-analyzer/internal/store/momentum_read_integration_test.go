@@ -206,8 +206,8 @@ func TestMomentumRead_CandidatesRecentAlert(t *testing.T) {
 		{"ZZM04", "equity", "rsi_oversold", "notice", since},                       // exactly at the window start
 	} {
 		if _, err := tx.Exec(ctx, `
-INSERT INTO fired_alerts (symbol, exchange_type, alert_type, interval, value, severity, message, fired_at)
-VALUES ($1, $2, $3, '1Day', 1, $4, $3 || ' message', $5)`, a.symbol, a.exchange, a.kind, a.severity, a.at); err != nil {
+INSERT INTO fired_alerts (symbol, exchange_type, alert_type, interval, value, severity, message, fired_at, bar_date)
+VALUES ($1, $2, $3, '1Day', 1, $4, $3 || ' message', $5, ($5::timestamptz AT TIME ZONE 'UTC')::date)`, a.symbol, a.exchange, a.kind, a.severity, a.at); err != nil {
 			t.Fatal(err)
 		}
 	}

@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"os"
+	"path/filepath"
 	"slices"
 	"testing"
 	"time"
@@ -90,6 +92,10 @@ func (f *fakeStore) AlertMeta(context.Context) (store.AlertMeta, error) {
 			t := a.FiredAt.UTC()
 			m.EarliestFired = &t
 		}
+		if a.BarDate != nil && (m.OnsetsSince == nil || a.FiredAt.Before(*m.OnsetsSince)) {
+			t := a.FiredAt.UTC()
+			m.OnsetsSince = &t
+		}
 	}
 	slices.Sort(m.Types)
 	return m, f.queryErr
@@ -132,7 +138,7 @@ func TestAlerts_DefaultIsTheNewestBoundedFeed(t *testing.T) {
 	first := alerts[0].(map[string]any)
 	want := map[string]any{"id": 3.0, "symbol": "TSM", "exchange_type": "equity", "alert_type": "liquidity_sweep",
 		"interval": "1Day", "value": 4.0, "severity": "notice", "message": "Liquidity sweep detected (4 sweeps)",
-		"fired_at": "2026-09-25T20:14:00Z"}
+		"fired_at": "2026-09-25T20:14:00Z", "bar_date": nil}
 	if len(first) != len(want) {
 		t.Errorf("alert = %v, want exactly %v", first, want)
 	}
@@ -319,4 +325,36 @@ func alertIDs(body map[string]any) []float64 {
 		ids = append(ids, a.(map[string]any)["id"].(float64))
 	}
 	return ids
+}
+
+// Labels come from shared/content/alert_messages.json; onsets_since is the
+// first row with a bar_date, and each alert carries its bar_date.
+func TestAlerts_TypeLabelsAndOnsets(t *testing.T) {
+	st := alertsFixture()
+	body := decode(t, get(t, newTestServer(t, st, freshNow), "/api/v1/alerts"))
+	labels := body["type_labels"].(map[string]any)
+	if labels["liquidity_sweep"] != "Liquidity sweep" || labels["bb_squeeze"] != "Bollinger squeeze" || len(labels) != 6 {
+		t.Errorf("type_labels = %v", labels)
+	}
+	if body["onsets_since"] != nil || body["alerts"].([]any)[0].(map[string]any)["bar_date"] != nil {
+		t.Errorf("no onset rows yet: onsets_since %v", body["onsets_since"])
+	}
+	bar := time.Date(2026, 9, 28, 0, 0, 0, 0, time.UTC)
+	st.alerts = append([]store.AlertRow{{ID: 9, Symbol: "XOM", ExchangeType: "equity", AlertType: "bb_squeeze", Interval: "1Day",
+		Severity: "info", Message: "Bollinger Squeeze began", FiredAt: bar.Add(30 * time.Hour), BarDate: &bar}}, st.alerts...)
+	body = decode(t, get(t, newTestServer(t, st, freshNow), "/api/v1/alerts"))
+	if body["onsets_since"] != "2026-09-29T06:00:00Z" || body["alerts"].([]any)[0].(map[string]any)["bar_date"] != "2026-09-28" {
+		t.Errorf("onsets_since %v first %v", body["onsets_since"], body["alerts"].([]any)[0])
+	}
+}
+
+func TestLoadAlertMessages(t *testing.T) {
+	if _, err := LoadAlertMessages(filepath.Join(t.TempDir(), "missing.json")); err == nil {
+		t.Error("a missing file must fail: there is no fallback")
+	}
+	p := filepath.Join(t.TempDir(), "m.json")
+	_ = os.WriteFile(p, []byte(`{"alert_types":{"bb_squeeze":{"label":"","message":"x"}}}`), 0o644)
+	if _, err := LoadAlertMessages(p); err == nil {
+		t.Error("an entry without a label must fail")
+	}
 }

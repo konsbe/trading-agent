@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "about": "Each alert type the analyst bot can post: its display label and its message template. The bot renders the template (Python str.format placeholders) and stores the result in fired_alerts.message, so Discord and Alarm History read the same text; momentum-api serves the labels to the web. Alerts mark onsets: the condition started on the bar named by bar_date after at least 5 sessions without it. Templates describe the condition only; they make no prediction.",
+  "alert_types": {
+    "rsi_overbought": {
+      "label": "RSI overbought",
+      "message": "RSI {rsi:.1f} crossed above {threshold:g} (overbought)"
+    },
+    "rsi_oversold": {
+      "label": "RSI oversold",
+      "message": "RSI {rsi:.1f} crossed below {threshold:g} (oversold)"
+    },
+    "bb_squeeze": {
+      "label": "Bollinger squeeze",
+      "message": "Bollinger Squeeze began — the Bollinger Bands are inside the Keltner Channel (recent volatility is low)."
+    },
+    "liquidity_sweep": {
+      "label": "Liquidity sweep",
+      "message": "New liquidity sweep on the latest bar: {side} sweep of the {level:.2f} swing level, close {close:.2f}"
+    },
+    "vix_elevated": {
+      "label": "VIX elevated",
+      "message": "VIX {vix:.1f} crossed above {threshold:g} — regime: {regime}"
+    },
+    "fa_tier_flip": {
+      "label": "Fundamental tier flip",
+      "message": "FA composite tier changed: {prev_tier} → {new_tier}"
+    }
+  }
+}

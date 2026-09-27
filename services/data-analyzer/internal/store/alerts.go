@@ -22,6 +22,9 @@ type AlertRow struct {
 	Severity     string
 	Message      string
 	FiredAt      time.Time
+	// BarDate is the bar the onset happened on (migration 031); nil for rows
+	// from before onset alerts, which re-posted an ongoing condition.
+	BarDate *time.Time
 }
 
 // AlertFilter narrows ListAlerts / ListAlertGroups. Nil or empty fields do
@@ -83,7 +86,7 @@ func ListAlerts(ctx context.Context, q Querier, f AlertFilter) ([]AlertRow, erro
 	}
 	args = append(args, f.Limit)
 	rows, err := q.Query(ctx, `
-SELECT id, symbol, exchange_type, alert_type, interval, value::float8, severity, message, fired_at
+SELECT id, symbol, exchange_type, alert_type, interval, value::float8, severity, message, fired_at, bar_date
 FROM fired_alerts
 WHERE `+strings.Join(where, " AND ")+`
 ORDER BY fired_at DESC, id DESC
@@ -96,7 +99,7 @@ LIMIT `+fmt.Sprintf("$%d", len(args)), args...)
 	for rows.Next() {
 		var a AlertRow
 		if err := rows.Scan(&a.ID, &a.Symbol, &a.ExchangeType, &a.AlertType, &a.Interval,
-			&a.Value, &a.Severity, &a.Message, &a.FiredAt); err != nil {
+			&a.Value, &a.Severity, &a.Message, &a.FiredAt, &a.BarDate); err != nil {
 			return nil, fmt.Errorf("scan alert: %w", err)
 		}
 		a.FiredAt = a.FiredAt.UTC()
@@ -142,7 +145,7 @@ WITH m AS (
     FROM m ORDER BY symbol, alert_type, fired_at DESC, id DESC
 )
 SELECT g.symbol, g.alert_type, g.n, g.first_at, g.last_at,
-       l.id, l.exchange_type, l.interval, l.value::float8, l.severity, l.message, l.fired_at
+       l.id, l.exchange_type, l.interval, l.value::float8, l.severity, l.message, l.fired_at, l.bar_date
 FROM g JOIN l USING (symbol, alert_type)
 WHERE `+strings.Join(outer, " AND ")+`
 ORDER BY l.fired_at DESC, l.id DESC
@@ -156,7 +159,7 @@ LIMIT `+fmt.Sprintf("$%d", len(args)), args...)
 		var g AlertGroup
 		a := &g.Latest
 		if err := rows.Scan(&g.Symbol, &g.AlertType, &g.Count, &g.FirstFiredAt, &g.LastFiredAt,
-			&a.ID, &a.ExchangeType, &a.Interval, &a.Value, &a.Severity, &a.Message, &a.FiredAt); err != nil {
+			&a.ID, &a.ExchangeType, &a.Interval, &a.Value, &a.Severity, &a.Message, &a.FiredAt, &a.BarDate); err != nil {
 			return nil, fmt.Errorf("scan alert group: %w", err)
 		}
 		a.Symbol, a.AlertType = g.Symbol, g.AlertType
@@ -172,18 +175,24 @@ LIMIT `+fmt.Sprintf("$%d", len(args)), args...)
 type AlertMeta struct {
 	Types         []string
 	EarliestFired *time.Time
+	// OnsetsSince is the first onset alert (the first row with a bar_date):
+	// before it, rows re-posted ongoing conditions. Nil until one exists.
+	OnsetsSince *time.Time
 }
 
 func LoadAlertMeta(ctx context.Context, q Querier) (AlertMeta, error) {
 	var m AlertMeta
 	if err := q.QueryRow(ctx, `
-SELECT COALESCE(array_agg(DISTINCT alert_type ORDER BY alert_type), '{}'), min(fired_at)
-FROM fired_alerts`).Scan(&m.Types, &m.EarliestFired); err != nil {
+SELECT COALESCE(array_agg(DISTINCT alert_type ORDER BY alert_type), '{}'), min(fired_at),
+       min(fired_at) FILTER (WHERE bar_date IS NOT NULL)
+FROM fired_alerts`).Scan(&m.Types, &m.EarliestFired, &m.OnsetsSince); err != nil {
 		return m, fmt.Errorf("alert meta: %w", err)
 	}
-	if m.EarliestFired != nil {
-		t := m.EarliestFired.UTC()
-		m.EarliestFired = &t
+	for _, p := range []**time.Time{&m.EarliestFired, &m.OnsetsSince} {
+		if *p != nil {
+			t := (*p).UTC()
+			*p = &t
+		}
 	}
 	return m, nil
 }

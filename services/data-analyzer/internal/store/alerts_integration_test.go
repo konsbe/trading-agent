@@ -25,8 +25,8 @@ func TestAlerts_ListAlerts(t *testing.T) {
 		{"ZZAL1", "equity", "rsi_overbought", f64p(75.1), base.Add(time.Hour)},
 	} {
 		if _, err := tx.Exec(ctx, `
-INSERT INTO fired_alerts (symbol, exchange_type, alert_type, interval, value, severity, message, fired_at)
-VALUES ($1, $2, $3, '1Day', $4, 'notice', $3 || ' msg', $5)`, a.symbol, a.exchange, a.kind, a.value, a.at); err != nil {
+INSERT INTO fired_alerts (symbol, exchange_type, alert_type, interval, value, severity, message, fired_at, bar_date)
+VALUES ($1, $2, $3, '1Day', $4, 'notice', $3 || ' msg', $5, ($5::timestamptz AT TIME ZONE 'UTC')::date)`, a.symbol, a.exchange, a.kind, a.value, a.at); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -96,8 +96,8 @@ func TestAlerts_FiltersGroupsCursorAndMeta(t *testing.T) {
 	} {
 		var id int64
 		if err := tx.QueryRow(ctx, `
-INSERT INTO fired_alerts (symbol, exchange_type, alert_type, interval, value, severity, message, fired_at)
-VALUES ($1, 'equity', $2, '1Day', $3::numeric, $4, $2 || ' ' || $3::numeric::text, $5) RETURNING id`, a.symbol, a.kind, a.value, a.severity, a.at).Scan(&id); err != nil {
+INSERT INTO fired_alerts (symbol, exchange_type, alert_type, interval, value, severity, message, fired_at, bar_date)
+VALUES ($1, 'equity', $2, '1Day', $3::numeric, $4, $2 || ' ' || $3::numeric::text, $5, ($5::timestamptz AT TIME ZONE 'UTC')::date) RETURNING id`, a.symbol, a.kind, a.value, a.severity, a.at).Scan(&id); err != nil {
 			t.Fatal(err)
 		}
 		ids[a.key] = id
@@ -164,3 +164,41 @@ VALUES ($1, 'equity', $2, '1Day', $3::numeric, $4, $2 || ' ' || $3::numeric::tex
 	}
 }
 
+// Migration 031: one row per symbol, alert type and bar; a new row needs a
+// bar_date; OnsetsSince is the first row that has one.
+func TestAlerts_OneRowPerOnsetBar(t *testing.T) {
+	ctx := context.Background()
+	tx := fixtureTx(t)
+	ins := func(bar any, at time.Time) error {
+		_, err := tx.Exec(ctx, `SAVEPOINT s1`)
+		if err != nil {
+			return err
+		}
+		_, err = tx.Exec(ctx, `
+INSERT INTO fired_alerts (symbol, exchange_type, alert_type, interval, severity, message, fired_at, bar_date)
+VALUES ('ZZOB1', 'equity', 'bb_squeeze', '1Day', 'info', 'Bollinger Squeeze began', $1, $2)`, at, bar)
+		if err != nil {
+			_, _ = tx.Exec(ctx, `ROLLBACK TO SAVEPOINT s1`)
+		}
+		return err
+	}
+	bar := time.Date(2099, 5, 4, 0, 0, 0, 0, time.UTC)
+	at := time.Date(2099, 5, 4, 23, 0, 0, 0, time.UTC)
+	if err := ins(bar, at); err != nil {
+		t.Fatal(err)
+	}
+	if err := ins(bar, at.Add(4*time.Hour)); err == nil {
+		t.Error("a second row for the same symbol, alert type and bar must be rejected")
+	}
+	if err := ins(nil, at.Add(8*time.Hour)); err == nil {
+		t.Error("a new row without bar_date must be rejected")
+	}
+	rows, err := ListAlerts(ctx, tx, AlertFilter{Symbol: strp("ZZOB1"), Limit: 5})
+	if err != nil || len(rows) != 1 || rows[0].BarDate == nil || !rows[0].BarDate.Equal(bar) {
+		t.Fatalf("rows = %+v, %v", rows, err)
+	}
+	meta, err := LoadAlertMeta(ctx, tx)
+	if err != nil || meta.OnsetsSince == nil {
+		t.Fatalf("meta = %+v, %v", meta, err)
+	}
+}

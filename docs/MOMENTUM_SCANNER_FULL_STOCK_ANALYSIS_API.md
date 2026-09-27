@@ -562,6 +562,19 @@ shared `heuristic_ta_caveat`, verbatim). Only alerts actually posted to
 Discord are recorded (the bot writes the row after a confirmed post); the
 momentum screener's alerts are not written to `fired_alerts`.
 
+**Onset alerts (migration 031, 2026-09-27).** The bot now posts only onsets —
+a condition that started on the latest bar after at least 5 sessions without
+it (technical-analysis `alert_onsets`; VIX: a crossing in VIXCLS) — instead of
+re-posting a condition every 4-hour cooldown while it stays true.
+`fired_alerts.bar_date` names the onset bar and is unique per `symbol`,
+`alert_type`, `bar_date`; the bot claims the row before posting, so an onset is
+stored and posted at most once. Rows from before the switch have `bar_date`
+null (they were re-posts). Every alert carries `bar_date`; responses add
+`onsets_since` (the first onset row's `fired_at`, null until one exists) and
+`type_labels` (each alert type's label, from
+`shared/content/alert_messages.json`, which also holds the message templates
+the bot renders).
+
 ## 4. Candidates-page alert badge
 
 Add to the candidates list response (`GET /api/v1/scanner/today`, per

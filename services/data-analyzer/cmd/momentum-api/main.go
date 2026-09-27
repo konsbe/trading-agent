@@ -73,6 +73,7 @@ func main() {
 	marketTextPath := env("MOMENTUM_MARKET_REPORT_TEXT_PATH", "../../shared/content/market_report_descriptions.json")
 	corrTextPath := env("MOMENTUM_CORRELATION_TEXT_PATH", "../../shared/content/correlation_sentences.json")
 	corrLabelsPath := env("MOMENTUM_CORRELATION_LABELS_PATH", "../../shared/content/correlation_labels.json")
+	alertMessagesPath := env("MOMENTUM_ALERT_MESSAGES_PATH", "../../shared/content/alert_messages.json")
 	scanGrace := duration(log, "MOMENTUM_API_SCAN_GRACE", 6*time.Hour)
 	cacheTTL := duration(log, "MOMENTUM_API_CACHE_TTL", maxCacheTTL)
 	if cacheTTL > maxCacheTTL {
@@ -157,6 +158,13 @@ func main() {
 		os.Exit(1)
 	}
 
+	alertMessages, err := momentumapi.LoadAlertMessages(alertMessagesPath)
+	if err != nil {
+		log.Error("momentum-api: alert messages", "err", err,
+			"fix", "set MOMENTUM_ALERT_MESSAGES_PATH to shared/content/alert_messages.json (in Docker, mount ../shared/content)")
+		os.Exit(1)
+	}
+
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
@@ -198,6 +206,7 @@ func main() {
 		MarketReportText:    marketText,
 		CorrelationText:     corrText,
 		CorrelationLabels:   corrLabels,
+		AlertMessages:       alertMessages,
 
 		AnalysisNames: technical.NamesFor(technical.Emitter{Cfg: taCfg}),
 		AnalysisCompute: func(ctx context.Context, symbol string, parts momentumapi.AnalysisParts) error {
