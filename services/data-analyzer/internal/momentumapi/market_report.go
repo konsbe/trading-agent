@@ -207,12 +207,14 @@ func buildMarketReport(in store.MarketReportInputs, now time.Time, opts reportOp
 	for _, sec := range stanceSections {
 		global[sec.key] = buildStance(in.Macro, sec.prefix, sec.stance)
 	}
-	global["macro_correlations_regime"] = macroPayload(in.Macro, "mc_macro_correlation")
-	global["market_cycle_composite"] = macroPayload(in.Macro, "mc_market_cycle")
+	global["macro_correlations_regime"] = macroPayloadText(in.Macro, "mc_macro_correlation", "regime", "label", regimeText)
+	global["market_cycle_composite"] = macroPayloadText(in.Macro, "mc_market_cycle", "composite_phase", "composite_label", cycleText)
 	aa, hasAA := in.Macro["aa_reference_snapshot"]
 	for _, k := range []string{"seasonality", "presidential_cycle", "intermarket"} {
 		global[k] = pick(aa.Payload, k, hasAA)
 	}
+	global["seasonality"] = rewriteSeasonality(global["seasonality"].(json.RawMessage))
+	global["intermarket"] = rewriteIntermarket(global["intermarket"].(json.RawMessage))
 	// automation_status is the snapshot's reference_modules list, unchanged —
 	// including every not_automated / needs_data / partial entry.
 	global["automation_status"] = pick(aa.Payload, "reference_modules", hasAA)
@@ -330,6 +332,17 @@ func macroPayload(macro map[string]store.MacroRow, metric string) any {
 		"as_of":   row.TS.Format(time.DateOnly),
 		"payload": row.Payload,
 	}
+}
+
+// macroPayloadText is macroPayload with the payload's description served as
+// display text for its code (market_report_text.go).
+func macroPayloadText(macro map[string]store.MacroRow, metric, codeField, textField string, table map[string]string) any {
+	row, ok := macro[metric]
+	if !ok {
+		return nil
+	}
+	row.Payload = rewriteText(row.Payload, codeField, textField, table)
+	return macroPayload(map[string]store.MacroRow{metric: row}, metric)
 }
 
 func vixHeader(v *datedValue, macro map[string]store.MacroRow) any {
