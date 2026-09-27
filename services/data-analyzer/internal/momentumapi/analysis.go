@@ -631,8 +631,9 @@ func buildCorrelations(d map[string]store.StoredRow) correlationsOut {
 		c.Clusters = append(c.Clusters, cl)
 		c.AlignedSignals = append(c.AlignedSignals, cl.Positives...)
 	}
-	// corr_summary averages the four scores, an empty cluster as 0: with none
-	// evaluated its 0 / "mixed_positive" describes nothing.
+	// corr_summary rows written before 2026-09-27 averaged all four scores, an
+	// empty cluster as 0; with none evaluated their 0 / "mixed_positive"
+	// describes nothing. Newer rows store no score then.
 	if len(c.Clusters) > 0 && evaluated == 0 {
 		c.Composite = scoreTier{}
 	}

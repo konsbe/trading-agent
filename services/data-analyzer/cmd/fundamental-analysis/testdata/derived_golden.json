@@ -135,7 +135,8 @@
    "overall_score": 0.08,
    "warnings_count": 2,
    "positives_count": 3,
-   "master_net_signal": "bullish"
+   "master_net_signal": "bullish",
+   "clusters_evaluated": 4
   }
  },
  {
@@ -693,7 +694,8 @@
    "overall_score": 0,
    "warnings_count": 0,
    "positives_count": 0,
-   "master_net_signal": "neutral"
+   "master_net_signal": "neutral",
+   "clusters_evaluated": 1
   }
  },
  {

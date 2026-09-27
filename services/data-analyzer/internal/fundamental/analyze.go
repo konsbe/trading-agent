@@ -2299,17 +2299,18 @@ func (w *analyzer) scoreCorrelations(ctx context.Context, symbol string, rows []
 		"bearish_count":          bearishN,
 	})
 
-	// Overall summary — average of the four cluster scores.
-	summaryScore := round2((eq1Cluster + vq2Cluster + lev3Cluster + op4Cluster) / 4)
+	summary, nEvaluated := evaluatedMean([]clusterScore{
+		{eq1Cluster, eq1Max}, {vq2Cluster, vq2Max}, {lev3Cluster, lev3Max}, {op4Cluster, op4Max},
+	})
 	var allWarnings []string
 	allWarnings = append(allWarnings, eq1Warnings...)
 	allWarnings = append(allWarnings, vq2Warnings...)
 	allWarnings = append(allWarnings, lev3Warnings...)
 	allWarnings = append(allWarnings, op4Warnings...)
 
-	upsert("corr_summary", ptr(summaryScore), map[string]any{
-		"overall_score": summaryScore,
-		"tier":          corrTier(summaryScore),
+	summaryPayload := map[string]any{
+		"overall_score":      summary,
+		"clusters_evaluated": nEvaluated,
 		"clusters": map[string]string{
 			"earnings_quality":   corrTier(eq1Cluster),
 			"valuation_quality":  corrTier(vq2Cluster),
@@ -2326,12 +2327,37 @@ func (w *analyzer) scoreCorrelations(ctx context.Context, symbol string, rows []
 		},
 		"warnings_count":  len(allWarnings),
 		"positives_count": len(eq1Positives) + len(vq2Positives) + len(lev3Positives) + len(op4Positives),
-	})
+	}
+	if summary != nil {
+		summaryPayload["tier"] = corrTier(*summary)
+	}
+	upsert("corr_summary", summary, summaryPayload)
 
 	w.log.Info("correlations scored", "symbol", symbol,
-		"summary", summaryScore, "net_signal", netLabel,
+		"summary", summary, "net_signal", netLabel,
 		"bullish", bullishN, "bearish", bearishN,
 	)
+}
+
+type clusterScore struct{ score, checks float64 }
+
+// evaluatedMean is the correlations summary: the mean of the clusters that ran
+// at least one check, rounded to 2 places. An unevaluated cluster's score is 0
+// by construction, not a reading, so it is left out; with none evaluated there
+// is no summary (nil).
+func evaluatedMean(clusters []clusterScore) (*float64, int) {
+	sum, n := 0.0, 0
+	for _, c := range clusters {
+		if c.checks > 0 {
+			sum += c.score
+			n++
+		}
+	}
+	if n == 0 {
+		return nil, 0
+	}
+	m := round2(sum / float64(n))
+	return &m, n
 }
 
 // corrTier maps a cluster score in [-1, +1] to a human-readable tier label.
