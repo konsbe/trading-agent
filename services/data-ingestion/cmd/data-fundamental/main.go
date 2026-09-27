@@ -13,6 +13,7 @@ import (
 
 	"github.com/konsbe/trading-agent/services/data-ingestion/internal/config"
 	"github.com/konsbe/trading-agent/services/data-ingestion/internal/fetch/alphavantage"
+	"github.com/konsbe/trading-agent/services/data-ingestion/internal/fetch/edgar"
 	"github.com/konsbe/trading-agent/services/data-ingestion/internal/fetch/finnhub"
 	"github.com/konsbe/trading-agent/services/data-ingestion/internal/ratelimit"
 	"github.com/konsbe/trading-agent/services/data-ingestion/internal/store"
@@ -57,7 +58,12 @@ func main() {
 		log.Warn("ALPHA_VANTAGE_API_KEY not set; forward P/E and sector data will be missing")
 	}
 
-	w := &worker{cfg: cfg, pool: pool, fh: fh, av: av, log: log}
+	ed := edgar.New(cfg.SECEdgarUserAgent, cfg.SECEdgarRatePerSec, cfg.SECEdgarTimeout)
+	if ed == nil {
+		log.Warn("SEC_EDGAR_USER_AGENT not set; 20-F filers' cash-flow statements will be missing")
+	}
+
+	w := &worker{cfg: cfg, pool: pool, fh: fh, av: av, ed: ed, log: log}
 
 	// Manual "Compute" requests (computation_interest reason manual) poll on
 	// their own goroutine: the passes below block for minutes (Alpha Vantage
@@ -172,6 +178,7 @@ type worker struct {
 	pool *pgxpool.Pool
 	fh   *finnhub.Client
 	av   *alphavantage.Client
+	ed   *edgar.Client // nil without SEC_EDGAR_USER_AGENT
 	log  *slog.Logger
 }
 
@@ -381,6 +388,7 @@ func (w *worker) runFinancialsFor(ctx context.Context, syms []string) {
 		status, reason := store.StatementsAvailable, ""
 		if !ok {
 			status, reason = store.StatementsNoneReturned, "Finnhub returned no 10-K/10-Q filings"
+			w.store20FCashFlow(ctx, sym)
 		}
 		if err := store.MarkStatements(ctx, w.pool, sym, status, reason); err != nil {
 			w.log.Warn("mark statements", "symbol", sym, "err", err)

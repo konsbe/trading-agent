@@ -104,3 +104,46 @@ SELECT COALESCE(
 	}
 	return c, nil
 }
+
+// IFRSCashFlow is a 20-F filer's cash-flow statement as data-fundamental
+// stored it from SEC EDGAR companyfacts (source sec_edgar_20f): the card's
+// lines keyed operating / investing / financing / capex / buybacks /
+// dividends, in the filing's reporting currency, never converted. A line the
+// filer tags with its own extension concept is absent from Lines.
+type IFRSCashFlow struct {
+	Form       string             `json:"form"`
+	Accession  string             `json:"accession"`
+	Filed      string             `json:"filed"`
+	PeriodEnd  string             `json:"period_end"`
+	FiscalYear int                `json:"fiscal_year"`
+	Currency   string             `json:"currency"`
+	Lines      map[string]float64 `json:"lines"`
+	// Latest20F is the newest 20-F on EDGAR's filing index when the row was
+	// stored; newer than PeriodEnd means companyfacts lags that filing.
+	Latest20F *struct {
+		Filed     string `json:"filed"`
+		PeriodEnd string `json:"period_end"`
+	} `json:"latest_20f"`
+}
+
+func LatestIFRSCashFlow(ctx context.Context, q Querier, symbol string) (*IFRSCashFlow, error) {
+	var payload []byte
+	err := q.QueryRow(ctx, `
+SELECT payload FROM equity_fundamentals
+WHERE symbol = $1 AND source = 'sec_edgar_20f' AND metric = 'cash_flow_statement' AND period LIKE 'annual\_%'
+ORDER BY period DESC, ts DESC LIMIT 1`, symbol).Scan(&payload)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("20-F cash flow %s: %w", symbol, err)
+	}
+	var cf IFRSCashFlow
+	if err := json.Unmarshal(payload, &cf); err != nil {
+		return nil, fmt.Errorf("20-F cash flow %s: payload: %w", symbol, err)
+	}
+	if cf.Currency == "" || len(cf.Lines) == 0 {
+		return nil, nil
+	}
+	return &cf, nil
+}

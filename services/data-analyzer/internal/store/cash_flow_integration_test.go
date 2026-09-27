@@ -68,3 +68,26 @@ func TestLoadStatementCoverage_AssetTypeFallbacks(t *testing.T) {
 		}
 	}
 }
+
+// The newest stored 20-F row is read, and a 10-K statement is never shadowed:
+// LoadAnalysis only asks for it when there is none.
+func TestLatestIFRSCashFlow(t *testing.T) {
+	ctx := context.Background()
+	tx := fixtureTx(t)
+	ts := time.Date(2099, 1, 1, 0, 0, 0, 0, time.UTC)
+	if _, err := tx.Exec(ctx, `INSERT INTO equity_fundamentals (ts, symbol, period, metric, payload, source) VALUES
+		($1, 'ZZ20F', 'annual_2023', 'cash_flow_statement', '{"form":"20-F","period_end":"2023-12-31","fiscal_year":2023,"currency":"TWD","lines":{"operating":1}}', 'sec_edgar_20f'),
+		($1, 'ZZ20F', 'annual_2024', 'cash_flow_statement', '{"form":"20-F","filed":"2025-04-17","period_end":"2024-12-31","fiscal_year":2024,"currency":"TWD","lines":{"operating":2},"latest_20f":{"filed":"2026-04-16","period_end":"2025-12-31"}}', 'sec_edgar_20f')`, ts); err != nil {
+		t.Fatal(err)
+	}
+	cf, err := LatestIFRSCashFlow(ctx, tx, "ZZ20F")
+	if err != nil || cf == nil {
+		t.Fatalf("= %v, %v", cf, err)
+	}
+	if cf.FiscalYear != 2024 || cf.Currency != "TWD" || cf.Lines["operating"] != 2 || cf.Latest20F == nil || cf.Latest20F.Filed != "2026-04-16" {
+		t.Errorf("statement = %+v latest %+v", cf, cf.Latest20F)
+	}
+	if none, err := LatestIFRSCashFlow(ctx, tx, "ZZ20FNONE"); err != nil || none != nil {
+		t.Errorf("no row = %v, %v", none, err)
+	}
+}

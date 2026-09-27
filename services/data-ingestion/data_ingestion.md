@@ -433,6 +433,18 @@ Tall/narrow format — one row per `(symbol, period, metric)`. This mirrors the 
 |---|---|---|
 | `FUNDAMENTAL_SYMBOLS` | falls back to `ALPACA_DATA_SYMBOLS`, then `AAPL,MSFT,SPY` | Fallback only: the fetched set is `followed_symbols` (Alpha Vantage passes) or the computation set (Finnhub passes), see "Which symbols each worker fetches" |
 
+#### SEC EDGAR (20-F cash-flow statements)
+
+For a symbol Finnhub returns no 10-K/10-Q for, data-fundamental reads SEC
+EDGAR companyfacts (`ifrs-full`) and stores the newest fiscal year's IFRS
+cash-flow statement as `equity_fundamentals` source `sec_edgar_20f`, metric
+`cash_flow_statement`, period `annual_<FY>` — in the filing's reporting
+currency, never converted (the unit carrying the prior-year comparatives; a
+one-year convenience translation is excluded). It also records the newest
+20-F on EDGAR's filing index, so the card can say when companyfacts lags a
+newer filing. Uses `SEC_EDGAR_USER_AGENT` (required; unset disables it),
+`SEC_EDGAR_RATE_PER_SEC` (default 3) and `SEC_EDGAR_TIMEOUT` (60s).
+
 #### Poll intervals
 
 | Variable | Default | Description |

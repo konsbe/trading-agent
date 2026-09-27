@@ -92,7 +92,10 @@ type AnalysisInputs struct {
 	// CashFlow is the latest stored annual cash-flow statement (nil when none);
 	// Coverage says why there is none.
 	CashFlow *CashFlowStatement
-	Coverage StatementCoverage
+	// CashFlow20F is a 20-F filer's IFRS statement from SEC EDGAR, loaded only
+	// when there is no 10-K statement.
+	CashFlow20F *IFRSCashFlow
+	Coverage    StatementCoverage
 }
 
 func LoadAnalysis(ctx context.Context, q Querier, symbol, interval string, headlines int) (AnalysisInputs, error) {
@@ -155,6 +158,11 @@ LIMIT $2`, symbol, headlines)
 	}
 	if in.CashFlow, err = LatestAnnualCashFlow(ctx, q, symbol); err != nil {
 		return in, err
+	}
+	if in.CashFlow == nil {
+		if in.CashFlow20F, err = LatestIFRSCashFlow(ctx, q, symbol); err != nil {
+			return in, err
+		}
 	}
 	if in.Coverage, err = LoadStatementCoverage(ctx, q, symbol); err != nil {
 		return in, err

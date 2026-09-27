@@ -342,6 +342,25 @@ says why — crypto, a fund, a foreign listing, the filings source returned no
 never an empty card. Source: the newest `annual_%` `report_raw` in
 `equity_fundamentals`; coverage from `symbol_data_status` (migration 030).
 
+**20-F filers (2026-09-27).** When there is no 10-K, the card reads the
+newest `sec_edgar_20f` / `cash_flow_statement` row, which data-fundamental
+stores from SEC EDGAR companyfacts (`ifrs-full`) for symbols Finnhub returns
+no 10-K/10-Q for (TSM, SHEL, TTE, BP, GFS). Rows map to the statement's own
+lines: `CashFlowsFromUsedIn{Operating,Investing,Financing}Activities`,
+`PurchaseOfPropertyPlantAndEquipmentClassifiedAsInvestingActivities`,
+`PaymentsToAcquireOrRedeemEntitysShares`,
+`DividendsPaidToEquityHoldersOfParentClassifiedAsFinancingActivities` (else
+`DividendsPaidClassifiedAsFinancingActivities`). Values are in the reporting
+currency — the unit carrying the prior-year comparatives in that 20-F, so
+TSM's one-year US-dollar convenience copy is excluded and TSM shows TWD —
+never converted. Added fields: `fiscal_year`, `currency`, `source` (`10-K via
+Finnhub` / `20-F via SEC EDGAR`), `newer_filing` (`{form, filed, period_end}`
+when EDGAR's filing index lists a newer 20-F than companyfacts carries: TSM's
+FY2025 20-F filed 2026-04-16) and per-line `missing_note` (`not in filing`
+for a 10-K; `not reported as a comparable line` for a 20-F line reported
+under the filer's own tag — SHEL / TTE capex — or folded into a broader line
+— BP's capex includes intangibles and other non-current assets).
+
 #### Field mapping (doc field → stored source)
 
 | Field | Source |

@@ -217,3 +217,45 @@ func TestBuildCashFlow(t *testing.T) {
 		}
 	}
 }
+
+// A 20-F filer's statement: reporting currency named, source labelled, a line
+// the filer tags with its own concept reads "not reported as a comparable
+// line", and a newer 20-F missing from companyfacts is surfaced.
+func TestBuildCashFlow_20F(t *testing.T) {
+	cf := &store.IFRSCashFlow{
+		Form: "20-F", Filed: "2025-04-17", PeriodEnd: "2024-12-31", FiscalYear: 2024, Currency: "TWD",
+		Lines: map[string]float64{"operating": 1826177100000, "investing": -864842800000, "financing": -346301000000,
+			"capex": 956006500000, "dividends": 363055200000},
+	}
+	cf.Latest20F = &struct {
+		Filed     string `json:"filed"`
+		PeriodEnd string `json:"period_end"`
+	}{Filed: "2026-04-16", PeriodEnd: "2025-12-31"}
+	out := buildCashFlow(store.AnalysisInputs{CashFlow20F: cf})
+	if !out.Available || *out.Currency != "TWD" || *out.Source != "20-F via SEC EDGAR" || *out.FiscalYear != 2024 || *out.Form != "20-F" {
+		t.Fatalf("20-F card = %+v", out)
+	}
+	if out.NewerFiling == nil || out.NewerFiling.Filed != "2026-04-16" || out.NewerFiling.PeriodEnd != "2025-12-31" {
+		t.Errorf("newer filing = %+v", out.NewerFiling)
+	}
+	for _, l := range out.Lines {
+		switch l.Key {
+		case "buybacks":
+			if l.Value != nil || l.MissingNote == nil || *l.MissingNote != "not reported as a comparable line" {
+				t.Errorf("buybacks = %+v", l)
+			}
+		case "operating":
+			if l.Value == nil || *l.Value != 1826177100000 || l.MissingNote != nil {
+				t.Errorf("operating = %+v", l)
+			}
+		}
+	}
+	cf.Latest20F.PeriodEnd = "2024-12-31"
+	if out := buildCashFlow(store.AnalysisInputs{CashFlow20F: cf}); out.NewerFiling != nil {
+		t.Errorf("the shown filing is the newest: no notice, got %+v", out.NewerFiling)
+	}
+	us := buildCashFlow(store.AnalysisInputs{CashFlow: &store.CashFlowStatement{Form: "10-K", EndDate: "2025-12-31", Lines: map[string]float64{}}})
+	if *us.Currency != "USD" || *us.Source != "10-K via Finnhub" || *us.FiscalYear != 2025 || *us.Lines[0].MissingNote != "not in filing" {
+		t.Errorf("10-K card = %+v", us)
+	}
+}

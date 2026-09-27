@@ -17,6 +17,12 @@ type Fundamental struct {
 	// Provides forward P/E, sector, beta, PEG ratio (not available on Finnhub free tier).
 	AlphaVantageKey string
 
+	// SEC EDGAR, for 20-F filers' IFRS cash-flow statements (Finnhub serves
+	// only 10-K/10-Q). Empty user agent disables it: SEC rejects anonymous clients.
+	SECEdgarUserAgent  string
+	SECEdgarRatePerSec float64
+	SECEdgarTimeout    time.Duration
+
 	// Equity symbols to fetch fundamentals for.
 	Symbols []string
 
@@ -162,6 +168,9 @@ func LoadFundamental() (Fundamental, error) {
 		Base:                         b,
 		FinnhubKey:                   os.Getenv("FINNHUB_API_KEY"),
 		AlphaVantageKey:              os.Getenv("ALPHA_VANTAGE_API_KEY"),
+		SECEdgarUserAgent:            os.Getenv("SEC_EDGAR_USER_AGENT"),
+		SECEdgarRatePerSec:           floatEnv("SEC_EDGAR_RATE_PER_SEC", 3),
+		SECEdgarTimeout:              pollFor("SEC_EDGAR_TIMEOUT", 60*time.Second),
 		Symbols:                      syms,
 		PollMetrics:                  pollFor("DATA_FUNDAMENTAL_METRICS_POLL_INTERVAL", defaultMetrics),
 		PollFinancials:               pollFor("DATA_FUNDAMENTAL_FINANCIALS_POLL_INTERVAL", defaultFinancials),
