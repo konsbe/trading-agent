@@ -754,3 +754,40 @@ func TestAnalysis_ActionSignal(t *testing.T) {
 		t.Errorf("no VIX = %+v", a)
 	}
 }
+
+// A cluster that ran no comparison is stored as score 0, "mixed_positive"
+// (ETFs: all four). It is served as not evaluated: checks_run 0, score and
+// tier null; the composite too when no cluster ran any.
+func TestCorrelations_EmptyClusterIsNotEvaluated(t *testing.T) {
+	row := func(v float64, p string) store.StoredRow {
+		return store.StoredRow{Value: ptr(v), Payload: json.RawMessage(p)}
+	}
+	empty := `{"tier": "mixed_positive", "checks_run": 0, "warnings": null, "positives": null}`
+	d := map[string]store.StoredRow{
+		"corr_summary":            row(0, `{"tier": "mixed_positive"}`),
+		"corr_earnings_quality":   row(0, empty),
+		"corr_valuation_quality":  row(0, empty),
+		"corr_leverage_liquidity": row(0, empty),
+		"corr_operational":        row(0, empty),
+	}
+	c := buildCorrelations(d)
+	for _, cl := range c.Clusters {
+		if cl.Score != nil || cl.Tier != nil || cl.ChecksRun == nil || *cl.ChecksRun != 0 {
+			t.Errorf("%s: score %v tier %v checks %v, want null / null / 0", cl.Name, cl.Score, cl.Tier, cl.ChecksRun)
+		}
+	}
+	if c.Composite.Score != nil || c.Composite.Tier != nil {
+		t.Errorf("composite = %+v, want null when no cluster was evaluated", c.Composite)
+	}
+
+	// One evaluated cluster keeps its reading, and the stored composite stands.
+	d["corr_operational"] = row(-0.5, `{"tier": "mixed_negative", "checks_run": 2}`)
+	d["corr_summary"] = row(-0.13, `{"tier": "mixed_negative"}`)
+	c = buildCorrelations(d)
+	if op := c.Clusters[3]; op.Tier == nil || *op.Tier != "mixed_negative" || *op.ChecksRun != 2 {
+		t.Errorf("operational = %+v, want mixed_negative over 2 checks", op)
+	}
+	if c.Composite.Tier == nil || *c.Composite.Tier != "mixed_negative" {
+		t.Errorf("composite = %+v, want the stored mixed_negative", c.Composite)
+	}
+}

@@ -270,9 +270,12 @@ type balanceOut struct {
 }
 
 type clusterOut struct {
-	Name      string   `json:"name"`
-	Score     *float64 `json:"score"`
-	Tier      *string  `json:"tier"`
+	Name  string   `json:"name"`
+	Score *float64 `json:"score"`
+	Tier  *string  `json:"tier"`
+	// ChecksRun is how many comparisons the cluster ran. At 0 the stored score
+	// is 0 and the tier "mixed_positive"; both are served null instead.
+	ChecksRun *int     `json:"checks_run"`
 	Positives []string `json:"positives"`
 	Warnings  []string `json:"warnings"`
 }
@@ -612,15 +615,26 @@ var masterSignals = []string{"value_trap", "hidden_value", "bullish_convergence"
 func buildCorrelations(d map[string]store.StoredRow) correlationsOut {
 	c := correlationsOut{Composite: derivedScoreTier(d, "corr_summary"), Clusters: []clusterOut{}, AlignedSignals: []string{}}
 	c.MasterSignals.Fired = []string{}
+	evaluated := 0
 	for _, name := range correlationClusters {
 		r, p, ok := rowPayload(d, "corr_"+name)
 		if !ok {
 			continue
 		}
-		cl := clusterOut{Name: name, Score: finite(r.Value), Tier: p.str("tier"),
+		cl := clusterOut{Name: name, Score: finite(r.Value), Tier: p.str("tier"), ChecksRun: intPtr(p.num("checks_run")),
 			Positives: correlationDisplayTexts(p.strings("positives")), Warnings: correlationDisplayTexts(p.strings("warnings"))}
+		if cl.ChecksRun != nil && *cl.ChecksRun == 0 {
+			cl.Score, cl.Tier = nil, nil
+		} else {
+			evaluated++
+		}
 		c.Clusters = append(c.Clusters, cl)
 		c.AlignedSignals = append(c.AlignedSignals, cl.Positives...)
+	}
+	// corr_summary averages the four scores, an empty cluster as 0: with none
+	// evaluated its 0 / "mixed_positive" describes nothing.
+	if len(c.Clusters) > 0 && evaluated == 0 {
+		c.Composite = scoreTier{}
 	}
 	if _, p, ok := rowPayload(d, "corr_master_signals"); ok {
 		c.MasterSignals.NetSignal = p.str("net_signal")
