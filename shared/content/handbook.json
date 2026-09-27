@@ -1157,7 +1157,7 @@
             },
             {
               "type": "paragraph",
-              "text": "**Repeats are re-posts, not separate events.** After posting an alert the bot waits out a cooldown for that symbol and alert type (four hours by default). If the same condition still holds when the cooldown ends, it posts it again. So ×10 usually means one ongoing condition seen ten times, not ten new signals: a liquidity sweep, for instance, can keep firing for many sessions."
+              "text": "**Before and after 27 September 2026, 23:52 Greek time (20:52 UTC).** Alerts recorded before then are re-posts, not separate events: the bot posted a condition, waited out a four-hour cooldown for that symbol and alert type, and posted it again if the condition still held. So ×10 in that period usually means one ongoing condition seen ten times, not ten new signals — a liquidity sweep, for instance, could keep firing for many sessions. From that switch on, each alert marks an **onset**: the condition started on the bar shown as \"bar …\" after at least 5 sessions without it (RSI crossing above 70 or below 30, a Bollinger Squeeze beginning, a new liquidity sweep on the bar, VIX crossing above 25, or a fundamental tier flip). A condition that stays true is not posted again, and the same onset is recorded at most once. The page shows the switch in its note under \"Records start\"."
             },
             {
               "type": "paragraph",
