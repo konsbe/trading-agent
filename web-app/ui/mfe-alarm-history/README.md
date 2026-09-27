@@ -5,7 +5,9 @@ bot posted, newest first, grouped by symbol and type. Listed in the sidebar's
 **Tracking** group at `/alarm-history`.
 
 Backed by `momentum-api` `GET /api/v1/alerts` (read-only over `fired_alerts`;
-see `services/data-analyzer/internal/momentumapi/alerts.go`).
+see `services/data-analyzer/internal/momentumapi/alerts.go`). Page behaviour —
+views, filters, local-day bounds, paging and the 60 s refresh — is described in
+`src/features/AlarmHistory/README.md`.
 
 | | |
 |---|---|

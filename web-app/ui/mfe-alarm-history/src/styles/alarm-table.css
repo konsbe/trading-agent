@@ -1,0 +1,105 @@
+/*
+ * Alert tables (grouped, raw, and a group's own alerts). Same treatment as the
+ * Watchlist table; `contain: inline-size` keeps a wide table from widening
+ * spog's grid cell — it scrolls here instead.
+ */
+.alarm-table__wrap {
+    container-type: inline-size;
+    contain: inline-size;
+    min-width: 0;
+    max-width: 100%;
+    overflow-x: auto;
+    border: 1px solid var(--color-outline-variant);
+    border-radius: var(--radius-md);
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-outline) transparent;
+}
+
+.alarm-table__wrap:focus-visible {
+    outline: 2px solid var(--color-focus-ring);
+    outline-offset: 2px;
+}
+
+.alarm-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: var(--font-size-sm);
+    color: var(--color-on-surface);
+}
+
+.alarm-table__caption,
+.alarm-table__sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+}
+
+.alarm-table th,
+.alarm-table td {
+    padding: var(--space-xs) var(--space-sm);
+    border-bottom: 1px solid var(--color-outline-variant);
+    text-align: left;
+    vertical-align: middle;
+    white-space: nowrap;
+    font-weight: var(--font-weight-regular);
+}
+
+.alarm-table tr > :first-child {
+    padding-left: var(--space-md);
+}
+
+.alarm-table tr > :last-child {
+    padding-right: var(--space-md);
+}
+
+.alarm-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    padding-top: var(--space-sm);
+    padding-bottom: var(--space-sm);
+    background: var(--color-surface-container);
+    color: var(--color-on-surface-variant);
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-medium);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    vertical-align: bottom;
+}
+
+.alarm-table__row > th,
+.alarm-table__row > td {
+    background: var(--color-surface-container-low);
+    transition: background var(--transition-fast);
+}
+
+.alarm-table__row:hover > th,
+.alarm-table__row:hover > td {
+    background: var(--color-surface-container-high);
+}
+
+.alarm-table > tbody > tr:last-child > th,
+.alarm-table > tbody > tr:last-child > td {
+    border-bottom: 0;
+}
+
+.alarm-table__time {
+    font-family: var(--font-family-label);
+    font-variant-numeric: tabular-nums;
+}
+
+/* Messages wrap instead of widening the table. */
+.alarm-table td[data-column='message'] {
+    min-width: 16rem;
+    white-space: normal;
+    line-height: 1.35;
+}
+
+.alarm-table__muted {
+    color: var(--color-on-surface-variant);
+    font-size: var(--font-size-xs);
+}

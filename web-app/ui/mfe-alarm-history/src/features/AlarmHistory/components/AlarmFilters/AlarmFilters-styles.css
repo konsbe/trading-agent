@@ -1,0 +1,92 @@
+.alarm-filters {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: var(--space-sm) var(--space-lg);
+    padding: var(--space-sm) var(--space-md);
+    border-radius: var(--radius-lg);
+    background: var(--color-surface-container-low);
+}
+
+.alarm-filters__field,
+.alarm-filters__group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xxs);
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+}
+
+.alarm-filters__label {
+    padding: 0;
+    color: var(--color-on-surface-variant);
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-medium);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.alarm-filters__chips,
+.alarm-filters__dates {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-xs);
+}
+
+.alarm-filters__input {
+    box-sizing: border-box;
+    height: 2rem;
+    padding: 0 var(--space-sm);
+    border: 1px solid var(--color-outline);
+    border-radius: var(--radius-md);
+    background: var(--color-surface-container-high);
+    color: var(--color-on-surface);
+    font-family: var(--font-family);
+    font-size: var(--font-size-sm);
+    transition: border-color var(--transition-fast);
+}
+
+.alarm-filters__input--symbol {
+    width: 12rem;
+    font-family: var(--font-family-label);
+    text-transform: uppercase;
+}
+
+.alarm-filters__input--symbol::placeholder {
+    color: var(--color-on-surface-variant);
+    font-family: var(--font-family);
+    text-transform: none;
+}
+
+.alarm-filters__input:hover {
+    border-color: var(--color-on-surface-variant);
+}
+
+.alarm-filters__input:focus {
+    border-color: var(--color-primary);
+    outline: none;
+}
+
+.alarm-filters__input:focus-visible {
+    outline: 2px solid var(--color-focus-ring);
+    outline-offset: 2px;
+}
+
+.alarm-filters__date {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-xs);
+}
+
+.alarm-filters__date-label {
+    color: var(--color-on-surface-variant);
+    font-size: var(--font-size-sm);
+}
+
+.alarm-filters__hint {
+    color: var(--color-on-surface-variant);
+    font-size: var(--font-size-xs);
+}

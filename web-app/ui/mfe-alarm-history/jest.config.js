@@ -1,5 +1,9 @@
 const isCI = process.env.CI === 'true' || process.env.JENKINS_HOME || process.env.GITLAB_CI;
 
+// Local-time tests (day bounds, DST changes, formatted times) need a fixed zone
+// with DST; workers inherit it. Europe/Athens: +03:00 summer, +02:00 winter.
+process.env.TZ = 'Europe/Athens';
+
 module.exports = {
     preset: 'ts-jest',
     testEnvironment: 'jsdom',

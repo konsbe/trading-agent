@@ -1,0 +1,33 @@
+/* Ticker over its asset kind, like the symbol cell on the Watchlist. */
+.alarm-symbol {
+    display: inline-flex;
+    flex-direction: column;
+    line-height: 1.3;
+}
+
+.alarm-symbol__ticker {
+    align-self: flex-start;
+    color: var(--color-on-surface);
+    font-family: var(--font-family-label);
+    font-weight: var(--font-weight-bold);
+}
+
+.alarm-symbol__ticker.is-link {
+    border-radius: var(--radius-sm);
+    text-decoration: none;
+}
+
+.alarm-symbol__ticker.is-link:hover {
+    color: var(--color-primary);
+    text-decoration: underline;
+}
+
+.alarm-symbol__ticker.is-link:focus-visible {
+    outline: 2px solid var(--color-focus-ring);
+    outline-offset: 2px;
+}
+
+.alarm-symbol__kind {
+    color: var(--color-on-surface-variant);
+    font-size: var(--font-size-xs);
+}

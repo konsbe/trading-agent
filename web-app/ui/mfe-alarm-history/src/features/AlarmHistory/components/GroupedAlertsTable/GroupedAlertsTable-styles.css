@@ -1,0 +1,68 @@
+.alarm-grouped td[data-column='expand'],
+.alarm-grouped th[data-column='expand'] {
+    width: 1%;
+    padding-right: 0;
+}
+
+.alarm-grouped__toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.75rem;
+    height: 1.75rem;
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: var(--radius-md);
+    background: transparent;
+    color: var(--color-on-surface-variant);
+    cursor: pointer;
+    transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.alarm-grouped__toggle:hover {
+    border-color: var(--color-outline-variant);
+    background: var(--color-surface-container-highest);
+    color: var(--color-on-surface);
+}
+
+.alarm-grouped__toggle:focus-visible {
+    outline: 2px solid var(--color-focus-ring);
+    outline-offset: 1px;
+}
+
+.alarm-grouped__chevron {
+    transform: rotate(-90deg);
+    transition: transform var(--transition-fast);
+}
+
+.alarm-grouped__toggle[aria-expanded='true'] .alarm-grouped__chevron {
+    transform: none;
+}
+
+.alarm-grouped__row.is-open > td {
+    border-bottom-color: transparent;
+    background: var(--color-surface-container-high);
+}
+
+.alarm-grouped__repeats {
+    font-family: var(--font-family-label);
+    font-size: var(--font-size-xs);
+    font-variant-numeric: tabular-nums;
+    color: var(--color-on-surface-variant);
+    cursor: help;
+}
+
+/* The group's own alerts, inset under its row. */
+.alarm-grouped__expansion > td {
+    padding: 0 var(--space-md) var(--space-sm) calc(var(--space-md) + 2rem);
+    background: var(--color-surface-container-high);
+    white-space: normal;
+}
+
+.alarm-grouped__expansion .alarm-table__wrap {
+    border-color: var(--color-outline-variant);
+}
+
+.alarm-grouped__expansion .alarm-table thead th {
+    position: static;
+}
