@@ -1035,7 +1035,7 @@
   "payload": {
    "bb_lower": 23.268393728278596,
    "bb_upper": 26.095709592706683,
-   "explanation": "BB inside Keltner = low-volatility coil. Watch for expansion breakout.",
+   "explanation": "The Bollinger Bands are inside the Keltner Channel (recent volatility is low).",
    "keltner_lower": 23.383746394091965,
    "keltner_upper": 25.94074073754306,
    "squeeze": false
@@ -1798,7 +1798,7 @@
   "payload": {
    "bb_lower": 23.268393728278596,
    "bb_upper": 26.095709592706683,
-   "explanation": "BB inside Keltner = low-volatility coil. Watch for expansion breakout.",
+   "explanation": "The Bollinger Bands are inside the Keltner Channel (recent volatility is low).",
    "keltner_lower": 23.340377603466443,
    "keltner_upper": 25.931339881183348,
    "squeeze": false
@@ -2620,7 +2620,7 @@
   "payload": {
    "bb_lower": 23.268393728278596,
    "bb_upper": 26.095709592706683,
-   "explanation": "BB inside Keltner = low-volatility coil. Watch for expansion breakout.",
+   "explanation": "The Bollinger Bands are inside the Keltner Channel (recent volatility is low).",
    "keltner_lower": 23.335389030460473,
    "keltner_upper": 25.927173267207703,
    "squeeze": false
@@ -3501,7 +3501,7 @@
   "payload": {
    "bb_lower": 23.268393728278596,
    "bb_upper": 26.095709592706683,
-   "explanation": "BB inside Keltner = low-volatility coil. Watch for expansion breakout.",
+   "explanation": "The Bollinger Bands are inside the Keltner Channel (recent volatility is low).",
    "keltner_lower": 23.335393503442212,
    "keltner_upper": 25.927175632506888,
    "squeeze": false
@@ -4382,7 +4382,7 @@
   "payload": {
    "bb_lower": 23.268393728278596,
    "bb_upper": 26.095709592706683,
-   "explanation": "BB inside Keltner = low-volatility coil. Watch for expansion breakout.",
+   "explanation": "The Bollinger Bands are inside the Keltner Channel (recent volatility is low).",
    "keltner_lower": 23.335393503443353,
    "keltner_upper": 25.927175632509066,
    "squeeze": false
@@ -5263,7 +5263,7 @@
   "payload": {
    "bb_lower": 23.268393728278596,
    "bb_upper": 26.095709592706683,
-   "explanation": "BB inside Keltner = low-volatility coil. Watch for expansion breakout.",
+   "explanation": "The Bollinger Bands are inside the Keltner Channel (recent volatility is low).",
    "keltner_lower": 23.335393503443353,
    "keltner_upper": 25.927175632509066,
    "squeeze": false

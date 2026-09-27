@@ -135,7 +135,7 @@ Each group can be independently toggled on/off via `TECHNICAL_ENABLE_*` env vars
 |---|---|---|
 | `bb_20_2` | Bollinger Bands (20-period, 2σ) | `upper`, `middle`, `lower`, `pct_b`, `bandwidth` |
 | `keltner_e20_a10_m2` | Keltner Channels (EMA 20, ATR 10, mult 2) | `upper`, `middle`, `lower`, `outside_upper/lower` |
-| `bb_squeeze` | Bollinger Squeeze signal: BB bands fully inside Keltner → low-volatility coil before expansion | `squeeze` (bool), `bb_lower/upper`, `keltner_lower/upper` |
+| `bb_squeeze` | Bollinger Squeeze: the Bollinger Bands are fully inside the Keltner Channel (recent volatility is low). Describes the condition only; no breakout is implied (H5: squeezes were followed by slightly smaller moves) | `squeeze` (bool), `bb_lower/upper`, `keltner_lower/upper` |
 | `donchian_20` | Donchian Channel (20-bar price range) | `upper`, `lower`, `middle` |
 | `vix_regime` | VIX classification read from `macro_fred.VIXCLS` | `vix`, `regime` (`extreme_fear`, `elevated`, `normal`, `complacency`) |
 

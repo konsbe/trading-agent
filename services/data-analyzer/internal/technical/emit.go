@@ -463,8 +463,9 @@ func (e Emitter) Emit(bars []compute.Bar, upsert func(indicator string, value *f
 	}
 
 	// ── Bollinger Squeeze ─────────────────────────────────────────────────────
-	// Squeeze = BB bands are entirely inside Keltner channels → low volatility
-	// coil. A breakout expansion typically follows.
+	// Squeeze = BB bands are entirely inside Keltner channels: recent volatility
+	// is low. It describes the condition only — the pre-registered test (H5)
+	// found squeezes followed by slightly smaller moves, not larger ones.
 	if e.Cfg.EnableBBSqueeze && bbCaptured && keltnerCaptured {
 		squeeze := Squeeze(bbBands, kc)
 		sq := 0.0
@@ -477,7 +478,7 @@ func (e Emitter) Emit(bars []compute.Bar, upsert func(indicator string, value *f
 			"bb_upper":      bbBands.Upper,
 			"keltner_lower": kc.Lower,
 			"keltner_upper": kc.Upper,
-			"explanation":   "BB inside Keltner = low-volatility coil. Watch for expansion breakout.",
+			"explanation":   "The Bollinger Bands are inside the Keltner Channel (recent volatility is low).",
 		})
 	}
 
