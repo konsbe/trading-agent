@@ -12,6 +12,10 @@
 -- Old rows keep bar_date NULL (they were re-posts, not onsets); the CHECK is
 -- NOT VALID so it binds every new or updated row without rewriting them.
 -- Idempotent.
+--
+-- Deploy: the column and the index are safe before the bot's new code (NULLs
+-- never conflict); the CHECK is applied in the same step as the new
+-- analyst-bot, never before it (README.md, "Deploying a migration").
 
 ALTER TABLE fired_alerts ADD COLUMN IF NOT EXISTS bar_date DATE;
 
