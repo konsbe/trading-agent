@@ -10,7 +10,6 @@ const BOTTOM_ORDER = 0;
 /** Pages without an MFE yet. Dropped as soon as a config MFE claims the same path. */
 export const PLACEHOLDER_ROUTES: PlaceholderRoute[] = [
     { path: "/stock-detail", label: "Stock Detail", icon: "mdi-finance" },
-    { path: "/alarm-history", label: "Alarm History", icon: "mdi-bell-outline" },
     { path: "/tracked-positions", label: "Tracked Positions", icon: "mdi-format-list-checks" },
     { path: "/settings", label: "Settings", icon: "mdi-cog-outline" },
 ];

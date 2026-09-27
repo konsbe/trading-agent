@@ -1,0 +1,12 @@
+{
+    "extends": "./tsconfig.json",
+    "compilerOptions": {
+        "module": "CommonJS",
+        "moduleResolution": "node",
+        "isolatedModules": false,
+        "allowSyntheticDefaultImports": true,
+        "types": ["jest", "@testing-library/jest-dom"]
+    },
+    "include": ["src/**/*", "jest.setup.ts", "__mocks__"],
+    "exclude": ["node_modules", "dist"]
+}

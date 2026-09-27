@@ -173,9 +173,9 @@ describe('buildNavGroups', () => {
         expect(labelsOf(main)).toEqual([
             ['Market Reports', ['Daily Market Report', 'Momentum Scanner']],
             ['Research', ['Backtest Lab']],
-            ['Tracking', ['Watchlist', 'Followed Symbols', 'Computed Symbols']],
+            ['Tracking', ['Watchlist', 'Followed Symbols', 'Computed Symbols', 'Alarm History']],
             ['Education', ['Handbook', 'MasterClass', 'Glossary']],
-            [PLACEHOLDER_NAV_GROUP, ['Stock Detail', 'Alarm History', 'Tracked Positions', 'Settings']],
+            [PLACEHOLDER_NAV_GROUP, ['Stock Detail', 'Tracked Positions', 'Settings']],
         ]);
         expect(labelsOf(bottom)).toEqual([['Admin', ['Data Source']]]);
     });

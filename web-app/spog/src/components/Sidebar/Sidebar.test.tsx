@@ -31,8 +31,8 @@ describe('Sidebar', () => {
         const main = screen.getByTestId('app-sidebar-main');
         expect(linkLabels(main)).toEqual([
             'Daily Market Report', 'Momentum Scanner', 'Backtest Lab', 'Watchlist', 'Followed Symbols', 'Computed Symbols',
-            'Handbook', 'MasterClass', 'Glossary',
-            'Stock Detail', 'Alarm History', 'Tracked Positions', 'Settings',
+            'Alarm History', 'Handbook', 'MasterClass', 'Glossary',
+            'Stock Detail', 'Tracked Positions', 'Settings',
         ]);
         expect(linkLabels(screen.getByTestId('app-sidebar-bottom'))).toEqual(['Data Source']);
         expect(screen.getByRole('link', { name: 'Momentum Scanner' })).toHaveAttribute('href', '/candidates');

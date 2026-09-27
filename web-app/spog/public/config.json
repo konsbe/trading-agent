@@ -81,6 +81,21 @@
       "nav_icon": "mdi-format-list-checks",
       "router_path": "/computed-symbols"
     },
+    "mfe_alarm_history": {
+      "label": "Alarm History",
+      "version": "1.0.0",
+      "endpoint": "http://localhost:3007/remoteEntry.js",
+      "module": "./AlarmHistory",
+      "scope": "mfe_alarm_history",
+      "description": "Alerts the analyst bot posted, newest first, grouped by symbol and type",
+      "roles": [],
+      "enabled": true,
+      "nav_group": "Tracking",
+      "nav_order": 3,
+      "nav_sub_order": 4,
+      "nav_icon": "mdi-bell-outline",
+      "router_path": "/alarm-history"
+    },
     "mfe_backtest_lab": {
       "label": "Backtest Lab",
       "version": "1.0.0",
