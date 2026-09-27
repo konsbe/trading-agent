@@ -775,19 +775,27 @@
           "blocks": [
             {
               "type": "paragraph",
-              "text": "The **Cash flow** card shows the company's latest **annual** cash-flow statement as filed — the 10-K — with a header naming the form, the end of the fiscal year it covers and the filing date, for example \"10-K · fiscal year ended 31 Dec 2025 · filed 18 Feb 2026\". It never shows a single quarter: the cash-flow figures in a quarterly report (10-Q) are totals for the fiscal year so far, not the quarter's own, so the card notes \"Annual figures only — quarterly cash-flow figures are year-to-date.\""
+              "text": "The **Cash flow** card shows the company's latest **annual** cash-flow statement as filed. US companies file it in a 10-K, which the app reads through its filings provider, Finnhub, in US dollars. Foreign issuers listed in the US — such as TSMC (TSM), Shell (SHEL), TotalEnergies (TTE), BP and GlobalFoundries (GFS) — file a 20-F instead, which the app reads from SEC EDGAR's companyfacts data under the IFRS taxonomy. The header names the form, the fiscal year and its end, the filing date and the source exactly as the card shows it, for example \"10-K · fiscal year 2025, ended 31 Dec 2025 · filed 18 Feb 2026 · 10-K via Finnhub\" or \"20-F · fiscal year 2024, ended 31 Dec 2024 · filed 17 Apr 2025 · 20-F via SEC EDGAR\". It never shows a single quarter: the cash-flow figures in a quarterly report (10-Q) are totals for the fiscal year so far, not the quarter's own, so the card notes \"Annual figures only — quarterly cash-flow figures are year-to-date.\""
+            },
+            {
+              "type": "paragraph",
+              "text": "Figures are shown in the filing's own reporting currency, named once in the header, and are never converted: \"Figures in USD, as reported\", or for another currency \"Figures in TWD, as reported — not converted\". TSMC reports in New Taiwan dollars, so its card reads in TWD; the US-dollar convenience figures its 20-F also contains are deliberately not used. US-dollar amounts are shortened as $51.97B; any other currency is written with its ISO code rather than a guessed symbol, for example TWD 1,826.18B."
             },
             {
               "type": "list",
               "items": [
-                "**Net cash from operating activities**, **Net cash from investing activities** and **Net cash from financing activities** — the statement's three totals, in US dollars as filed and shortened (for example $51.97B). A negative figure, shown with a minus sign, is cash that went out.",
-                "**Capital spending (property, plant & equipment)**, **Share buybacks** and **Dividends paid** — amounts the company paid, shown as positive figures and marked \"amount paid\".",
-                "A line the filing does not contain shows \"—\" with \"not in filing\" — never zero."
+                "**Net cash from operating activities**, **Net cash from investing activities** and **Net cash from financing activities** — the statement's three totals, as filed and shortened. A negative figure, shown with a minus sign, is cash that went out.",
+                "**Capital spending (property, plant & equipment)**, **Share buybacks** and **Dividends paid** — amounts the company paid, shown as positive figures and marked \"amount paid\". For a 20-F they are the statement's own lines for purchase of property, plant and equipment, repurchases of shares, and dividends paid to the parent company's shareholders.",
+                "A line with no figure shows \"—\", never zero, with the reason the app gives: \"not in filing\" when a 10-K does not contain it, or \"not reported as a comparable line\" when a 20-F filer reports that line under its own company-specific item, or folded into a broader line, instead of the standard one — so there is no like-for-like figure to show. Shell's and TotalEnergies' capital expenditure are their own items; BP's combines property, plant and equipment with intangible and other non-current assets."
               ]
             },
             {
               "type": "paragraph",
-              "text": "These are plain facts from the filing: no tier and no green or red. When there is no statement the card still appears and says why, in a sentence starting \"No cash-flow statement available:\" — a crypto pair, a fund (funds file no company cash-flow statement), a foreign listing (the app's filings source covers US 10-K/10-Q filers only), a company for which the filings source returned no 10-K or 10-Q (many foreign issuers, such as Shell, file a 20-F instead), or a symbol whose filings have not been fetched yet."
+              "text": "SEC's companyfacts data can lag a newly filed 20-F. When SEC EDGAR lists a newer 20-F than the one shown, the card says so in one line, for example \"A newer 20-F (fiscal year ended 31 Dec 2025, filed 16 Apr 2026) is on SEC EDGAR but not in its companyfacts data yet.\" — as for TSMC, whose card still shows fiscal year 2024."
+            },
+            {
+              "type": "paragraph",
+              "text": "These are plain facts from the filing: no tier and no green or red. When there is no statement the card still appears and says why, in a sentence starting \"No cash-flow statement available:\" — a crypto pair, a fund (funds file no company cash-flow statement), a listing outside the US (neither filings source covers it), a company for which Finnhub returned no 10-K or 10-Q and SEC EDGAR has no IFRS (20-F) cash-flow statement either, or a symbol whose filings have not been fetched yet (they are fetched once it is followed, on the Watchlist, a candidate, or computed)."
             }
           ],
           "terms": []
@@ -977,6 +985,61 @@
       ]
     },
     {
+      "id": "watchlist",
+      "title": "Watchlist",
+      "intro": "*What this part of the app is for:* the Watchlist is your list of symbols to keep an eye on, newest first, with the same market columns as Today's Candidates, read the same way. It is saved to one shared list until sign-in exists. Adding a symbol also queues its data: the data workers fetch it within a few minutes and it is then computed, so a newly added symbol fills in on its own. Like the rest of the app it describes stored data and does not recommend anything.",
+      "entries": [
+        {
+          "id": "watchlist-rows",
+          "title": "What a row shows",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "Each row shows the symbol, company and exchange, then **Close**, **Change %**, **RVOL**, **$ Volume**, **Market cap**, **RSI**, **Breakout**, **% of 52w high**, **Catalyst** and **Score**, with the same formulas, formats and tooltips as the candidates list, then **Compute** and **Remove**. A close that is not from the latest expected session carries a neutral \"as of\" date so an old price never reads as current. **Score** is shown only for a symbol that is one of today's candidates; any other row reads \"—\", never 0."
+            },
+            {
+              "type": "paragraph",
+              "text": "While a symbol has no stored data at all its row reads \"No price data\" and all market columns read \"—\"; this lasts only until its first fetch arrives."
+            }
+          ],
+          "terms": []
+        },
+        {
+          "id": "watchlist-daily-bars",
+          "title": "Rows marked \"from daily bars\"",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "The scanner covers US common stocks only, so a symbol outside its universe — an ADR such as TSMC (TSM) or BP, for example — has no scanner reading. For such a symbol the row is worked out when the page loads from the symbol's own stored daily bars (from Yahoo Finance), with the same formulas the scanner uses: **Close**, **Change %**, **$ Volume**, **RVOL**, **RSI**, **Breakout** and **% of 52w high**. The row is marked \"from daily bars\" under the company name; its tooltip reads \"Outside the scanner's universe: computed from this symbol's own daily bars (source: Yahoo Finance) with the scanner's formulas. Not a scanner reading — no score.\" Its date follows the symbol's latest daily bar."
+            },
+            {
+              "type": "list",
+              "items": [
+                "**No score** — such a symbol is never a candidate, so Score reads \"—\".",
+                "**Market cap** comes from the fundamentals provider when it is reported in US dollars. When the provider's figure is in another currency (TSMC's is in New Taiwan dollars) or does not reconcile with the US-dollar price (as for BP), the cell reads \"—\" with a short note such as \"Not in USD (TWD) — not converted\"; its tooltip gives the full reason. No converted figure is ever shown."
+              ]
+            }
+          ],
+          "terms": []
+        },
+        {
+          "id": "watchlist-adding",
+          "title": "Adding a symbol",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "Pick a match from the search, or type a ticker and press Enter. A match outside the scanner's filters is marked \"not scanned — from daily bars\": it can be added, and its row is then worked out from its own daily bars as above."
+            },
+            {
+              "type": "paragraph",
+              "text": "Adding a symbol queues its data fetch straight away, without pressing Compute. The row's Compute column shows the progress — **Waiting for data · queued 5:56 PM (added to watchlist)**, then **Computing analysis** — and the row reloads with its new figures once it reads computed, usually within a few minutes (see The Compute button)."
+            }
+          ],
+          "terms": []
+        }
+      ]
+    },
+    {
       "id": "tracking",
       "title": "Followed Symbols and Computed Symbols",
       "intro": "*What this part of the app is for:* these two screens, under Tracking next to the Watchlist, show and change which symbols the data pipeline works on. **Followed Symbols** is the list the pipeline fetches and computes every day. **Computed Symbols** lists every symbol it is computing right now and why, including your own **Compute** requests. The app itself never fetches data when you press a button here: it records the request, the data workers fetch on their own schedule, and the daily computation picks the symbol up.",
@@ -1015,14 +1078,14 @@
             {
               "type": "list",
               "items": [
-                "**State** — for a Compute request, where it stands (see the Compute entry); otherwise **Computed**, or **Scheduled · next daily pass** when the symbol has not been computed yet.",
+                "**State** — for a queued fetch (a Compute request, or a symbol just added to the Watchlist), where it stands (see the Compute entry); otherwise **Computed**, or **Scheduled · next daily pass** when the symbol has not been computed yet.",
                 "**Last computed** — when the daily computation last ran for the symbol, or \"not yet\".",
                 "**Stop computing** — shown only for a Manual reason. It closes only your request: a symbol with another reason stays computed (\"Other reasons keep it computed\"); one with none leaves the list, and its computed history is kept."
               ]
             },
             {
               "type": "paragraph",
-              "text": "While a request is waiting for data or computing, the screen checks again every 12 seconds and says so above the table; otherwise it does not refresh on its own."
+              "text": "While a queued fetch — a Compute request or a Watchlist addition — is waiting for data or computing, the screen checks again every 12 seconds and says so above the table; otherwise it does not refresh on its own."
             }
           ],
           "terms": []
@@ -1038,7 +1101,7 @@
             {
               "type": "list",
               "items": [
-                "**Waiting for data · requested 5:45 PM** — queued; the data has not been fetched yet.",
+                "**Waiting for data · requested 5:45 PM** — queued; the data has not been fetched yet. A symbol just added to the Watchlist is queued the same way without pressing Compute, and reads **Waiting for data · queued 5:56 PM (added to watchlist)**.",
                 "**Computing analysis** — the data has arrived and the computation picks it up within about a minute.",
                 "**Computed 5:49 PM** — done, with a link to Stock Detail for a stock or fund.",
                 "**Data hasn't arrived — requested …, waited … min** — the data was still missing after 30 minutes, so the app stops waiting instead of showing a request as in progress forever. **Check again** looks at the same open request once more; it does not start a new fetch.",
