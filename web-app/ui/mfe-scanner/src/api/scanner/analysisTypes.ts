@@ -79,6 +79,8 @@ export interface CorrelationCluster {
     name: string;
     score: number | null;
     tier: string | null;
+    /** Comparisons the cluster ran; 0 means none could be evaluated (score/tier are then null). Null for older rows. */
+    checks_run: number | null;
     positives: string[];
     warnings: string[];
 }

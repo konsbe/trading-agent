@@ -78,6 +78,58 @@ describe('CorrelationsSection', () => {
         );
     });
 
+    it('reads a cluster that ran no checks as "not evaluated", and a null tier with checks as "—"', () => {
+        const { correlations } = makeAnalysis();
+        render(
+            <CorrelationsSection
+                correlations={{
+                    ...correlations,
+                    clusters: [
+                        { ...correlations.clusters[0], score: null, tier: null, checks_run: 0 },
+                        { ...correlations.clusters[1], score: null, tier: null, checks_run: 2 },
+                    ],
+                }}
+            />,
+        );
+
+        const clusters = within(screen.getByTestId('correlation-clusters')).getAllByRole('listitem');
+        expect(clusters.map(li => li.textContent)).toEqual(['Earnings Quality — not evaluated', 'Leverage Liquidity — —']);
+    });
+
+    it('reads the composite as "not evaluated" when no cluster ran a check', () => {
+        const { correlations } = makeAnalysis();
+        render(
+            <CorrelationsSection
+                correlations={{
+                    ...correlations,
+                    composite: { score: null, tier: null },
+                    clusters: correlations.clusters.map(c => ({ ...c, score: null, tier: null, checks_run: 0 })),
+                }}
+            />,
+        );
+
+        expect(screen.getByTestId('correlations-composite').textContent).toBe('Compositenot evaluated');
+        const clusters = within(screen.getByTestId('correlation-clusters')).getAllByRole('listitem');
+        expect(clusters.map(li => li.textContent)).toEqual(['Earnings Quality — not evaluated', 'Leverage Liquidity — not evaluated']);
+    });
+
+    it('keeps the stored composite tier when only some clusters ran checks', () => {
+        const { correlations } = makeAnalysis();
+        render(
+            <CorrelationsSection
+                correlations={{
+                    ...correlations,
+                    composite: { score: 0.6, tier: 'mixed_positive' },
+                    clusters: [{ ...correlations.clusters[0], score: null, tier: null, checks_run: 0 }, correlations.clusters[1]],
+                }}
+            />,
+        );
+
+        expect(screen.getByTestId('correlations-composite').textContent).toBe('Composite0.60 · mixed, leaning agree');
+        const clusters = within(screen.getByTestId('correlation-clusters')).getAllByRole('listitem');
+        expect(clusters.map(li => li.textContent)).toEqual(['Earnings Quality — not evaluated', 'Leverage Liquidity — weak']);
+    });
+
     it('says so when nothing is stored', () => {
         render(<CorrelationsSection correlations={makeEmptyAnalysis().correlations} />);
 

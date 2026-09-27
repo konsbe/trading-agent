@@ -1,6 +1,14 @@
 import { CollapsibleCard } from '@trading-agent/shared-components';
 import { EMPTY_VALUE } from '@/common/format/format';
-import { clusterLine, COMBINED_PATTERN_LABELS, CORRELATION_TIER_LABELS, displayBand, NET_SIGNAL_LABELS } from '../../../utils/analysisFormat';
+import {
+    clusterLine,
+    COMBINED_PATTERN_LABELS,
+    CORRELATION_TIER_LABELS,
+    displayBand,
+    NET_SIGNAL_LABELS,
+    noClusterEvaluated,
+    NOT_EVALUATED,
+} from '../../../utils/analysisFormat';
 import CompositeLine from '../CompositeLine';
 import { CorrelationsSectionProps } from './types';
 import '@/styles/scanner-global.css';
@@ -35,12 +43,17 @@ const CorrelationsSection = ({ correlations }: CorrelationsSectionProps) => {
             data-testid="analysis-correlations"
             title="Correlations"
         >
-            <CompositeLine composite={correlations.composite} labels={CORRELATION_TIER_LABELS} data-testid="correlations-composite" />
+            <CompositeLine
+                composite={correlations.composite}
+                labels={CORRELATION_TIER_LABELS}
+                valueText={noClusterEvaluated(clusters) ? NOT_EVALUATED : undefined}
+                data-testid="correlations-composite"
+            />
 
             <div className="scanner-analysis__group">
                 <h3 className="scanner-analysis__group-title">Cluster health</h3>
                 <SentenceList
-                    items={clusters.map(c => clusterLine(c.name, c.tier, CORRELATION_TIER_LABELS))}
+                    items={clusters.map(c => clusterLine(c.name, c.tier, CORRELATION_TIER_LABELS, c.checks_run))}
                     empty="No correlation clusters stored."
                     testId="correlation-clusters"
                 />

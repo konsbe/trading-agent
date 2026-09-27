@@ -119,6 +119,16 @@ export const compositeText = ({ score, tier }: ScoreTier, labels?: BandDisplayMa
     return parts.length > 0 ? parts.join(' · ') : EMPTY_VALUE;
 };
 
-/** "Earnings Quality — healthy"; a null tier is "—". */
-export const clusterLine = (name: string, tier: string | null, labels?: BandDisplayMap): string =>
-    `${titleCaseCode(name)} — ${displayBand(tier, labels) ?? EMPTY_VALUE}`;
+/** A correlation cluster (or composite) that ran no comparisons. */
+export const NOT_EVALUATED = 'not evaluated';
+
+/**
+ * "Earnings Quality — healthy"; a null tier is "—". A cluster that ran no
+ * checks (`checksRun === 0`) is "not evaluated", never a lean.
+ */
+export const clusterLine = (name: string, tier: string | null, labels?: BandDisplayMap, checksRun: number | null = null): string =>
+    `${titleCaseCode(name)} — ${checksRun === 0 ? NOT_EVALUATED : (displayBand(tier, labels) ?? EMPTY_VALUE)}`;
+
+/** True when there is at least one cluster and none of them ran a check. */
+export const noClusterEvaluated = (clusters: readonly { checks_run: number | null }[]): boolean =>
+    clusters.length > 0 && clusters.every(cluster => cluster.checks_run === 0);

@@ -95,6 +95,29 @@ describe('parseStockAnalysis', () => {
         expect(parsed.heuristic_signals.chart_patterns).toEqual([]);
     });
 
+    it('reads a cluster checks_run count when present', () => {
+        const body = clone(makeAnalysis());
+        body.correlations.clusters[0].checks_run = 0;
+        body.correlations.clusters[1].checks_run = 5;
+        const parsed = parseStockAnalysis(body);
+
+        expect(parsed.correlations.clusters.map(c => c.checks_run)).toEqual([0, 5]);
+    });
+
+    it.each([
+        ['absent', undefined],
+        ['null', null],
+        ['a string', '3'],
+        ['negative', -1],
+        ['fractional', 1.5],
+    ])('reads a cluster checks_run that is %s as null', (_label, value) => {
+        const body = clone(makeAnalysis());
+        if (value === undefined) delete body.correlations.clusters[0].checks_run;
+        else body.correlations.clusters[0].checks_run = value;
+
+        expect(parseStockAnalysis(body).correlations.clusters[0].checks_run).toBeNull();
+    });
+
     it('rejects a body whose status is not ready', () => {
         expect(() => parseStockAnalysis({ ...clone(makeAnalysis()), status: 'computing' })).toThrow(/status/);
     });

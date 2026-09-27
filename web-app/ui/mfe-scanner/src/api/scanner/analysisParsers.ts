@@ -27,6 +27,10 @@ const section = (value: unknown, path: string): Json => (value === null || value
 
 const optInt = (value: unknown, path: string): number | null => optNum(value, path);
 
+/** A non-negative integer count; anything else (missing, null, malformed) reads as null rather than failing the body. */
+const optCount = (value: unknown): number | null =>
+    typeof value === 'number' && Number.isInteger(value) && value >= 0 ? value : null;
+
 const strList = (value: unknown, path: string): string[] => strArray(value ?? [], path);
 
 const valueBand = (value: unknown, path: string): ValueBand => {
@@ -122,6 +126,7 @@ const parseCluster = (value: unknown, path: string): CorrelationCluster => {
         name: str(o.name, `${path}.name`),
         score: optNum(o.score, `${path}.score`),
         tier: optStr(o.tier, `${path}.tier`),
+        checks_run: optCount(o.checks_run),
         positives: strList(o.positives, `${path}.positives`),
         warnings: strList(o.warnings, `${path}.warnings`),
     };

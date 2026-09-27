@@ -13,6 +13,7 @@ import {
     MOAT_PROXY_TIER_LABELS,
     NET_DEBT_OPERATING_INCOME_BAND_LABELS,
     NET_SIGNAL_LABELS,
+    noClusterEvaluated,
     RD_INTENSITY_TIER_LABELS,
     ROE_BAND_LABELS,
     ROIC_BAND_LABELS,
@@ -98,6 +99,20 @@ describe('analysisFormat', () => {
         expect(compositeText({ score: 0.15, tier: 'mixed_positive' }, CORRELATION_TIER_LABELS)).toBe('0.15 · mixed, leaning agree');
         expect(compositeText({ score: null, tier: 'alert' }, CORRELATION_TIER_LABELS)).toBe('mostly conflict');
         expect(compositeText({ score: 0.5, tier: 'new_tier' }, CORRELATION_TIER_LABELS)).toBe('0.50 · new tier');
+    });
+
+    it('clusterLine reads "not evaluated" when the cluster ran no checks', () => {
+        expect(clusterLine('earnings_quality', null, CORRELATION_TIER_LABELS, 0)).toBe('Earnings Quality — not evaluated');
+        expect(clusterLine('earnings_quality', 'mixed_positive', CORRELATION_TIER_LABELS, 0)).toBe('Earnings Quality — not evaluated');
+        expect(clusterLine('earnings_quality', null, CORRELATION_TIER_LABELS, 3)).toBe('Earnings Quality — —');
+        expect(clusterLine('earnings_quality', 'healthy', CORRELATION_TIER_LABELS, 3)).toBe('Earnings Quality — mostly agree');
+    });
+
+    it('noClusterEvaluated needs at least one cluster and every one at zero checks', () => {
+        expect(noClusterEvaluated([])).toBe(false);
+        expect(noClusterEvaluated([{ checks_run: 0 }, { checks_run: 0 }])).toBe(true);
+        expect(noClusterEvaluated([{ checks_run: 0 }, { checks_run: 2 }])).toBe(false);
+        expect(noClusterEvaluated([{ checks_run: 0 }, { checks_run: null }])).toBe(false);
     });
 
     it('clusterLine reads "Name — tier"', () => {
