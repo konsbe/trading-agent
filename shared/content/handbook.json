@@ -1266,6 +1266,7 @@
               "items": [
                 "**Symbol / Exchange / Bucket** — the ticker, company, exchange, and the scanner bucket it was alerted in (Market or Penny). The ticker opens the symbol's Stock Detail page.",
                 "**Alerted Date** — the session the alert was raised on.",
+                "**Closed Date** (Closed) — the session the exit rule fired on, the one Exit % is measured at.",
                 "**Sessions Elapsed** — how many trading sessions the exit rules have evaluated since the alert. Trading sessions follow the NYSE calendar, so weekends and market holidays never count. On a closed row it is the count at which it closed.",
                 "**Reference Price** — the close on the alert date, as traded. Every percentage on the page is measured from it.",
                 "**Current Price** (Active) — the close on the latest scan date.",
