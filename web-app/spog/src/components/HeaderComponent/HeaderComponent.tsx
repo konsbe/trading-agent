@@ -80,12 +80,14 @@ const HeaderComponent = ({ title, icon: Icon, enableNavigation, navigationPath, 
     };
 
     useEffect(() => {
+        // Only when the title is read from the URL (enableNavigation): other
+        // routes keep arbitrary query state, e.g. a table's sort "close:desc".
         // ref to track if navigation already occurred to prevent the risk of infinite loop
-        if (hasSpecialChars && !hasNavigatedRef.current) {
+        if (showNavigation && hasSpecialChars && !hasNavigatedRef.current) {
             hasNavigatedRef.current = true;
             navigate(navigationPath);
         }
-    }, [hasSpecialChars, navigationPath, navigate]);
+    }, [showNavigation, hasSpecialChars, navigationPath, navigate]);
 
 
 

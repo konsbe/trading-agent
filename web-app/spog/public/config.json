@@ -34,7 +34,8 @@
       "nav_order": 1,
       "nav_sub_order": 2,
       "nav_icon": "mdi-view-grid-outline",
-      "router_path": "/candidates"
+      "router_path": "/candidates",
+      "enable_navigation": false
     },
     "mfe_watchlist": {
       "label": "Watchlist",
@@ -49,7 +50,8 @@
       "nav_order": 3,
       "nav_sub_order": 1,
       "nav_icon": "mdi-bookmark-outline",
-      "router_path": "/watchlist"
+      "router_path": "/watchlist",
+      "enable_navigation": false
     },
     "mfe_watchlist_followed": {
       "label": "Followed Symbols",
@@ -64,7 +66,8 @@
       "nav_order": 3,
       "nav_sub_order": 2,
       "nav_icon": "mdi-eye",
-      "router_path": "/followed-symbols"
+      "router_path": "/followed-symbols",
+      "enable_navigation": false
     },
     "mfe_watchlist_computed": {
       "label": "Computed Symbols",
@@ -79,7 +82,8 @@
       "nav_order": 3,
       "nav_sub_order": 3,
       "nav_icon": "mdi-format-list-checks",
-      "router_path": "/computed-symbols"
+      "router_path": "/computed-symbols",
+      "enable_navigation": false
     },
     "mfe_alarm_history": {
       "label": "Alarm History",
@@ -94,7 +98,8 @@
       "nav_order": 3,
       "nav_sub_order": 4,
       "nav_icon": "mdi-bell-outline",
-      "router_path": "/alarm-history"
+      "router_path": "/alarm-history",
+      "enable_navigation": false
     },
     "mfe_tracked": {
       "label": "Tracked Positions",
@@ -109,7 +114,8 @@
       "nav_order": 3,
       "nav_sub_order": 5,
       "nav_icon": "mdi-chart-box-outline",
-      "router_path": "/tracked-positions"
+      "router_path": "/tracked-positions",
+      "enable_navigation": false
     },
     "mfe_backtest_lab": {
       "label": "Backtest Lab",
@@ -124,7 +130,8 @@
       "nav_order": 2,
       "nav_sub_order": 1,
       "nav_icon": "mdi-flask-outline",
-      "router_path": "/backtest-lab"
+      "router_path": "/backtest-lab",
+      "enable_navigation": false
     },
     "mfe_data_source": {
       "label": "Data Source",
@@ -139,7 +146,8 @@
       "nav_order": 0,
       "nav_sub_order": 1,
       "nav_icon": "mdi-database-outline",
-      "router_path": "/data-source"
+      "router_path": "/data-source",
+      "enable_navigation": false
     },
     "mfe_market_report": {
       "label": "Daily Market Report",
@@ -154,7 +162,8 @@
       "nav_order": 1,
       "nav_sub_order": 1,
       "nav_icon": "mdi-chart-box-outline",
-      "router_path": "/market-report"
+      "router_path": "/market-report",
+      "enable_navigation": false
     },
     "mfe_education_handbook": {
       "label": "Handbook",
@@ -169,7 +178,8 @@
       "nav_order": 4,
       "nav_sub_order": 1,
       "nav_icon": "mdi-bookmark-outline",
-      "router_path": "/handbook"
+      "router_path": "/handbook",
+      "enable_navigation": false
     },
     "mfe_education_masterclass": {
       "label": "MasterClass",
@@ -184,7 +194,8 @@
       "nav_order": 4,
       "nav_sub_order": 2,
       "nav_icon": "mdi-eye",
-      "router_path": "/masterclass"
+      "router_path": "/masterclass",
+      "enable_navigation": false
     },
     "mfe_education_glossary": {
       "label": "Glossary",
@@ -199,7 +210,8 @@
       "nav_order": 4,
       "nav_sub_order": 3,
       "nav_icon": "mdi-format-list-checks",
-      "router_path": "/glossary"
+      "router_path": "/glossary",
+      "enable_navigation": false
     }
   },
   "iframes": {}

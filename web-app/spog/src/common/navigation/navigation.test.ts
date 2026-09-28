@@ -35,7 +35,7 @@ describe('getMfeRoutes', () => {
 
         expect(routes).toEqual([{
             mfeKey: 'mfe_a', path: '/a', label: 'A', module: './A', roles: ['admin'],
-            icon: 'mdi-eye', group: 'G', order: 2, subOrder: 3,
+            icon: 'mdi-eye', group: 'G', order: 2, subOrder: 3, enableNavigation: false,
         }]);
     });
 
@@ -47,6 +47,16 @@ describe('getMfeRoutes', () => {
         }));
 
         expect(routes.map(route => route.path)).toEqual(['/on']);
+    });
+
+    it('reads enable_navigation, off unless explicitly true', () => {
+        const routes = getMfeRoutes(configOf({
+            on: mfe({ router_path: '/on', enable_navigation: true }),
+            off: mfe({ router_path: '/off', enable_navigation: false }),
+            unset: mfe({ router_path: '/unset' }),
+        }));
+        const by = Object.fromEntries(routes.map(r => [r.mfeKey, r.enableNavigation]));
+        expect(by).toEqual({ on: true, off: false, unset: false });
     });
 
     it('excludes MFEs without a usable router_path', () => {

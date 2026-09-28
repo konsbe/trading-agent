@@ -70,6 +70,11 @@ declare global {
     nav_sub_order?: number;    // Item order inside its group (ascending)
     nav_icon?: string;         // Icon name, e.g. "mdi-chart-box-outline"
     router_path?: string;      // Route URL, e.g. "/candidates"
+    // Header title read from the URL's first query param, with a back arrow
+    // (spog HeaderComponent). Off by default: MFEs keep their own query state
+    // (table sort / search) in the URL, and HeaderComponent redirects to
+    // router_path when that param has characters outside [a-zA-Z0-9 _-].
+    enable_navigation?: boolean;
   }
 
   interface MFEConfigEntryWithRoles extends Omit<MFEConfigEntry, 'roles'> {

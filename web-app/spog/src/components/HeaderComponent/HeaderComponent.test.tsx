@@ -351,6 +351,35 @@ describe('HeaderComponent', () => {
 
   describe('HeaderComponent navigation and security', () => {
 
+    it('does not redirect on special characters when navigation is off (table URL state)', () => {
+      navigateMock.mockClear();
+      customRenderWithAllProviders(
+        <HeaderComponent
+          title="Momentum Scanner"
+          icon={DummyIcon}
+          enableNavigation={false}
+          navigationPath={navigationPath}
+        />,
+        { route: '/candidates?market_sort=close:desc&market_q=BRK.B' }
+      );
+      expect(navigateMock).not.toHaveBeenCalled();
+      expect(screen.getByText('Momentum Scanner')).toBeInTheDocument();
+    });
+
+    it('still redirects on special characters when navigation is on', () => {
+      navigateMock.mockClear();
+      customRenderWithAllProviders(
+        <HeaderComponent
+          title="Test Title"
+          icon={DummyIcon}
+          enableNavigation={true}
+          navigationPath={navigationPath}
+        />,
+        { route: '/?dashboard=%3Cscript%3E' }
+      );
+      expect(navigateMock).toHaveBeenCalledWith(navigationPath);
+    });
+
     it('does not navigate if no special characters', () => {
       window.history.pushState({}, '', '/?dashboard=alarms');
       navigateMock.mockClear();

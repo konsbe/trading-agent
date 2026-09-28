@@ -14,6 +14,8 @@ export interface MfeRoute extends NavItem {
     group: string;
     order: number;
     subOrder: number;
+    /** config `enable_navigation` (default false): see MFEConfigEntry. */
+    enableNavigation: boolean;
 }
 
 /** A not-yet-implemented page rendered as a text placeholder. */
