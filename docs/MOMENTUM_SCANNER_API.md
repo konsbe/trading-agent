@@ -863,6 +863,20 @@ the literal percentages.
   `last_scan_date` to `expected_session`), and `tracker_behind` (bool). Build it
   with the MFE, not before; the UI must not derive staleness from row dates.
 
+  **As built (2026-09-28).** `chain` is on every `/scanner/tracked` response:
+  `expected_session` (`ExpectedSession`, the scan-grace rule), `last_scan_date`
+  (`max(momentum_features.ts)`, null without a scan), `last_tracked_session`
+  (latest `momentum_chain_runs.session` with `tracker_completed_at`),
+  `sessions_behind` (NYSE sessions after `last_scan_date` up to and including
+  `expected_session`; null without a scan) and `tracker_behind` — true when the
+  latest scanned session's chain row has `scanner_completed_at` more than 15
+  minutes ago and no `tracker_completed_at` (inside 15 minutes the chain is
+  still running), or has `gave_up_at` set (at once). "No new scan"
+  (`sessions_behind` ≥ 1) takes precedence over the tracker variant. Read-only
+  over `momentum_chain_runs`; the chain services are untouched. Rows never
+  evaluated yet (`last_evaluated_date` null, alerted on the latest session)
+  read "Not yet evaluated" with Unrealized "—" in the UI, never 0.
+
 
 
 # Momentum Scanner — API Service Spec, Addendum: Backtest Lab

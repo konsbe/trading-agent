@@ -41,6 +41,7 @@ type fakeStore struct {
 	intradayAsked []string
 	known         map[string]bool
 	watchlist     []store.WatchlistItem
+	trackerChain  store.TrackerChain
 	fallbacks     map[string]*store.BarFallback
 	owners        []*string
 	symbols       []store.SymbolMatch
@@ -110,6 +111,9 @@ func (f *fakeStore) TrackedPositions(_ context.Context, st store.TrackedStatusFi
 		}
 	}
 	return out, f.queryErr
+}
+func (f *fakeStore) TrackerChain(context.Context, *time.Time) (store.TrackerChain, error) {
+	return f.trackerChain, f.queryErr
 }
 func (f *fakeStore) TrackedCounts(context.Context) (store.TrackedCounts, error) {
 	return f.trackedCounts, f.queryErr

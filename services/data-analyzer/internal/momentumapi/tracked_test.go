@@ -200,3 +200,55 @@ func TestLoadCaveats_RequiresEveryExitReasonNote(t *testing.T) {
 		t.Error("a caveats file missing exit-reason notes must fail at startup")
 	}
 }
+
+// The chain object: trading sessions behind, and the tracker lag rule (15 min
+// after the scan marker without a tracker marker, or a give-up at once).
+func TestBuildTrackedChain(t *testing.T) {
+	d := func(s string) time.Time { v, _ := time.Parse(time.DateOnly, s); return v }
+	at := func(s string) *time.Time { v, _ := time.Parse(time.RFC3339, s); return &v }
+	now := *at("2026-09-29T02:00:00Z")
+	fri, mon := d("2026-09-25"), d("2026-09-28")
+	cases := []struct {
+		name          string
+		expected      time.Time
+		latest        *time.Time
+		run           *store.ChainRun
+		wantBehind    int
+		wantTrackerBh bool
+	}{
+		{"current, tracked", mon, &mon, &store.ChainRun{ScannerCompletedAt: at("2026-09-29T01:00:00Z"), TrackerCompletedAt: at("2026-09-29T01:01:00Z")}, 0, false},
+		{"weekend is not a session", mon, &fri, nil, 1, false},
+		{"tracker still running (inside grace)", mon, &mon, &store.ChainRun{ScannerCompletedAt: at("2026-09-29T01:50:00Z")}, 0, false},
+		{"tracker lagging (past grace)", mon, &mon, &store.ChainRun{ScannerCompletedAt: at("2026-09-29T01:40:00Z")}, 0, true},
+		{"gave up: at once", mon, &mon, &store.ChainRun{ScannerCompletedAt: at("2026-09-29T01:59:00Z"), GaveUpAt: at("2026-09-29T01:59:30Z")}, 0, true},
+		{"labor day skipped", d("2026-09-08"), ptrT(d("2026-09-04")), nil, 1, false},
+	}
+	for _, c := range cases {
+		out, err := buildTrackedChain(c.expected, c.latest, store.TrackerChain{LatestScanRun: c.run}, now)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if out.SessionsBehind == nil || *out.SessionsBehind != c.wantBehind || out.TrackerBehind != c.wantTrackerBh {
+			t.Errorf("%s: sessions_behind %v tracker_behind %v, want %d %v", c.name, out.SessionsBehind, out.TrackerBehind, c.wantBehind, c.wantTrackerBh)
+		}
+	}
+	out, _ := buildTrackedChain(mon, nil, store.TrackerChain{}, now)
+	if out.SessionsBehind != nil || out.LastScanDate != nil || out.ExpectedSession != "2026-09-28" {
+		t.Errorf("no scan: %+v", out)
+	}
+}
+
+func ptrT(t time.Time) *time.Time { return &t }
+
+func TestTracked_ServesChain(t *testing.T) {
+	st := trackedFixture()
+	tracked := scanDay
+	st.trackerChain = store.TrackerChain{LastTrackedSession: &tracked,
+		LatestScanRun: &store.ChainRun{ScannerCompletedAt: ptrT(scanDay.Add(30 * time.Hour)), TrackerCompletedAt: ptrT(scanDay.Add(30 * time.Hour))}}
+	body, _ := trackedRows(t, newTestServer(t, st, freshNow), "")
+	c := body["chain"].(map[string]any)
+	if c["expected_session"] != "2026-09-17" || c["last_scan_date"] != "2026-09-17" || c["last_tracked_session"] != "2026-09-17" ||
+		c["sessions_behind"] != 0.0 || c["tracker_behind"] != false {
+		t.Errorf("chain = %v", c)
+	}
+}

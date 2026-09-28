@@ -19,7 +19,71 @@ var trackedStatuses = map[string]store.TrackedStatusFilter{
 
 type trackedResponse struct {
 	Summary trackedSummary    `json:"summary"`
+	Chain   trackedChain      `json:"chain"`
 	Tracked []trackedPosition `json:"tracked"`
+}
+
+// trackedChain is the system-level freshness of the daily chain, for the one
+// banner above the tabs (addendum §6.1): computed here from the NYSE calendar
+// and scan-grace rule behind scan.is_stale, so the UI never derives staleness
+// from row dates. Counts are trading sessions, so weekends and holidays never
+// raise them.
+type trackedChain struct {
+	// ExpectedSession: the latest session whose scan should exist by now.
+	ExpectedSession string `json:"expected_session"`
+	// LastScanDate: max(momentum_features.ts); null when there is no scan.
+	LastScanDate *string `json:"last_scan_date"`
+	// LastTrackedSession: the latest session the tracker completed.
+	LastTrackedSession *string `json:"last_tracked_session"`
+	// SessionsBehind: trading sessions after LastScanDate up to and including
+	// ExpectedSession (0 = current); null when there is no scan.
+	SessionsBehind *int `json:"sessions_behind"`
+	// TrackerBehind: the latest scanned session's chain row has its scan
+	// marker more than trackerGrace ago and no tracker marker, or gave up.
+	TrackerBehind bool `json:"tracker_behind"`
+}
+
+// trackerGrace: the tracker runs right after the scanner; a missing tracker
+// marker inside this window is the chain still running, not a lag.
+const trackerGrace = 15 * time.Minute
+
+// sessionsAfter counts NYSE sessions d with from < d <= through (civil dates).
+func sessionsAfter(from, through time.Time) (int, error) {
+	n := 0
+	for d := civilDate(from).AddDate(0, 0, 1); !d.After(civilDate(through)); d = d.AddDate(0, 0, 1) {
+		ok, err := IsTradingDay(d)
+		if err != nil {
+			return 0, err
+		}
+		if ok {
+			n++
+		}
+	}
+	return n, nil
+}
+
+func buildTrackedChain(expected time.Time, latest *time.Time, c store.TrackerChain, now time.Time) (trackedChain, error) {
+	out := trackedChain{
+		ExpectedSession:    expected.Format(time.DateOnly),
+		LastScanDate:       dateOnly(latest),
+		LastTrackedSession: dateOnly(c.LastTrackedSession),
+	}
+	if latest != nil {
+		n, err := sessionsAfter(*latest, expected)
+		if err != nil {
+			return out, err
+		}
+		out.SessionsBehind = &n
+	}
+	if r := c.LatestScanRun; r != nil {
+		switch {
+		case r.GaveUpAt != nil:
+			out.TrackerBehind = r.TrackerCompletedAt == nil
+		case r.ScannerCompletedAt != nil && r.TrackerCompletedAt == nil:
+			out.TrackerBehind = now.Sub(*r.ScannerCompletedAt) > trackerGrace
+		}
+	}
+	return out, nil
 }
 
 type trackedSummary struct {
@@ -101,9 +165,28 @@ func (s *Server) handleTracked(w http.ResponseWriter, r *http.Request) {
 		s.storeError(w, r, err)
 		return
 	}
+	now := s.cfg.Now()
+	expected, err := ExpectedSession(now, s.cfg.SessionReadyAfter)
+	if err != nil {
+		s.cfg.Log.Error("momentum-api: tracked chain calendar", "err", err)
+		writeJSON(w, http.StatusInternalServerError, errorResponse{Error: "session_calendar_unavailable"})
+		return
+	}
+	tc, err := s.cfg.Store.TrackerChain(ctx, latest)
+	if err != nil {
+		s.storeError(w, r, err)
+		return
+	}
+	chain, err := buildTrackedChain(expected, latest, tc, now)
+	if err != nil {
+		s.cfg.Log.Error("momentum-api: tracked chain calendar", "err", err)
+		writeJSON(w, http.StatusInternalServerError, errorResponse{Error: "session_calendar_unavailable"})
+		return
+	}
 
 	resp := trackedResponse{
 		Summary: trackedSummary{ActiveCount: counts.Active, ClosedCount: counts.Closed},
+		Chain:   chain,
 		Tracked: []trackedPosition{},
 	}
 	for _, row := range rows {

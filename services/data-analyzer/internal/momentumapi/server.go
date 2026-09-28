@@ -17,6 +17,9 @@ import (
 // (DBStore) runs the internal/store queries; tests substitute a fake or run
 // DBStore inside a rolled-back transaction.
 type Store interface {
+	// TrackerChain: the latest scanned session's chain row and the last
+	// session the tracker completed (Tracked Positions freshness banner).
+	TrackerChain(ctx context.Context, lastScan *time.Time) (store.TrackerChain, error)
 	LatestScanDate(ctx context.Context) (time.Time, bool, error)
 	ScanSummary(ctx context.Context, date time.Time) (store.ScanSummary, error)
 	Candidates(ctx context.Context, date, alertsSince time.Time) ([]store.CandidateRow, error)
@@ -53,6 +56,9 @@ type DBStore struct {
 	PingFn func(ctx context.Context) error
 }
 
+func (s DBStore) TrackerChain(ctx context.Context, lastScan *time.Time) (store.TrackerChain, error) {
+	return store.LoadTrackerChain(ctx, s.Q, lastScan)
+}
 func (s DBStore) LatestScanDate(ctx context.Context) (time.Time, bool, error) {
 	return store.LatestScanDate(ctx, s.Q)
 }
