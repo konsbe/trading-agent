@@ -96,6 +96,21 @@
       "nav_icon": "mdi-bell-outline",
       "router_path": "/alarm-history"
     },
+    "mfe_tracked": {
+      "label": "Tracked Positions",
+      "version": "1.0.0",
+      "endpoint": "http://localhost:3009/remoteEntry.js",
+      "module": "./TrackedPositions",
+      "scope": "mfe_tracked",
+      "description": "Scanner alerts followed through the exit rules, as research instrumentation",
+      "roles": [],
+      "enabled": true,
+      "nav_group": "Tracking",
+      "nav_order": 3,
+      "nav_sub_order": 5,
+      "nav_icon": "mdi-chart-box-outline",
+      "router_path": "/tracked-positions"
+    },
     "mfe_backtest_lab": {
       "label": "Backtest Lab",
       "version": "1.0.0",

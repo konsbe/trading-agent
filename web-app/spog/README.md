@@ -26,8 +26,8 @@ sidebar link:
 Adding a page, group or item only needs a `config.json` edit. `/` redirects to
 the first item of the first (non-bottom) group.
 
-Not-yet-implemented pages (`/stock-detail`, `/tracked-positions`,
-`/settings`) are text placeholders defined in
+Not-yet-implemented pages (`/stock-detail`, `/settings`) are text
+placeholders defined in
 `src/common/navigation/navigation.ts`, listed last under "Coming Soon". A
 placeholder disappears as soon as a config MFE claims its path. `/404` and
 `/unauthorized` are error pages.
