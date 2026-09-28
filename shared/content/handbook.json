@@ -263,6 +263,10 @@
             {
               "type": "paragraph",
               "text": "The three Treasury yields show only the yield, in percent, and its date. They have no phase by design: the phase rules are written for prices, and a yield is an interest rate — a yield falling from its high means bond prices rising, the opposite of a drawdown."
+            },
+            {
+              "type": "paragraph",
+              "text": "On a stock's or fund's card — SPY, GLD, USO, SHEL and your Watchlist symbols — the symbol next to the name opens its Stock Detail page, and **← Back to Daily Market Report** there returns here. The Treasury yields and Bitcoin have no Stock Detail page, so their symbols are plain text."
             }
           ],
           "terms": []
@@ -995,7 +999,7 @@
           "blocks": [
             {
               "type": "paragraph",
-              "text": "Each row shows the symbol, company and exchange, then **Close**, **Change %**, **RVOL**, **$ Volume**, **Market cap**, **RSI**, **Breakout**, **% of 52w high**, **Catalyst** and **Score**, with the same formulas, formats and tooltips as the candidates list, then **Compute** and **Remove**. A close that is not from the latest expected session carries a neutral \"as of\" date so an old price never reads as current. **Score** is shown only for a symbol that is one of today's candidates; any other row reads \"—\", never 0."
+              "text": "Each row shows the symbol, company and exchange, then **Close**, **Change %**, **RVOL**, **$ Volume**, **Market cap**, **RSI**, **Breakout**, **% of 52w high**, **Catalyst** and **Score**, with the same formulas, formats and tooltips as the candidates list, then **Added** (the day the symbol was added), **Compute** and **Remove**. A close that is not from the latest expected session carries a neutral \"as of\" date so an old price never reads as current. **Score** is shown only for a symbol that is one of today's candidates; any other row reads \"—\", never 0."
             },
             {
               "type": "paragraph",
@@ -1167,6 +1171,21 @@
           "terms": []
         },
         {
+          "id": "alarm-history-sort-search",
+          "title": "Sorting and searching alerts",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "Click a column header to sort: **Last fired** (or **Fired**), **Symbol**, **Alert type**, **Severity** (info, then notice, then warning), **Message** (in the grouped view, **Latest message**: the group's newest message) and, in the grouped view, **Repeats**; click again to reverse. Only a group's open/close control does not sort. The search box above the table finds alerts whose symbol, message, severity or alert type (as shown) contains what you type, in upper or lower case; in the grouped view it groups the matching alerts, and an opened group lists those same alerts, newest first."
+            },
+            {
+              "type": "paragraph",
+              "text": "Unlike the other tables, sorting and searching here run on the server over every alert in your filters, not only the rows already loaded, so the first page of a sorted list really is the top of the whole list, and **Load more** adds the next rows in that order. A sorted or searched list is fixed at the moment it first loaded: alerts that arrive later are not slipped in between its pages, so no row is skipped or shown twice. The next automatic check (see Links and refreshing) starts it again from its first page, now including them. A search can be up to 60 characters. The default is the grouped view, newest first, with no search."
+            }
+          ],
+          "terms": []
+        },
+        {
           "id": "alarm-history-filters",
           "title": "Filters and dates",
           "blocks": [
@@ -1181,7 +1200,7 @@
             },
             {
               "type": "paragraph",
-              "text": "Changing a filter starts the list again from the newest rows and closes any opened groups. A filter the app rejects, such as a symbol with characters no symbol has, is explained in plain words in place of the list."
+              "text": "Changing a filter starts the list again from its first page and closes any opened groups. The filters, the view (grouped or every alert), the sort and the search are kept in the page's address, so going back to the page — for example with **← Back to Alarm History** on Stock Detail — shows the same list. A filter the app rejects, such as a symbol with characters no symbol has, is explained in plain words in place of the list."
             }
           ],
           "terms": []
@@ -1226,11 +1245,11 @@
           "blocks": [
             {
               "type": "paragraph",
-              "text": "For an equity, the symbol links to its Stock Detail page, opened at the Classical Technical Signals section. Crypto symbols have no Stock Detail page and are not linked. Neither is a market-wide alert such as VIX elevated: it is about the whole market, even though it is recorded under the symbol whose scan noticed it (the row says \"market-wide\")."
+              "text": "For a stock or fund, the symbol links to its Stock Detail page, opened at the Classical Technical Signals section. Crypto symbols have no Stock Detail page and are not linked. Neither is a market-wide alert such as VIX elevated: it is about the whole market, even though it is recorded under the symbol whose scan noticed it (the row says \"market-wide\")."
             },
             {
               "type": "paragraph",
-              "text": "Nothing is pushed to the page. It checks for new alerts when you come back to its tab and every 60 seconds while it is open and visible, and shows **Last checked** with the time of the latest successful check. A check re-reads only the newest rows and adds new ones on top; rows you loaded with Load older and groups you opened stay as they are. If a check fails, the rows stay and the page says it couldn't check."
+              "text": "Nothing is pushed to the page. It checks for new alerts when you come back to its tab and every 60 seconds while it is open and visible, and shows **Last checked** with the time of the latest successful check. In the default newest-first list, a check re-reads only the newest rows and adds new ones on top; rows you loaded with Load older and groups you opened stay as they are. In a sorted or searched list, a check starts the list again from its first page, as of that moment. If a check fails, the rows stay and the page says it couldn't check."
             }
           ],
           "terms": []
@@ -1340,6 +1359,62 @@
             {
               "type": "paragraph",
               "text": "If both apply, only \"No new scan\" is shown. Both count trading sessions on the NYSE calendar, so a weekend or holiday never raises them, and both come from the chain's own records, never from the rows' dates. The per-row notes stay as they are while the banner shows."
+            }
+          ],
+          "terms": []
+        }
+      ]
+    },
+    {
+      "id": "using-the-tables",
+      "title": "Using the tables",
+      "intro": "*What this part of the app is for:* every table in the app — Today's Candidates, Watchlist, Followed Symbols, Computed Symbols, Alarm History, Tracked Positions and the Data Source daily chain — sorts, searches and links the same way. Sorting only reorders rows; it never ranks them by how good they are.",
+      "entries": [
+        {
+          "id": "tables-sorting",
+          "title": "Sorting",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "Click a column header to sort by it; click it again to reverse. The sorted column shows ▲ or ▼, the others a faint two-way mark. Every column sorts except action columns (Remove, Unfollow, Stop computing) and, in Alarm History, a group's open/close control. A value shown as \"—\" (or \"not yet\", \"not computed\", \"Not yet evaluated\") always goes to the bottom, whichever way you sort, and rows with the same value are ordered by symbol (in the daily chain, newest session first)."
+            },
+            {
+              "type": "list",
+              "items": [
+                "**Today's Candidates** — by RVOL, highest first; the score keeps its \"unvalidated\" label in every order.",
+                "**Watchlist** and **Followed Symbols** — the newest added first.",
+                "**Computed Symbols** — the most recently computed first; \"not yet\" last.",
+                "**Alarm History** — newest first (the grouped view by when a group last fired).",
+                "**Tracked Positions** — the most recent alert first, on both tabs.",
+                "**Data Source daily chain** — the newest session first.",
+                "**Compute** and **State** columns sort by computation state: what needs attention first (failed, data hasn't arrived), then what is waiting or computing, then scheduled and computed. The daily chain's **Status** sorts the same way: not run and failed first, not recorded last."
+              ]
+            },
+            {
+              "type": "paragraph",
+              "text": "Two lists keep a fixed order and do not sort: the Backtest Lab's hypotheses (the order they were registered in) and Stock Detail's score breakdown (the model's own order)."
+            }
+          ],
+          "terms": []
+        },
+        {
+          "id": "tables-search",
+          "title": "Searching a table",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "The search box above a table keeps the rows where any column's text, as shown on screen, contains what you type — a symbol, a company name, a date such as \"Sep 24\", a label such as \"Crypto\" or \"Recovered\" — in upper or lower case. While it filters it says how many rows match, for example \"3 of 20 rows\"; Esc or the × clears it. It searches the rows the page has loaded. Alarm History is the exception: its search and its sorting run on the server over every alert in your filters, and a sorted or searched list stays as it was when it first loaded until the next check (see Sorting and searching alerts under Alarm History)."
+            }
+          ],
+          "terms": []
+        },
+        {
+          "id": "tables-links",
+          "title": "Symbol links and Back",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "A symbol that is a stock or a fund links to its Stock Detail page. Crypto pairs (such as BTCUSDT), Treasury yields and market-wide rows (the VIX, VIX elevated alerts) have no Stock Detail page, so they are plain text. Each table's sort and search — and, on a page with tabs, the open tab — are kept in the page's address, and Stock Detail offers **← Back to …** naming the page you came from (Watchlist, Followed Symbols, Computed Symbols, Alarm History, Tracked Positions, Daily Market Report or Candidates). It returns you to the same view, sorted and searched as you left it."
             }
           ],
           "terms": []
