@@ -32,13 +32,15 @@ export interface TrackedRow {
     bucket: TrackedBucket;
     status: TrackedStatus;
     alerted_date: string;
-    sessions_elapsed: number;
+    /** Null until the tracker has evaluated the row once. */
+    sessions_elapsed: number | null;
     /** Null until the tracker has evaluated the row once. */
     last_evaluated_date: string | null;
     evaluation_behind: boolean;
     reference_price: number;
     current_price: number | null;
     current_price_date: string | null;
+    /** Null until the tracker has evaluated the row once, or without a current price. */
     unrealized_pct: number | null;
     max_gain_pct: number | null;
     exit_reason: string | null;

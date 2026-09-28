@@ -4,6 +4,7 @@ export type TrackedTableVariant = 'active' | 'closed';
 
 export type TrackedColumnKey =
     | 'alerted_date'
+    | 'closed_date'
     | 'sessions_elapsed'
     | 'reference_price'
     | 'current_price'

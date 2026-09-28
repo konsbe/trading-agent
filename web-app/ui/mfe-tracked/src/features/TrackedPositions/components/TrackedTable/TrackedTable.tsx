@@ -9,26 +9,29 @@ import { TrackedColumn, TrackedTableProps, TrackedTableVariant } from './types';
 import '@/styles/tracked-table.css';
 import './TrackedTable-styles.css';
 
-const BASE_COLUMNS: TrackedColumn[] = [
-    { key: 'alerted_date', label: 'Alerted Date' },
+const ALERTED_DATE: TrackedColumn = { key: 'alerted_date', label: 'Alerted Date' };
+const EVALUATION_COLUMNS: TrackedColumn[] = [
     { key: 'sessions_elapsed', label: 'Sessions Elapsed', numeric: true, description: 'Trading sessions the exit rules have evaluated since the alert' },
     { key: 'reference_price', label: 'Reference Price', numeric: true, description: 'Close on the alert date' },
 ];
 
 const COLUMNS: Record<TrackedTableVariant, TrackedColumn[]> = {
     active: [
-        ...BASE_COLUMNS,
+        ALERTED_DATE,
+        ...EVALUATION_COLUMNS,
         { key: 'current_price', label: 'Current Price', numeric: true, description: 'Close on the latest scan date' },
         { key: 'unrealized_pct', label: 'Unrealized %', numeric: true, description: 'Current price vs reference price' },
     ],
     closed: [
-        ...BASE_COLUMNS,
+        ALERTED_DATE,
+        { key: 'closed_date', label: 'Closed Date', description: 'The session the exit rule fired on' },
+        ...EVALUATION_COLUMNS,
         { key: 'exit_reason', label: 'Exit Reason', description: 'The exit rule that closed the row; open it for the rule’s note' },
         { key: 'exit_pct', label: 'Exit %', numeric: true, description: 'Exit price vs reference price' },
     ],
 };
 
-/** A row never evaluated has no reading yet: "—", uncoloured, never the API's placeholder 0. */
+/** A row never evaluated has no reading yet: "—", uncoloured. */
 const UnrealizedCell = ({ row }: { row: TrackedRow }) =>
     isNotYetEvaluated(row) ? <span data-testid="unrealized-pending">{EMPTY_VALUE}</span> : <ChangeCell value={row.unrealized_pct} />;
 
@@ -64,6 +67,8 @@ const cellFor = (key: TrackedColumn['key'], row: TrackedRow, exitReason: ReactNo
     switch (key) {
         case 'alerted_date':
             return formatTradingDay(row.alerted_date);
+        case 'closed_date':
+            return formatTradingDay(row.closed_date);
         case 'sessions_elapsed':
             return <SessionsCell row={row} />;
         case 'reference_price':

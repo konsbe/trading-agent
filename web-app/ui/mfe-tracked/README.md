@@ -144,7 +144,8 @@ Reference Price, Current Price, Unrealized %.
 - Unrealized % is the only red/green (--color-price-up /
   --color-price-down). Everything else neutral, same weight, no
   urgency icons.
-- Never-evaluated rows (last_evaluated_date null): Sessions Elapsed
+- Never-evaluated rows (last_evaluated_date null; the API then also
+  serves sessions_elapsed and unrealized_pct as null): Sessions Elapsed
   reads "Not yet evaluated", Unrealized % reads "—" (never 0 or
   0.00%), with a neutral note that the next tracker run evaluates them.
 - evaluation_behind true on a row: a neutral note that sessions elapsed
@@ -153,7 +154,10 @@ Reference Price, Current Price, Unrealized %.
 - Null current price (symbol stopped scanning): "—", row kept.
 
 CLOSED TAB
-Same base columns, plus Exit Reason and Exit %.
+Columns: Symbol / Exchange / Bucket, Alerted Date, Closed Date,
+Sessions Elapsed, Reference Price, Exit Reason, Exit %.
+- Closed Date is closed_date, formatted like Alerted Date ("—" if
+  null). Exit price is not shown.
 - Exit Reason as plain text (e.g. breakout_failed), not a coloured
   badge.
 - Exit % red/green, as above.

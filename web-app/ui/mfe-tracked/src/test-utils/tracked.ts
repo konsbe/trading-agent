@@ -28,7 +28,7 @@ export const makeActiveRow = (overrides: Partial<TrackedRow> = {}): TrackedRow =
     ...overrides,
 });
 
-/** Alerted on the latest session and not evaluated yet (the API reports 0 sessions and 0%). */
+/** Alerted on the latest session and not evaluated yet (the API serves null sessions and null %). */
 export const makeUnevaluatedRow = (overrides: Partial<TrackedRow> = {}): TrackedRow =>
     makeActiveRow({
         symbol: 'ABLV',
@@ -36,11 +36,11 @@ export const makeUnevaluatedRow = (overrides: Partial<TrackedRow> = {}): Tracked
         company_name: 'ABLE VIEW GLOBAL INC-B',
         bucket: 'penny',
         alerted_date: '2026-09-25',
-        sessions_elapsed: 0,
+        sessions_elapsed: null,
         last_evaluated_date: null,
         reference_price: 1.3,
         current_price: 1.3,
-        unrealized_pct: 0,
+        unrealized_pct: null,
         max_gain_pct: 0,
         ...overrides,
     });

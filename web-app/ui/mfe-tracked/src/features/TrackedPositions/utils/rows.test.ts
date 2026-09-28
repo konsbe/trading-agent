@@ -7,8 +7,11 @@ describe('rows', () => {
         expect(rowKey(makeActiveRow({ symbol: 'SDEV', alerted_date: '2026-09-25' }))).toBe('SDEV-2026-09-25');
     });
 
-    it('treats only a row without last_evaluated_date as not yet evaluated', () => {
+    it('treats a row without last_evaluated_date or sessions_elapsed as not yet evaluated', () => {
         expect(isNotYetEvaluated(makeUnevaluatedRow())).toBe(true);
+        expect(isNotYetEvaluated(makeActiveRow({ last_evaluated_date: null }))).toBe(true);
+        expect(isNotYetEvaluated(makeActiveRow({ sessions_elapsed: null }))).toBe(true);
+        expect(isNotYetEvaluated(makeActiveRow())).toBe(false);
         expect(isNotYetEvaluated(makeActiveRow({ sessions_elapsed: 0 }))).toBe(false);
     });
 

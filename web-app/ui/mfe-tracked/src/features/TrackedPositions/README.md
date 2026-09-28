@@ -20,8 +20,8 @@ line instead of the error state.
 | `FreshnessBanner` | One neutral note above the tabs from `chain` only (`utils/freshness.ts`): "No new scan for N trading sessions …" when `sessions_behind ≥ 1`, else "The {date} scan exists but tracking has not been updated since {date}." when `tracker_behind`. Never derived from row dates. |
 | `TrackedTabs` | WAI-ARIA tabs, "Active (n)" / "Closed (n)"; arrow keys, Home, End. The selection lives in `?tab=closed` (`useTrackedTab`). |
 | `TrackedPanel` | The tab's `CollapsibleCard` (`tracked.positions.active` / `.closed`), the "not yet evaluated" count note, and the empty states "Nothing currently tracked" / "No closed positions yet". |
-| `TrackedTable` | Active: Symbol / Exchange / Bucket, Alerted Date, Sessions Elapsed, Reference Price, Current Price, Unrealized %. Closed: the base columns plus Exit Reason and Exit %. |
-| `SessionsCell` | "Not yet evaluated" when `last_evaluated_date` is null; "as of {date}" under the count when `evaluation_behind`. |
+| `TrackedTable` | Active: Symbol / Exchange / Bucket, Alerted Date, Sessions Elapsed, Reference Price, Current Price, Unrealized %. Closed: Symbol / Exchange / Bucket, Alerted Date, Closed Date, Sessions Elapsed, Reference Price, Exit Reason, Exit % (no exit price). |
+| `SessionsCell` | "Not yet evaluated" when `last_evaluated_date` or `sessions_elapsed` is null (`isNotYetEvaluated`); "as of {date}" under the count when `evaluation_behind`. |
 | `SymbolCell` | Ticker (hosted: links to `/candidates/{symbol}`), company · exchange · bucket. |
 | `TrackedSkeleton` | Loading placeholder with the page's layout. |
 
@@ -29,8 +29,9 @@ line instead of the error state.
 
 - Only Unrealized % and Exit % are toned, via the kit's `ChangeCell`
   (`--color-price-up` / `--color-price-down`; zero and null stay neutral).
-- A row never evaluated shows "Not yet evaluated" and "—" for Unrealized %,
-  never the API's stored 0.
+- A row never evaluated (the API serves null `last_evaluated_date`,
+  `sessions_elapsed` and `unrealized_pct`) shows "Not yet evaluated" and "—"
+  for Unrealized %, never 0 or 0.0%.
 - Exit Reason is plain text in a button (`aria-expanded`, `aria-controls`);
   it opens `exit_reason_note` in a row directly below, which stays open until
   the user closes it (state held by the screen in `useOpenNotes`, so it

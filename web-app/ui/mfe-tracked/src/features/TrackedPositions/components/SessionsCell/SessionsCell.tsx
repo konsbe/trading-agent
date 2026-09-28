@@ -7,7 +7,7 @@ export const NOT_YET_EVALUATED = 'Not yet evaluated';
 
 /**
  * Trading sessions the exit rules have evaluated. A row never evaluated reads
- * "Not yet evaluated" (the API's stored 0 is not a count); a row the tracker has
+ * "Not yet evaluated"; a row the tracker has
  * not evaluated through the latest scan says what date its count is as of.
  */
 const SessionsCell = ({ row }: SessionsCellProps) => {

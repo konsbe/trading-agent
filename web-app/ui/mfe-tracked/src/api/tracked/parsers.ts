@@ -41,7 +41,7 @@ const parseRow = (value: unknown, path: string): TrackedRow => {
         bucket: bucket(o.bucket, `${path}.bucket`),
         status: status(o.status, `${path}.status`),
         alerted_date: tradingDay(o.alerted_date, `${path}.alerted_date`),
-        sessions_elapsed: count(o.sessions_elapsed, `${path}.sessions_elapsed`),
+        sessions_elapsed: optCount(o.sessions_elapsed, `${path}.sessions_elapsed`),
         last_evaluated_date: optDay(o.last_evaluated_date, `${path}.last_evaluated_date`),
         evaluation_behind: bool(o.evaluation_behind, `${path}.evaluation_behind`),
         reference_price: num(o.reference_price, `${path}.reference_price`),

@@ -107,6 +107,13 @@ describe('TrackedPositionsPage', () => {
             expect(cell('ABLV-2026-09-25', 'current_price')).toHaveTextContent('$1.30');
         });
 
+        it('are recognised from a null sessions_elapsed even when last_evaluated_date is set', async () => {
+            await renderPage({ body: makeTracked([makeUnevaluatedRow({ last_evaluated_date: '2026-09-25' })]) });
+
+            expect(cell('ABLV-2026-09-25', 'sessions_elapsed')).toHaveTextContent(/^Not yet evaluated$/);
+            expect(cell('ABLV-2026-09-25', 'unrealized_pct')).toHaveTextContent(/^—$/);
+        });
+
         it('get one calm note above the table, counting them', async () => {
             await renderPage();
 
@@ -152,14 +159,34 @@ describe('TrackedPositionsPage', () => {
     });
 
     describe('closed tab', () => {
-        it('opens from the tab or from ?tab=closed, with Exit Reason and Exit % columns', async () => {
+        it('opens from the tab or from ?tab=closed, with Closed Date, Exit Reason and Exit % columns and no exit price', async () => {
             await renderPage({ url: '/?tab=closed' });
 
             expect(screen.getByRole('tab', { name: 'Closed (16)' })).toHaveAttribute('aria-selected', 'true');
             const headers = within(screen.getByTestId('tracked-closed-table')).getAllByRole('columnheader').map(th => th.textContent);
-            expect(headers).toEqual(['Symbol / Exchange / Bucket', 'Alerted Date', 'Sessions Elapsed', 'Reference Price', 'Exit Reason', 'Exit %']);
+            expect(headers).toEqual([
+                'Symbol / Exchange / Bucket',
+                'Alerted Date',
+                'Closed Date',
+                'Sessions Elapsed',
+                'Reference Price',
+                'Exit Reason',
+                'Exit %',
+            ]);
             expect(screen.getAllByTestId(/^tracked-row-/)).toHaveLength(2);
+            expect(screen.getByTestId('tracked-closed-table').querySelector('[data-column="exit_price"]')).toBeNull();
             expect(fetchMock).toHaveBeenCalledTimes(1);
+        });
+
+        it('shows the closed date like the alerted date, and "—" without one', async () => {
+            await renderPage({
+                url: '/?tab=closed',
+                body: makeTracked([makeClosedRow(), makeClosedRow({ symbol: 'AAA', closed_date: null })]),
+            });
+
+            expect(cell('EZGO-2026-09-24', 'alerted_date')).toHaveTextContent(/^Sep 24, 2026$/);
+            expect(cell('EZGO-2026-09-24', 'closed_date')).toHaveTextContent(/^Sep 25, 2026$/);
+            expect(cell('AAA-2026-09-24', 'closed_date')).toHaveTextContent(/^—$/);
         });
 
         it('shows the exit reason as plain text, not a badge', async () => {
