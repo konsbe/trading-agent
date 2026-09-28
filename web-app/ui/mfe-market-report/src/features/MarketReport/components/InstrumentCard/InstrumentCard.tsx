@@ -1,4 +1,6 @@
+import { isStockDetailEligible, StockDetailLink } from '@trading-agent/shared-components';
 import { Instrument, InstrumentMarketCycle } from '@/api';
+import { useIsHosted } from '@/providers/HostModeContext';
 import { EMPTY, formatDate, formatNumber, formatPercent, formatSignedPercent } from '../../utils/format';
 import { displayCode } from '../../utils/humanize';
 import { InstrumentCardProps } from './types';
@@ -6,6 +8,9 @@ import '@/styles/market-report-global.css';
 import './InstrumentCard-styles.css';
 
 const CRYPTO_BASIS = '00:00 UTC daily close';
+
+/** "← Back to Daily Market Report" on Stock Detail. */
+export const MARKET_REPORT_ORIGIN_LABEL = 'Daily Market Report';
 
 /** The only red/green on the page: the day's change, via the price aliases; zero stays neutral. */
 const changeTone = (value: number | null): string =>
@@ -58,16 +63,33 @@ const MarketCycle = ({ inst, testId }: { inst: Instrument; testId: string }) => 
     );
 };
 
-/** One instrument: a yield (value + date only) or a priced instrument with its market-cycle facts. */
+/**
+ * One instrument: a yield (value + date only) or a priced instrument with its
+ * market-cycle facts. Hosted, a stock or fund's symbol opens Stock Detail;
+ * yields and crypto have none.
+ */
 const InstrumentCard = ({ instrument: inst }: InstrumentCardProps) => {
     const testId = `instrument-${inst.key}`;
     const isYield = inst.type === 'treasury_yield';
+    const linked = useIsHosted() && isStockDetailEligible({ symbol: inst.symbol, asset_type: inst.type });
 
     return (
         <article className="market-report-tile market-report-instrument" aria-label={inst.label} data-testid={testId} data-type={inst.type}>
             <header className="market-report-instrument__header">
                 <h3 className="market-report-tile__title">{inst.label}</h3>
-                <span className="market-report-muted market-report-mono market-report-small">{inst.symbol}</span>
+                {linked ? (
+                    <StockDetailLink
+                        className="market-report-mono market-report-small market-report-instrument__symbol is-link"
+                        symbol={inst.symbol}
+                        originLabel={MARKET_REPORT_ORIGIN_LABEL}
+                        aria-label={`${inst.symbol}, open Stock Detail`}
+                        data-testid={`${testId}-symbol`}
+                    />
+                ) : (
+                    <span className="market-report-muted market-report-mono market-report-small" data-testid={`${testId}-symbol`}>
+                        {inst.symbol}
+                    </span>
+                )}
             </header>
 
             {isYield ? (

@@ -2,6 +2,7 @@ import { readdirSync, readFileSync } from 'fs';
 import { join, relative } from 'path';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router-dom';
 import { ApiError, MarketReport, toMarketReportError } from '@/api';
 import useMarketReport, { UseMarketReport } from '@/hooks/marketReport/useMarketReport';
 import { HostModeProvider } from '@/providers/HostModeContext';
@@ -16,9 +17,11 @@ const hookMock = useMarketReport as jest.MockedFunction<typeof useMarketReport>;
 const renderPage = (state: Partial<UseMarketReport>, { hosted = true } = {}) => {
     hookMock.mockReturnValue({ report: null, error: null, isLoading: false, ...state });
     return render(
-        <HostModeProvider hosted={hosted}>
-            <MarketReportPage />
-        </HostModeProvider>
+        <MemoryRouter initialEntries={['/market-report']}>
+            <HostModeProvider hosted={hosted}>
+                <MarketReportPage />
+            </HostModeProvider>
+        </MemoryRouter>
     );
 };
 
@@ -541,6 +544,23 @@ describe('Section 1 — market overview', () => {
 });
 
 describe('Section 2 — instruments', () => {
+    it('links stocks and funds to Stock Detail with "Back to Daily Market Report"; yields and Bitcoin are text', () => {
+        renderReport();
+
+        expect(screen.getByTestId('instrument-sp500-symbol')).toHaveAttribute('href', '/candidates/SPY');
+        expect(screen.getByTestId('instrument-gold-symbol')).toHaveAttribute('href', '/candidates/GLD');
+        expect(screen.getByTestId('instrument-shell-symbol')).toHaveAttribute('href', '/candidates/SHEL');
+        expect(screen.getByTestId('instrument-NVDA-symbol')).toHaveAttribute('href', '/candidates/NVDA');
+        for (const key of ['us10y', 'us5y', 'us2y', 'bitcoin']) {
+            expect(screen.getByTestId(`instrument-${key}-symbol`).tagName).toBe('SPAN');
+        }
+    });
+
+    it('links no instrument standalone', () => {
+        renderPage({ report: makeReport() }, { hosted: false });
+        expect(screen.getByTestId('instrument-sp500-symbol').tagName).toBe('SPAN');
+    });
+
     it('groups the fixed list and the watchlist in collapsible cards', () => {
         renderReport();
         const tracked = within(screen.getByTestId('group-tracked')).getAllByRole('article').map(a => a.getAttribute('aria-label'));
@@ -778,10 +798,14 @@ describe('collapsible groups', () => {
 });
 
 describe('guards', () => {
-    it('has only news links and only collapse toggles and disclosures as buttons', () => {
+    it('has only news and Stock Detail links and only collapse toggles and disclosures as buttons', () => {
         const { container } = renderReport(richBody());
 
-        container.querySelectorAll('a').forEach(a => expect(a).toHaveAttribute('data-testid', 'news-link'));
+        container.querySelectorAll('a').forEach(a => {
+            if (a.getAttribute('data-testid') === 'news-link') return;
+            expect(a.getAttribute('data-testid')).toMatch(/^instrument-.+-symbol$/);
+            expect(a.getAttribute('href')).toMatch(/^\/candidates\//);
+        });
         const buttons = screen.getAllByRole('button');
         const toggles = buttons.filter(b => b.classList.contains('ta-collapsible-card__toggle'));
         const disclosures = buttons.filter(b => b.classList.contains('market-report-reading__toggle'));

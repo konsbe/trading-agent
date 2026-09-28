@@ -6,6 +6,22 @@
     gap: var(--space-xs) var(--space-sm);
 }
 
+.market-report-instrument__symbol.is-link {
+    color: var(--color-on-surface-variant);
+    text-decoration: none;
+    border-radius: var(--radius-sm);
+}
+
+.market-report-instrument__symbol.is-link:hover {
+    color: var(--color-primary);
+    text-decoration: underline;
+}
+
+.market-report-instrument__symbol.is-link:focus-visible {
+    outline: 2px solid var(--color-focus-ring);
+    outline-offset: 2px;
+}
+
 .market-report-instrument__price-block {
     display: flex;
     flex-direction: column;
