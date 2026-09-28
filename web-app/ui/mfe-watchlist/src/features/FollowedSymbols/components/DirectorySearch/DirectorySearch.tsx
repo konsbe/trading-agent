@@ -26,6 +26,7 @@ const DirectorySearch = ({ isFollowed, saving, errors, onFollow }: TrackingSearc
             return (
                 <SearchResultRow
                     symbol={result.symbol}
+                    assetType={result.asset_type}
                     name={result.name}
                     facts={facts(result)}
                     markers={

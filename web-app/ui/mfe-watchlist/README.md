@@ -13,6 +13,14 @@ all under the sidebar's **Tracking** group:
 
 Backed by `momentum-api` (`docs/MOMENTUM_SCANNER_API.md` §2.5 and §2.5a).
 
+Every table sorts from its headers and has a search box (shared `useTableView`,
+`SortableHeader`, `TableSearch`; URL keys `watchlist_*`, `followed_*`,
+`computed_*`). Defaults: Watchlist and Followed newest added first, Computed
+most recently computed first ("not yet" last). Compute / State columns sort by
+`COMPUTE_STATE_ORDER` (attention first). Hosted, stock and fund tickers open
+Stock Detail through the shared `StockDetailLink` with "Back to Watchlist /
+Followed Symbols / Computed Symbols"; crypto pairs are plain text.
+
 | | |
 |---|---|
 | Module Federation name / scope | `mfe_watchlist` |
@@ -146,13 +154,13 @@ after `exposes` in `webpack.config.js` changes.
 src/
   api/            fetch-client (GET/PUT/DELETE, ApiError {status, code}), parse, watchlist/…, tracking/{types, parsers, trackingApi}
   app/            app-root / followed-root / computed-root (exposed, hosted), bootstrap (standalone), wrapper
-  common/         error copy, formatters and tracking labels, webpack MF helper
-  components/     PageLayout, ApiErrorState, ComputeButton, ComputeState, Tag
+  common/         error copy, formatters and tracking labels, compute state order / Compute column, sort summary, webpack MF helper
+  components/     PageLayout, ApiErrorState, ComputeButton, ComputeState, SymbolLink (Stock Detail link for stocks / funds), Tag
   config/         api.config.ts
   features/       Watchlist/…, FollowedSymbols/{SearchPanel, UniverseSearch, DirectorySearch, FollowedTable, …}, ComputedSymbols/ComputedTable
   hooks/          useApiResource, useQuerySearch, watchlist/{useWatchlist, useSymbolSearch}, tracking/{useFollowedSymbols, useDirectorySearch}
   pages/          WatchlistPage, FollowedSymbolsPage, ComputedSymbolsPage
-  providers/      HostModeContext (hosted vs standalone), ComputeStatusContext
+  providers/      HostModeContext (hosted vs standalone), ComputeStatusContext, StockDetailOrigin ("Back to …" label per screen)
   styles/         tracking-table.css (Followed / Computed tables)
   router/         AppRouter (relative routes)
   types/          MF remote declarations, constants

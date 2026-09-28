@@ -1,10 +1,13 @@
-import { Button, CloseIcon, EMPTY_VALUE } from '@trading-agent/shared-components';
+import { ReactNode } from 'react';
+import { Button, CloseIcon, EMPTY_VALUE, SortableHeader } from '@trading-agent/shared-components';
 import { ComputedSymbol } from '@/api';
 import { getTrackingErrorMessage } from '@/common/errors/errorMessages';
 import { formatDateTime } from '@/common/format/format';
 import { ASSET_TYPE_LABELS, labelOf, REASON_DESCRIPTIONS, REASON_LABELS } from '@/common/format/trackingLabels';
 import ComputeState from '@/components/ComputeState';
+import SymbolLink from '@/components/SymbolLink';
 import Tag from '@/components/Tag';
+import { COMPUTED_COLUMNS, NOT_COMPUTED_TEXT } from './columns';
 import { ComputedTableProps } from './types';
 import '@/styles/tracking-table.css';
 import './ComputedTable-styles.css';
@@ -17,19 +20,54 @@ const stopHint = (item: ComputedSymbol): string =>
         ? 'Other reasons keep it computed'
         : 'Leaves the list; computed history is kept';
 
-/** Every symbol with an open reason: why, where its computation stands, and Stop computing for manual requests. */
-const ComputedTable = ({ items, dataTimeoutMinutes, requesting, errors, onStop }: ComputedTableProps) => (
+const renderCell = (key: string, item: ComputedSymbol, dataTimeoutMinutes: number | null): ReactNode => {
+    switch (key) {
+        case 'name':
+            return (
+                <span className="tracking-table__name" title={item.name ?? undefined}>
+                    {item.name ?? EMPTY_VALUE}
+                </span>
+            );
+        case 'type':
+            return labelOf(ASSET_TYPE_LABELS, item.asset_type);
+        case 'reasons':
+            return (
+                <span className="tracking-table__chips">
+                    {item.reasons.map(reason => (
+                        <Tag
+                            key={reason}
+                            tone={reason === 'manual' ? 'accent' : 'neutral'}
+                            title={labelOf(REASON_DESCRIPTIONS, reason)}
+                            data-testid={`reason-${item.symbol}-${reason}`}
+                        >
+                            {labelOf(REASON_LABELS, reason)}
+                        </Tag>
+                    ))}
+                </span>
+            );
+        case 'state':
+            return <ComputeState item={item} dataTimeoutMinutes={dataTimeoutMinutes} variant="table" />;
+        case 'computed_at':
+            return item.computed_at ? <time dateTime={item.computed_at}>{formatDateTime(item.computed_at)}</time> : NOT_COMPUTED_TEXT;
+        default:
+            return null;
+    }
+};
+
+/**
+ * Every symbol with an open reason in the screen's sort: why, where its
+ * computation stands, and Stop computing for manual requests. Stocks and
+ * funds link to Stock Detail (hosted); crypto pairs don't.
+ */
+const ComputedTable = ({ id, items, headerProps, dataTimeoutMinutes, requesting, errors, onStop }: ComputedTableProps) => (
     <div className="tracking-table__wrap" role="region" aria-label="Computed symbols, scrolls horizontally" tabIndex={0}>
-        <table className="tracking-table computed-table" data-testid="computed-table">
+        <table className="tracking-table computed-table" id={id} data-testid="computed-table">
             <caption className="tracking-table__caption">Computed symbols</caption>
             <thead>
                 <tr>
-                    <th scope="col" data-column="symbol">Symbol</th>
-                    <th scope="col" data-column="name">Name</th>
-                    <th scope="col" data-column="type">Type</th>
-                    <th scope="col" data-column="reasons">Reasons</th>
-                    <th scope="col" data-column="state">State</th>
-                    <th scope="col" data-column="computed">Last computed</th>
+                    {COMPUTED_COLUMNS.map(column => (
+                        <SortableHeader key={column.key} {...headerProps(column.key)} />
+                    ))}
                     <th scope="col" data-column="actions">
                         <span className="tracking-table__sr-only">Actions</span>
                     </th>
@@ -41,39 +79,21 @@ const ComputedTable = ({ items, dataTimeoutMinutes, requesting, errors, onStop }
                     const error = errors.get(item.symbol);
                     return (
                         <tr key={item.symbol} className="tracking-table__row" data-testid={`computed-row-${item.symbol}`}>
-                            <th scope="row" data-column="symbol">
-                                <span className="tracking-table__ticker">{item.symbol}</span>
-                            </th>
-                            <td data-column="name">
-                                <span className="tracking-table__name" title={item.name ?? undefined}>
-                                    {item.name ?? EMPTY_VALUE}
-                                </span>
-                            </td>
-                            <td data-column="type">{labelOf(ASSET_TYPE_LABELS, item.asset_type)}</td>
-                            <td data-column="reasons">
-                                <span className="tracking-table__chips">
-                                    {item.reasons.map(reason => (
-                                        <Tag
-                                            key={reason}
-                                            tone={reason === 'manual' ? 'accent' : 'neutral'}
-                                            title={labelOf(REASON_DESCRIPTIONS, reason)}
-                                            data-testid={`reason-${item.symbol}-${reason}`}
-                                        >
-                                            {labelOf(REASON_LABELS, reason)}
-                                        </Tag>
-                                    ))}
-                                </span>
-                            </td>
-                            <td data-column="state">
-                                <ComputeState item={item} dataTimeoutMinutes={dataTimeoutMinutes} variant="table" />
-                            </td>
-                            <td data-column="computed" className="tracking-table__muted">
-                                {item.computed_at ? (
-                                    <time dateTime={item.computed_at}>{formatDateTime(item.computed_at)}</time>
+                            {COMPUTED_COLUMNS.map(column =>
+                                column.key === 'symbol' ? (
+                                    <th key={column.key} scope="row" data-column="symbol">
+                                        <SymbolLink className="tracking-table__ticker" symbol={item.symbol} assetType={item.asset_type} />
+                                    </th>
                                 ) : (
-                                    'not yet'
-                                )}
-                            </td>
+                                    <td
+                                        key={column.key}
+                                        data-column={column.key}
+                                        className={column.key === 'computed_at' ? 'tracking-table__muted' : undefined}
+                                    >
+                                        {renderCell(column.key, item, dataTimeoutMinutes)}
+                                    </td>
+                                )
+                            )}
                             <td data-column="actions">
                                 {isManual(item) && (
                                     <span className="computed-table__stop">

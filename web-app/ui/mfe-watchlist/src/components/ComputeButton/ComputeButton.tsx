@@ -2,7 +2,7 @@ import { useCallback } from 'react';
 import { Button } from '@trading-agent/shared-components';
 import { ComputedSymbol } from '@/api';
 import { getTrackingErrorMessage } from '@/common/errors/errorMessages';
-import { isPending, queuedTime } from '@/common/compute/queue';
+import { hasAutomaticQueue, hasOpenManualRequest, isPending } from '@/common/compute/queue';
 import ComputeState from '@/components/ComputeState';
 import { useComputeStatus } from '@/providers/ComputeStatusContext';
 import { ComputeButtonProps } from './types';
@@ -13,13 +13,6 @@ const REASON_WORDS: Record<string, string> = {
     watchlist: 'on the watchlist',
     candidate: "today's candidate",
 };
-
-const hasOpenManualRequest = (item: ComputedSymbol | undefined): item is ComputedSymbol =>
-    Boolean(item && item.manual_requested_at !== null && item.reasons.includes('manual'));
-
-/** A fetch queued without a Compute press (a watchlist addition) that is moving or has timed out. */
-const hasAutomaticQueue = (item: ComputedSymbol | undefined): item is ComputedSymbol =>
-    Boolean(item && queuedTime(item) !== null && (isPending(item) || item.state === 'data_not_arrived'));
 
 /** Tooltip for a symbol without a manual request. */
 const computeHint = (item: ComputedSymbol | undefined): string => {

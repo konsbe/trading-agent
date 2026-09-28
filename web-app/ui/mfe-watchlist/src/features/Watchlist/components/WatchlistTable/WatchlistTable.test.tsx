@@ -16,8 +16,12 @@ import {
     makeWatchlistQueued,
     TSM_MARKET_CAP_NOTE,
 } from '@/test-utils/fixtures';
+import { staticHeaderProps } from '@/test-utils/headerProps';
+import { buildWatchlistColumns, WATCHLIST_DEFAULT_SORT } from './columns';
 import WatchlistTable from './WatchlistTable';
 import { WatchlistTableProps } from './types';
+
+const COLUMNS = buildWatchlistColumns(() => undefined);
 
 jest.mock('@/api/tracking/trackingApi', () => ({
     fetchComputedSymbols: jest.fn(),
@@ -36,6 +40,8 @@ const renderTable = (overrides: Partial<WatchlistTableProps> = {}, { hosted = fa
         id: 'watchlist-table',
         caption: 'Watched symbols',
         rows: [makeWatchlistItem()],
+        columns: COLUMNS,
+        headerProps: staticHeaderProps(COLUMNS, WATCHLIST_DEFAULT_SORT),
         saving: new Set(),
         onRemove: jest.fn(),
         ...overrides,
@@ -197,7 +203,7 @@ describe('WatchlistTable', () => {
     });
 
     describe('market columns (same as the candidates table)', () => {
-        it("shows the candidates table's columns, labels and tooltips in its order, between Symbol and Compute / Remove", () => {
+        it("shows the candidates table's columns, labels and tooltips in its order, between Symbol and Added / Compute / Remove", () => {
             renderTable();
 
             const headers = screen.getAllByRole('columnheader');
@@ -213,6 +219,7 @@ describe('WatchlistTable', () => {
                 '% of 52w high',
                 'Catalyst',
                 'Score',
+                'Added',
                 'Compute',
                 'Actions',
             ]);

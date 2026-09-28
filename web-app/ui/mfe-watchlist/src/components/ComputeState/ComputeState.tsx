@@ -1,17 +1,14 @@
-import { Link } from 'react-router-dom';
+import { StockDetailLink } from '@trading-agent/shared-components';
 import { ComputedSymbol } from '@/api';
 import { isQueuedByRequest, queuedTime } from '@/common/compute/queue';
 import { formatClockTime, formatDateTime, minutesSince } from '@/common/format/format';
-import { scannerDetailPath } from '@/config/routes';
-import { useIsHosted } from '@/providers/HostModeContext';
+import { useCanOpenStockDetail, useStockDetailOrigin } from '@/providers/StockDetailOrigin';
 import { ComputeStateProps } from './types';
 import './ComputeState-styles.css';
 
 /** Stock Detail's own wording for an analysis being computed (mfe-scanner AnalysisSections). */
 export const COMPUTING_LABEL = 'Computing analysis';
 
-/** Stock Detail exists hosted only, and serves any symbol with daily bars — not crypto pairs. */
-const useDetailLinkable = (item: ComputedSymbol) => useIsHosted() && item.asset_type !== 'crypto';
 
 const Time = ({ iso }: { iso: string }) => (
     <time dateTime={iso} title={formatDateTime(iso)}>
@@ -40,7 +37,8 @@ const QueuedAt = ({ item, iso }: { item: ComputedSymbol; iso: string }) =>
  * the Computed Symbols table shows in its own column.
  */
 const ComputeState = ({ item, dataTimeoutMinutes, variant = 'inline' }: ComputeStateProps) => {
-    const linkable = useDetailLinkable(item);
+    const linkable = useCanOpenStockDetail()({ symbol: item.symbol, asset_type: item.asset_type });
+    const originLabel = useStockDetailOrigin();
     const queuedAt = queuedTime(item);
     const testId = `compute-state-${item.symbol}`;
 
@@ -88,9 +86,14 @@ const ComputeState = ({ item, dataTimeoutMinutes, variant = 'inline' }: ComputeS
                         )}
                     </span>
                     {variant === 'inline' && linkable && (
-                        <Link className="compute-state__link" to={scannerDetailPath(item.symbol)} data-testid={`compute-detail-link-${item.symbol}`}>
+                        <StockDetailLink
+                            className="compute-state__link"
+                            symbol={item.symbol}
+                            originLabel={originLabel}
+                            data-testid={`compute-detail-link-${item.symbol}`}
+                        >
                             Stock Detail
-                        </Link>
+                        </StockDetailLink>
                     )}
                 </span>
             );

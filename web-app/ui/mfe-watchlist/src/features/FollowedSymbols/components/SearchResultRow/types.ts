@@ -3,6 +3,8 @@ import { ApiErrorShape } from '@/api';
 
 export interface SearchResultRowProps {
     symbol: string;
+    /** `equity` | `etf` | `crypto`; omitted for scanner-universe results (all stocks). Crypto isn't linked to Stock Detail. */
+    assetType?: string | null;
     name: string | null;
     /** Joined with " · "; empty values are skipped. */
     facts: (string | null)[];

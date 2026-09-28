@@ -70,6 +70,23 @@
     vertical-align: bottom;
 }
 
+/*
+ * Sort buttons (shared SortableHeader) fill their cell and carry its padding:
+ * the header's block padding here, the outer columns' wider inset below.
+ */
+.tracking-table thead th.is-sortable {
+    padding: 0;
+}
+
+.tracking-table thead th .ta-sort-header__button {
+    padding: var(--space-sm);
+    white-space: nowrap;
+}
+
+.tracking-table thead th:first-child .ta-sort-header__button {
+    padding-left: var(--space-md);
+}
+
 .tracking-table__row > th,
 .tracking-table__row > td {
     background: var(--color-surface-container-low);
@@ -135,4 +152,13 @@
 
 .tracking-table__action {
     gap: var(--space-xs);
+}
+
+.tracking-table__no-match {
+    margin: 0;
+    padding: var(--space-md);
+    border: 1px dashed var(--color-outline-variant);
+    border-radius: var(--radius-md);
+    color: var(--color-on-surface-variant);
+    text-align: center;
 }

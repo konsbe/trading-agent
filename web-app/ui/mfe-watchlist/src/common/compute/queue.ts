@@ -20,3 +20,14 @@ export const isQueuedByRequest = (item: QueueFields): boolean => {
 /** The queued fetch is still moving; `data_not_arrived` and `failed` are final until the user acts. */
 export const isPending = (item: ComputedSymbol): boolean =>
     queuedTime(item) !== null && (item.state === 'waiting_for_data' || item.state === 'computing');
+
+export const hasOpenManualRequest = (item: ComputedSymbol | undefined): item is ComputedSymbol =>
+    Boolean(item && item.manual_requested_at !== null && item.reasons.includes('manual'));
+
+/** A fetch queued without a Compute press (a watchlist addition) that is moving or has timed out. */
+export const hasAutomaticQueue = (item: ComputedSymbol | undefined): item is ComputedSymbol =>
+    Boolean(item && queuedTime(item) !== null && (isPending(item) || item.state === 'data_not_arrived'));
+
+/** The item whose state a Compute control shows next to (or instead of) its button, or null for a plain button. */
+export const shownComputeItem = (item: ComputedSymbol | undefined): ComputedSymbol | null =>
+    hasOpenManualRequest(item) || hasAutomaticQueue(item) ? item : null;

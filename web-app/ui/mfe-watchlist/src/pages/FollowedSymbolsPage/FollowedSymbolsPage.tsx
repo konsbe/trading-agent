@@ -1,13 +1,20 @@
 import { useCallback } from 'react';
-import { CollapsibleCard, MFEDataWrapper, Skeleton } from '@trading-agent/shared-components';
+import { CollapsibleCard, MFEDataWrapper, Skeleton, TableSearch, useTableView } from '@trading-agent/shared-components';
 import { getTrackingErrorMessage } from '@/common/errors/errorMessages';
+import { sortSummary } from '@/common/table/sortSummary';
 import ApiErrorState from '@/components/ApiErrorState';
 import PageLayout from '@/components/PageLayout';
 import DirectorySearch from '@/features/FollowedSymbols/components/DirectorySearch';
-import FollowedTable from '@/features/FollowedSymbols/components/FollowedTable';
+import FollowedTable, {
+    FOLLOWED_DATE_KEYS,
+    FOLLOWED_DEFAULT_SORT,
+    FOLLOWED_URL_KEY,
+    useFollowedColumns,
+} from '@/features/FollowedSymbols/components/FollowedTable';
 import UniverseSearch from '@/features/FollowedSymbols/components/UniverseSearch';
 import useFollowedSymbols from '@/hooks/tracking/useFollowedSymbols';
 import { ComputeStatusProvider, useComputeStatus } from '@/providers/ComputeStatusContext';
+import { ORIGIN_LABELS, StockDetailOriginProvider } from '@/providers/StockDetailOrigin';
 import './FollowedSymbolsPage-styles.css';
 
 export const FOLLOWED_EXPLAINER =
@@ -23,6 +30,8 @@ const FollowedScreen = () => {
     const handleFollow = useCallback((symbol: string) => void follow(symbol), [follow]);
     const handleUnfollow = useCallback((symbol: string) => void unfollow(symbol), [unfollow]);
     const hasLoaded = !isLoading && !loadError;
+    const columns = useFollowedColumns();
+    const view = useTableView({ rows: items, columns, defaultSort: FOLLOWED_DEFAULT_SORT, urlKey: FOLLOWED_URL_KEY });
 
     return (
         <PageLayout title={hasLoaded ? `Followed Symbols (${items.length})` : 'Followed Symbols'} subtitle={FOLLOWED_EXPLAINER}>
@@ -35,7 +44,13 @@ const FollowedScreen = () => {
                 persistKey="watchlist.followed.list"
                 data-testid="followed-list"
                 title="Followed symbols"
-                meta={hasLoaded && items.length > 0 ? <p className="followed-page__meta">Newest first</p> : undefined}
+                meta={
+                    hasLoaded && items.length > 0 ? (
+                        <p className="followed-page__meta" aria-live="polite" data-testid="followed-sort-label">
+                            {sortSummary(columns, view.sort, FOLLOWED_DATE_KEYS)}
+                        </p>
+                    ) : undefined
+                }
             >
                 {isLoading && (
                     <div role="status" aria-label="Loading followed symbols" aria-busy="true" data-testid="followed-loading">
@@ -47,7 +62,30 @@ const FollowedScreen = () => {
                 )}
                 {hasLoaded && (
                     <MFEDataWrapper data={items} noDataMessage={EMPTY_FOLLOWED_MESSAGE} showEmptyIllustration={false} emptyStateStackStyle={EMPTY_STATE_STYLE}>
-                        <FollowedTable items={items} saving={saving} errors={errors} onUnfollow={handleUnfollow} />
+                        <TableSearch
+                            label="Search followed symbols"
+                            value={view.query}
+                            onChange={view.setQuery}
+                            total={view.total}
+                            shown={view.shown}
+                            controls="followed-table"
+                            data-testid="followed-search"
+                        />
+                        {view.shown === 0 ? (
+                            <p className="tracking-table__no-match" data-testid="followed-no-match">
+                                No followed symbols match “{view.query.trim()}”
+                            </p>
+                        ) : (
+                            <FollowedTable
+                                id="followed-table"
+                                rows={view.rows}
+                                columns={columns}
+                                headerProps={view.headerProps}
+                                saving={saving}
+                                errors={errors}
+                                onUnfollow={handleUnfollow}
+                            />
+                        )}
                     </MFEDataWrapper>
                 )}
             </CollapsibleCard>
@@ -62,7 +100,9 @@ const FollowedScreen = () => {
  */
 const FollowedSymbolsPage = () => (
     <ComputeStatusProvider>
-        <FollowedScreen />
+        <StockDetailOriginProvider label={ORIGIN_LABELS.followed}>
+            <FollowedScreen />
+        </StockDetailOriginProvider>
     </ComputeStatusProvider>
 );
 

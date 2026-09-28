@@ -94,9 +94,18 @@ describe('ComputeState', () => {
     });
 
     it('says "queued" without "added to watchlist" when no watchlist reason is open', () => {
-        renderState(makeWatchlistQueued('waiting_for_data', { reasons: ['followed'] }));
-        expect(state('BP')).toHaveTextContent(/queued \S+ \S+$/);
-        expect(state('BP')).not.toHaveTextContent('added to watchlist');
+        // Same local day as the queue time, so the time renders clock-only whatever the real date is.
+        const now = new Date('2026-09-27T17:59:00Z');
+        jest.useFakeTimers({ now });
+        try {
+            renderState(makeWatchlistQueued('waiting_for_data', { reasons: ['followed'] }));
+            const queued = formatClockTime('2026-09-27T17:56:04Z', now);
+            expect(queued).not.toContain(',');
+            expect(state('BP').textContent).toBe(`Waiting for data · queued ${queued}`);
+            expect(state('BP')).not.toHaveTextContent('added to watchlist');
+        } finally {
+            jest.useRealTimers();
+        }
     });
 
     it('omits the timeout when it is unknown', () => {

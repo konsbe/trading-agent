@@ -106,7 +106,11 @@ describe('WatchlistPage', () => {
     it('lists the symbols newest first with the count in the title', async () => {
         await renderLoaded({
             owner: 'unauthenticated',
-            items: [makeWatchlistItem({ symbol: 'TSLA' }), makeUncoveredItem('DVY'), makeWatchlistItem({ symbol: 'FSLY' })],
+            items: [
+                makeWatchlistItem({ symbol: 'TSLA', added_at: '2026-09-26T08:00:00Z' }),
+                { ...makeUncoveredItem('DVY'), added_at: '2026-09-25T08:00:00Z' },
+                makeWatchlistItem({ symbol: 'FSLY', added_at: '2026-09-24T08:00:00Z' }),
+            ],
         });
 
         expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Watchlist (3)');

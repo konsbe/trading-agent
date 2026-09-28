@@ -60,12 +60,12 @@ describe('ComputedSymbolsPage', () => {
         await renderPage();
 
         expect(row('AMZN').getByTestId('compute-state-AMZN')).toHaveTextContent(/^Computed$/);
-        expect(screen.getByTestId('computed-row-AMZN').querySelector('[data-column="computed"] time')).toHaveAttribute(
+        expect(screen.getByTestId('computed-row-AMZN').querySelector('[data-column="computed_at"] time')).toHaveAttribute(
             'dateTime',
             '2026-09-27T14:12:07Z'
         );
         expect(row('ABLV').getByTestId('compute-state-ABLV')).toHaveTextContent('Scheduled · next daily pass');
-        expect(screen.getByTestId('computed-row-ABLV').querySelector('[data-column="computed"]')).toHaveTextContent('not yet');
+        expect(screen.getByTestId('computed-row-ABLV').querySelector('[data-column="computed_at"]')).toHaveTextContent('not yet');
         expect(row('VTI').getByTestId('compute-state-VTI')).toHaveTextContent(/^Waiting for data · requested/);
         expect(row('ABLV').getByText('—')).toBeInTheDocument();
     });
