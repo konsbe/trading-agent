@@ -252,3 +252,31 @@ func TestTracked_ServesChain(t *testing.T) {
 		t.Errorf("chain = %v", c)
 	}
 }
+
+// A row the tracker has never evaluated (alerted on the latest session) serves
+// sessions_elapsed and unrealized_pct as null, never 0; evaluated rows keep
+// their numbers.
+func TestTracked_NotYetEvaluatedIsNullNotZero(t *testing.T) {
+	st := trackedFixture()
+	st.tracked = append(st.tracked, store.TrackedPositionRow{
+		Symbol: "FRESH", Bucket: "penny", Status: "active", AlertedTS: scanDay,
+		SessionsElapsed: 0, ReferencePrice: 1.30, LatestClose: ptr(1.30), MaxGainPct: ptr(0.0),
+	})
+	_, rows := trackedRows(t, newTestServer(t, st, freshNow), "?status=active")
+	got := map[string]map[string]any{}
+	for _, r := range rows {
+		got[r["symbol"].(string)] = r
+	}
+	f := got["FRESH"]
+	for _, k := range []string{"sessions_elapsed", "unrealized_pct", "last_evaluated_date"} {
+		if v, present := f[k]; !present || v != nil {
+			t.Errorf("FRESH %s = %v (present %v), want explicit null", k, v, present)
+		}
+	}
+	if f["current_price"] != 1.30 {
+		t.Errorf("FRESH current_price = %v, want the latest close", f["current_price"])
+	}
+	if n := got["NEXR"]; n["sessions_elapsed"] != 3.0 || n["unrealized_pct"] == nil {
+		t.Errorf("evaluated row = %v", n)
+	}
+}

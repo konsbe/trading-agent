@@ -100,9 +100,11 @@ type trackedPosition struct {
 	AlertedDate string  `json:"alerted_date"`
 
 	// SessionsElapsed is the tracker's stored count as of LastEvaluatedDate;
+	// null (as is UnrealizedPct) for a row the tracker has never evaluated
+	// (alerted on the latest session): a count of 0 would read as a reading.
 	// EvaluationBehind is true for an active row the tracker has not yet
 	// evaluated through the latest scan, so the count may lag.
-	SessionsElapsed   int     `json:"sessions_elapsed"`
+	SessionsElapsed   *int    `json:"sessions_elapsed"`
 	LastEvaluatedDate *string `json:"last_evaluated_date"`
 	EvaluationBehind  bool    `json:"evaluation_behind"`
 
@@ -203,11 +205,16 @@ func (s *Server) toTrackedPosition(row store.TrackedPositionRow, latest *time.Ti
 		Bucket:            row.Bucket,
 		Status:            row.Status,
 		AlertedDate:       row.AlertedTS.Format(time.DateOnly),
-		SessionsElapsed:   row.SessionsElapsed,
 		LastEvaluatedDate: dateOnly(row.LastEvaluatedTS),
 		ReferencePrice:    row.ReferencePrice,
 		MaxGainPct:        finite(row.MaxGainPct),
 		ExitReason:        row.ExitReason,
+	}
+
+	evaluated := row.LastEvaluatedTS != nil
+	if evaluated {
+		n := row.SessionsElapsed
+		p.SessionsElapsed = &n
 	}
 
 	if row.Status == "active" {
@@ -215,7 +222,7 @@ func (s *Server) toTrackedPosition(row store.TrackedPositionRow, latest *time.Ti
 		if price := finite(row.LatestClose); price != nil && latest != nil {
 			p.CurrentPrice = price
 			p.CurrentPriceDate = dateOnly(latest)
-			if row.ReferencePrice > 0 {
+			if row.ReferencePrice > 0 && evaluated {
 				v := (*price/row.ReferencePrice - 1) * 100
 				p.UnrealizedPct = finite(&v)
 			}
