@@ -3,6 +3,7 @@ export {
     ArrowLeftIcon,
     CloseIcon,
     ChevronDownIcon,
+    SearchIcon,
     LogoutIcon,
     SunIcon,
     MoonIcon,

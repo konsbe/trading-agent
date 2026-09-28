@@ -26,6 +26,20 @@ describe('mfe barrel exports', () => {
         expect(mfeExports.DotIcon).toBeDefined();
     });
 
+    it('exports the table view, sort header, search, Stock Detail link and page header', () => {
+        expect(mfeExports.useTableView).toBeDefined();
+        expect(mfeExports.sortRows).toBeDefined();
+        expect(mfeExports.filterRows).toBeDefined();
+        expect(mfeExports.SortableHeader).toBeDefined();
+        expect(mfeExports.TableSearch).toBeDefined();
+        expect(mfeExports.SearchIcon).toBeDefined();
+        expect(mfeExports.StockDetailLink).toBeDefined();
+        expect(mfeExports.stockDetailLink).toBeDefined();
+        expect(mfeExports.readStockDetailState).toBeDefined();
+        expect(mfeExports.isStockDetailEligible).toBeDefined();
+        expect(mfeExports.PageHeader).toBeDefined();
+    });
+
     it('exports the market cells, columns and formatters', () => {
         expect(mfeExports.ChangeCell).toBeDefined();
         expect(mfeExports.MarketCapCell).toBeDefined();

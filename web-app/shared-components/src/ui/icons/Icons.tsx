@@ -41,6 +41,13 @@ export const CloseIcon = createIcon('CloseIcon', (
     <path d="M18 6 6 18M6 6l12 12" />
 ));
 
+export const SearchIcon = createIcon('SearchIcon', (
+    <>
+        <circle cx="11" cy="11" r="7" />
+        <path d="m20 20-3.5-3.5" />
+    </>
+));
+
 export const ChevronDownIcon = createIcon('ChevronDownIcon', (
     <path d="m6 9 6 6 6-6" />
 ));

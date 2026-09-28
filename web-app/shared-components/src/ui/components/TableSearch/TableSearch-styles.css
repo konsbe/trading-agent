@@ -1,0 +1,104 @@
+.ta-table-search {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-xs) var(--space-sm);
+    min-width: 0;
+    font-family: var(--font-family);
+    font-size: var(--font-size-sm);
+    color: var(--color-on-surface);
+}
+
+.ta-table-search__label {
+    color: var(--color-on-surface-variant);
+    font-size: var(--font-size-xs);
+}
+
+.ta-table-search__label.is-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+}
+
+.ta-table-search__field {
+    position: relative;
+    display: flex;
+    align-items: center;
+    flex: 0 1 18rem;
+    min-width: 10rem;
+}
+
+.ta-table-search__icon {
+    position: absolute;
+    left: var(--space-sm);
+    color: var(--color-on-surface-variant);
+    pointer-events: none;
+}
+
+.ta-table-search__input {
+    box-sizing: border-box;
+    width: 100%;
+    height: 32px;
+    padding: 0 calc(var(--space-sm) + 20px) 0 calc(var(--space-sm) + 22px);
+    border: 1px solid var(--color-outline-variant);
+    border-radius: var(--radius-md);
+    background: var(--color-surface-container-low);
+    color: var(--color-on-surface);
+    font: inherit;
+    transition: border-color var(--transition-fast);
+}
+
+.ta-table-search__input::placeholder {
+    color: var(--color-on-surface-variant);
+    opacity: 1;
+}
+
+/* The kit's clear button replaces the browser's own. */
+.ta-table-search__input::-webkit-search-cancel-button {
+    appearance: none;
+}
+
+.ta-table-search__input:hover {
+    border-color: var(--color-outline);
+}
+
+.ta-table-search__input:focus-visible {
+    border-color: var(--color-primary);
+    outline: 2px solid var(--color-focus-ring);
+    outline-offset: 1px;
+}
+
+.ta-table-search__clear {
+    position: absolute;
+    right: var(--space-xxs);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--color-on-surface-variant);
+    cursor: pointer;
+}
+
+.ta-table-search__clear:hover {
+    background: var(--color-surface-container-high);
+    color: var(--color-on-surface);
+}
+
+.ta-table-search__clear:focus-visible {
+    outline: 2px solid var(--color-focus-ring);
+    outline-offset: 0;
+}
+
+.ta-table-search__count {
+    color: var(--color-on-surface-variant);
+    font-size: var(--font-size-xs);
+    font-variant-numeric: tabular-nums;
+}

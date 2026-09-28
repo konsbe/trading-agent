@@ -1,5 +1,6 @@
 import { ReactNode } from 'react';
 import { CatalystTier, MarketCapFields } from '../../../format';
+import { TableColumn } from '../TableView/types';
 
 /** What ScoreCell reads. `momentum_score_100` null means "no score row", which is not the same as 0. */
 export interface ScoreFields {
@@ -39,7 +40,8 @@ export type MarketColumnKey =
     | 'catalyst_tier'
     | 'momentum_score_100';
 
-export interface MarketColumn {
+/** A `useTableView` column over `MarketRow`, plus how to render it. */
+export interface MarketColumn extends TableColumn<MarketRow> {
     key: MarketColumnKey;
     /** Header text. */
     label: string;

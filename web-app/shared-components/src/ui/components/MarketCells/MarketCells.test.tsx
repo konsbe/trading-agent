@@ -7,6 +7,7 @@ import MarketCapCell from './MarketCapCell';
 import ScoreCell, { scoreLabel } from './ScoreCell';
 import { MARKET_COLUMNS } from './marketColumns';
 import { MarketRow } from './types';
+import { filterRows, initialSortDirection, sortRows } from '../TableView';
 
 const makeRow = (overrides: Partial<MarketRow> = {}): MarketRow => ({
     close: 3.42,
@@ -153,6 +154,48 @@ describe('MARKET_COLUMNS', () => {
             expect(renderColumn(key, nulls).textContent).toBe('—')
         );
         expect(renderColumn('momentum_score_100', nulls).textContent).toBe('No score, unvalidated—unvalidated');
+    });
+});
+
+describe('MARKET_COLUMNS as table-view columns', () => {
+    const symbols = (list: { symbol: string }[]) => list.map(r => r.symbol);
+    const row = (symbol: string, overrides: Partial<MarketRow>) => ({ symbol, ...makeRow(overrides) });
+
+    it('sorts market cap by the value shown (reported, else estimate), nulls last both ways', () => {
+        const list = [
+            row('REP', { market_cap: 5e8, market_cap_est: 1e6 }),
+            row('EST', { market_cap: null, market_cap_est: 3e8, market_cap_is_proxy: true }),
+            row('NIL', { market_cap: null, market_cap_est: null }),
+            row('BIG', { market_cap: 4e9 }),
+        ];
+        expect(symbols(sortRows(list, MARKET_COLUMNS, { key: 'market_cap', direction: 'asc' }))).toEqual(['EST', 'REP', 'BIG', 'NIL']);
+        expect(symbols(sortRows(list, MARKET_COLUMNS, { key: 'market_cap', direction: 'desc' }))).toEqual(['BIG', 'REP', 'EST', 'NIL']);
+    });
+
+    it('ranks breakout states (unknown after known) and catalyst tiers, both starting descending', () => {
+        const list = [
+            row('NON', { breakout_state: 'none', catalyst_tier: 'none' }),
+            row('ZZZ', { breakout_state: 'mystery', catalyst_tier: null }),
+            row('BRK', { breakout_state: 'breakout', catalyst_tier: 'B' }),
+            row('BFC', { breakout_state: 'breakout_from_consolidation', catalyst_tier: 'A' }),
+            row('NUL', { breakout_state: null, catalyst_tier: null }),
+        ];
+        const breakout = MARKET_COLUMNS.find(c => c.key === 'breakout_state')!;
+        const catalyst = MARKET_COLUMNS.find(c => c.key === 'catalyst_tier')!;
+        expect(initialSortDirection(breakout, list)).toBe('desc');
+        expect(initialSortDirection(catalyst, list)).toBe('desc');
+        expect(symbols(sortRows(list, MARKET_COLUMNS, { key: 'breakout_state', direction: 'desc' }))).toEqual(['ZZZ', 'BFC', 'BRK', 'NON', 'NUL']);
+        expect(symbols(sortRows(list, MARKET_COLUMNS, { key: 'catalyst_tier', direction: 'desc' }))).toEqual(['BFC', 'BRK', 'NON', 'NUL', 'ZZZ']);
+    });
+
+    it('searches the text each cell shows', () => {
+        const list = [row('A', {}), row('B', { breakout_state: 'none', catalyst_tier: 'A', market_cap: null, market_cap_est: 120e6 })];
+        expect(symbols(filterRows(list, MARKET_COLUMNS, 'from consolidation'))).toEqual(['A']);
+        expect(symbols(filterRows(list, MARKET_COLUMNS, 'tier a'))).toEqual(['B']);
+        expect(symbols(filterRows(list, MARKET_COLUMNS, '(est.)'))).toEqual(['B']);
+        expect(symbols(filterRows(list, MARKET_COLUMNS, '53/75'))).toEqual(['A', 'B']);
+        expect(symbols(filterRows(list, MARKET_COLUMNS, '+15.5%'))).toEqual(['A', 'B']);
+        expect(symbols(filterRows(list, MARKET_COLUMNS, 'breakout_from'))).toEqual([]);
     });
 });
 
