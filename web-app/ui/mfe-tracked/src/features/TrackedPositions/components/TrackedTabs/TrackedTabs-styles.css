@@ -1,0 +1,35 @@
+.tracked-tabs {
+    display: flex;
+    gap: var(--space-md);
+    border-bottom: 1px solid var(--color-outline-variant);
+}
+
+.tracked-tabs__tab {
+    margin-bottom: -1px;
+    padding: var(--space-xs) var(--space-xxs);
+    border: 0;
+    border-bottom: 2px solid transparent;
+    background: transparent;
+    color: var(--color-on-surface-variant);
+    font-family: var(--font-family);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+    cursor: pointer;
+    transition: color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.tracked-tabs__tab:hover {
+    color: var(--color-on-surface);
+}
+
+/* Active indicator: primary, per the Stitch "active indicator" role. */
+.tracked-tabs__tab.is-selected {
+    border-bottom-color: var(--color-primary);
+    color: var(--color-on-surface);
+}
+
+.tracked-tabs__tab:focus-visible {
+    outline: 2px solid var(--color-focus-ring);
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
+}

@@ -6,8 +6,10 @@ Listed in the sidebar's **Tracking** group at `/tracked-positions`.
 
 Backed by `momentum-api` `GET /api/v1/scanner/tracked?status=active|closed|all`
 (read-only over `momentum_tracked`; see
-`services/data-analyzer/internal/momentumapi/tracked.go`). The page is currently
-a placeholder.
+`services/data-analyzer/internal/momentumapi/tracked.go`). The page reads
+`status=all` once and splits it into **Active** / **Closed** tabs (counts from
+`summary`), shows the chain freshness banner from `chain`, and re-reads when its
+browser tab becomes visible again. See `src/features/TrackedPositions/README.md`.
 
 | | |
 |---|---|
@@ -83,12 +85,16 @@ A running dev server must be restarted after `exposes` in `webpack.config.js` ch
 
 ```
 src/
-  api/            fetch-client (GET/PUT/DELETE, ApiError {status, code})
+  api/            fetch-client (GET/PUT/DELETE, ApiError {status, code}), strict readers,
+                  tracked/ (types, parsers, fetchTracked)
   app/            app-root (exposed, hosted), bootstrap (standalone), wrapper
-  common/         error copy, webpack MF helper
+  common/         error copy, date formatter, webpack MF helper
   components/     PageLayout, ApiErrorState
-  config/         api.config.ts (base URL, TRACKED_ENDPOINTS)
+  config/         api.config.ts (base URL, TRACKED_ENDPOINTS), routes.ts (Stock Detail link)
+  features/       TrackedPositions (screen, banner, tabs, tables, hooks, utils)
+  hooks/          useApiResource, useRefreshOnVisible
   pages/          TrackedPositionsPage
+  styles/         tracked-table.css (shared table look)
   providers/      HostModeContext (hosted vs standalone)
   router/         AppRouter (relative routes)
   types/          MF remote declarations, constants

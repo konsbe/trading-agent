@@ -1,0 +1,71 @@
+/* Exit reason: plain text in a button (not a badge), neutral like Breakout on the candidates table. */
+.tracked-exit__toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-xxs);
+    margin: 0 calc(-1 * var(--space-xxs));
+    padding: var(--space-xxs);
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--color-on-surface);
+    font: inherit;
+    cursor: pointer;
+}
+
+.tracked-exit__toggle:hover .tracked-exit__reason {
+    text-decoration: underline;
+}
+
+.tracked-exit__toggle:focus-visible {
+    outline: 2px solid var(--color-focus-ring);
+    outline-offset: 1px;
+}
+
+.tracked-exit__reason {
+    font-family: var(--font-family-label);
+}
+
+.tracked-exit__chevron {
+    flex: 0 0 auto;
+    color: var(--color-on-surface-variant);
+    transition: transform var(--transition-fast);
+}
+
+.tracked-exit__toggle[aria-expanded='true'] .tracked-exit__chevron {
+    transform: rotate(180deg);
+}
+
+/* The opened note: a plain inline panel under its row, never a tooltip. */
+.tracked-table .tracked-exit__note-row > td {
+    padding-top: 0;
+    white-space: normal;
+}
+
+.tracked-exit__note-row:hover > td {
+    background: var(--color-surface-container-low);
+}
+
+.tracked-exit__note {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xxs);
+    max-width: 72ch;
+    margin: 0 0 var(--space-xs);
+    padding: var(--space-xs) var(--space-sm);
+    border-left: 2px solid var(--color-outline);
+    border-radius: var(--radius-sm);
+    background: var(--color-surface-container);
+}
+
+.tracked-exit__note-label {
+    color: var(--color-on-surface-variant);
+    font-family: var(--font-family-label);
+    font-size: var(--font-size-xs);
+}
+
+.tracked-exit__note-text {
+    margin: 0;
+    color: var(--color-on-surface);
+    line-height: 1.45;
+}

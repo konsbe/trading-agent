@@ -1,0 +1,14 @@
+/* Card chrome (surface, radius, header toggle) comes from the shared CollapsibleCard. */
+
+.tracked-panel__meta {
+    margin: 0;
+    color: var(--color-on-surface-variant);
+    font-size: var(--font-size-xs);
+}
+
+/* Calm, neutral note: rows awaiting their first evaluation are expected, not a problem. */
+.tracked-panel__note {
+    margin: 0 0 var(--space-sm);
+    color: var(--color-on-surface-variant);
+    font-size: var(--font-size-sm);
+}

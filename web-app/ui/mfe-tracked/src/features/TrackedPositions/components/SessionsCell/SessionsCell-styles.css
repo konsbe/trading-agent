@@ -1,0 +1,15 @@
+.tracked-sessions {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: flex-end;
+    line-height: 1.3;
+}
+
+/* Neutral, not a warning: both are expected states of the daily chain. */
+.tracked-sessions__pending,
+.tracked-sessions__hint {
+    color: var(--color-on-surface-variant);
+    font-family: var(--font-family);
+    font-size: var(--font-size-xs);
+    font-style: italic;
+}

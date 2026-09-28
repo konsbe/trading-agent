@@ -1,0 +1,13 @@
+.tracked-screen {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+    min-width: 0;
+}
+
+/* Neutral: the rows shown are still true as of the last load. */
+.tracked-screen__refresh-error {
+    margin: 0;
+    color: var(--color-on-surface-variant);
+    font-size: var(--font-size-sm);
+}

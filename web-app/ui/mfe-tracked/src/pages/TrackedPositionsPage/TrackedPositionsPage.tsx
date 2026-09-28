@@ -1,9 +1,5 @@
-import PageLayout from '@/components/PageLayout';
+import TrackedPositionsScreen from '@/features/TrackedPositions';
 
-const TrackedPositionsPage = () => (
-    <PageLayout title="Tracked Positions">
-        <p data-testid="tracked-placeholder">Tracked positions will appear here.</p>
-    </PageLayout>
-);
+const TrackedPositionsPage = () => <TrackedPositionsScreen />;
 
 export default TrackedPositionsPage;
