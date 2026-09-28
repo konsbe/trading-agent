@@ -59,16 +59,17 @@ const (
 	AlertSortAlertType = "alert_type" // type id; ids sort like their labels
 	AlertSortSeverity  = "severity"   // info < notice < warning
 	AlertSortCount     = "count"      // grouped only
+	AlertSortMessage   = "message"    // raw: the message; grouped: the latest message
 )
 
 var alertSortRaw = map[string]string{
 	AlertSortFired: "fired_at", AlertSortSymbol: "symbol", AlertSortAlertType: "alert_type",
-	AlertSortSeverity: severityRankSQL("severity"),
+	AlertSortSeverity: severityRankSQL("severity"), AlertSortMessage: "message",
 }
 
 var alertSortGrouped = map[string]string{
 	AlertSortFired: "l.fired_at", AlertSortSymbol: "g.symbol", AlertSortAlertType: "g.alert_type",
-	AlertSortSeverity: severityRankSQL("l.severity"), AlertSortCount: "g.n",
+	AlertSortSeverity: severityRankSQL("l.severity"), AlertSortCount: "g.n", AlertSortMessage: "l.message",
 }
 
 func severityRankSQL(col string) string {

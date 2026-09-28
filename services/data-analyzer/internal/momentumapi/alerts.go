@@ -24,8 +24,8 @@ import (
 //	limit         rows or groups per page (default 100, max 500)
 //	mode          raw (default) or grouped: one row per symbol + alert type in
 //	              the range, with count, first / last fired and the latest alert
-//	sort, dir     a sorted view: fired | symbol | alert_type | severity, plus
-//	              count when grouped; dir asc | desc (default desc). Ties by
+//	sort, dir     a sorted view: fired | symbol | alert_type | severity |
+//	              message (grouped: the latest message), plus count when grouped; dir asc | desc (default desc). Ties by
 //	              symbol, then newest
 //	q             a search: symbol, displayed type label, severity or message
 //	              (case-insensitive; grouped: groups of the matching alerts)

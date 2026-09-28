@@ -563,7 +563,8 @@ Discord are recorded (the bot writes the row after a confirmed post); the
 momentum screener's alerts are not written to `fired_alerts`.
 
 **Sort and search (2026-09-28).** `sort` = `fired` | `symbol` | `alert_type`
-| `severity` (info < notice < warning), plus `count` in grouped mode; `dir`
+| `severity` (info < notice < warning) | `message` (grouped: the latest
+message), plus `count` in grouped mode; `dir`
 = `asc` | `desc` (default desc); ties by symbol, then newest. `q` searches
 case-insensitively (literal, max 60 characters) across symbol, message,
 severity and the displayed type label (resolved through

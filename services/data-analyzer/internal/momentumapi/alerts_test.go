@@ -397,6 +397,11 @@ func TestAlerts_SortSearchOffset(t *testing.T) {
 	if ids := alertIDs(body); !slices.Equal(ids, []float64{1}) {
 		t.Errorf("Bollinger matches the bb_squeeze row by its label: ids %v", ids)
 	}
+	for _, path := range []string{"/api/v1/alerts?sort=message&dir=asc", "/api/v1/alerts?mode=grouped&sort=message"} {
+		if rec := get(t, srv, path); rec.Code != http.StatusOK {
+			t.Errorf("%s = %d, want 200 (message is sortable)", path, rec.Code)
+		}
+	}
 	if body := decode(t, get(t, srv, "/api/v1/alerts?mode=grouped&sort=count&dir=desc")); body["sort"] != "count" {
 		t.Errorf("grouped count sort = %v", body["sort"])
 	}
