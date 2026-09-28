@@ -1236,6 +1236,114 @@
           "terms": []
         }
       ]
+    },
+    {
+      "id": "tracked-positions",
+      "title": "Tracked Positions",
+      "intro": "*What this part of the app is for:* Tracked Positions, under Tracking, follows every alert the momentum scanner raised — each symbol that passed all of the scanner's gates on a session — through the pre-registered exit rules, until one of those rules closes it. It is research instrumentation: a record of how the alerts behaved afterwards, kept to judge the exit rules themselves. It is not a portfolio. Nothing was bought or sold, and its percentages are price moves from the alert-day close, not results of any trade.",
+      "entries": [
+        {
+          "id": "tracked-positions-rows",
+          "title": "What is tracked, and when",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "The daily chain runs once a session's bars have landed: bar ingestion, then the momentum scanner, then the tracker. The tracker first evaluates every active row against the new session, then opens one row for each of that session's gate-pass alerts. A symbol alerted on more than one session therefore has one row per alert, and can appear twice."
+            },
+            {
+              "type": "paragraph",
+              "text": "The page has two tabs, **Active** (the default) and **Closed**, each with its count, for example \"Active (20)\" and \"Closed (16)\". Both lists show the most recent alert first. Nothing is pushed to the page: it re-reads the list when you come back to its browser tab, and if that fails the rows stay and the page says it couldn't check."
+            }
+          ],
+          "terms": []
+        },
+        {
+          "id": "tracked-positions-columns",
+          "title": "The columns",
+          "blocks": [
+            {
+              "type": "list",
+              "items": [
+                "**Symbol / Exchange / Bucket** — the ticker, company, exchange, and the scanner bucket it was alerted in (Market or Penny). The ticker opens the symbol's Stock Detail page.",
+                "**Alerted Date** — the session the alert was raised on.",
+                "**Sessions Elapsed** — how many trading sessions the exit rules have evaluated since the alert. Trading sessions follow the NYSE calendar, so weekends and market holidays never count. On a closed row it is the count at which it closed.",
+                "**Reference Price** — the close on the alert date, as traded. Every percentage on the page is measured from it.",
+                "**Current Price** (Active) — the close on the latest scan date.",
+                "**Unrealized %** (Active) — the current price against the reference price: (current ÷ reference − 1) × 100.",
+                "**Exit Reason** (Closed) — the exit rule that closed the row, as its plain name, for example breakout_failed.",
+                "**Exit %** (Closed) — the close on the session the rule fired against the reference price, measured the same way."
+              ]
+            },
+            {
+              "type": "paragraph",
+              "text": "Only **Unrealized %** and **Exit %** are coloured, green up and red down, like Change % on the candidates list: they are price facts, not signals. Everything else, including the exit reason, is neutral text with no badge or icon."
+            }
+          ],
+          "terms": []
+        },
+        {
+          "id": "tracked-positions-not-evaluated",
+          "title": "\"Not yet evaluated\" rows",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "A row opened on the latest session has not been through the exit rules yet: the tracker first evaluates a row on the session after its alert. Its **Sessions Elapsed** reads \"Not yet evaluated\" and its **Unrealized %** reads \"—\", never 0 or 0.0%, because there is no reading yet; its Current Price is the alert-day close itself. One note above the Active table counts these rows, for example \"10 rows have not been evaluated yet — the next tracker run evaluates them.\""
+            },
+            {
+              "type": "paragraph",
+              "text": "Separately, a single active row can lag the others — for example when its symbol has no bar for the latest session. The tracker then has not evaluated that row through the latest scan, and its Sessions Elapsed carries a neutral note, \"as of\" the last session it was evaluated on, so a lagging count never reads as current."
+            }
+          ],
+          "terms": []
+        },
+        {
+          "id": "tracked-positions-exit-reasons",
+          "title": "Exit reasons and their notes",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "Each session the tracker checks an active row against the exit rules in this order, and the first one that matches closes it:"
+            },
+            {
+              "type": "list",
+              "items": [
+                "**breakout_failed** — the close fell back below the 20-day resistance level the symbol broke out over at the alert. Measured to fire on the first session in most cases (651 of 1,545 replayed exits, at a median peak of 0.00%), so it is an overly sensitive rule, not a confirmed breakout failure.",
+                "**lost_vwap** — the close fell below its rolling 20-day VWAP (volume-weighted average price). A plain definition; no finding qualifies it.",
+                "**momentum_stalled** — relative volume (20-day) stayed below 1.5 for 3 sessions in a row. A plain definition; no finding qualifies it.",
+                "**stop_atr** — the close fell more than 2 × ATR(14) below the reference price. In the replay this condition was true 116 times but fired first only 31 times: faster rules usually close the row before it, and the order of the rules is itself unvalidated.",
+                "**timeout** — 20 sessions passed without another exit firing. It never fired in 1,545 replayed exits (the longest ran 17 sessions), so a timeout here is itself unusual."
+              ]
+            },
+            {
+              "type": "paragraph",
+              "text": "Click a row's Exit Reason (or press Enter or Space on it) to open that rule's note in a panel directly under the row; it stays open until you click it again. Each note is specific to its rule — there is no single blanket warning — and the lost_vwap and momentum_stalled notes are just their definitions."
+            }
+          ],
+          "terms": []
+        },
+        {
+          "id": "tracked-positions-freshness",
+          "title": "When the daily chain is behind",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "If the daily chain itself has stalled — for example because the bars did not arrive — every row is old at once. The page then shows one note above the tabs, in neutral styling (no data is wrong, it is old):"
+            },
+            {
+              "type": "list",
+              "items": [
+                "**No new scan** — \"No new scan for 2 trading sessions — the latest is Sep 25, 2026. Tracked figures below are as of that date.\" Shown when at least one expected session has no scan yet; it says \"1 trading session\" for one.",
+                "**Tracking behind** — \"The Sep 28, 2026 scan exists but tracking has not been updated since Sep 25, 2026.\" Shown when the latest scan finished more than 15 minutes ago without the tracker completing for it, or the chain gave up on that session."
+              ]
+            },
+            {
+              "type": "paragraph",
+              "text": "If both apply, only \"No new scan\" is shown. Both count trading sessions on the NYSE calendar, so a weekend or holiday never raises them, and both come from the chain's own records, never from the rows' dates. The per-row notes stay as they are while the banner shows."
+            }
+          ],
+          "terms": []
+        }
+      ]
     }
   ]
 }
