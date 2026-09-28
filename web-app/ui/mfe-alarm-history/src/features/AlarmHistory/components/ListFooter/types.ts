@@ -8,5 +8,7 @@ export interface ListFooterProps {
     isLoadingOlder: boolean;
     olderError: ApiError | null;
     onLoadOlder: () => void;
+    /** A sorted or searched view: "Load more" / "the first N" instead of "Load older" / "the newest N". */
+    sorted?: boolean;
     'data-testid': string;
 }

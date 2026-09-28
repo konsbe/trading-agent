@@ -3,6 +3,14 @@ export type ExchangeType = 'equity' | 'crypto' | (string & {});
 
 export type AlertsMode = 'raw' | 'grouped';
 
+/** Server-side sort keys; `count` only in grouped mode. For a group, `fired` is its last fired time and `message` its latest message. */
+export type AlertSortKey = 'fired' | 'symbol' | 'alert_type' | 'severity' | 'message' | 'count';
+
+export type SortDir = 'asc' | 'desc';
+
+/** The API's `q` limit (characters). */
+export const MAX_ALERT_QUERY_LENGTH = 60;
+
 /** One fired_alerts row: an alert the analyst bot's alert scan posted to Discord. */
 export interface FiredAlert {
     id: number;
@@ -34,8 +42,10 @@ export interface AlertGroup {
 export interface AlertsResponse {
     mode: AlertsMode;
     has_more: boolean;
-    /** Cursor for the next page (pass as `before`); set exactly when `has_more`. */
+    /** Cursor for the next page of the default newest-first view (pass as `before`). */
     next_before: number | null;
+    /** Next page of a sorted or searched view (pass as `offset`). Exactly one of the two is set when `has_more`. */
+    next_offset: number | null;
     alerts: FiredAlert[];
     groups: AlertGroup[];
     /** Every alert type that has ever fired (filter options). */
@@ -59,7 +69,16 @@ export interface AlertsQuery {
     since?: string;
     /** RFC3339 with offset, exclusive. */
     until?: string;
+    /** Id cursor; only for the default newest-first view (the API answers 400 invalid_before otherwise). */
     before?: number;
     limit?: number;
     mode?: AlertsMode;
+    /** Omitted = newest first by fired time. */
+    sort?: AlertSortKey;
+    /** Default desc. */
+    dir?: SortDir;
+    /** Search: symbol, message, severity, displayed type label (case-insensitive, literal, ≤ 60 characters). */
+    q?: string;
+    /** Pages a sorted or searched view. */
+    offset?: number;
 }

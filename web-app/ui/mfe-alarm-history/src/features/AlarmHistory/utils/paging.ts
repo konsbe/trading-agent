@@ -28,16 +28,20 @@ const compareOrder = (a: { fired_at: string; id: number }, b: { fired_at: string
 export interface Page<T> {
     items: T[];
     hasMore: boolean;
+    /** The default newest-first view's id cursor. */
     nextBefore: number | null;
+    /** A sorted or searched view's next offset. */
+    nextOffset: number | null;
 }
 
-/** "Load older": the next page appended; anything already listed keeps its place. */
+/** "Load older" / "Load more": the next page appended; anything already listed keeps its place. */
 export const appendPage = <T>(current: Page<T>, older: Page<T>, shape: ListShape<T>): Page<T> => {
     const seen = new Set(current.items.map(shape.keyOf));
     return {
         items: [...current.items, ...older.items.filter(item => !seen.has(shape.keyOf(item)))],
         hasMore: older.hasMore,
         nextBefore: older.nextBefore,
+        nextOffset: older.nextOffset,
     };
 };
 
@@ -61,5 +65,5 @@ export const mergeFirstPage = <T>(current: Page<T>, fresh: Page<T>, shape: ListS
         item => !freshKeys.has(shape.keyOf(item)) && compareOrder(shape.orderOf(item), oldestFresh) > 0
     );
     if (tail.length === 0) return fresh;
-    return { items: [...fresh.items, ...tail], hasMore: current.hasMore, nextBefore: current.nextBefore };
+    return { items: [...fresh.items, ...tail], hasMore: current.hasMore, nextBefore: current.nextBefore, nextOffset: current.nextOffset };
 };

@@ -12,6 +12,7 @@ describe('parseAlertsResponse', () => {
             mode: 'grouped',
             has_more: true,
             next_before: 467,
+            next_offset: null,
             alerts: [],
             groups: [group],
             types: ['bb_squeeze', 'fa_tier_flip', 'liquidity_sweep', 'rsi_overbought'],
@@ -67,8 +68,17 @@ describe('parseAlertsResponse', () => {
         expect(parseAlertsResponse(body)).toMatchObject({ alerts: [], groups: [], types: [] });
     });
 
+    it('parses a sorted / searched page, paged by next_offset', () => {
+        const parsed = parseAlertsResponse({ ...toWire(makeResponse()), has_more: true, next_before: null, next_offset: 200, sort: 'count', dir: 'asc', q: 'xom' });
+
+        expect(parsed).toMatchObject({ has_more: true, next_before: null, next_offset: 200 });
+    });
+
     it.each([
-        ['has_more set without next_before', { has_more: true, next_before: null }],
+        ['has_more set without next_before or next_offset', { has_more: true, next_before: null }],
+        ['next_offset set without has_more', { has_more: false, next_offset: 100 }],
+        ['both cursors set', { has_more: true, next_before: 12, next_offset: 100 }],
+        ['a non-number next_offset', { has_more: true, next_offset: '100' }],
         ['next_before set without has_more', { has_more: false, next_before: 12 }],
         ['a non-boolean has_more', { has_more: 'yes' }],
         ['an unknown mode', { mode: 'daily' }],

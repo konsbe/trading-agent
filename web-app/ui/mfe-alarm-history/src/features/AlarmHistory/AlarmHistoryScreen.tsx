@@ -1,5 +1,5 @@
-import { ReactNode } from 'react';
-import { CollapsibleCard } from '@trading-agent/shared-components';
+import { ReactNode, useMemo } from 'react';
+import { CollapsibleCard, TableSearch } from '@trading-agent/shared-components';
 import { formatClockWithSeconds, formatDateTime } from '@/common/format/format';
 import useAlarmHistory from './hooks/useAlarmHistory';
 import { AlertsMeta } from './hooks/usePagedAlerts';
@@ -10,10 +10,14 @@ import AlertsTable from './components/AlertsTable';
 import GroupedAlertsTable from './components/GroupedAlertsTable';
 import ListFooter from './components/ListFooter';
 import ListState from './components/ListState';
+import { GROUPED_COLUMNS, RAW_COLUMNS, sortDescription } from './utils/alertColumns';
 import { AlarmHistoryScreenProps } from './types';
 import './AlarmHistoryScreen-styles.css';
 
 const NO_LABELS: Readonly<Record<string, string>> = {};
+
+/** Each keystroke would start a new server view; wait for a pause. */
+export const SEARCH_DEBOUNCE_MS = 300;
 
 /**
  * Why an empty period may be empty: before the first record nothing was
@@ -32,16 +36,28 @@ const emptyDetail = (meta: AlertsMeta | null, since: string | undefined, until: 
     return null;
 };
 
+const SEARCH_PLACEHOLDER = 'Symbol, type, severity or message';
+
 /**
  * Alarm History: the alerts the analyst bot posted to Discord, newest first,
  * grouped by symbol + alert type by default or every alert on request.
- * Refreshes itself on tab focus and every 60 s while visible (no push).
+ * Headers sort and the search box searches on the server — every record in
+ * the filters, not just the loaded page — and both, with the filters and the
+ * view, live in the URL. Refreshes itself on tab focus and every 60 s while
+ * visible (no push); a sorted or searched view then starts again from page 1.
  */
 const AlarmHistoryScreen = ({ refreshIntervalMs, pageSize }: AlarmHistoryScreenProps) => {
-    const { filters, showAll, setShowAll, grouped, raw, meta, lastChecked, expanded, toggleGroup, refreshToken } =
+    const { filters, showAll, setShowAll, grouped, raw, groupedView, rawView, meta, lastChecked, expanded, toggleGroup, refreshToken } =
         useAlarmHistory({ refreshIntervalMs, pageSize });
     const active = showAll ? raw : grouped;
-    const detail = emptyDetail(meta, filters.query.since, filters.query.until);
+    const view = showAll ? rawView : groupedView;
+    const searchQuery = view.query.trim();
+    const detail = searchQuery ? `No alerts in these filters match “${searchQuery}”.` : emptyDetail(meta, filters.query.since, filters.query.until);
+    const groupQuery = useMemo(
+        () => (groupedView.query.trim() ? { ...filters.query, q: groupedView.query.trim() } : filters.query),
+        [filters.query, groupedView.query]
+    );
+    const tableId = showAll ? 'alarm-raw-table' : 'alarm-grouped-table';
 
     const cardMeta = (
         <>
@@ -81,6 +97,16 @@ const AlarmHistoryScreen = ({ refreshIntervalMs, pageSize }: AlarmHistoryScreenP
                     persistKey="alarm-history.page.alerts"
                     data-testid="alarm-alerts-card"
                 >
+                    <TableSearch
+                        key={showAll ? 'raw' : 'grouped'}
+                        label={showAll ? 'Search every alert' : 'Search alert groups'}
+                        placeholder={SEARCH_PLACEHOLDER}
+                        value={view.query}
+                        onChange={view.setQuery}
+                        debounceMs={SEARCH_DEBOUNCE_MS}
+                        controls={tableId}
+                        data-testid="alarm-search"
+                    />
                     <ListState
                         isLoading={active.isLoading}
                         error={active.error}
@@ -91,7 +117,12 @@ const AlarmHistoryScreen = ({ refreshIntervalMs, pageSize }: AlarmHistoryScreenP
                     >
                         {showAll ? (
                             <>
-                                <AlertsTable id="alarm-raw-table" caption="Every alert, newest first" alerts={raw.items} />
+                                <AlertsTable
+                                    id="alarm-raw-table"
+                                    caption={`Every alert, ${sortDescription(RAW_COLUMNS, rawView.sort)}`}
+                                    alerts={raw.items}
+                                    headerProps={rawView.headerProps}
+                                />
                                 <ListFooter
                                     count={raw.items.length}
                                     noun={raw.items.length === 1 ? 'alert' : 'alerts'}
@@ -99,17 +130,20 @@ const AlarmHistoryScreen = ({ refreshIntervalMs, pageSize }: AlarmHistoryScreenP
                                     isLoadingOlder={raw.isLoadingOlder}
                                     olderError={raw.olderError}
                                     onLoadOlder={raw.loadOlder}
+                                    sorted={raw.isOffsetView}
                                     data-testid="raw-footer"
                                 />
                             </>
                         ) : (
                             <>
                                 <GroupedAlertsTable
+                                    caption={`Alerts grouped by symbol and alert type, ${sortDescription(GROUPED_COLUMNS, groupedView.sort)}`}
                                     groups={grouped.items}
                                     expanded={expanded}
                                     onToggle={toggleGroup}
-                                    query={filters.query}
+                                    query={groupQuery}
                                     refreshToken={refreshToken}
+                                    headerProps={groupedView.headerProps}
                                 />
                                 <ListFooter
                                     count={grouped.items.length}
@@ -118,6 +152,7 @@ const AlarmHistoryScreen = ({ refreshIntervalMs, pageSize }: AlarmHistoryScreenP
                                     isLoadingOlder={grouped.isLoadingOlder}
                                     olderError={grouped.olderError}
                                     onLoadOlder={grouped.loadOlder}
+                                    sorted={grouped.isOffsetView}
                                     data-testid="grouped-footer"
                                 />
                             </>

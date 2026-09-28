@@ -33,6 +33,25 @@ describe('buildAlertsQuery', () => {
         });
     });
 
+    it('sends a sorted / searched view with its offset, the search trimmed', () => {
+        const params = new URLSearchParams(
+            buildAlertsQuery({ mode: 'grouped', sort: 'count', dir: 'asc', q: '  sweep ', offset: 200, until: '2026-09-28T08:00:00.000Z' }).slice(1)
+        );
+
+        expect(Object.fromEntries(params)).toEqual({
+            until: '2026-09-28T08:00:00.000Z',
+            mode: 'grouped',
+            sort: 'count',
+            dir: 'asc',
+            q: 'sweep',
+            offset: '200',
+        });
+    });
+
+    it('omits a blank search', () => {
+        expect(buildAlertsQuery({ q: '   ', mode: 'raw' })).toBe('?mode=raw');
+    });
+
     it('omits empty lists and a blank symbol', () => {
         expect(buildAlertsQuery({ symbol: '  ', alertTypes: [], severities: [], mode: 'raw' })).toBe('?mode=raw');
     });

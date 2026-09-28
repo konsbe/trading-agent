@@ -69,18 +69,21 @@ const parseMode = (value: unknown): AlertsMode => {
 
 /**
  * GET /api/v1/alerts. The echoed filters are not read: the page already knows what it asked for.
- * A body without `type_labels`, `onsets_since` or `bar_date` (an older API) still parses.
+ * A body without `type_labels`, `onsets_since`, `bar_date` or `next_offset` (an older API) still parses.
  */
 export const parseAlertsResponse = (body: unknown): AlertsResponse => {
     const o = asObject(body, 'body');
     if (typeof o.has_more !== 'boolean') fail('has_more', 'a boolean');
     const hasMore = o.has_more === true;
     const nextBefore = asNullableNumber(o.next_before, 'next_before');
-    if (hasMore !== (nextBefore !== null)) fail('next_before', 'set exactly when has_more');
+    const nextOffset = asNullableNumber(o.next_offset, 'next_offset');
+    if (nextBefore !== null && nextOffset !== null) fail('next_offset', 'unset when next_before is set');
+    if (hasMore !== (nextBefore !== null || nextOffset !== null)) fail('next_before', 'next_before or next_offset set exactly when has_more');
     return {
         mode: parseMode(o.mode),
         has_more: hasMore,
         next_before: nextBefore,
+        next_offset: nextOffset,
         alerts: asList(o.alerts, 'alerts', parseFiredAlert),
         groups: asList(o.groups, 'groups', parseAlertGroup),
         types: asList(o.types, 'types', asString),

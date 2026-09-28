@@ -15,6 +15,11 @@ export const buildAlertsQuery = (query: AlertsQuery): string => {
     if (query.before !== undefined) params.set('before', String(query.before));
     if (query.limit !== undefined) params.set('limit', String(query.limit));
     if (query.mode) params.set('mode', query.mode);
+    if (query.sort) params.set('sort', query.sort);
+    if (query.dir) params.set('dir', query.dir);
+    const q = query.q?.trim();
+    if (q) params.set('q', q);
+    if (query.offset !== undefined) params.set('offset', String(query.offset));
     const qs = params.toString();
     return qs ? `?${qs}` : '';
 };

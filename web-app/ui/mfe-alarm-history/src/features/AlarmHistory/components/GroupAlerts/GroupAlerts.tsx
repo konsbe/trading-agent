@@ -14,8 +14,10 @@ const pickAlerts = (response: AlertsResponse) => response.alerts;
 export const GROUP_PAGE_SIZE = 5;
 
 /**
- * An expanded group's individual alerts: the raw list for that symbol + alert
- * type under the page's range and severity filters, with its own "Load older".
+ * An expanded group's individual alerts, newest first: the raw list for that
+ * symbol + alert type under the page's range and severity filters and search
+ * (so it lists the alerts the group counts), with its own "Load older" (or
+ * "Load more" under a search, which pages by offset).
  */
 const GroupAlerts = ({ group, query, refreshToken }: GroupAlertsProps) => {
     const groupQuery = useMemo(
@@ -49,6 +51,7 @@ const GroupAlerts = ({ group, query, refreshToken }: GroupAlertsProps) => {
                     isLoadingOlder={list.isLoadingOlder}
                     olderError={list.olderError}
                     onLoadOlder={list.loadOlder}
+                    sorted={list.isOffsetView}
                     data-testid={`${testId}-footer`}
                 />
             </ListState>

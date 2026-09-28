@@ -13,9 +13,23 @@ export interface AlertsMeta {
     caveat: string;
 }
 
+/**
+ * A sorted or searched view: paged by `offset` over a result pinned to its
+ * first load's time. The default newest-first view (no search, no sort or
+ * fired desc) keeps the id cursor and merges refreshes into what is listed.
+ */
+export const isOffsetView = (query: AlertsQuery): boolean =>
+    Boolean(query.q?.trim()) || (query.sort !== undefined && !(query.sort === 'fired' && query.dir !== 'asc'));
+
+/** The earlier of the user's `until` (a local-day bound) and the view's pinned time. */
+export const pinnedUntil = (until: string | undefined, pinnedAt: string): string =>
+    until !== undefined && Date.parse(until) <= Date.parse(pinnedAt) ? until : pinnedAt;
+
 export interface PagedAlerts<T> {
     items: T[];
     hasMore: boolean;
+    /** True for a sorted or searched view (offset paging, "Load more"). */
+    isOffsetView: boolean;
     /** From the latest successful response; null until the first one. */
     meta: AlertsMeta | null;
     /** True while the first page for the current filters is loading. */
@@ -42,18 +56,23 @@ interface Options<T> {
     pageSize?: number;
     /** Skip requests entirely (e.g. while the filters are invalid). */
     enabled?: boolean;
+    /** Clock for a view's pinned `until`; tests pass a fixed one. */
+    now?: () => Date;
 }
 
 const toApiError = (err: unknown): ApiError =>
     isApiError(err) ? err : new ApiError(0, 'unknown_error', (err as Error)?.message ?? String(err));
 
-const EMPTY: Page<never> = { items: [], hasMore: false, nextBefore: null };
+const EMPTY: Page<never> = { items: [], hasMore: false, nextBefore: null, nextOffset: null };
 
 const toPage = <T>(response: AlertsResponse, pick: (response: AlertsResponse) => T[]): Page<T> => ({
     items: pick(response),
     hasMore: response.has_more,
     nextBefore: response.next_before,
+    nextOffset: response.next_offset,
 });
+
+const systemNow = () => new Date();
 
 const toMeta = (response: AlertsResponse): AlertsMeta => ({
     types: response.types,
@@ -64,11 +83,15 @@ const toMeta = (response: AlertsResponse): AlertsMeta => ({
 });
 
 /**
- * One alerts list (raw rows or groups) with keyset paging: the first page on
- * mount / filter change, "Load older" appends the next page, and each
- * `refreshToken` change re-reads the first page and merges it in. A filter
- * change aborts in-flight requests, and responses for an older list (before a
- * filter change or a replacing refresh) are dropped.
+ * One alerts list (raw rows or groups): the first page on mount / filter,
+ * sort or search change, "Load older" / "Load more" appends the next page.
+ * The default newest-first view pages by id cursor and a `refreshToken` change
+ * re-reads its first page and merges it in. A sorted or searched view pages by
+ * offset with `until` pinned to its first load's time (so alerts arriving in
+ * between cannot shift pages); a refresh starts a new view: page 1 again,
+ * newly pinned, replacing the list. A change aborts in-flight requests, and
+ * responses for an older list (before a change or a replacing refresh) are
+ * dropped.
  */
 const usePagedAlerts = <T>({
     query,
@@ -77,6 +100,7 @@ const usePagedAlerts = <T>({
     refreshToken,
     pageSize = PAGE_SIZE,
     enabled = true,
+    now = systemNow,
 }: Options<T>): PagedAlerts<T> => {
     const [page, setPage] = useState<Page<T>>(EMPTY);
     const [meta, setMeta] = useState<AlertsMeta | null>(null);
@@ -89,8 +113,25 @@ const usePagedAlerts = <T>({
     const [retryToken, setRetryToken] = useState(0);
 
     const queryKey = buildAlertsQuery({ ...query, limit: pageSize });
+    const offsetView = isOffsetView(query);
     const queryRef = useRef(query);
     queryRef.current = query;
+    const nowRef = useRef(now);
+    nowRef.current = now;
+    /** The current offset view's pinned `until`; null for the cursor view. */
+    const pinnedRef = useRef<string | null>(null);
+
+    /** Page 1 of the current query; an offset view is pinned anew. */
+    const firstPageQuery = (): AlertsQuery => {
+        const current = queryRef.current;
+        if (!isOffsetView(current)) {
+            pinnedRef.current = null;
+            return { ...current, limit: pageSize };
+        }
+        const pinnedAt = nowRef.current().toISOString();
+        pinnedRef.current = pinnedAt;
+        return { ...current, limit: pageSize, until: pinnedUntil(current.until, pinnedAt) };
+    };
     const pickRef = useRef(pick);
     pickRef.current = pick;
     const shapeRef = useRef(shape);
@@ -139,7 +180,7 @@ const usePagedAlerts = <T>({
         }
         setIsLoading(true);
         const controller = track();
-        fetchAlerts({ ...queryRef.current, limit: pageSize }, { signal: controller.signal }).then(
+        fetchAlerts(firstPageQuery(), { signal: controller.signal }).then(
             response => {
                 untrack(controller);
                 if (controller.signal.aborted || epoch !== epochRef.current) return;
@@ -165,18 +206,30 @@ const usePagedAlerts = <T>({
         if (refreshToken === firstRefresh.current) return;
         firstRefresh.current = refreshToken;
         if (!enabled || isLoading || error) return;
+        const newView = isOffsetView(queryRef.current);
+        if (newView) {
+            // A new view: drop any in-flight page of the old one before re-pinning.
+            epochRef.current += 1;
+            olderRequestRef.current = null;
+            setIsLoadingOlder(false);
+            setOlderError(null);
+        }
         const epoch = epochRef.current;
         const controller = track();
-        fetchAlerts({ ...queryRef.current, limit: pageSize }, { signal: controller.signal }).then(
+        fetchAlerts(firstPageQuery(), { signal: controller.signal }).then(
             response => {
                 untrack(controller);
                 if (controller.signal.aborted || epoch !== epochRef.current) return;
                 const fresh = toPage(response, pickRef.current);
-                setPage(latest => {
-                    const merged = mergeFirstPage(latest, fresh, shapeRef.current);
-                    if (merged === fresh) epochRef.current += 1;
-                    return merged;
-                });
+                if (newView) {
+                    setPage(fresh);
+                } else {
+                    setPage(latest => {
+                        const merged = mergeFirstPage(latest, fresh, shapeRef.current);
+                        if (merged === fresh) epochRef.current += 1;
+                        return merged;
+                    });
+                }
                 setMeta(toMeta(response));
                 setRefreshError(null);
                 setLastChecked(new Date());
@@ -192,7 +245,16 @@ const usePagedAlerts = <T>({
 
     const loadOlder = useCallback(() => {
         const current = pageRef.current;
-        if (olderRequestRef.current || !current.hasMore || current.nextBefore === null) return;
+        const pinned = pinnedRef.current;
+        const next: Partial<AlertsQuery> | null =
+            pinned !== null
+                ? current.nextOffset === null
+                    ? null
+                    : { offset: current.nextOffset, until: pinnedUntil(queryRef.current.until, pinned) }
+                : current.nextBefore === null
+                  ? null
+                  : { before: current.nextBefore };
+        if (olderRequestRef.current || !current.hasMore || next === null) return;
         const request = {};
         olderRequestRef.current = request;
         const epoch = epochRef.current;
@@ -205,10 +267,7 @@ const usePagedAlerts = <T>({
             olderRequestRef.current = null;
             if (mountedRef.current) setIsLoadingOlder(false);
         };
-        fetchAlerts(
-            { ...queryRef.current, limit: pageSize, before: current.nextBefore },
-            { signal: controller.signal }
-        ).then(
+        fetchAlerts({ ...queryRef.current, limit: pageSize, ...next }, { signal: controller.signal }).then(
             response => {
                 done();
                 if (controller.signal.aborted || epoch !== epochRef.current) return;
@@ -228,6 +287,7 @@ const usePagedAlerts = <T>({
     return {
         items: page.items,
         hasMore: page.hasMore,
+        isOffsetView: offsetView,
         meta,
         isLoading,
         error,

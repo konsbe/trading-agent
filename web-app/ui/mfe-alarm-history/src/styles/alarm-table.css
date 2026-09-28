@@ -71,6 +71,27 @@
     vertical-align: bottom;
 }
 
+/*
+ * Sort buttons (shared SortableHeader) fill their cell and carry its padding:
+ * the header's block padding here, the outer columns' wider inset below.
+ */
+.alarm-table thead th.is-sortable {
+    padding: 0;
+}
+
+.alarm-table thead th .ta-sort-header__button {
+    padding: var(--space-sm);
+    white-space: nowrap;
+}
+
+.alarm-table thead th:first-child .ta-sort-header__button {
+    padding-left: var(--space-md);
+}
+
+.alarm-table thead th:last-child .ta-sort-header__button {
+    padding-right: var(--space-md);
+}
+
 .alarm-table__row > th,
 .alarm-table__row > td {
     background: var(--color-surface-container-low);

@@ -1,3 +1,4 @@
+import { TableHeaderProps } from '@trading-agent/shared-components';
 import { FiredAlert } from '@/api';
 
 export interface AlertsTableProps {
@@ -6,4 +7,6 @@ export interface AlertsTableProps {
     caption: string;
     alerts: readonly FiredAlert[];
     showType?: boolean;
+    /** Sortable headers (`useTableView().headerProps`); omitted for a fixed newest-first list. */
+    headerProps?: (key: string) => TableHeaderProps;
 }

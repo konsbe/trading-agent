@@ -49,6 +49,7 @@ export const makeResponse = (overrides: Partial<AlertsResponse> = {}): AlertsRes
     mode: 'raw',
     has_more: false,
     next_before: null,
+    next_offset: null,
     alerts: [],
     groups: [],
     types: ['bb_squeeze', 'fa_tier_flip', 'liquidity_sweep', 'rsi_overbought'],

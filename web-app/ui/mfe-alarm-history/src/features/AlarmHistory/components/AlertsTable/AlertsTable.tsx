@@ -1,28 +1,36 @@
-import { SeverityBadge } from '@trading-agent/shared-components';
+import { SeverityBadge, SortableHeader } from '@trading-agent/shared-components';
 import { formatBarDate, formatDateTime, formatFiredAt } from '@/common/format/format';
 import { useTypeLabel } from '../../providers/TypeLabelsContext';
+import { RAW_COLUMNS } from '../../utils/alertColumns';
 import AlertSymbol from '../AlertSymbol';
 import { AlertsTableProps } from './types';
 import '@/styles/alarm-table.css';
 
 /**
- * Individual alerts, newest first: fired time (local, with the onset bar's
- * date below it when the alert has one), symbol, alert type, severity and the
- * bot's message. A group's expansion omits the type column (it is the group's).
+ * Individual alerts in the order served: fired time (local, with the onset
+ * bar's date below it when the alert has one), symbol, alert type, severity
+ * and the bot's message. With `headerProps` the headers sort (server-side);
+ * a group's expansion has none (newest first) and omits the type column (it
+ * is the group's).
  */
-const AlertsTable = ({ id, caption, alerts, showType = true }: AlertsTableProps) => {
+const AlertsTable = ({ id, caption, alerts, showType = true, headerProps }: AlertsTableProps) => {
     const typeLabel = useTypeLabel();
+    const columns = RAW_COLUMNS.filter(column => showType || column.key !== 'alert_type');
     return (
         <div className="alarm-table__wrap" role="region" aria-label={`${caption}, scrolls horizontally`} tabIndex={0}>
             <table className="alarm-table" id={id} data-testid={id}>
                 <caption className="alarm-table__caption">{caption}</caption>
                 <thead>
                     <tr>
-                        <th scope="col" data-column="fired">Fired</th>
-                        <th scope="col" data-column="symbol">Symbol</th>
-                        {showType && <th scope="col" data-column="type">Alert type</th>}
-                        <th scope="col" data-column="severity">Severity</th>
-                        <th scope="col" data-column="message">Message</th>
+                        {columns.map(column =>
+                            headerProps ? (
+                                <SortableHeader key={column.key} {...headerProps(column.key)} />
+                            ) : (
+                                <th key={column.key} scope="col" data-column={column.key}>
+                                    {column.label}
+                                </th>
+                            )
+                        )}
                     </tr>
                 </thead>
                 <tbody>

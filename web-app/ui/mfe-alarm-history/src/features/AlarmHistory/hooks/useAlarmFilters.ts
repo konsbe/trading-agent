@@ -1,8 +1,18 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AlertsQuery } from '@/api';
 import { DayRange, defaultRange, rangeBounds } from '@/common/dates/localDays';
+import useParamWriter from '@/common/url/useParamWriter';
 
 export const SYMBOL_DEBOUNCE_MS = 400;
+
+/** Query-string names of the filters (only set when not the default). */
+export const FILTER_PARAMS = {
+    symbol: 'symbol',
+    alertTypes: 'type',
+    severities: 'severity',
+    from: 'from',
+    to: 'to',
+} as const;
 
 export interface AlarmFilters {
     /** The symbol box as typed. */
@@ -22,7 +32,7 @@ export interface AlarmFilters {
     setFrom: (day: string) => void;
     setTo: (day: string) => void;
     resetRange: () => void;
-    /** The filters as an API query (no mode / paging). */
+    /** The filters as an API query (no mode / paging / sort). */
     query: AlertsQuery;
 }
 
@@ -31,28 +41,91 @@ const toggle = (list: string[], value: string) =>
 
 const normalizeSymbol = (value: string) => value.trim().toUpperCase();
 
-/** Filter state for the page; any change yields a new `query` (and so restarts paging). */
+const readList = (raw: string | null): string[] =>
+    raw
+        ? raw
+              .split(',')
+              .map(v => v.trim())
+              .filter(Boolean)
+        : [];
+
+const writeList = (list: string[]): string | null => (list.length > 0 ? [...list].sort().join(',') : null);
+
+/**
+ * Filter state for the page, kept in the query string (`symbol`, `type`,
+ * `severity`, `from`, `to`; defaults omitted) so reload, back and "Back to
+ * Alarm History" restore it. Any change yields a new `query` (and so restarts
+ * paging). The symbol box applies after a pause or on Enter.
+ */
 const useAlarmFilters = (now: () => Date = () => new Date()): AlarmFilters => {
-    const [initialRange] = useState(() => defaultRange(now()));
-    const [symbolInput, setSymbolInput] = useState('');
-    const [symbol, setSymbol] = useState('');
-    const [alertTypes, setAlertTypes] = useState<string[]>([]);
-    const [severities, setSeverities] = useState<string[]>([]);
-    const [range, setRange] = useState<DayRange>(initialRange);
+    const [params, write] = useParamWriter();
+    const nowRef = useRef(now);
+    nowRef.current = now;
+    /** The default range the URL omits; fixed at mount, renewed by "Last 7 days". */
+    const [today, setToday] = useState(() => defaultRange(now()));
+
+    const symbol = normalizeSymbol(params.get(FILTER_PARAMS.symbol) ?? '');
+    const typesParam = params.get(FILTER_PARAMS.alertTypes);
+    const severitiesParam = params.get(FILTER_PARAMS.severities);
+    const alertTypes = useMemo(() => readList(typesParam), [typesParam]);
+    const severities = useMemo(() => readList(severitiesParam), [severitiesParam]);
+    const fromParam = params.get(FILTER_PARAMS.from);
+    const toParam = params.get(FILTER_PARAMS.to);
+    const range = useMemo<DayRange>(
+        () => ({ from: fromParam ?? today.from, to: toParam ?? today.to }),
+        [fromParam, toParam, today]
+    );
+
+    const [symbolInput, setSymbolInput] = useState(symbol);
+    // Follow an outside change of the applied symbol (back / forward) without clobbering typing.
+    const lastApplied = useRef(symbol);
+    useEffect(() => {
+        if (symbol !== lastApplied.current) {
+            lastApplied.current = symbol;
+            setSymbolInput(symbol);
+        }
+    }, [symbol]);
+
+    const applyNow = useCallback(
+        (value: string) => {
+            const next = normalizeSymbol(value);
+            lastApplied.current = next;
+            write({ [FILTER_PARAMS.symbol]: next || null });
+        },
+        [write]
+    );
 
     useEffect(() => {
         const next = normalizeSymbol(symbolInput);
         if (next === symbol) return undefined;
-        const timer = setTimeout(() => setSymbol(next), SYMBOL_DEBOUNCE_MS);
+        const timer = setTimeout(() => applyNow(next), SYMBOL_DEBOUNCE_MS);
         return () => clearTimeout(timer);
-    }, [symbolInput, symbol]);
+    }, [symbolInput, symbol, applyNow]);
 
-    const applySymbol = useCallback(() => setSymbol(normalizeSymbol(symbolInput)), [symbolInput]);
-    const toggleAlertType = useCallback((type: string) => setAlertTypes(list => toggle(list, type)), []);
-    const toggleSeverity = useCallback((severity: string) => setSeverities(list => toggle(list, severity)), []);
-    const setFrom = useCallback((from: string) => setRange(r => ({ ...r, from })), []);
-    const setTo = useCallback((to: string) => setRange(r => ({ ...r, to })), []);
-    const resetRange = useCallback(() => setRange(defaultRange(now())), [now]);
+    const applySymbol = useCallback(() => applyNow(symbolInput), [applyNow, symbolInput]);
+
+    const toggleAlertType = useCallback(
+        (type: string) => write({ [FILTER_PARAMS.alertTypes]: writeList(toggle(alertTypes, type)) }),
+        [alertTypes, write]
+    );
+    const toggleSeverity = useCallback(
+        (severity: string) => write({ [FILTER_PARAMS.severities]: writeList(toggle(severities, severity)) }),
+        [severities, write]
+    );
+
+    const writeRange = useCallback(
+        (next: DayRange) => {
+            const isDefault = next.from === today.from && next.to === today.to;
+            write({ [FILTER_PARAMS.from]: isDefault ? null : next.from, [FILTER_PARAMS.to]: isDefault ? null : next.to });
+        },
+        [today, write]
+    );
+    const setFrom = useCallback((from: string) => writeRange({ ...range, from }), [range, writeRange]);
+    const setTo = useCallback((to: string) => writeRange({ ...range, to }), [range, writeRange]);
+    const resetRange = useCallback(() => {
+        setToday(defaultRange(nowRef.current()));
+        write({ [FILTER_PARAMS.from]: null, [FILTER_PARAMS.to]: null });
+    }, [write]);
 
     const query = useMemo<AlertsQuery>(
         () => ({
@@ -64,7 +137,6 @@ const useAlarmFilters = (now: () => Date = () => new Date()): AlarmFilters => {
         [symbol, alertTypes, severities, range]
     );
 
-    const today = defaultRange(now());
     const isDefaultRange = range.from === today.from && range.to === today.to;
 
     return {

@@ -1,7 +1,8 @@
 import { Fragment } from 'react';
-import { ChevronDownIcon, SeverityBadge } from '@trading-agent/shared-components';
+import { ChevronDownIcon, SeverityBadge, SortableHeader } from '@trading-agent/shared-components';
 import { formatDateTime, formatFiredAt, formatRepeats } from '@/common/format/format';
 import { useTypeLabel } from '../../providers/TypeLabelsContext';
+import { GROUPED_COLUMNS } from '../../utils/alertColumns';
 import { groupKey } from '../../utils/paging';
 import AlertSymbol from '../AlertSymbol';
 import GroupAlerts from '../GroupAlerts';
@@ -14,28 +15,26 @@ const COLUMNS = 7;
 const domId = (key: string) => `alarm-group-${key.replace(/[^A-Za-z0-9_-]/g, '-')}`;
 
 /**
- * One row per symbol + alert type in the range, newest (by last fired) first:
- * last fired, symbol, type, the latest alert's severity and message, and the
- * repeat count with its first–last span. A group with repeats expands to its
- * individual alerts below the row.
+ * One row per symbol + alert type in the range, in the order served (newest
+ * by last fired unless a header sorts it, server-side): last fired, symbol,
+ * type, the latest alert's severity and message, and the repeat count with
+ * its first–last span. A group with repeats expands to its individual alerts
+ * (newest first) below the row; the expander column doesn't sort.
  */
-const GroupedAlertsTable = ({ groups, expanded, onToggle, query, refreshToken }: GroupedAlertsTableProps) => {
+const GroupedAlertsTable = ({ caption, groups, expanded, onToggle, query, refreshToken, headerProps }: GroupedAlertsTableProps) => {
     const typeLabel = useTypeLabel();
     return (
         <div className="alarm-table__wrap" role="region" aria-label="Alerts by symbol and type, scrolls horizontally" tabIndex={0}>
             <table className="alarm-table alarm-grouped" id="alarm-grouped-table" data-testid="alarm-grouped-table">
-                <caption className="alarm-table__caption">Alerts grouped by symbol and alert type, newest first</caption>
+                <caption className="alarm-table__caption">{caption}</caption>
                 <thead>
                     <tr>
                         <th scope="col" data-column="expand">
                             <span className="alarm-table__sr-only">Show alerts</span>
                         </th>
-                        <th scope="col" data-column="fired">Last fired</th>
-                        <th scope="col" data-column="symbol">Symbol</th>
-                        <th scope="col" data-column="type">Alert type</th>
-                        <th scope="col" data-column="severity">Severity</th>
-                        <th scope="col" data-column="message">Latest message</th>
-                        <th scope="col" data-column="repeats">Repeats</th>
+                        {GROUPED_COLUMNS.map(column => (
+                            <SortableHeader key={column.key} {...headerProps(column.key)} />
+                        ))}
                     </tr>
                 </thead>
                 <tbody>

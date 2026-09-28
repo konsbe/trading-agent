@@ -3,7 +3,7 @@ import { AlertsQuery, AlertsResponse } from '@/api';
 import { makeAlert, makeResponse, toWire } from '@/test-utils/alerts';
 import { mockResponse } from '@/test-utils/fixtures';
 import { RAW_SHAPE } from '../utils/paging';
-import usePagedAlerts from './usePagedAlerts';
+import usePagedAlerts, { isOffsetView, pinnedUntil } from './usePagedAlerts';
 
 const pick = (r: AlertsResponse) => r.alerts;
 
@@ -19,6 +19,12 @@ const deferredFetch = () => {
     );
     return { fetch, pending };
 };
+
+const offsetBody = (ids: number[], nextOffset: number | null) =>
+    mockResponse(
+        200,
+        toWire(makeResponse({ alerts: ids.map(id => makeAlert({ id })), has_more: nextOffset !== null, next_offset: nextOffset }))
+    );
 
 const body = (ids: number[], nextBefore: number | null) =>
     mockResponse(
@@ -105,5 +111,70 @@ describe('usePagedAlerts', () => {
         await waitFor(() => expect(result.current.isLoading).toBe(false));
         expect(server.fetch).not.toHaveBeenCalled();
         expect(result.current.items).toEqual([]);
+    });
+
+    describe('sorted / searched views', () => {
+        const T0 = new Date('2026-09-27T19:00:00Z');
+        let clock: Date;
+        const renderView = (query: AlertsQuery) =>
+            renderHook(
+                ({ q, token }) =>
+                    usePagedAlerts({ query: q, pick, shape: RAW_SHAPE, refreshToken: token, pageSize: 2, now: () => clock }),
+                { initialProps: { q: query, token: 0 } }
+            );
+        const params = (i: number) => Object.fromEntries(new URL(server.pending[i].url).searchParams);
+
+        beforeEach(() => {
+            clock = T0;
+        });
+
+        it('pins until to the first load and pages by offset under it', async () => {
+            const { result } = renderView({ mode: 'raw', sort: 'symbol', dir: 'asc', until: '2026-09-28T00:00:00+03:00' });
+            expect(params(0)).toMatchObject({ sort: 'symbol', dir: 'asc', until: '2026-09-27T19:00:00.000Z' });
+            await act(async () => server.pending[0].resolve(offsetBody([1, 2], 2)));
+            expect(result.current.isOffsetView).toBe(true);
+
+            clock = new Date('2026-09-27T19:00:30Z');
+            act(() => result.current.loadOlder());
+            expect(params(1)).toMatchObject({ offset: '2', until: '2026-09-27T19:00:00.000Z' });
+            expect(params(1).before).toBeUndefined();
+            await act(async () => server.pending[1].resolve(offsetBody([3], null)));
+            expect(result.current.items.map(a => a.id)).toEqual([1, 2, 3]);
+        });
+
+        it('starts a new view on refresh, replacing the list and dropping an in-flight page', async () => {
+            const { result, rerender } = renderView({ mode: 'raw', q: 'xom' });
+            await act(async () => server.pending[0].resolve(offsetBody([1, 2], 2)));
+            act(() => result.current.loadOlder());
+
+            clock = new Date('2026-09-27T19:01:00Z');
+            rerender({ q: { mode: 'raw', q: 'xom' }, token: 1 });
+            expect(params(2)).toMatchObject({ q: 'xom', until: '2026-09-27T19:01:00.000Z' });
+            expect(params(2).offset).toBeUndefined();
+            expect(result.current.isLoadingOlder).toBe(false);
+
+            await act(async () => server.pending[1].resolve(offsetBody([3, 4], 4)));
+            await act(async () => server.pending[2].resolve(offsetBody([9, 1], 2)));
+            expect(result.current.items.map(a => a.id)).toEqual([9, 1]);
+
+            act(() => result.current.loadOlder());
+            expect(params(3)).toMatchObject({ offset: '2', until: '2026-09-27T19:01:00.000Z' });
+        });
+
+        it("keeps the user's until when it is earlier", () => {
+            renderView({ mode: 'raw', sort: 'severity', until: '2026-09-27T00:00:00+03:00' });
+            expect(params(0).until).toBe('2026-09-27T00:00:00+03:00');
+        });
+
+        it('knows which views page by offset', () => {
+            expect(isOffsetView({})).toBe(false);
+            expect(isOffsetView({ sort: 'fired' })).toBe(false);
+            expect(isOffsetView({ sort: 'fired', dir: 'desc' })).toBe(false);
+            expect(isOffsetView({ sort: 'fired', dir: 'asc' })).toBe(true);
+            expect(isOffsetView({ sort: 'count' })).toBe(true);
+            expect(isOffsetView({ q: '  ' })).toBe(false);
+            expect(isOffsetView({ q: 'x' })).toBe(true);
+            expect(pinnedUntil(undefined, '2026-09-27T19:00:00.000Z')).toBe('2026-09-27T19:00:00.000Z');
+        });
     });
 });

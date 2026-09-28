@@ -6,6 +6,40 @@ import { mockResponse } from './fixtures';
 const newestFirst = (a: { fired_at: string; id: number }, b: { fired_at: string; id: number }) =>
     Date.parse(b.fired_at) - Date.parse(a.fired_at) || b.id - a.id;
 
+const SEVERITY_RANK: Record<string, number> = { info: 0, notice: 1, warning: 2 };
+
+interface Sortable {
+    symbol: string;
+    alert_type: string;
+    severity: string;
+    message: string;
+    fired_at: string;
+    id: number;
+    count: number;
+}
+
+const sortValue = (row: Sortable, key: string): number | string => {
+    switch (key) {
+        case 'fired':
+            return Date.parse(row.fired_at);
+        case 'severity':
+            return SEVERITY_RANK[row.severity] ?? 3;
+        case 'count':
+            return row.count;
+        default:
+            return row[key as 'symbol' | 'alert_type' | 'message'];
+    }
+};
+
+/** The API's sorted order: by key and direction, ties by symbol, then newest. */
+const sortedBy = (key: string, asc: boolean) => (a: Sortable, b: Sortable) => {
+    const va = sortValue(a, key);
+    const vb = sortValue(b, key);
+    const cmp = typeof va === 'number' && typeof vb === 'number' ? va - vb : String(va).localeCompare(String(vb));
+    if (cmp !== 0) return asc ? cmp : -cmp;
+    return a.symbol.localeCompare(b.symbol) || newestFirst(a, b);
+};
+
 const multi = (params: URLSearchParams, key: string) =>
     params
         .getAll(key)
@@ -25,8 +59,9 @@ export interface AlertsServer {
 
 /**
  * An in-memory GET /api/v1/alerts with the real filters, keyset paging
- * (before / next_before) and grouping, so screen tests exercise the page
- * against the API's contract rather than canned responses.
+ * (before / next_before), grouping, and sorted / searched views (sort, dir,
+ * q, offset / next_offset, 400s), so screen tests exercise the page against
+ * the API's contract rather than canned responses.
  */
 export interface AlertsServerOptions {
     recordsStart?: string | null;
@@ -61,6 +96,22 @@ export const createAlertsServer = (
         const limit = Number(params.get('limit') ?? 100);
         const mode = params.get('mode') ?? 'raw';
         const before = params.get('before') ? Number(params.get('before')) : null;
+        const sort = params.get('sort');
+        const validSorts = ['fired', 'symbol', 'alert_type', 'severity', 'message', ...(mode === 'grouped' ? ['count'] : [])];
+        if (sort && !validSorts.includes(sort)) return mockResponse(400, { error: 'invalid_sort' });
+        const dir = params.get('dir') ?? 'desc';
+        if (dir !== 'asc' && dir !== 'desc') return mockResponse(400, { error: 'invalid_dir' });
+        const q = params.get('q')?.trim() ?? '';
+        if (q.length > 60) return mockResponse(400, { error: 'invalid_query' });
+        const offsetParam = params.get('offset');
+        const offset = offsetParam === null ? 0 : Number(offsetParam);
+        if (!Number.isInteger(offset) || offset < 0) return mockResponse(400, { error: 'invalid_offset' });
+        const offsetView = q !== '' || (sort !== null && !(sort === 'fired' && dir === 'desc')) || offsetParam !== null;
+        if (offsetView && before !== null) return mockResponse(400, { error: 'invalid_before' });
+        const needle = q.toLowerCase();
+        const matchesQuery = (r: FiredAlert) =>
+            !needle ||
+            [r.symbol, r.message, r.severity, typeLabels[r.alert_type] ?? r.alert_type].some(text => text.toLowerCase().includes(needle));
         const cursor = before === null ? null : rows.find(r => r.id === before)!;
 
         const matching = rows
@@ -69,7 +120,9 @@ export const createAlertsServer = (
             .filter(r => severities.length === 0 || severities.includes(r.severity))
             .filter(r => !since || Date.parse(r.fired_at) >= Date.parse(since))
             .filter(r => !until || Date.parse(r.fired_at) < Date.parse(until))
+            .filter(matchesQuery)
             .sort(newestFirst);
+        const order = sort ? sortedBy(sort, dir === 'asc') : null;
         const older = (a: { fired_at: string; id: number }) => !cursor || newestFirst(cursor, a) < 0;
 
         let alerts: FiredAlert[] = [];
@@ -89,13 +142,21 @@ export const createAlertsServer = (
                     latest: list[0],
                 }))
                 .filter(g => older(g.latest))
-                .sort((a, b) => newestFirst(a.latest, b.latest));
-            hasMore = all.length > limit;
-            groups = all.slice(0, limit);
+                .sort((a, b) =>
+                    order
+                        ? order(
+                              { ...a.latest, fired_at: a.last_fired_at, count: a.count },
+                              { ...b.latest, fired_at: b.last_fired_at, count: b.count }
+                          )
+                        : newestFirst(a.latest, b.latest)
+                );
+            hasMore = all.length > offset + limit;
+            groups = all.slice(offset, offset + limit);
         } else {
             const all = matching.filter(older);
-            hasMore = all.length > limit;
-            alerts = all.slice(0, limit);
+            if (order) all.sort((a, b) => order({ ...a, count: 1 }, { ...b, count: 1 }));
+            hasMore = all.length > offset + limit;
+            alerts = all.slice(offset, offset + limit);
         }
         const last = mode === 'grouped' ? groups[groups.length - 1]?.latest : alerts[alerts.length - 1];
         const earliest = rows.length === 0 ? null : [...rows].sort(newestFirst)[rows.length - 1].fired_at;
@@ -115,7 +176,11 @@ export const createAlertsServer = (
             limit,
             mode,
             has_more: hasMore,
-            next_before: hasMore ? last!.id : null,
+            next_before: hasMore && !offsetView ? last!.id : null,
+            next_offset: hasMore && offsetView ? offset + limit : null,
+            sort,
+            dir,
+            q: q || null,
             alerts: alerts.map(wire),
             groups: groups.map(g => ({ ...g, latest: wire(g.latest) })),
             types: [...new Set(rows.map(r => r.alert_type))].sort(),

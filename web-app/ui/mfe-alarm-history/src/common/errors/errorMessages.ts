@@ -18,6 +18,10 @@ const FILTER_MESSAGES: Record<string, string> = {
     invalid_before: "Older alerts couldn't be loaded from that point. Change a filter to start again.",
     invalid_limit: 'The page size was rejected.',
     invalid_mode: 'That view is not available.',
+    invalid_sort: "That column can't be sorted on the server. Pick another column.",
+    invalid_dir: 'That sort direction was rejected.',
+    invalid_query: 'Search is limited to 60 characters.',
+    invalid_offset: "The next page couldn't be loaded from that point. Change the sort or search to start again.",
 };
 
 /** True for an HTTP 400: a filter the API rejected, not an outage. */
