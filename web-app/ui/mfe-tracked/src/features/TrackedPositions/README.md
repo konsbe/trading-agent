@@ -19,10 +19,10 @@ line instead of the error state.
 |---|---|
 | `FreshnessBanner` | One neutral note above the tabs from `chain` only (`utils/freshness.ts`): "No new scan for N trading sessions …" when `sessions_behind ≥ 1`, else "The {date} scan exists but tracking has not been updated since {date}." when `tracker_behind`. Never derived from row dates. |
 | `TrackedTabs` | WAI-ARIA tabs, "Active (n)" / "Closed (n)"; arrow keys, Home, End. The selection lives in `?tab=closed` (`useTrackedTab`). |
-| `TrackedPanel` | The tab's `CollapsibleCard` (`tracked.positions.active` / `.closed`), the "not yet evaluated" count note, and the empty states "Nothing currently tracked" / "No closed positions yet". |
-| `TrackedTable` | Active: Symbol / Exchange / Bucket, Alerted Date, Sessions Elapsed, Reference Price, Current Price, Unrealized %. Closed: Symbol / Exchange / Bucket, Alerted Date, Closed Date, Sessions Elapsed, Reference Price, Exit Reason, Exit % (no exit price). |
+| `TrackedPanel` | The tab's `CollapsibleCard` (`tracked.positions.active` / `.closed`), the "not yet evaluated" count note, a `TableSearch`, the shared `useTableView` (URL keys `active_*` / `closed_*`, default most recent alert first) and the empty states "Nothing currently tracked" / "No closed positions yet". |
+| `TrackedTable` | Every header sorts (`SortableHeader`; "Not yet evaluated" / "—" last both ways). Active: Symbol / Exchange / Bucket, Alerted Date, Sessions Elapsed, Reference Price, Current Price, Unrealized %. Closed: Symbol / Exchange / Bucket, Alerted Date, Closed Date, Sessions Elapsed, Reference Price, Exit Reason, Exit % (no exit price). |
 | `SessionsCell` | "Not yet evaluated" when `last_evaluated_date` or `sessions_elapsed` is null (`isNotYetEvaluated`); "as of {date}" under the count when `evaluation_behind`. |
-| `SymbolCell` | Ticker (hosted: links to `/candidates/{symbol}`), company · exchange · bucket. |
+| `SymbolCell` | Ticker (hosted: the shared `StockDetailLink`, "Back to Tracked Positions" with the tab, sort and search), company · exchange · bucket. |
 | `TrackedSkeleton` | Loading placeholder with the page's layout. |
 
 ## Rules the tests pin

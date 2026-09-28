@@ -35,6 +35,9 @@ module.exports = {
         '^react/(.*)$': '<rootDir>/node_modules/react/$1',
         '^react-dom$': '<rootDir>/node_modules/react-dom',
         '^react-dom/(.*)$': '<rootDir>/node_modules/react-dom/$1',
+        // ...and this package's router, so shared hooks/links see the same Router context.
+        '^react-router-dom$': '<rootDir>/node_modules/react-router-dom',
+        '^react-router$': '<rootDir>/node_modules/react-router',
         '^@trading-agent/shared-components$': '<rootDir>/../../shared-components/src/mfe.ts',
         '^shellSpog/(.*)$': '<rootDir>/__mocks__/shellSpog/$1.ts',
         '^@/(.*)$': '<rootDir>/src/$1',

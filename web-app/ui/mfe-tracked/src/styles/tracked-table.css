@@ -79,6 +79,26 @@
     font-family: var(--font-family);
 }
 
+/*
+ * Sort buttons (shared SortableHeader) fill their cell and carry its padding:
+ * the header's block padding here, the outer columns' wider inset below.
+ */
+.tracked-table thead th.is-sortable {
+    padding: 0;
+}
+
+.tracked-table thead th .ta-sort-header__button {
+    padding: var(--space-sm);
+}
+
+.tracked-table thead th:first-child .ta-sort-header__button {
+    padding-left: var(--space-md);
+}
+
+.tracked-table thead th:last-child .ta-sort-header__button {
+    padding-right: var(--space-md);
+}
+
 .tracked-table__row > th,
 .tracked-table__row > td {
     background: var(--color-surface-container-low);

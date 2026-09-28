@@ -1,35 +1,14 @@
 import { Fragment, ReactNode } from 'react';
-import { ChangeCell, ChevronDownIcon, EMPTY_VALUE, formatPrice } from '@trading-agent/shared-components';
+import { ChangeCell, ChevronDownIcon, EMPTY_VALUE, formatPrice, SortableHeader } from '@trading-agent/shared-components';
 import { TrackedRow } from '@/api';
 import { formatTradingDay } from '@/common/format/format';
 import { isNotYetEvaluated, rowKey } from '../../utils/rows';
 import SessionsCell from '../SessionsCell';
 import SymbolCell from '../SymbolCell';
-import { TrackedColumn, TrackedTableProps, TrackedTableVariant } from './types';
+import { TRACKED_COLUMNS } from './columns';
+import { TrackedColumn, TrackedTableProps } from './types';
 import '@/styles/tracked-table.css';
 import './TrackedTable-styles.css';
-
-const ALERTED_DATE: TrackedColumn = { key: 'alerted_date', label: 'Alerted Date' };
-const EVALUATION_COLUMNS: TrackedColumn[] = [
-    { key: 'sessions_elapsed', label: 'Sessions Elapsed', numeric: true, description: 'Trading sessions the exit rules have evaluated since the alert' },
-    { key: 'reference_price', label: 'Reference Price', numeric: true, description: 'Close on the alert date' },
-];
-
-const COLUMNS: Record<TrackedTableVariant, TrackedColumn[]> = {
-    active: [
-        ALERTED_DATE,
-        ...EVALUATION_COLUMNS,
-        { key: 'current_price', label: 'Current Price', numeric: true, description: 'Close on the latest scan date' },
-        { key: 'unrealized_pct', label: 'Unrealized %', numeric: true, description: 'Current price vs reference price' },
-    ],
-    closed: [
-        ALERTED_DATE,
-        { key: 'closed_date', label: 'Closed Date', description: 'The session the exit rule fired on' },
-        ...EVALUATION_COLUMNS,
-        { key: 'exit_reason', label: 'Exit Reason', description: 'The exit rule that closed the row; open it for the rule’s note' },
-        { key: 'exit_pct', label: 'Exit %', numeric: true, description: 'Exit price vs reference price' },
-    ],
-};
 
 /** A row never evaluated has no reading yet: "—", uncoloured. */
 const UnrealizedCell = ({ row }: { row: TrackedRow }) =>
@@ -81,18 +60,21 @@ const cellFor = (key: TrackedColumn['key'], row: TrackedRow, exitReason: ReactNo
             return exitReason;
         case 'exit_pct':
             return <ChangeCell value={row.exit_pct} />;
+        default:
+            return null;
     }
 };
 
 /**
- * Active or closed tracked rows. Only Unrealized % and Exit % are toned (price
- * tokens via ChangeCell); every other value is neutral. A closed row's exit
- * reason opens its note inline below the row and stays open until the user
- * closes it.
+ * Active or closed tracked rows in the tab's sort; every header sorts. Only
+ * Unrealized % and Exit % are toned (price tokens via ChangeCell); every other
+ * value is neutral. A closed row's exit reason opens its note inline below the
+ * row and stays open until the user closes it.
  */
-const TrackedTable = ({ id, caption, variant, rows, openNotes, onToggleNote }: TrackedTableProps) => {
-    const columns = COLUMNS[variant];
-    const columnCount = columns.length + 1;
+const TrackedTable = ({ id, caption, variant, rows, headerProps, openNotes, onToggleNote }: TrackedTableProps) => {
+    const columns = TRACKED_COLUMNS[variant];
+    const bodyColumns = columns.filter(column => column.key !== 'symbol');
+    const columnCount = columns.length;
 
     return (
         // Focusable, labelled scroll region so keyboard users can scroll when the table overflows.
@@ -101,17 +83,14 @@ const TrackedTable = ({ id, caption, variant, rows, openNotes, onToggleNote }: T
                 <caption className="tracked-table__caption">{caption}</caption>
                 <thead>
                     <tr>
-                        <th scope="col" data-column="symbol">Symbol / Exchange / Bucket</th>
                         {columns.map(column => (
-                            <th
+                            <SortableHeader
                                 key={column.key}
-                                scope="col"
+                                {...headerProps(column.key)}
+                                align={column.numeric ? 'end' : 'start'}
                                 className={column.numeric ? 'is-numeric' : undefined}
                                 title={column.description}
-                                data-column={column.key}
-                            >
-                                {column.label}
-                            </th>
+                            />
                         ))}
                     </tr>
                 </thead>
@@ -127,7 +106,7 @@ const TrackedTable = ({ id, caption, variant, rows, openNotes, onToggleNote }: T
                                     <th scope="row" data-column="symbol">
                                         <SymbolCell row={row} />
                                     </th>
-                                    {columns.map(column => (
+                                    {bodyColumns.map(column => (
                                         <td key={column.key} className={column.numeric ? 'is-numeric' : undefined} data-column={column.key}>
                                             {cellFor(column.key, row, exitReason)}
                                         </td>

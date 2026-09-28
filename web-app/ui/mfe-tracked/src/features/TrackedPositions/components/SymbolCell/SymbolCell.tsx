@@ -1,23 +1,23 @@
-import { Link } from 'react-router-dom';
-import { EMPTY_VALUE } from '@trading-agent/shared-components';
-import { scannerDetailPath } from '@/config/routes';
+import { EMPTY_VALUE, isStockDetailEligible, StockDetailLink } from '@trading-agent/shared-components';
 import { useIsHosted } from '@/providers/HostModeContext';
 import { BUCKET_LABELS } from '../../utils/rows';
 import { SymbolCellProps } from './types';
 import './SymbolCell-styles.css';
 
+/** "← Back to Tracked Positions" on Stock Detail. */
+export const TRACKED_ORIGIN_LABEL = 'Tracked Positions';
+
 /**
- * Ticker, then "company · exchange · bucket". Hosted, the ticker opens the
- * scanner's Stock Detail page; standalone that route doesn't exist.
+ * Ticker, then "company · exchange · bucket". Hosted, the ticker opens Stock
+ * Detail, recording this tab with its sort and search as "Back to Tracked
+ * Positions"; standalone that route doesn't exist.
  */
 const SymbolCell = ({ row }: SymbolCellProps) => {
-    const isHosted = useIsHosted();
+    const linked = useIsHosted() && isStockDetailEligible({ symbol: row.symbol });
     return (
         <div className="tracked-symbol">
-            {isHosted ? (
-                <Link className="tracked-symbol__ticker is-link" to={scannerDetailPath(row.symbol)}>
-                    {row.symbol}
-                </Link>
+            {linked ? (
+                <StockDetailLink className="tracked-symbol__ticker is-link" symbol={row.symbol} originLabel={TRACKED_ORIGIN_LABEL} />
             ) : (
                 <span className="tracked-symbol__ticker">{row.symbol}</span>
             )}

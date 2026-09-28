@@ -90,7 +90,7 @@ src/
   app/            app-root (exposed, hosted), bootstrap (standalone), wrapper
   common/         error copy, date formatter, webpack MF helper
   components/     PageLayout, ApiErrorState
-  config/         api.config.ts (base URL, TRACKED_ENDPOINTS), routes.ts (Stock Detail link)
+  config/         api.config.ts (base URL, TRACKED_ENDPOINTS)
   features/       TrackedPositions (screen, banner, tabs, tables, hooks, utils)
   hooks/          useApiResource, useRefreshOnVisible
   pages/          TrackedPositionsPage
