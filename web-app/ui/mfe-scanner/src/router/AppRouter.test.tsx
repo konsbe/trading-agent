@@ -10,8 +10,8 @@ jest.mock('@/pages/CandidateDetailPage', () => {
 
 describe('AppRouter', () => {
     it.each([
-        ['standalone at /', '/', 'candidates-page'],
-        ['standalone at /:symbol', '/VGZ', 'detail-page VGZ'],
+        ['at the router root /', '/', 'candidates-page'],
+        ['at the router root /:symbol', '/VGZ', 'detail-page VGZ'],
     ])('%s', (_label, path, text) => {
         render(
             <MemoryRouter initialEntries={[path]}>

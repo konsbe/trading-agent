@@ -1,6 +1,6 @@
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { ApiError } from '@/api';
 import usePriceBars from '@/hooks/scanner/usePriceBars';
 import useScannerSymbol from '@/hooks/scanner/useScannerSymbol';
@@ -44,9 +44,14 @@ beforeEach(() => {
     });
 });
 
-const Location = () => <span data-testid="location">{useLocation().pathname}</span>;
+const Location = () => {
+    const { pathname, search } = useLocation();
+    return <span data-testid="location">{`${pathname}${search}`}</span>;
+};
 
-const renderAt = (path = '/candidates/VGZ', { hosted = false } = {}) =>
+type Entry = string | { pathname: string; hash?: string; state?: unknown };
+
+const renderAt = (path: Entry = '/candidates/VGZ', { hosted = false } = {}) =>
     render(
         <HostModeProvider hosted={hosted}>
             <MemoryRouter initialEntries={[path]}>
@@ -131,13 +136,94 @@ describe('CandidateDetailPage', () => {
             expect(screen.getByTestId('watchlist-button')).toHaveTextContent('Add to watchlist');
         });
 
-        it('links back to the list from the top and the bottom', async () => {
+        it('deep link: "← All candidates" at the top and the bottom, to /candidates', async () => {
             mockHook({ data: makeSymbolResponse() });
             renderAt();
 
-            expect(screen.getByRole('link', { name: '← Return to candidates' })).toHaveAttribute('href', '/candidates');
-            await userEvent.click(screen.getByRole('link', { name: /All candidates/ }));
+            const links = screen.getAllByRole('link', { name: '← All candidates' });
+            expect(links).toHaveLength(2);
+            links.forEach(link => expect(link).toHaveAttribute('href', '/candidates'));
+            expect(within(screen.getByRole('navigation', { name: 'Breadcrumb' })).getByRole('link')).toBe(links[0]);
+            await userEvent.click(links[0]);
             expect(screen.getByTestId('location')).toHaveTextContent(/^\/candidates$/);
+        });
+
+        it('keeps the Score breakdown in its fixed model order: no sort controls or search', () => {
+            mockHook({ data: makeSymbolResponse() });
+            renderAt();
+            const breakdown = screen.getByTestId('score-breakdown');
+            expect(breakdown.querySelector('[aria-sort]')).toBeNull();
+            expect(within(breakdown).queryByRole('searchbox')).not.toBeInTheDocument();
+        });
+
+        describe('opened from a list', () => {
+            const FROM = '/candidates?market_sort=symbol%3Aasc&market_q=gold';
+            const fromCandidates = { pathname: '/candidates/VGZ', state: { from: FROM, fromLabel: 'Candidates' } };
+
+            it('says "← Back to Candidates" and returns to the stored URL, sort and search included', async () => {
+                mockHook({ data: makeSymbolResponse() });
+                renderAt(fromCandidates);
+
+                const back = within(screen.getByRole('navigation', { name: 'Breadcrumb' })).getByRole('link');
+                expect(back).toHaveTextContent('← Back to Candidates');
+                expect(back).toHaveAttribute('href', FROM);
+                expect(screen.getAllByRole('link', { name: '← Back to Candidates' })).toHaveLength(2);
+                expect(screen.queryByRole('link', { name: '← All candidates' })).not.toBeInTheDocument();
+
+                await userEvent.click(back);
+                expect(screen.getByTestId('location')).toHaveTextContent(FROM);
+            });
+
+            it('keeps the origin across in-page entries that carry no state (e.g. #classical-signals)', async () => {
+                mockHook({ data: makeSymbolResponse() });
+                const Jump = () => {
+                    const navigate = useNavigate();
+                    return (
+                        <>
+                            <button type="button" onClick={() => navigate({ hash: 'classical-signals' })}>
+                                jump
+                            </button>
+                            <button type="button" onClick={() => navigate('/candidates/VGZ', { state: { from: '/watchlist', fromLabel: 'Watchlist' } })}>
+                                reopen
+                            </button>
+                        </>
+                    );
+                };
+                render(
+                    <HostModeProvider hosted={false}>
+                        <MemoryRouter initialEntries={[fromCandidates]}>
+                            <Location />
+                            <Routes>
+                                <Route
+                                    path="/candidates/:symbol"
+                                    element={
+                                        <>
+                                            <Jump />
+                                            <CandidateDetailPage />
+                                        </>
+                                    }
+                                />
+                            </Routes>
+                        </MemoryRouter>
+                    </HostModeProvider>
+                );
+
+                const back = () => within(screen.getByRole('navigation', { name: 'Breadcrumb' })).getByRole('link');
+                await userEvent.click(screen.getByRole('button', { name: 'jump' }));
+                expect(back()).toHaveAttribute('href', FROM);
+
+                // Re-opened from another list while mounted: the newer origin wins, and sticks.
+                await userEvent.click(screen.getByRole('button', { name: 'reopen' }));
+                await userEvent.click(screen.getByRole('button', { name: 'jump' }));
+                expect(back()).toHaveTextContent('← Back to Watchlist');
+                expect(back()).toHaveAttribute('href', '/watchlist');
+            });
+
+            it('ignores router state that is not a Stock Detail origin', () => {
+                mockHook({ data: makeSymbolResponse() });
+                renderAt({ pathname: '/candidates/VGZ', state: { from: 'https://elsewhere.example', fromLabel: 'X' } });
+                expect(screen.getAllByRole('link', { name: '← All candidates' })).toHaveLength(2);
+            });
         });
 
         it('shows the disclaimer pill standalone but not hosted', () => {
@@ -374,6 +460,15 @@ describe('CandidateDetailPage', () => {
 
         await userEvent.click(within(notice).getByRole('link', { name: 'Back to candidates' }));
         expect(screen.getByTestId('location')).toHaveTextContent(/^\/candidates$/);
+    });
+
+    it('points the "no data" way back at the list it was opened from', () => {
+        mockHook({ error: new ApiError(404, 'no_data_for_symbol') });
+        renderAt({ pathname: '/candidates/zzzz', state: { from: '/candidates?penny_q=z', fromLabel: 'Candidates' } });
+        expect(within(screen.getByTestId('no-data-state')).getByRole('link', { name: 'Back to Candidates' })).toHaveAttribute(
+            'href',
+            '/candidates?penny_q=z'
+        );
     });
 
     it.each([

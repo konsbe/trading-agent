@@ -77,78 +77,20 @@
 }
 
 /*
- * Header sort control: full-cell button so the whole header is the hit target.
- * Label and indicator are centred on each other (not bottom-aligned), and the
- * indicator is a fixed box, so no state change moves the label.
+ * Header sort buttons (and their indicator) come from the shared
+ * SortableHeader; here only the outer columns' wider inset and the numeric
+ * headers' body font (numeric cells use the label font).
  */
-.scanner-table__sort {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-xxs);
-    width: 100%;
-    padding: var(--space-xs) var(--space-sm);
-    border: 0;
-    border-radius: 0;
-    background: transparent;
-    color: inherit;
-    font: inherit;
-    letter-spacing: inherit;
-    text-align: inherit;
-    text-transform: inherit;
-    cursor: pointer;
-}
-
-.scanner-table thead th:first-child .scanner-table__sort {
+.scanner-table thead th:first-child .ta-sort-header__button {
     padding-left: var(--space-md);
 }
 
-.scanner-table thead th:last-child .scanner-table__sort {
+.scanner-table thead th:last-child .ta-sort-header__button {
     padding-right: var(--space-md);
 }
 
-.scanner-table .is-numeric .scanner-table__sort {
-    justify-content: flex-end;
+.scanner-table .is-numeric .ta-sort-header__button {
     font-family: var(--font-family);
-}
-
-.scanner-table__sort:hover {
-    background: color-mix(in srgb, var(--color-surface-container), var(--color-on-surface) 8%);
-    color: var(--color-on-surface);
-}
-
-.scanner-table__sort.is-active {
-    color: var(--color-on-surface);
-}
-
-.scanner-table__sort:focus-visible {
-    outline: 2px solid var(--color-focus-ring);
-    outline-offset: -2px;
-}
-
-.scanner-table__sort-label {
-    min-width: 0;
-}
-
-.scanner-table__sort-indicator {
-    display: inline-flex;
-    flex: 0 0 auto;
-    align-items: center;
-    justify-content: center;
-    width: 8px;
-    height: 12px;
-    opacity: 0.45;
-}
-
-.scanner-table__sort-indicator svg {
-    display: block;
-    width: 100%;
-    height: 100%;
-    fill: currentColor;
-}
-
-.scanner-table__sort-indicator.is-active {
-    color: var(--color-primary);
-    opacity: 1;
 }
 
 /* Rows */

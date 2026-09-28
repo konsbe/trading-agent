@@ -1,21 +1,33 @@
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import { render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { HostModeProvider } from '@/providers/HostModeContext';
 import PageLayout from './PageLayout';
 
 describe('PageLayout', () => {
     it('shows the title, subtitle, actions, back link and the disclaimer pill standalone', () => {
         render(
-            <PageLayout title="Title" subtitle="Sub" actions={<button type="button">Act</button>} backLink={<a href="/">Back</a>}>
-                body
-            </PageLayout>
+            <MemoryRouter>
+                <PageLayout
+                    title="Title"
+                    subtitle="Sub"
+                    actions={<button type="button">Act</button>}
+                    back={{ label: 'Back', to: '/candidates' }}
+                    badges={[<span key="b">Badge</span>]}
+                >
+                    body
+                </PageLayout>
+            </MemoryRouter>
         );
 
         expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Title');
         expect(screen.getByText('Sub')).toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'Act' })).toBeInTheDocument();
+        expect(screen.getByRole('link', { name: 'Back' })).toHaveAttribute('href', '/candidates');
         expect(screen.getByRole('navigation', { name: 'Breadcrumb' })).toHaveTextContent('Back');
+        expect(screen.getByRole('listitem')).toHaveTextContent('Badge');
+        expect(screen.getByTestId('page-header')).toContainElement(screen.getByTestId('disclaimer-pill'));
         expect(screen.getByTestId('disclaimer-pill')).toHaveTextContent('Screener — not a forecast');
         expect(screen.getByText('body')).toBeInTheDocument();
         expect(screen.getByTestId('scanner-page')).not.toHaveClass('scanner-page--hosted');

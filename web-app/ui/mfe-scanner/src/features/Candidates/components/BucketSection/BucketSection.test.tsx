@@ -1,6 +1,7 @@
-import { render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useLocation } from 'react-router-dom';
+import { TABLE_SEARCH_DEBOUNCE_MS } from '@trading-agent/shared-components';
 import { BucketResult, Candidate } from '@/api';
 import { makeCandidate, makeCandidates } from '@/test-utils/fixtures';
 import { COLUMNS } from '../CandidatesTable';
@@ -8,12 +9,16 @@ import BucketSection from './BucketSection';
 
 const result = (candidates: Candidate[]): BucketResult => ({ total_candidates: candidates.length, candidates });
 
-const renderBucket = (candidates: Candidate[]) =>
+const Search = () => <span data-testid="url-search">{useLocation().search}</span>;
+
+const renderBucket = (candidates: Candidate[], entry = '/candidates') =>
     render(
-        <MemoryRouter>
+        <MemoryRouter initialEntries={[entry]}>
+            <Search />
             <BucketSection bucket="market" result={result(candidates)} />
         </MemoryRouter>
     );
+const urlParams = () => new URLSearchParams(screen.getByTestId('url-search').textContent!);
 
 const table = () => screen.getByTestId('scanner-bucket-market-table');
 const bodyRows = () => within(table()).getAllByRole('row').slice(1);
@@ -189,6 +194,88 @@ describe('BucketSection', () => {
     it('explains the score in the Score header tooltip', () => {
         renderBucket(rows);
         expect(header('Score')).toHaveAttribute('title', expect.stringMatching(/unvalidated/i));
+    });
+
+    describe('URL state and search', () => {
+        const searchBox = () => screen.getByRole('searchbox', { name: 'Search Market candidates' });
+
+        it('keeps the sort in the URL under market_sort, omitting the default', async () => {
+            renderBucket(rows);
+            expect(urlParams().has('market_sort')).toBe(false);
+
+            await userEvent.click(sortButton('Symbol'));
+            expect(urlParams().get('market_sort')).toBe('symbol:asc');
+            expect(screen.getByTestId('bucket-market-sort-label')).toHaveTextContent('Sorted by Symbol — descriptive, not predictive');
+
+            await userEvent.click(sortButton('RVOL'));
+            expect(urlParams().has('market_sort')).toBe(false);
+        });
+
+        it('restores sort and search from the URL on mount', () => {
+            renderBucket(rows, '/candidates?market_sort=close%3Aasc&market_q=b&penny_q=zzz');
+            expect(header('Close')).toHaveAttribute('aria-sort', 'ascending');
+            expect(screen.getByTestId('bucket-market-sort-label')).toHaveTextContent('Sorted by Close');
+            expect(searchBox()).toHaveValue('b');
+            // "b": BBB's ticker and "breakout", CCC's "breakout from consolidation"; Close ascending.
+            expect(order()).toEqual(['CCC', 'BBB']);
+            expect(screen.getByTestId('bucket-market-search-count')).toHaveTextContent('2 of 4 rows');
+        });
+
+        it('falls back to RVOL for an unknown sort key in the URL', () => {
+            renderBucket(rows, '/candidates?market_sort=bogus%3Aasc');
+            expect(header('RVOL')).toHaveAttribute('aria-sort', 'descending');
+            expect(order()).toEqual(['AAA', 'CCC', 'BBB', 'NUL']);
+        });
+
+        it('filters by the text shown (ticker, company, exchange, cells), debounced, into market_q', async () => {
+            jest.useFakeTimers();
+            try {
+                renderBucket([
+                    makeCandidate({ symbol: 'VGZ', company_name: 'Vista Gold Corp', exchange: 'NYSE American' }),
+                    makeCandidate({ symbol: 'LOBO', company_name: 'LOBO TECHNOLOGIES LTD-A', exchange: 'NASDAQ', catalyst_tier: 'A' }),
+                ]);
+                const type = (text: string) => fireEvent.change(searchBox(), { target: { value: text } });
+
+                type('gold');
+                expect(order()).toEqual(['LOBO', 'VGZ']);
+                act(() => jest.advanceTimersByTime(TABLE_SEARCH_DEBOUNCE_MS));
+                expect(order()).toEqual(['VGZ']);
+                expect(urlParams().get('market_q')).toBe('gold');
+                expect(screen.getByTestId('bucket-market-search-count')).toHaveTextContent('1 of 2 rows');
+
+                type('nasdaq');
+                act(() => jest.advanceTimersByTime(TABLE_SEARCH_DEBOUNCE_MS));
+                expect(order()).toEqual(['LOBO']);
+
+                type('tier a');
+                act(() => jest.advanceTimersByTime(TABLE_SEARCH_DEBOUNCE_MS));
+                expect(order()).toEqual(['LOBO']);
+            } finally {
+                jest.useRealTimers();
+            }
+        });
+
+        it('says so when nothing matches, and clearing brings every row back', async () => {
+            renderBucket(rows, '/candidates?market_q=zzz');
+            expect(screen.queryByRole('table')).not.toBeInTheDocument();
+            expect(screen.getByTestId('bucket-market-no-match')).toHaveTextContent('No Market candidates match “zzz”');
+            expect(screen.getByTestId('bucket-market-search-count')).toHaveTextContent('0 of 4 rows');
+
+            await userEvent.click(screen.getByRole('button', { name: 'Clear search' }));
+            expect(order()).toEqual(['AAA', 'CCC', 'BBB', 'NUL']);
+            expect(urlParams().has('market_q')).toBe(false);
+        });
+
+        it('windows the filtered rows', () => {
+            renderBucket(makeCandidates(25), '/candidates?market_q=S1');
+            expect(order()).toEqual(['S10', 'S11', 'S12', 'S13', 'S14', 'S15', 'S16', 'S17', 'S18', 'S19']);
+            expect(screen.queryByTestId('bucket-market-toggle')).not.toBeInTheDocument();
+        });
+
+        it('shows no search for an empty bucket', () => {
+            renderBucket([]);
+            expect(screen.queryByRole('searchbox')).not.toBeInTheDocument();
+        });
     });
 
     describe('windowing', () => {

@@ -17,6 +17,8 @@ describe('bootstrap (standalone)', () => {
         });
 
         expect(screen.getByText('standalone-router')).toBeInTheDocument();
+        // Mounted under /candidates like hosted, so Stock Detail links and "Back to …" URLs match.
+        expect(window.location.pathname).toBe('/candidates');
         expect(screen.getByTestId('ta-theme-root')).toBeInTheDocument();
         act(() => root?.unmount());
     });

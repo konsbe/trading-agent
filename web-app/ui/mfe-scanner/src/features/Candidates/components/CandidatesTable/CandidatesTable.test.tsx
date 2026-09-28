@@ -3,13 +3,14 @@ import { join } from 'path';
 import { render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { makeCandidate } from '@/test-utils/fixtures';
-import { DEFAULT_SORT, SortState } from '../../utils/sortCandidates';
+import { SortState } from '@trading-agent/shared-components';
+import { staticHeaderProps } from '@/test-utils/headerProps';
 import CandidatesTable from './CandidatesTable';
 
 const renderTable = (rows = [makeCandidate({ symbol: 'LOBO', company_name: 'LOBO TECHNOLOGIES LTD-A', exchange: 'NASDAQ' })]) =>
     render(
         <MemoryRouter>
-            <CandidatesTable id="t" caption="Market candidates" rows={rows} sort={DEFAULT_SORT} onSort={jest.fn()} />
+            <CandidatesTable id="t" caption="Market candidates" rows={rows} headerProps={staticHeaderProps()} />
         </MemoryRouter>
     );
 
@@ -89,14 +90,11 @@ describe('CandidatesTable', () => {
             expect(css).toMatch(/@container \(min-width: 1190px\)\s*\{\s*\.scanner-table thead th\s*\{\s*white-space: nowrap;/);
         });
 
-        it('centres the sort indicator on the label in a fixed box, so no state shifts the label', () => {
-            expect(rule('.scanner-table__sort')).toMatch(/align-items:\s*center/);
-            const indicator = rule('.scanner-table__sort-indicator');
-            expect(indicator).toMatch(/flex:\s*0 0 auto/);
-            expect(indicator).toMatch(/width:\s*8px/);
-            expect(indicator).toMatch(/height:\s*12px/);
-            expect(indicator).toMatch(/align-items:\s*center/);
-            expect(indicator).toMatch(/justify-content:\s*center/);
+        it('uses the shared sort header, only insetting the outer columns and keeping numeric headers in the body font', () => {
+            expect(css).not.toMatch(/scanner-table__sort/);
+            expect(rule('.scanner-table thead th:first-child .ta-sort-header__button')).toMatch(/padding-left:\s*var\(--space-md\)/);
+            expect(rule('.scanner-table thead th:last-child .ta-sort-header__button')).toMatch(/padding-right:\s*var\(--space-md\)/);
+            expect(rule('.scanner-table .is-numeric .ta-sort-header__button')).toMatch(/font-family:\s*var\(--font-family\)/);
         });
     });
 
@@ -148,7 +146,7 @@ describe('CandidatesTable', () => {
         const renderSorted = (sort: SortState) =>
             render(
                 <MemoryRouter>
-                    <CandidatesTable id="t" caption="Market candidates" rows={[makeCandidate()]} sort={sort} onSort={jest.fn()} />
+                    <CandidatesTable id="t" caption="Market candidates" rows={[makeCandidate()]} headerProps={staticHeaderProps(sort)} />
                 </MemoryRouter>
             );
         const indicator = (label: RegExp) =>

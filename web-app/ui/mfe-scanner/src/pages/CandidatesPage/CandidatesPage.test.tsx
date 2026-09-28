@@ -1,8 +1,9 @@
 import { readFileSync } from 'fs';
 import { join } from 'path';
-import { render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
+import { Link, MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
+import { readStockDetailState, TABLE_SEARCH_DEBOUNCE_MS } from '@trading-agent/shared-components';
 import { ApiError } from '@/api';
 import { formatDateTime } from '@/common/format/format';
 import useScannerToday from '@/hooks/scanner/useScannerToday';
@@ -21,6 +22,18 @@ const mockHook = (state: Partial<ReturnType<typeof useScannerToday>>) =>
 
 const Location = () => <span data-testid="location">{useLocation().pathname}</span>;
 
+/** Stand-in Stock Detail: shows the stored origin and links back to it, as the real page does. */
+const DetailStub = () => {
+    const origin = readStockDetailState(useLocation().state);
+    return origin ? (
+        <Link to={origin.from} data-testid="detail-back">
+            ← Back to {origin.fromLabel}
+        </Link>
+    ) : (
+        <>detail</>
+    );
+};
+
 const renderPage = ({ hosted = false } = {}) =>
     render(
         <HostModeProvider hosted={hosted}>
@@ -33,7 +46,7 @@ const renderPage = ({ hosted = false } = {}) =>
                                 <Location />
                                 <Routes>
                                     <Route index element={<CandidatesPage />} />
-                                    <Route path=":symbol" element={<>detail</>} />
+                                    <Route path=":symbol" element={<DetailStub />} />
                                 </Routes>
                             </>
                         }
@@ -309,6 +322,37 @@ describe('CandidatesPage', () => {
 
             await userEvent.click(cell('VGZ', 'rvol_20'));
             expect(screen.getByTestId('location')).toHaveTextContent(/^\/candidates\/VGZ$/);
+            expect(screen.getByTestId('detail-back')).toHaveTextContent('← Back to Candidates');
+        });
+
+        it.each([
+            ['ticker link', () => userEvent.click(screen.getByRole('link', { name: 'VGZ' }))],
+            ['row click', () => userEvent.click(cell('VGZ', 'rvol_20'))],
+        ])('round trip via the %s: Back to Candidates restores the sort and search', async (_how, open) => {
+            jest.useFakeTimers({ advanceTimers: true });
+            try {
+                mockHook({ data: makeTodayResponse() });
+                renderPage();
+                const market = () => screen.getByTestId('bucket-market');
+
+                await userEvent.click(within(market()).getByRole('button', { name: 'Symbol' }));
+                fireEvent.change(within(market()).getByRole('searchbox'), { target: { value: 'vista' } });
+                act(() => jest.advanceTimersByTime(TABLE_SEARCH_DEBOUNCE_MS));
+                expect(within(market()).getAllByRole('row')).toHaveLength(2);
+
+                await open();
+                expect(screen.getByTestId('location')).toHaveTextContent(/^\/candidates\/VGZ$/);
+                expect(screen.getByTestId('detail-back')).toHaveAttribute('href', '/candidates?market_sort=symbol%3Aasc&market_q=vista');
+
+                await userEvent.click(screen.getByTestId('detail-back'));
+                expect(screen.getByTestId('location')).toHaveTextContent(/^\/candidates$/);
+                expect(within(market()).getByRole('columnheader', { name: 'Symbol' })).toHaveAttribute('aria-sort', 'ascending');
+                expect(within(market()).getByRole('searchbox')).toHaveValue('vista');
+                expect(within(market()).getByTestId('bucket-market-sort-label')).toHaveTextContent('Sorted by Symbol');
+                expect(within(market()).getAllByRole('row')).toHaveLength(2);
+            } finally {
+                jest.useRealTimers();
+            }
         });
 
         it('navigates on Enter from the focused row', async () => {

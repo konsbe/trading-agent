@@ -13,6 +13,7 @@ import GatesPanel from '@/features/CandidateDetail/components/GatesPanel';
 import PriceChart from '@/features/CandidateDetail/components/PriceChart';
 import ScoreBreakdown from '@/features/CandidateDetail/components/ScoreBreakdown';
 import WatchlistButton from '@/features/CandidateDetail/components/WatchlistButton';
+import useStockDetailBack from '@/features/CandidateDetail/hooks/useStockDetailBack';
 import useScannerSymbol from '@/hooks/scanner/useScannerSymbol';
 import useStockAnalysis from '@/hooks/scanner/useStockAnalysis';
 import { CLASSICAL_SIGNALS_ID } from '@/types/constants';
@@ -35,10 +36,14 @@ const DetailSkeleton = ({ symbol }: { symbol: string }) => (
  * stored (404, or `scanner_data: false`) gets a plain note where the gates /
  * facts / score would be, and its analysis still renders below.
  * `#classical-signals` opens the Classical technical signals section.
+ * Back (header, footer, no-data notice) returns to the list the symbol was
+ * opened from, with its sort and search, else to all candidates.
+ * The Score breakdown keeps its fixed model order: it is never sortable.
  */
 const CandidateDetailPage = () => {
     const { symbol: routeSymbol = '' } = useParams<{ symbol: string }>();
     const { hash } = useLocation();
+    const back = useStockDetailBack();
     const { data, error, isLoading, reload } = useScannerSymbol(routeSymbol);
     const analysis = useStockAnalysis(routeSymbol);
     const symbol = data?.symbol ?? routeSymbol.toUpperCase();
@@ -52,11 +57,7 @@ const CandidateDetailPage = () => {
         <PageLayout
             title={<DetailTitle symbol={symbol} companyName={data?.company_name} />}
             subtitle={data ? <DetailMeta exchange={data.exchange} bucket={data.bucket} asOf={data.as_of} /> : undefined}
-            backLink={
-                <Link className="scanner-link" to="..">
-                    ← All candidates
-                </Link>
-            }
+            back={back}
         >
             {isLoading && !data && !noScannerData && <DetailSkeleton symbol={symbol} />}
 
@@ -65,8 +66,8 @@ const CandidateDetailPage = () => {
                     <p className="scanner-detail__no-data-text">
                         The scanner has never stored a row for {symbol}, so there are no gates, facts or score.
                     </p>
-                    <Link className="scanner-link" to="..">
-                        Back to candidates
+                    <Link className="scanner-link" to={back.to}>
+                        {back.inlineLabel}
                     </Link>
                 </StatusNotice>
             )}
@@ -95,8 +96,8 @@ const CandidateDetailPage = () => {
             {data && <WatchlistButton symbol={data.symbol} />}
             {(data || noScannerData) && (
                 <nav className="scanner-detail__footer-nav" aria-label="Return">
-                    <Link className="scanner-link" to="..">
-                        ← Return to candidates
+                    <Link className="scanner-link" to={back.to}>
+                        {back.label}
                     </Link>
                 </nav>
             )}

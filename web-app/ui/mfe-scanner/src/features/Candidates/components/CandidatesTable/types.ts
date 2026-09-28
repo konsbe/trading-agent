@@ -1,11 +1,8 @@
 import { ReactNode } from 'react';
+import { TableColumn, TableHeaderProps } from '@trading-agent/shared-components';
 import { Candidate } from '@/api';
-import { SortKey, SortState } from '../../utils/sortCandidates';
 
-export interface CandidateColumn {
-    key: SortKey;
-    /** Header text; also used in the "Sorted by …" label. */
-    label: string;
+export interface CandidateColumn extends TableColumn<Candidate> {
     numeric: boolean;
     /** Header tooltip. */
     description?: string;
@@ -17,6 +14,6 @@ export interface CandidatesTableProps {
     /** Accessible table name, e.g. "Market candidates". */
     caption: string;
     rows: Candidate[];
-    sort: SortState;
-    onSort: (key: SortKey) => void;
+    /** `useTableView().headerProps`: sort state and handler per column. */
+    headerProps: (key: string) => TableHeaderProps;
 }

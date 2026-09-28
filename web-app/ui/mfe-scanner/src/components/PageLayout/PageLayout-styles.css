@@ -23,31 +23,13 @@
     line-height: var(--line-height);
 }
 
-.scanner-page__back {
-    font-size: var(--font-size-sm);
-}
-
+/* Title-less header (hosted list: spog titles the page); titled pages use the shared PageHeader. */
 .scanner-page__header {
     display: flex;
     flex-wrap: wrap;
     align-items: flex-start;
     justify-content: space-between;
     gap: var(--space-sm) var(--space-md);
-}
-
-.scanner-page__heading {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-xxs);
-    min-width: 0;
-}
-
-.scanner-page__title {
-    margin: 0;
-    font-family: var(--font-family-headline);
-    font-size: var(--font-size-xl);
-    font-weight: var(--font-weight-bold);
-    color: var(--color-on-surface);
 }
 
 .scanner-page__subtitle {

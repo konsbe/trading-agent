@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { makeCandidate } from '@/test-utils/fixtures';
 import CandidatesTable from '../CandidatesTable';
-import { DEFAULT_SORT } from '../../utils/sortCandidates';
+import { staticHeaderProps } from '@/test-utils/headerProps';
 import AlertBadge, { alertTypeLabel } from './AlertBadge';
 
 const ALERT = {
@@ -27,7 +27,7 @@ const renderTable = (rows = [makeCandidate({ recent_alert: ALERT }), makeCandida
                     path="/candidates/*"
                     element={
                         <Routes>
-                            <Route index element={<CandidatesTable id="t" caption="Market candidates" rows={rows} sort={DEFAULT_SORT} onSort={jest.fn()} />} />
+                            <Route index element={<CandidatesTable id="t" caption="Market candidates" rows={rows} headerProps={staticHeaderProps()} />} />
                             <Route path=":symbol" element={<>detail</>} />
                         </Routes>
                     }

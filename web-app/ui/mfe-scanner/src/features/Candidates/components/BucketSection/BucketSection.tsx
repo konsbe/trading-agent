@@ -1,25 +1,25 @@
 import { useState } from 'react';
-import { Button, CollapsibleCard } from '@trading-agent/shared-components';
-import { BUCKET_LABELS, WINDOW_SIZE } from '../../constants';
-import useCandidateSort from '../../hooks/useCandidateSort';
-import CandidatesTable, { columnLabel } from '../CandidatesTable';
+import { Button, CollapsibleCard, TableSearch, useTableView } from '@trading-agent/shared-components';
+import { BUCKET_LABELS, DEFAULT_SORT, WINDOW_SIZE } from '../../constants';
+import CandidatesTable, { COLUMNS, columnLabel } from '../CandidatesTable';
 import { BucketSectionProps } from './types';
 import './BucketSection-styles.css';
 
 /**
- * One bucket in a collapsible card: sortable table windowed to the top
- * WINDOW_SIZE rows of the current sort, with "and N more" revealing the rest.
- * Sort and windowing state live here, outside the collapsible content, so
- * they survive collapse/expand.
+ * One bucket in a collapsible card: a searchable, sortable table windowed to
+ * the top WINDOW_SIZE rows of the current sort, with "and N more" revealing
+ * the rest. Sort and search live in the URL (`<bucket>_sort`, `<bucket>_q`)
+ * and windowing here, outside the collapsible content, so they survive
+ * collapse/expand and "Back to Candidates" from Stock Detail.
  */
 const BucketSection = ({ bucket, result }: BucketSectionProps) => {
-    const { sort, sorted, toggleSort } = useCandidateSort(result.candidates);
+    const view = useTableView({ rows: result.candidates, columns: COLUMNS, defaultSort: DEFAULT_SORT, urlKey: bucket });
     const [showAll, setShowAll] = useState(false);
 
     const label = BUCKET_LABELS[bucket];
     const tableId = `scanner-bucket-${bucket}-table`;
-    const hiddenCount = Math.max(sorted.length - WINDOW_SIZE, 0);
-    const visible = showAll ? sorted : sorted.slice(0, WINDOW_SIZE);
+    const hiddenCount = Math.max(view.shown - WINDOW_SIZE, 0);
+    const visible = showAll ? view.rows : view.rows.slice(0, WINDOW_SIZE);
 
     return (
         <CollapsibleCard
@@ -40,26 +40,35 @@ const BucketSection = ({ bucket, result }: BucketSectionProps) => {
                 </span>
             }
             meta={
-                sorted.length > 0 ? (
+                view.total > 0 ? (
                     <p className="scanner-bucket__sort-label" aria-live="polite" data-testid={`bucket-${bucket}-sort-label`}>
-                        Sorted by {columnLabel(sort.key)} — descriptive, not predictive
+                        Sorted by {columnLabel(view.sort.key)} — descriptive, not predictive
                     </p>
                 ) : undefined
             }
         >
-            {sorted.length === 0 ? (
+            {view.total === 0 ? (
                 <p className="scanner-bucket__empty" data-testid={`bucket-${bucket}-empty`}>
                     No {label} candidates in this scan
                 </p>
             ) : (
                 <>
-                    <CandidatesTable
-                        id={tableId}
-                        caption={`${label} candidates`}
-                        rows={visible}
-                        sort={sort}
-                        onSort={toggleSort}
+                    <TableSearch
+                        label={`Search ${label} candidates`}
+                        value={view.query}
+                        onChange={view.setQuery}
+                        total={view.total}
+                        shown={view.shown}
+                        controls={tableId}
+                        data-testid={`bucket-${bucket}-search`}
                     />
+                    {view.shown === 0 ? (
+                        <p className="scanner-bucket__empty" data-testid={`bucket-${bucket}-no-match`}>
+                            No {label} candidates match “{view.query.trim()}”
+                        </p>
+                    ) : (
+                        <CandidatesTable id={tableId} caption={`${label} candidates`} rows={visible} headerProps={view.headerProps} />
+                    )}
                     {hiddenCount > 0 && (
                         <div className="scanner-bucket__more">
                             <Button

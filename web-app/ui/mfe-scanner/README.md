@@ -23,13 +23,14 @@ v5 (Apache-2.0), approved for price charts (`docs/design-system/README.md` § Ch
 
 ## Routes
 
-Relative routes, so the same router works standalone (mounted at `/`) and
-hosted (mounted under spog's `candidates/*`):
+Relative routes, mounted under `/candidates/*` both hosted (spog's route) and
+standalone (the bootstrap mounts there and redirects anything else), so the
+absolute Stock Detail links and "Back to …" URLs work the same in both:
 
 | Path | Page |
 |------|------|
-| index | `CandidatesPage` — both buckets as sortable tables (default RVOL desc, nulls last), top 10 + "and N more" per bucket, row/Enter/link to detail; Change % uses `--color-price-up`/`--color-price-down` (zero neutral); a row with a `recent_alert` gets a severity badge ("notice — liquidity sweep") beside the ticker that opens detail at `#classical-signals` |
-| `:symbol` | `CandidateDetailPage` — Stitch "Stock Detail & Score Breakdown": header, gates panel (value vs threshold per check), evidence note, primary facts matrix, price chart (1D 5D 1M 6M 1Y ALL), score breakdown (sub-metric evaluator, penalty rules, footer), then the full analysis (below), shared-watchlist toggle. A symbol the scanner never stored (`/today/{symbol}` 404, or `scanner_data: false`) shows "No scanner data for this symbol" instead of gates/facts/score and still renders the analysis |
+| index | `CandidatesPage` — both buckets as sortable, searchable tables (shared `useTableView` / `SortableHeader` / `TableSearch`; default RVOL desc, nulls last both ways, ties by symbol), top 10 of the filtered rows + "and N more" per bucket, row/Enter/link to detail with "Back to Candidates" state; Change % uses `--color-price-up`/`--color-price-down` (zero neutral); a row with a `recent_alert` gets a severity badge ("notice — liquidity sweep") beside the ticker that opens detail at `#classical-signals` |
+| `:symbol` | `CandidateDetailPage` — Stitch "Stock Detail & Score Breakdown": header (shared `PageHeader`; back action "← Back to {label}" to the list URL the symbol was opened from, else "← All candidates"), gates panel (value vs threshold per check), evidence note, primary facts matrix, price chart (1D 5D 1M 6M 1Y ALL), score breakdown (sub-metric evaluator, penalty rules, footer), then the full analysis (below), shared-watchlist toggle. A symbol the scanner never stored (`/today/{symbol}` 404, or `scanner_data: false`) shows "No scanner data for this symbol" instead of gates/facts/score and still renders the analysis |
 
 Hosted vs standalone: `app-root` (hosted) wraps the app in `HostModeProvider hosted`;
 `bootstrap` (standalone) does not. Hosted screens omit the page title and the
@@ -49,7 +50,15 @@ the computed time, the chart's range tabs, the score status) stays visible and
 is outside the toggle. Each card's state is kept in `sessionStorage`
 (`ta-collapsible:scanner.list.<bucket>` / `scanner.detail.<widget>`), so a
 collapsed card stays collapsed while clicking through candidates in the same
-tab. Bucket sort order and "and N more" survive collapse/expand. Collapsing the
+tab. Bucket sort and search live in the URL — `market_sort` / `market_q`,
+`penny_sort` / `penny_q` (`<key>:<asc|desc>`, default RVOL omitted), written
+with `replace` — so they survive collapse/expand, reload and "← Back to
+Candidates" from Stock Detail; "and N more" survives collapse/expand. The ticker,
+row click and alert badge all open Stock Detail through the shared
+`stockDetailLink` / `StockDetailLink`, which store this URL as the back target.
+Stock Detail's back action navigates to that URL (not history back: the page
+adds its own entries for `#classical-signals`); its Score breakdown keeps the
+model's fixed order and is never sortable. Collapsing the
 chart disposes it; expanding builds a new one at the visible size.
 
 ## Full analysis (Stock Detail)
@@ -179,10 +188,10 @@ src/
   api/            fetch-client (GET/PUT/DELETE, ApiError {status, code}), types + strict parsers + endpoint functions
   app/            app-root (exposed, hosted), bootstrap (standalone), wrapper (ThemeProvider)
   common/         formatters + code humanizer, error copy, webpack MF helper
-  components/     PageLayout (pill when standalone), ApiErrorState, StatusNotice
+  components/     PageLayout (shared PageHeader; pill when standalone), ApiErrorState, StatusNotice
   config/         api.config.ts
-  features/       Candidates/{BucketSection, CandidatesTable, CandidatesSkeleton, StaleScanBanner, hooks, utils/sortCandidates}
-                  CandidateDetail/{DetailHeader, GatesPanel, EvidenceNote, FactsMatrix, PriceChart, ScoreBreakdown, WatchlistButton, utils/describe}
+  features/       Candidates/{BucketSection, CandidatesTable (columns = shared TableColumns), AlertBadge, CandidatesSkeleton, StaleScanBanner, constants}
+                  CandidateDetail/{DetailHeader, hooks/useStockDetailBack, GatesPanel, EvidenceNote, FactsMatrix, PriceChart, ScoreBreakdown, WatchlistButton, utils/describe}
   hooks/          useApiResource, scanner/{useScannerToday, useScannerSymbol, usePriceBars}, watchlist/useWatchlist
   pages/          CandidatesPage, CandidateDetailPage
   providers/      HostModeContext (hosted vs standalone)

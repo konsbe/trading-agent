@@ -1,14 +1,22 @@
 import { createRoot } from 'react-dom/client';
-import { BrowserRouter } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { STOCK_DETAIL_BASE_PATH } from '@trading-agent/shared-components';
 import '@trading-agent/shared-components/theme.css';
 import AppRouter from '@/router/AppRouter';
 import { AppWrapper } from './wrapper';
 
-/** Standalone dev mode (http://localhost:3001): own router, OS theme, no shell. */
+/**
+ * Standalone dev mode (http://localhost:3001): own router, OS theme, no shell.
+ * Mounted at spog's `/candidates/*` too, so absolute Stock Detail links and
+ * "Back to …" URLs behave the same as hosted.
+ */
 export const StandaloneApp = () => (
     <BrowserRouter>
         <AppWrapper>
-            <AppRouter />
+            <Routes>
+                <Route path={`${STOCK_DETAIL_BASE_PATH}/*`} element={<AppRouter />} />
+                <Route path="*" element={<Navigate to={STOCK_DETAIL_BASE_PATH} replace />} />
+            </Routes>
         </AppWrapper>
     </BrowserRouter>
 );

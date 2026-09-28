@@ -1,8 +1,8 @@
-import { Link } from 'react-router-dom';
-import { SeverityBadge } from '@trading-agent/shared-components';
+import { SeverityBadge, StockDetailLink } from '@trading-agent/shared-components';
 import { formatDateTime } from '@/common/format/format';
 import { humanizeCode } from '@/common/format/humanize';
 import { CLASSICAL_SIGNALS_ID } from '@/types/constants';
+import { CANDIDATES_ORIGIN_LABEL } from '../../constants';
 import { AlertBadgeProps } from './types';
 import './AlertBadge-styles.css';
 
@@ -19,15 +19,17 @@ export const alertTypeLabel = (alertType: string): string => {
 const AlertBadge = ({ symbol, alert }: AlertBadgeProps) => {
     const type = alertTypeLabel(alert.alert_type);
     return (
-        <Link
+        <StockDetailLink
             className="scanner-alert-badge"
-            to={{ pathname: encodeURIComponent(symbol), hash: CLASSICAL_SIGNALS_ID }}
+            symbol={symbol}
+            originLabel={CANDIDATES_ORIGIN_LABEL}
+            hash={CLASSICAL_SIGNALS_ID}
             title={`${alert.message} · ${formatDateTime(alert.fired_at)}`}
             aria-label={`${alert.severity} — ${type}: open classical technical signals for ${symbol}`}
             data-testid={`alert-badge-${symbol}`}
         >
             <SeverityBadge severity={alert.severity} detail={type} />
-        </Link>
+        </StockDetailLink>
     );
 };
 
