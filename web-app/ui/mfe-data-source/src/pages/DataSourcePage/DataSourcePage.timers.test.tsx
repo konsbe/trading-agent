@@ -1,4 +1,5 @@
 import { act, render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { fetchDataSourceStatus } from '@/api';
 import { makeStatus } from '@/test-utils/fixtures';
 import DataSourcePage from './DataSourcePage';
@@ -13,7 +14,7 @@ describe('DataSourcePage without timers', () => {
 
     it('fetches once on mount and never again on its own; Refresh fetches once more', async () => {
         fetchMock.mockResolvedValue(makeStatus());
-        render(<DataSourcePage />);
+        render(<DataSourcePage />, { wrapper: MemoryRouter });
         await act(async () => undefined);
         expect(screen.getByTestId('status-view')).toBeInTheDocument();
 

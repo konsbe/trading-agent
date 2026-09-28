@@ -33,6 +33,16 @@
     white-space: nowrap;
 }
 
+/* Sort buttons (shared SortableHeader) fill the cell and carry its padding. */
+.data-source-chain__table th.is-sortable {
+    padding: 0;
+}
+
+.data-source-chain__table th .ta-sort-header__button {
+    padding: var(--space-sm) var(--space-md);
+    white-space: nowrap;
+}
+
 .data-source-chain__table td {
     padding: var(--space-sm) var(--space-md);
     border-bottom: 1px solid var(--color-outline-variant);

@@ -4,14 +4,15 @@ The Data Source screen: current operational health from
 `GET /api/v1/data-sources/status`. It is the one deliberately live-framed page.
 It is checked on mount and when the user presses Refresh, and never on a timer.
 It is read-only: there are no links and no retry or restart controls. The only
-buttons are Refresh and the two collapse toggles.
+controls are Refresh, the two collapse toggles, and the daily chain's search
+box and sort headers.
 
 | Component | Shows | Card |
 |---|---|---|
 | `CheckControls` | `LastChecked` ("Last checked: …", local time with seconds) and `RefreshButton` ("Checking…" and disabled while in flight) | page header |
 | `OverallStatus` | `overall` + `overall_reasons` | always visible, not collapsible |
 | `ProvidersSection` / `ProviderCard` | one card per `PROVIDER_DISPLAY_ORDER` key | `CollapsibleCard`, `datasource.providers` |
-| `DailyChainSection` | sessions newest first, last-clean highlight, coverage note | `CollapsibleCard`, `datasource.chain` |
+| `DailyChainSection` | sessions newest first (every column sorts, `chain_sort` / `chain_q` in the URL; Status most concerning first), search, last-clean highlight, coverage note | `CollapsibleCard`, `datasource.chain` |
 | `DatabaseUnavailablePanel` | the 503 (`kind: database_unavailable`) as the finding itself | full-width alert |
 | `SectionUnavailable` | a section served as `"unavailable"` | inline |
 

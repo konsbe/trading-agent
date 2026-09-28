@@ -1,5 +1,6 @@
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router-dom';
 import { ApiError, DataSourceStatus, toDataSourceError } from '@/api';
 import useDataSourceStatus, { UseDataSourceStatus } from '@/hooks/dataSources/useDataSourceStatus';
 import { HostModeProvider } from '@/providers/HostModeContext';
@@ -17,9 +18,11 @@ const withState = (state: Partial<UseDataSourceStatus>) =>
 const renderPage = (state: Partial<UseDataSourceStatus>, { hosted = true } = {}) => {
     withState(state);
     return render(
-        <HostModeProvider hosted={hosted}>
-            <DataSourcePage />
-        </HostModeProvider>
+        <MemoryRouter>
+            <HostModeProvider hosted={hosted}>
+                <DataSourcePage />
+            </HostModeProvider>
+        </MemoryRouter>
     );
 };
 
@@ -378,7 +381,7 @@ describe('collapsible sections', () => {
     ])('%s collapses by click and Enter/Space and persists under %s', async (testId, key) => {
         const user = userEvent.setup();
         renderPage({ status: makeStatus() });
-        const toggle = within(screen.getByTestId(testId)).getByRole('button');
+        const toggle = screen.getByTestId(testId).querySelector<HTMLButtonElement>('.ta-collapsible-card__toggle')!;
         const content = document.getElementById(toggle.getAttribute('aria-controls')!)!;
 
         await user.click(toggle);
@@ -395,15 +398,18 @@ describe('collapsible sections', () => {
 });
 
 describe('read-only guard', () => {
-    it('has no links and no buttons besides Refresh and the collapse toggles', () => {
+    it('has no links, and no controls besides Refresh, the collapse toggles and the chain table view (search, sort headers)', () => {
         const { container } = renderPage({ status: tiingoAt94() });
 
         expect(container.querySelectorAll('a')).toHaveLength(0);
-        expect(container.querySelectorAll('input, select, textarea, form')).toHaveLength(0);
+        const inputs = container.querySelectorAll('input, select, textarea, form');
+        expect([...inputs].map(el => el.getAttribute('data-testid'))).toEqual(['chain-search-input']);
         const buttons = screen.getAllByRole('button');
-        expect(buttons).toHaveLength(3);
         expect(buttons[0]).toHaveTextContent('Refresh');
-        buttons.slice(1).forEach(b => expect(b).toHaveClass('ta-collapsible-card__toggle'));
+        const [toggles, rest] = [buttons.slice(1, 3), buttons.slice(3)];
+        toggles.forEach(b => expect(b).toHaveClass('ta-collapsible-card__toggle'));
+        rest.forEach(b => expect(b).toHaveClass('ta-sort-header__button'));
+        expect(rest.map(b => b.textContent)).toEqual(['Session', 'Coverage now', 'Attempts', 'Scanner', 'Tracker', 'Status']);
         expect(container.textContent).not.toMatch(/\bretry\b|restart|re-?run/i);
     });
 });
