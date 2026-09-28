@@ -39,6 +39,63 @@ type AlertFilter struct {
 	Until      *time.Time
 	Before     *int64
 	Limit      int
+
+	// Query is a case-insensitive search: it matches symbol, message or
+	// severity text, or any alert type in QueryTypes (the types whose
+	// displayed label matches, resolved by the caller from alert_messages).
+	Query      string
+	QueryTypes []string
+	// Sort is one of the AlertSort* keys ("" = newest first); Offset pages a
+	// sorted or searched view (Before is only for the default order).
+	Sort   string
+	Asc    bool
+	Offset int
+}
+
+// Sort keys: raw rows and groups. Ties always fall back to symbol, then newest.
+const (
+	AlertSortFired     = "fired" // raw: fired_at; grouped: the group's latest alert
+	AlertSortSymbol    = "symbol"
+	AlertSortAlertType = "alert_type" // type id; ids sort like their labels
+	AlertSortSeverity  = "severity"   // info < notice < warning
+	AlertSortCount     = "count"      // grouped only
+)
+
+var alertSortRaw = map[string]string{
+	AlertSortFired: "fired_at", AlertSortSymbol: "symbol", AlertSortAlertType: "alert_type",
+	AlertSortSeverity: severityRankSQL("severity"),
+}
+
+var alertSortGrouped = map[string]string{
+	AlertSortFired: "l.fired_at", AlertSortSymbol: "g.symbol", AlertSortAlertType: "g.alert_type",
+	AlertSortSeverity: severityRankSQL("l.severity"), AlertSortCount: "g.n",
+}
+
+func severityRankSQL(col string) string {
+	return "CASE " + col + " WHEN 'info' THEN 0 WHEN 'notice' THEN 1 WHEN 'warning' THEN 2 ELSE 3 END"
+}
+
+// ValidAlertSort reports whether key sorts raw rows (grouped false) or groups.
+func ValidAlertSort(key string, grouped bool) bool {
+	if grouped {
+		_, ok := alertSortGrouped[key]
+		return ok
+	}
+	_, ok := alertSortRaw[key]
+	return ok
+}
+
+// orderBy is the ORDER BY for a view; the default is newest first.
+func (f AlertFilter) orderBy(cols map[string]string, symbolCol, tsCol, idCol string) string {
+	col, ok := cols[f.Sort]
+	if !ok || f.Sort == AlertSortFired && !f.Asc {
+		return tsCol + " DESC, " + idCol + " DESC"
+	}
+	dir := "DESC"
+	if f.Asc {
+		dir = "ASC"
+	}
+	return fmt.Sprintf("%s %s, %s ASC, %s DESC, %s DESC", col, dir, symbolCol, tsCol, idCol)
 }
 
 // where returns the row filter (everything but the cursor) and its args.
@@ -62,6 +119,12 @@ func (f AlertFilter) where() ([]string, []any) {
 	}
 	if f.Until != nil {
 		add("fired_at < $%d", *f.Until)
+	}
+	if q := strings.TrimSpace(f.Query); q != "" {
+		args = append(args, "%"+likeEscaper.Replace(q)+"%", f.QueryTypes)
+		n := len(args)
+		where = append(where, fmt.Sprintf(
+			"(symbol ILIKE $%[1]d OR message ILIKE $%[1]d OR severity ILIKE $%[1]d OR alert_type = ANY($%[2]d::text[]))", n-1, n))
 	}
 	return where, args
 }
@@ -89,8 +152,8 @@ func ListAlerts(ctx context.Context, q Querier, f AlertFilter) ([]AlertRow, erro
 SELECT id, symbol, exchange_type, alert_type, interval, value::float8, severity, message, fired_at, bar_date
 FROM fired_alerts
 WHERE `+strings.Join(where, " AND ")+`
-ORDER BY fired_at DESC, id DESC
-LIMIT `+fmt.Sprintf("$%d", len(args)), args...)
+ORDER BY `+f.orderBy(alertSortRaw, "symbol", "fired_at", "id")+`
+LIMIT `+fmt.Sprintf("$%d", len(args))+offsetSQL(f.Offset), args...)
 	if err != nil {
 		return nil, fmt.Errorf("list alerts: %w", err)
 	}
@@ -148,8 +211,8 @@ SELECT g.symbol, g.alert_type, g.n, g.first_at, g.last_at,
        l.id, l.exchange_type, l.interval, l.value::float8, l.severity, l.message, l.fired_at, l.bar_date
 FROM g JOIN l USING (symbol, alert_type)
 WHERE `+strings.Join(outer, " AND ")+`
-ORDER BY l.fired_at DESC, l.id DESC
-LIMIT `+fmt.Sprintf("$%d", len(args)), args...)
+ORDER BY `+f.orderBy(alertSortGrouped, "g.symbol", "l.fired_at", "l.id")+`
+LIMIT `+fmt.Sprintf("$%d", len(args))+offsetSQL(f.Offset), args...)
 	if err != nil {
 		return nil, fmt.Errorf("list alert groups: %w", err)
 	}
@@ -195,4 +258,11 @@ FROM fired_alerts`).Scan(&m.Types, &m.EarliestFired, &m.OnsetsSince); err != nil
 		}
 	}
 	return m, nil
+}
+
+func offsetSQL(n int) string {
+	if n <= 0 {
+		return ""
+	}
+	return fmt.Sprintf(" OFFSET %d", n)
 }

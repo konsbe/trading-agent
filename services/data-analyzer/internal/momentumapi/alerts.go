@@ -24,6 +24,15 @@ import (
 //	limit         rows or groups per page (default 100, max 500)
 //	mode          raw (default) or grouped: one row per symbol + alert type in
 //	              the range, with count, first / last fired and the latest alert
+//	sort, dir     a sorted view: fired | symbol | alert_type | severity, plus
+//	              count when grouped; dir asc | desc (default desc). Ties by
+//	              symbol, then newest
+//	q             a search: symbol, displayed type label, severity or message
+//	              (case-insensitive; grouped: groups of the matching alerts)
+//	offset        pages a sorted or searched view (next_offset); before pages
+//	              only the default newest-first view. The page sends the first
+//	              load's time as until on every page, so arriving alerts cannot
+//	              shift offset pages
 //
 // Every response also carries the table-wide alert types, the earliest record
 // and the verbatim heuristic_ta_caveat. Not cached: the bot's scan adds rows
@@ -32,7 +41,21 @@ import (
 const (
 	alertsDefaultLimit = 100
 	alertsMaxLimit     = 500
+	alertsMaxQuery     = 60
 )
+
+// alertTypesMatching: the alert types whose displayed label (or id) contains q,
+// so a search matches what the page shows.
+func (s *Server) alertTypesMatching(q string) []string {
+	q = strings.ToLower(q)
+	out := []string{}
+	for id, label := range s.cfg.AlertMessages.Labels() {
+		if strings.Contains(strings.ToLower(label), q) || strings.Contains(id, q) {
+			out = append(out, id)
+		}
+	}
+	return out
+}
 
 var (
 	alertTypePattern = regexp.MustCompile(`^[a-z][a-z0-9_]{0,39}$`)
@@ -51,8 +74,14 @@ type alertsResponse struct {
 	Mode       string   `json:"mode"`
 	// HasMore: more rows (or groups) match; NextBefore is the cursor for the
 	// next page (pass it as before), set exactly when HasMore.
-	HasMore    bool         `json:"has_more"`
-	NextBefore *int64       `json:"next_before"`
+	HasMore    bool   `json:"has_more"`
+	NextBefore *int64 `json:"next_before"`
+	// Sorted / searched views page by offset: NextOffset is set exactly when
+	// HasMore there; Sort, Dir, Query echo the view.
+	NextOffset *int         `json:"next_offset"`
+	Sort       *string      `json:"sort"`
+	Dir        string       `json:"dir"`
+	Query      *string      `json:"q"`
 	Alerts     []alertOut   `json:"alerts"` // raw mode; [] in grouped mode
 	Groups     []alertGroup `json:"groups"` // grouped mode; [] in raw mode
 
@@ -221,6 +250,44 @@ func (s *Server) handleAlerts(w http.ResponseWriter, r *http.Request) {
 		bad("invalid_mode")
 		return
 	}
+	grouped := resp.Mode == "grouped"
+	resp.Dir = "desc"
+	if raw := strings.TrimSpace(q.Get("sort")); raw != "" {
+		if !store.ValidAlertSort(raw, grouped) {
+			bad("invalid_sort")
+			return
+		}
+		f.Sort, resp.Sort = raw, &raw
+	}
+	switch d := strings.ToLower(strings.TrimSpace(q.Get("dir"))); d {
+	case "", "desc":
+	case "asc":
+		f.Asc, resp.Dir = true, "asc"
+	default:
+		bad("invalid_dir")
+		return
+	}
+	if raw := strings.TrimSpace(q.Get("q")); raw != "" {
+		if len([]rune(raw)) > alertsMaxQuery {
+			bad("invalid_query")
+			return
+		}
+		f.Query, resp.Query = raw, &raw
+		f.QueryTypes = s.alertTypesMatching(raw)
+	}
+	offsetView := f.Query != "" || (f.Sort != "" && !(f.Sort == store.AlertSortFired && !f.Asc))
+	if raw := strings.TrimSpace(q.Get("offset")); raw != "" {
+		n, err := strconv.Atoi(raw)
+		if err != nil || n < 0 {
+			bad("invalid_offset")
+			return
+		}
+		f.Offset, offsetView = n, true
+	}
+	if offsetView && f.Before != nil {
+		bad("invalid_before") // the id cursor pages only the default newest-first view
+		return
+	}
 
 	ctx := r.Context()
 	meta, err := s.cfg.Store.AlertMeta(ctx)
@@ -260,8 +327,13 @@ func (s *Server) handleAlerts(w http.ResponseWriter, r *http.Request) {
 			})
 		}
 		if resp.HasMore {
-			id := groups[len(groups)-1].Latest.ID
-			resp.NextBefore = &id
+			if offsetView {
+				n := f.Offset + resp.Limit
+				resp.NextOffset = &n
+			} else {
+				id := groups[len(groups)-1].Latest.ID
+				resp.NextBefore = &id
+			}
 		}
 		writeJSON(w, http.StatusOK, resp)
 		return
@@ -278,8 +350,13 @@ func (s *Server) handleAlerts(w http.ResponseWriter, r *http.Request) {
 		resp.Alerts = append(resp.Alerts, toAlertOut(a))
 	}
 	if resp.HasMore {
-		id := rows[len(rows)-1].ID
-		resp.NextBefore = &id
+		if offsetView {
+			n := f.Offset + resp.Limit
+			resp.NextOffset = &n
+		} else {
+			id := rows[len(rows)-1].ID
+			resp.NextBefore = &id
+		}
 	}
 	writeJSON(w, http.StatusOK, resp)
 }

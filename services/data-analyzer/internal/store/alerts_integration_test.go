@@ -4,6 +4,8 @@ package store
 
 import (
 	"context"
+	"fmt"
+	"slices"
 	"testing"
 	"time"
 )
@@ -200,5 +202,76 @@ VALUES ('ZZOB1', 'equity', 'bb_squeeze', '1Day', 'info', 'Bollinger Squeeze bega
 	meta, err := LoadAlertMeta(ctx, tx)
 	if err != nil || meta.OnsetsSince == nil {
 		t.Fatalf("meta = %+v, %v", meta, err)
+	}
+}
+
+// Sorted and searched views over real SQL: severity by rank, ties by symbol,
+// the search across symbol / message / label-resolved types, offset pages,
+// and grouped count ordering.
+func TestAlerts_SortSearchOffset(t *testing.T) {
+	ctx := context.Background()
+	tx := fixtureTx(t)
+	base := time.Date(2099, 4, 1, 12, 0, 0, 0, time.UTC)
+	for i, a := range []struct{ sym, kind, sev, msg string }{
+		{"ZZSB", "liquidity_sweep", "notice", "New liquidity sweep"},
+		{"ZZSA", "bb_squeeze", "info", "Bollinger Squeeze began"},
+		{"ZZSC", "vix_elevated", "warning", "VIX crossed above 25"},
+		{"ZZSA", "liquidity_sweep", "notice", "New liquidity sweep again"},
+	} {
+		at := base.Add(time.Duration(i) * time.Hour)
+		if _, err := tx.Exec(ctx, `INSERT INTO fired_alerts (symbol, exchange_type, alert_type, interval, severity, message, fired_at, bar_date)
+			VALUES ($1, 'equity', $2, '1Day', $3, $4, $5, ($5::timestamptz AT TIME ZONE 'UTC')::date + $6::int)`, a.sym, a.kind, a.sev, a.msg, at, i); err != nil {
+			t.Fatal(err)
+		}
+	}
+	since := base.Add(-time.Hour)
+	syms := func(rows []AlertRow) (out []string) {
+		for _, r := range rows {
+			out = append(out, r.Symbol+":"+r.Severity)
+		}
+		return
+	}
+	rows, err := ListAlerts(ctx, tx, AlertFilter{Since: &since, Sort: AlertSortSeverity, Asc: false, Limit: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := syms(rows); len(got) != 4 || got[0] != "ZZSC:warning" || got[1] != "ZZSA:notice" || got[2] != "ZZSB:notice" || got[3] != "ZZSA:info" {
+		t.Errorf("severity desc, ties by symbol = %v", got)
+	}
+	rows, _ = ListAlerts(ctx, tx, AlertFilter{Since: &since, Sort: AlertSortSymbol, Asc: true, Limit: 2, Offset: 2})
+	if got := syms(rows); len(got) != 2 || got[0] != "ZZSB:notice" || got[1] != "ZZSC:warning" {
+		t.Errorf("symbol asc, offset 2 = %v", got)
+	}
+	rows, _ = ListAlerts(ctx, tx, AlertFilter{Since: &since, Query: "squeeze", Limit: 10})
+	if got := syms(rows); len(got) != 1 || got[0] != "ZZSA:info" {
+		t.Errorf("message search = %v", got)
+	}
+	rows, _ = ListAlerts(ctx, tx, AlertFilter{Since: &since, Query: "zzsc", Limit: 10})
+	if len(rows) != 1 {
+		t.Errorf("symbol search (case-insensitive) = %v", syms(rows))
+	}
+	rows, _ = ListAlerts(ctx, tx, AlertFilter{Since: &since, Query: "VIX elev", QueryTypes: []string{"vix_elevated"}, Limit: 10})
+	if len(rows) != 1 || rows[0].AlertType != "vix_elevated" {
+		t.Errorf("label-resolved type search = %v", syms(rows))
+	}
+	rows, _ = ListAlerts(ctx, tx, AlertFilter{Since: &since, Query: "100%", Limit: 10})
+	if len(rows) != 0 {
+		t.Errorf("%% is literal, not a wildcard: %v", syms(rows))
+	}
+	if _, err := tx.Exec(ctx, `INSERT INTO fired_alerts (symbol, exchange_type, alert_type, interval, severity, message, fired_at, bar_date)
+		VALUES ('ZZSB', 'equity', 'liquidity_sweep', '1Day', 'notice', 'New liquidity sweep', $1, '2099-04-10')`, base.Add(5*time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	groups, err := ListAlertGroups(ctx, tx, AlertFilter{Since: &since, Sort: AlertSortCount, Limit: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	for _, g := range groups {
+		got = append(got, fmt.Sprintf("%s:%s:%d", g.Symbol, g.AlertType, g.Count))
+	}
+	want := []string{"ZZSB:liquidity_sweep:2", "ZZSA:liquidity_sweep:1", "ZZSA:bb_squeeze:1", "ZZSC:vix_elevated:1"}
+	if !slices.Equal(got, want) {
+		t.Errorf("groups by count desc, ties by symbol then newest = %v, want %v", got, want)
 	}
 }

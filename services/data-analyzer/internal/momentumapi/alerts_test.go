@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -20,9 +21,17 @@ func (f *fakeStore) matchAlerts(fl store.AlertFilter) []store.AlertRow {
 			(len(fl.AlertTypes) == 0 || slices.Contains(fl.AlertTypes, a.AlertType)) &&
 			(len(fl.Severities) == 0 || slices.Contains(fl.Severities, a.Severity)) &&
 			(fl.Since == nil || !a.FiredAt.Before(*fl.Since)) &&
-			(fl.Until == nil || a.FiredAt.Before(*fl.Until)) {
+			(fl.Until == nil || a.FiredAt.Before(*fl.Until)) &&
+			(fl.Query == "" || strings.Contains(strings.ToLower(a.Symbol+" "+a.Message+" "+a.Severity), strings.ToLower(fl.Query)) ||
+				slices.Contains(fl.QueryTypes, a.AlertType)) {
 			out = append(out, a)
 		}
+	}
+	if fl.Offset > 0 {
+		if fl.Offset >= len(out) {
+			return []store.AlertRow{}
+		}
+		out = out[fl.Offset:]
 	}
 	return out
 }
@@ -207,6 +216,12 @@ func TestAlerts_Errors(t *testing.T) {
 		"/api/v1/alerts?before=0":                          "invalid_before",
 		"/api/v1/alerts?before=x":                          "invalid_before",
 		"/api/v1/alerts?mode=flat":                         "invalid_mode",
+		"/api/v1/alerts?sort=count":                        "invalid_sort",
+		"/api/v1/alerts?sort=price":                        "invalid_sort",
+		"/api/v1/alerts?dir=up":                            "invalid_dir",
+		"/api/v1/alerts?offset=-1":                         "invalid_offset",
+		"/api/v1/alerts?sort=symbol&before=3":              "invalid_before",
+		"/api/v1/alerts?q=sweep&before=3":                  "invalid_before",
 		"/api/v1/alerts?limit=0":                           "invalid_limit",
 		"/api/v1/alerts?limit=501":                         "invalid_limit",
 		"/api/v1/alerts?limit=ten":                         "invalid_limit",
@@ -356,5 +371,36 @@ func TestLoadAlertMessages(t *testing.T) {
 	_ = os.WriteFile(p, []byte(`{"alert_types":{"bb_squeeze":{"label":"","message":"x"}}}`), 0o644)
 	if _, err := LoadAlertMessages(p); err == nil {
 		t.Error("an entry without a label must fail")
+	}
+}
+
+// Sorted or searched views page by offset; the search also matches the
+// displayed type label (alert_messages.json), not only the stored id.
+func TestAlerts_SortSearchOffset(t *testing.T) {
+	st := alertsFixture()
+	srv := newTestServer(t, st, freshNow)
+	body := decode(t, get(t, srv, "/api/v1/alerts?sort=symbol&dir=asc&limit=2"))
+	f := st.alertFilters[len(st.alertFilters)-1]
+	if f.Sort != "symbol" || !f.Asc || body["sort"] != "symbol" || body["dir"] != "asc" ||
+		body["has_more"] != true || body["next_offset"] != 2.0 || body["next_before"] != nil {
+		t.Fatalf("page 1 = %v (filter %+v)", body, f)
+	}
+	body = decode(t, get(t, srv, "/api/v1/alerts?sort=symbol&dir=asc&limit=2&offset=2"))
+	if len(body["alerts"].([]any)) != 1 || body["has_more"] != false || body["next_offset"] != nil {
+		t.Errorf("page 2 = %v", body)
+	}
+	body = decode(t, get(t, srv, "/api/v1/alerts?q=Bollinger"))
+	f = st.alertFilters[len(st.alertFilters)-1]
+	if !slices.Equal(f.QueryTypes, []string{"bb_squeeze"}) || body["q"] != "Bollinger" {
+		t.Errorf("label search: types %v body %v", f.QueryTypes, body["q"])
+	}
+	if ids := alertIDs(body); !slices.Equal(ids, []float64{1}) {
+		t.Errorf("Bollinger matches the bb_squeeze row by its label: ids %v", ids)
+	}
+	if body := decode(t, get(t, srv, "/api/v1/alerts?mode=grouped&sort=count&dir=desc")); body["sort"] != "count" {
+		t.Errorf("grouped count sort = %v", body["sort"])
+	}
+	if body := decode(t, get(t, srv, "/api/v1/alerts?sort=fired&dir=desc&limit=1")); body["next_before"] == nil || body["next_offset"] != nil {
+		t.Errorf("newest-first view must keep next_before: %v", body)
 	}
 }

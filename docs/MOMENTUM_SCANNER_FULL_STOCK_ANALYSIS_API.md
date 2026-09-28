@@ -562,6 +562,19 @@ shared `heuristic_ta_caveat`, verbatim). Only alerts actually posted to
 Discord are recorded (the bot writes the row after a confirmed post); the
 momentum screener's alerts are not written to `fired_alerts`.
 
+**Sort and search (2026-09-28).** `sort` = `fired` | `symbol` | `alert_type`
+| `severity` (info < notice < warning), plus `count` in grouped mode; `dir`
+= `asc` | `desc` (default desc); ties by symbol, then newest. `q` searches
+case-insensitively (literal, max 60 characters) across symbol, message,
+severity and the displayed type label (resolved through
+`alert_messages.json`); in grouped mode it groups the matching alerts. A
+sorted or searched view pages by `offset` (`next_offset`, set exactly when
+`has_more`); `before` / `next_before` page only the default newest-first view
+(`400 invalid_before` otherwise). Alarm History fixes `until` to the first
+load's time for the life of a view, so alerts arriving between pages cannot
+shift offsets; a refresh or a new sort / search starts a new view. Errors:
+`invalid_sort`, `invalid_dir`, `invalid_query`, `invalid_offset`.
+
 **Onset alerts (migration 031, 2026-09-27).** The bot now posts only onsets —
 a condition that started on the latest bar after at least 5 sessions without
 it (technical-analysis `alert_onsets`; VIX: a crossing in VIXCLS) — instead of
