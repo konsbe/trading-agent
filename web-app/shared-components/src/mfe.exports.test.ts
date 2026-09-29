@@ -38,6 +38,7 @@ describe('mfe barrel exports', () => {
         expect(mfeExports.readStockDetailState).toBeDefined();
         expect(mfeExports.isStockDetailEligible).toBeDefined();
         expect(mfeExports.PageHeader).toBeDefined();
+        expect(mfeExports.PageFrame).toBeDefined();
     });
 
     it('exports the market cells, columns and formatters', () => {

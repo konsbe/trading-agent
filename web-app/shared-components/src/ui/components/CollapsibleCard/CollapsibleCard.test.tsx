@@ -112,6 +112,13 @@ describe('CollapsibleCard', () => {
         expect(screen.queryByText('body')).not.toBeInTheDocument();
     });
 
+    it('marks a fit card so it shrinks to its column, and not by default', () => {
+        const { rerender } = render(<CollapsibleCard id="x" title="Primary facts" data-testid="card"><p>body</p></CollapsibleCard>);
+        expect(screen.getByTestId('card')).not.toHaveClass('ta-collapsible-card--fit');
+        rerender(<CollapsibleCard id="x" title="Primary facts" data-testid="card" fit><p>body</p></CollapsibleCard>);
+        expect(screen.getByTestId('card')).toHaveClass('ta-collapsible-card--fit');
+    });
+
     it('supports controlled use through expanded/onToggle', async () => {
         const onToggle = jest.fn();
         const Controlled = () => {

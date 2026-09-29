@@ -89,6 +89,13 @@
     display: none;
 }
 
+/* Inside a `ta-fit` column: shrink to the space left, down to the content's `ta-fit-scroll` floor. */
+.ta-collapsible-card--fit,
+.ta-collapsible-card--fit > .ta-collapsible-card__content {
+    flex: 0 1 auto;
+    min-height: 0;
+}
+
 @media (prefers-reduced-motion: reduce) {
     .ta-collapsible-card__chevron,
     .ta-collapsible-card__toggle {

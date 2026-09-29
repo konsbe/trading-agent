@@ -21,6 +21,7 @@ const CollapsibleCard = ({
     onToggle,
     persistKey,
     headingLevel = 2,
+    fit = false,
     className = '',
     'data-testid': testId,
 }: CollapsibleCardProps) => {
@@ -32,7 +33,7 @@ const CollapsibleCard = ({
     return (
         <section
             id={id}
-            className={`ta-collapsible-card${expanded ? '' : ' is-collapsed'} ${className}`.trim()}
+            className={`ta-collapsible-card${expanded ? '' : ' is-collapsed'}${fit ? ' ta-collapsible-card--fit' : ''} ${className}`.trim()}
             data-testid={testId}
             data-expanded={expanded}
         >

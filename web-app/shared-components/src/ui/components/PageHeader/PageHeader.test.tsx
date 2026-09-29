@@ -66,7 +66,34 @@ describe('PageHeader', () => {
 
     it('takes a class and test id', () => {
         renderIn(<PageHeader title="T" className="extra" data-testid="ph" />);
-        expect(screen.getByTestId('ph')).toHaveClass('ta-page-header', 'extra');
+        expect(screen.getByTestId('ph')).toHaveClass('ta-page-header', 'ta-page-header--page', 'extra');
+    });
+
+    it('renders the top header bar variant', () => {
+        renderIn(<PageHeader title="Tracked Positions" subtitle="Every alert" variant="bar" />);
+        expect(screen.getByTestId('page-header')).toHaveClass('ta-page-header--bar');
+        expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Tracked Positions');
+    });
+
+    it('renders an icon-only back link left of the title, named by its label', async () => {
+        renderIn(<PageHeader title="BTCT" variant="bar" back={{ label: 'Back to Tracked Positions', to: '/tracked-positions?tab=closed', iconOnly: true }} />);
+        const link = screen.getByRole('link', { name: 'Back to Tracked Positions' });
+        expect(link).toHaveAttribute('href', '/tracked-positions?tab=closed');
+        expect(link).toHaveTextContent('');
+        expect(link.querySelector('svg')).not.toBeNull();
+        // In the title row, before the heading — not a text link above it.
+        const row = document.querySelector('.ta-page-header__row')!;
+        expect(row.firstElementChild).toContainElement(link);
+        expect(document.querySelector('.ta-page-header__back')).toBeNull();
+        await userEvent.click(link);
+        expect(screen.getByTestId('location')).toHaveTextContent('/tracked-positions?tab=closed');
+    });
+
+    it('renders an icon-only back button when the back action has only onClick', async () => {
+        const onClick = jest.fn();
+        renderIn(<PageHeader title="XOM" back={{ label: 'Back', onClick, iconOnly: true }} />);
+        await userEvent.click(screen.getByRole('button', { name: 'Back' }));
+        expect(onClick).toHaveBeenCalledTimes(1);
     });
 
     it('uses theme tokens only', () => {

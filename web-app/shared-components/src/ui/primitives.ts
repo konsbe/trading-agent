@@ -67,5 +67,7 @@ export type {
     StockDetailCandidate,
 } from './components/StockDetailLink';
 export { default as PageHeader } from './components/PageHeader';
-export type { PageHeaderProps, PageHeaderBack } from './components/PageHeader';
+export type { PageHeaderProps, PageHeaderBack, PageHeaderIconBack, PageHeaderTextBack, PageHeaderVariant } from './components/PageHeader';
+export { default as PageFrame } from './components/PageFrame';
+export type { PageFrameProps } from './components/PageFrame';
 export * from './icons';

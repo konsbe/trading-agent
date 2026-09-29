@@ -28,4 +28,29 @@
     --line-height: 1.5;
 
     --transition-fast: 120ms ease;
+
+    /* Smallest height a `ta-fit-scroll` region shrinks to before its page scrolls instead. */
+    --fit-scroll-min-height: 160px;
+}
+
+/*
+ * Fit-to-height layout: the page never scrolls, one region (a table body)
+ * does. Every flex column between the page's bounded body and that region is
+ * `ta-fit` (it shrinks to the height left over); the region is `ta-fit-scroll`.
+ * Siblings without the class keep their natural height. The region stops
+ * shrinking at --fit-scroll-min-height (or its own content, if shorter); below
+ * that the page body scrolls, so small viewports still reach everything.
+ */
+.ta-fit {
+    display: flex;
+    flex-direction: column;
+    flex: 0 1 auto;
+    min-height: 0;
+}
+
+.ta-fit-scroll {
+    flex: 0 1 auto;
+    min-height: 0;
+    min-height: calc-size(max-content, min(size, var(--fit-scroll-min-height)));
+    overflow: auto;
 }

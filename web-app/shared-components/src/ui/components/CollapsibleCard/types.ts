@@ -18,6 +18,12 @@ export interface CollapsibleCardProps {
     persistKey?: string;
     /** Heading level wrapping the toggle button. Default 2. */
     headingLevel?: 2 | 3 | 4;
+    /**
+     * Fit-to-height page (`ta-fit` column): the card shrinks to the height its
+     * column leaves, so a `ta-fit-scroll` child (a table wrapper) scrolls
+     * instead of the page. Default `false` (natural height).
+     */
+    fit?: boolean;
     className?: string;
     'data-testid'?: string;
 }

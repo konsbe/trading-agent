@@ -39,8 +39,19 @@
     gap: var(--space-sm) var(--space-md);
 }
 
+.ta-page-header__back-nav {
+    display: flex;
+    flex: 0 0 auto;
+    margin-left: calc(-1 * var(--space-xs));
+}
+
+.ta-page-header__back-icon {
+    color: var(--color-on-surface-variant);
+}
+
 .ta-page-header__heading {
     display: flex;
+    flex: 1 1 auto;
     flex-direction: column;
     gap: var(--space-xxs);
     min-width: 0;
@@ -82,4 +93,25 @@
     align-items: center;
     gap: var(--space-sm);
     margin-left: auto;
+}
+
+/* The page's top header bar: same surface and radius as the shell's header row. */
+.ta-page-header--bar {
+    flex: 0 0 auto;
+    padding: var(--space-sm) var(--space-md);
+    border-radius: var(--radius-lg);
+    background: var(--color-surface-container-low);
+}
+
+.ta-page-header--bar .ta-page-header__row {
+    flex-wrap: nowrap;
+    align-items: center;
+}
+
+.ta-page-header--bar .ta-page-header__title {
+    font-size: var(--font-size-lg);
+}
+
+.ta-page-header--bar .ta-page-header__subtitle {
+    font-size: var(--font-size-xs);
 }

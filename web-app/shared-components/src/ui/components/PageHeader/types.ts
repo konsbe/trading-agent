@@ -1,14 +1,33 @@
 import { ReactNode } from 'react';
 import { To } from 'react-router-dom';
 
-export interface PageHeaderBack {
-    /** Full link text, e.g. "← Back to Candidates". */
-    label: ReactNode;
+interface PageHeaderBackTarget {
     /** Router target; renders a `Link` (a real href, so middle-click works). */
     to?: To;
-    /** Without `to`, renders a link-styled button; with `to`, runs before navigation. */
+    /** Without `to`, renders a button; with `to`, runs before navigation. */
     onClick?: () => void;
 }
+
+export interface PageHeaderTextBack extends PageHeaderBackTarget {
+    /** Full link text above the title, e.g. "← Back to Candidates". */
+    label: ReactNode;
+    iconOnly?: false;
+}
+
+export interface PageHeaderIconBack extends PageHeaderBackTarget {
+    /** Accessible name of the arrow, e.g. "Back to Tracked Positions". */
+    label: string;
+    /** An arrow icon button left of the title instead of a text link above it. */
+    iconOnly: true;
+}
+
+export type PageHeaderBack = PageHeaderTextBack | PageHeaderIconBack;
+
+/**
+ * `page`: a title block inside the page. `bar`: the page's top header bar
+ * (the shell header's look), for MFE routes that render their own header.
+ */
+export type PageHeaderVariant = 'page' | 'bar';
 
 export interface PageHeaderProps {
     /** The page's h1. */
@@ -19,6 +38,8 @@ export interface PageHeaderProps {
     badges?: ReactNode[];
     /** Right-aligned controls (refresh, disclaimer pill). */
     actions?: ReactNode;
+    /** Default `page`. */
+    variant?: PageHeaderVariant;
     className?: string;
     'data-testid'?: string;
 }
