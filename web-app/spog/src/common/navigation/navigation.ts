@@ -40,6 +40,7 @@ export const getMfeRoutes = (config?: AppConfig): MfeRoute[] =>
             order: entry.nav_order ?? Number.POSITIVE_INFINITY,
             subOrder: entry.nav_sub_order ?? Number.POSITIVE_INFINITY,
             enableNavigation: entry.enable_navigation === true,
+            shellHeader: entry.shell_header !== false,
         }));
 
 /** Placeholder pages whose path is not already served by a config MFE. */

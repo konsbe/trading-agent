@@ -50,7 +50,7 @@ jest.mock('../../layouts/GridLayout', () => ({
                     {row.columns?.map((col: any, colIdx: number) => (
                         <div key={colIdx} data-testid={`grid-column-${colIdx}`}>
                             {col.components?.map((comp: any) => (
-                                <div key={comp.id} data-testid={comp.id}>
+                                <div key={comp.id} data-testid={comp.id} data-class-name={comp.className}>
                                     {comp.component}
                                 </div>
                             ))}
@@ -132,6 +132,25 @@ describe('SingleMfePage Component', () => {
             customRenderWithAllProviders(<CandidatesPage />);
 
             expect(screen.getByTestId('mfe_candidates')).toBeInTheDocument();
+            expect(screen.getByTestId('grid-row-1')).toContainElement(screen.getByTestId('mfe_candidates'));
+        });
+
+        it('renders only the MFE, on a bare cell, when the shell header is off', () => {
+            customRenderWithAllProviders(<CandidatesPage mfe_shell_header={false} />);
+
+            expect(screen.queryByTestId('header-component-mfe_candidates')).not.toBeInTheDocument();
+            expect(screen.queryByTestId('page-header')).not.toBeInTheDocument();
+            expect(screen.queryByTestId('grid-row-1')).not.toBeInTheDocument();
+            const cell = screen.getByTestId('mfe_candidates');
+            expect(screen.getByTestId('grid-row-0')).toContainElement(cell);
+            expect(cell).toHaveAttribute('data-class-name', 'grid-layout-component--bare');
+            expect(screen.getByTestId('content-wrapper-mfe_candidates')).toBeInTheDocument();
+        });
+
+        it('keeps the plain cell with the shell header', () => {
+            customRenderWithAllProviders(<CandidatesPage />);
+
+            expect(screen.getByTestId('mfe_candidates')).not.toHaveAttribute('data-class-name');
         });
 
     });

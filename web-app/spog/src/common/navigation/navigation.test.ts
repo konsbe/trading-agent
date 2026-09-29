@@ -35,8 +35,28 @@ describe('getMfeRoutes', () => {
 
         expect(routes).toEqual([{
             mfeKey: 'mfe_a', path: '/a', label: 'A', module: './A', roles: ['admin'],
-            icon: 'mdi-eye', group: 'G', order: 2, subOrder: 3, enableNavigation: false,
+            icon: 'mdi-eye', group: 'G', order: 2, subOrder: 3, enableNavigation: false, shellHeader: true,
         }]);
+    });
+
+    it('reads shell_header, on unless explicitly false', () => {
+        const routes = getMfeRoutes(configOf({
+            on: mfe({ router_path: '/on', shell_header: true }),
+            off: mfe({ router_path: '/off', shell_header: false }),
+            unset: mfe({ router_path: '/unset' }),
+        }));
+        const by = Object.fromEntries(routes.map(r => [r.mfeKey, r.shellHeader]));
+        expect(by).toEqual({ on: true, off: false, unset: true });
+    });
+
+    it('lets the table screens render their own header bar and keeps the shell header elsewhere', () => {
+        const by = Object.fromEntries(getMfeRoutes(appConfig as AppConfig).map(r => [r.path, r.shellHeader]));
+        ['/candidates', '/watchlist', '/followed-symbols', '/computed-symbols', '/alarm-history', '/tracked-positions'].forEach(path =>
+            expect(by[path]).toBe(false)
+        );
+        ['/market-report', '/backtest-lab', '/data-source', '/handbook', '/masterclass', '/glossary'].forEach(path =>
+            expect(by[path]).toBe(true)
+        );
     });
 
     it('excludes disabled MFEs using the isMfeEnabled truthiness rules', () => {

@@ -38,6 +38,7 @@ jest.mock('../pages/SingleMfePage', () => {
                 data-mfe-component={props.mfe_component as string}
                 data-navigation-path={props.mfe_navigation_path as string}
                 data-enable-navigation={String(props.mfe_enable_navigation)}
+                data-shell-header={String(props.mfe_shell_header)}
             >
                 {props.mfe_header_title as string}
             </div>
@@ -112,6 +113,7 @@ describe('AppRouter', () => {
             expect(mfePage).toHaveAttribute('data-mfe-component', expected.module);
             expect(mfePage).toHaveAttribute('data-navigation-path', expected.path);
             expect(mfePage).toHaveAttribute('data-enable-navigation', 'false');
+            expect(mfePage).toHaveAttribute('data-shell-header', String(expected.shellHeader));
             expect(mfePage).toHaveTextContent(expected.label);
         }
     );

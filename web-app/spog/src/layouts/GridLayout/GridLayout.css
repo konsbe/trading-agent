@@ -557,6 +557,12 @@
     flex-direction: column;
     overflow-y: hidden;
 }
+/* A cell whose component draws its own surfaces (an MFE with its own header bar). */
+.grid-layout-component--bare {
+    background-color: transparent;
+    border-radius: 0;
+}
+
 /* Scrollbar Styling - Applied to component container */
 .grid-layout-component::-webkit-scrollbar {
     width: 5px;

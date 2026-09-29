@@ -35,7 +35,8 @@
       "nav_sub_order": 2,
       "nav_icon": "mdi-view-grid-outline",
       "router_path": "/candidates",
-      "enable_navigation": false
+      "enable_navigation": false,
+      "shell_header": false
     },
     "mfe_watchlist": {
       "label": "Watchlist",
@@ -51,7 +52,8 @@
       "nav_sub_order": 1,
       "nav_icon": "mdi-bookmark-outline",
       "router_path": "/watchlist",
-      "enable_navigation": false
+      "enable_navigation": false,
+      "shell_header": false
     },
     "mfe_watchlist_followed": {
       "label": "Followed Symbols",
@@ -67,7 +69,8 @@
       "nav_sub_order": 2,
       "nav_icon": "mdi-eye",
       "router_path": "/followed-symbols",
-      "enable_navigation": false
+      "enable_navigation": false,
+      "shell_header": false
     },
     "mfe_watchlist_computed": {
       "label": "Computed Symbols",
@@ -83,7 +86,8 @@
       "nav_sub_order": 3,
       "nav_icon": "mdi-format-list-checks",
       "router_path": "/computed-symbols",
-      "enable_navigation": false
+      "enable_navigation": false,
+      "shell_header": false
     },
     "mfe_alarm_history": {
       "label": "Alarm History",
@@ -99,7 +103,8 @@
       "nav_sub_order": 4,
       "nav_icon": "mdi-bell-outline",
       "router_path": "/alarm-history",
-      "enable_navigation": false
+      "enable_navigation": false,
+      "shell_header": false
     },
     "mfe_tracked": {
       "label": "Tracked Positions",
@@ -115,7 +120,8 @@
       "nav_sub_order": 5,
       "nav_icon": "mdi-chart-box-outline",
       "router_path": "/tracked-positions",
-      "enable_navigation": false
+      "enable_navigation": false,
+      "shell_header": false
     },
     "mfe_backtest_lab": {
       "label": "Backtest Lab",

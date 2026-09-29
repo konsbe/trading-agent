@@ -31,6 +31,7 @@ export const buildRoutes = (config?: AppConfig): RouteObject[] => {
                         mfe_header_title={mfe.label}
                         mfe_navigation_path={mfe.path}
                         mfe_enable_navigation={mfe.enableNavigation}
+                        mfe_shell_header={mfe.shellHeader}
                     />
                 }
             />

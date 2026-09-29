@@ -16,6 +16,8 @@ export interface MfeRoute extends NavItem {
     subOrder: number;
     /** config `enable_navigation` (default false): see MFEConfigEntry. */
     enableNavigation: boolean;
+    /** config `shell_header` (default true): see MFEConfigEntry. */
+    shellHeader: boolean;
 }
 
 /** A not-yet-implemented page rendered as a text placeholder. */

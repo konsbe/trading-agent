@@ -75,6 +75,10 @@ declare global {
     // (table sort / search) in the URL, and HeaderComponent redirects to
     // router_path when that param has characters outside [a-zA-Z0-9 _-].
     enable_navigation?: boolean;
+    // false: SingleMfePage renders no HeaderComponent row and the MFE fills
+    // the whole cell, rendering its own header (live title, counts, back
+    // arrow). Default true.
+    shell_header?: boolean;
   }
 
   interface MFEConfigEntryWithRoles extends Omit<MFEConfigEntry, 'roles'> {
