@@ -44,7 +44,7 @@ describe('CandidatesTable', () => {
     it('wraps the table in a labelled, keyboard-focusable scroll region', () => {
         renderTable();
 
-        const region = screen.getByRole('region', { name: 'Market candidates, scrolls horizontally' });
+        const region = screen.getByRole('region', { name: 'Market candidates, scrolls' });
         expect(region).toHaveAttribute('tabindex', '0');
         expect(region).toHaveClass('scanner-table__wrap');
         expect(within(region).getByRole('table', { name: 'Market candidates' })).toBeInTheDocument();

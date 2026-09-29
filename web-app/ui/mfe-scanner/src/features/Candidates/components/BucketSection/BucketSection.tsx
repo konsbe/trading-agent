@@ -25,6 +25,7 @@ const BucketSection = ({ bucket, result }: BucketSectionProps) => {
         <CollapsibleCard
             id={`scanner-bucket-${bucket}`}
             persistKey={`scanner.list.${bucket}`}
+            fit
             className="scanner-bucket"
             data-testid={`bucket-${bucket}`}
             title={

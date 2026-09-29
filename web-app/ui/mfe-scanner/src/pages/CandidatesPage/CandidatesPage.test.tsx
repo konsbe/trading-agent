@@ -146,21 +146,37 @@ describe('CandidatesPage', () => {
             expect(within(meta).getByText(formatDateTime(data.scan.completed_at))).toHaveAttribute('datetime', data.scan.completed_at);
         });
 
-        it('standalone: shows its own title and the disclaimer pill', () => {
+        it('standalone: the header bar shows the title, the scan summary, Refresh and the disclaimer pill', () => {
             mockHook({ data: makeTodayResponse() });
             renderPage();
 
-            expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent("Today's Candidates");
+            const header = screen.getByTestId('page-header');
+            expect(header).toHaveClass('ta-page-header--bar');
+            expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Momentum Scanner');
+            expect(header).toContainElement(screen.getByTestId('scan-meta'));
+            expect(header).toContainElement(screen.getByRole('button', { name: 'Refresh' }));
             expect(screen.getByTestId('disclaimer-pill')).toHaveTextContent('Screener — not a forecast');
         });
 
-        it('hosted: no duplicate title or pill (the shell shows both)', () => {
+        it('hosted: its own header bar (spog shows none for this route), without the pill (the shell top bar has it)', () => {
             mockHook({ data: makeTodayResponse() });
             renderPage({ hosted: true });
 
-            expect(screen.queryByRole('heading', { level: 1 })).not.toBeInTheDocument();
+            expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Momentum Scanner');
             expect(screen.queryByTestId('disclaimer-pill')).not.toBeInTheDocument();
-            expect(screen.getByTestId('scan-meta')).toBeInTheDocument();
+            expect(screen.getByTestId('page-header')).toContainElement(screen.getByTestId('scan-meta'));
+        });
+
+        it('fits the page: each bucket card shrinks and its table body scrolls', () => {
+            const data = makeTodayResponse();
+            data.buckets.penny = { total_candidates: 1, candidates: [makeCandidate({ symbol: 'PNNY' })] };
+            mockHook({ data });
+            renderPage({ hosted: true });
+
+            ['market', 'penny'].forEach(bucket => {
+                expect(screen.getByTestId(`bucket-${bucket}`)).toHaveClass('ta-collapsible-card--fit');
+                expect(screen.getByTestId(`scanner-bucket-${bucket}-table-scroll`)).toHaveClass('ta-fit-scroll');
+            });
         });
 
         it('refreshes on demand', async () => {

@@ -71,6 +71,11 @@
     vertical-align: bottom;
 }
 
+/* The page's own table header stays above a group's nested table (and its header) scrolling under it. */
+.alarm-table__wrap.ta-fit-scroll > .alarm-table > thead th {
+    z-index: 2;
+}
+
 /*
  * Sort buttons (shared SortableHeader) fill their cell and carry its padding:
  * the header's block padding here, the outer columns' wider inset below.

@@ -36,8 +36,10 @@ const DetailSkeleton = ({ symbol }: { symbol: string }) => (
  * stored (404, or `scanner_data: false`) gets a plain note where the gates /
  * facts / score would be, and its analysis still renders below.
  * `#classical-signals` opens the Classical technical signals section.
- * Back (header, footer, no-data notice) returns to the list the symbol was
- * opened from, with its sort and search, else to all candidates.
+ * The header bar is the identity block: a back arrow on the left, then the
+ * ticker, company name and exchange · bucket · as-of line. Back (header
+ * arrow, footer, no-data notice) returns to the list the symbol was opened
+ * from, with its sort and search, else to all candidates.
  * The Score breakdown keeps its fixed model order: it is never sortable.
  */
 const CandidateDetailPage = () => {
@@ -57,7 +59,7 @@ const CandidateDetailPage = () => {
         <PageLayout
             title={<DetailTitle symbol={symbol} companyName={data?.company_name} />}
             subtitle={data ? <DetailMeta exchange={data.exchange} bucket={data.bucket} asOf={data.as_of} /> : undefined}
-            back={back}
+            back={back.arrow}
         >
             {isLoading && !data && !noScannerData && <DetailSkeleton symbol={symbol} />}
 

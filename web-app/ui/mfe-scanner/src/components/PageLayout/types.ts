@@ -2,11 +2,11 @@ import { ReactNode } from 'react';
 import { PageHeaderBack } from '@trading-agent/shared-components';
 
 export interface PageLayoutProps {
-    /** Rendered as the page's h1; omit when the shell already titles the page. */
+    /** The header bar's h1; without it no header bar renders. */
     title?: ReactNode;
     subtitle?: ReactNode;
     actions?: ReactNode;
-    /** Back action above the title (needs `title`). */
+    /** Back action (needs `title`); `iconOnly` puts an arrow left of the title. */
     back?: PageHeaderBack;
     /** Items beside the title (needs `title`). */
     badges?: ReactNode[];

@@ -11,13 +11,19 @@ import '@/styles/alarm-table.css';
  * bar's date below it when the alert has one), symbol, alert type, severity
  * and the bot's message. With `headerProps` the headers sort (server-side);
  * a group's expansion has none (newest first) and omits the type column (it
- * is the group's).
+ * is the group's). `fit`: the page's own list, whose rows scroll under the
+ * sticky header while the page stays put.
  */
-const AlertsTable = ({ id, caption, alerts, showType = true, headerProps }: AlertsTableProps) => {
+const AlertsTable = ({ id, caption, alerts, showType = true, headerProps, fit = false }: AlertsTableProps) => {
     const typeLabel = useTypeLabel();
     const columns = RAW_COLUMNS.filter(column => showType || column.key !== 'alert_type');
     return (
-        <div className="alarm-table__wrap" role="region" aria-label={`${caption}, scrolls horizontally`} tabIndex={0}>
+        <div
+            className={`alarm-table__wrap${fit ? ' ta-fit-scroll' : ''}`}
+            role="region"
+            aria-label={`${caption}, ${fit ? 'scrolls' : 'scrolls horizontally'}`}
+            tabIndex={0}
+        >
             <table className="alarm-table" id={id} data-testid={id}>
                 <caption className="alarm-table__caption">{caption}</caption>
                 <thead>

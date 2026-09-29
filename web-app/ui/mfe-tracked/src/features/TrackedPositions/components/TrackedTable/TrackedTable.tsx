@@ -78,7 +78,8 @@ const TrackedTable = ({ id, caption, variant, rows, headerProps, openNotes, onTo
 
     return (
         // Focusable, labelled scroll region so keyboard users can scroll when the table overflows.
-        <div className="tracked-table__wrap" role="region" aria-label={`${caption}, scrolls horizontally`} tabIndex={0}>
+        // ta-fit-scroll: rows scroll under the sticky header; the page itself does not.
+        <div className="tracked-table__wrap ta-fit-scroll" role="region" aria-label={`${caption}, scrolls`} tabIndex={0}>
             <table className="tracked-table" id={id} data-testid={id}>
                 <caption className="tracked-table__caption">{caption}</caption>
                 <thead>

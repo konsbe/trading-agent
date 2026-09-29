@@ -49,7 +49,7 @@ const renderCell = (key: string, item: FollowedSymbol): ReactNode => {
  * row. Stocks and funds link to Stock Detail (hosted); crypto pairs don't.
  */
 const FollowedTable = ({ id, rows, columns, headerProps, saving, errors, onUnfollow }: FollowedTableProps) => (
-    <div className="tracking-table__wrap" role="region" aria-label="Followed symbols, scrolls horizontally" tabIndex={0}>
+    <div className="tracking-table__wrap ta-fit-scroll" role="region" aria-label="Followed symbols, scrolls" tabIndex={0}>
         <table className="tracking-table" id={id} data-testid="followed-table">
             <caption className="tracking-table__caption">Followed symbols</caption>
             <thead>

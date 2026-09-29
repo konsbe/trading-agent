@@ -143,10 +143,11 @@ const WatchlistTable = ({ id, caption, rows, columns, headerProps, saving, onRem
 
     return (
         // Focusable, labelled scroll region so keyboard users can scroll when the table overflows.
+        // ta-fit-scroll: rows scroll under the sticky header; the page itself does not.
         <div
-            className="watchlist-table__wrap"
+            className="watchlist-table__wrap ta-fit-scroll"
             role="region"
-            aria-label={`${caption}, scrolls horizontally`}
+            aria-label={`${caption}, scrolls`}
             tabIndex={0}
             data-testid={`${id}-scroll`}
         >

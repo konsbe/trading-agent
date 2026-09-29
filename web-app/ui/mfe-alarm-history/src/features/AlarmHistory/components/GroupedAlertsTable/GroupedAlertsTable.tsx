@@ -24,7 +24,7 @@ const domId = (key: string) => `alarm-group-${key.replace(/[^A-Za-z0-9_-]/g, '-'
 const GroupedAlertsTable = ({ caption, groups, expanded, onToggle, query, refreshToken, headerProps }: GroupedAlertsTableProps) => {
     const typeLabel = useTypeLabel();
     return (
-        <div className="alarm-table__wrap" role="region" aria-label="Alerts by symbol and type, scrolls horizontally" tabIndex={0}>
+        <div className="alarm-table__wrap ta-fit-scroll" role="region" aria-label="Alerts by symbol and type, scrolls" tabIndex={0}>
             <table className="alarm-table alarm-grouped" id="alarm-grouped-table" data-testid="alarm-grouped-table">
                 <caption className="alarm-table__caption">{caption}</caption>
                 <thead>

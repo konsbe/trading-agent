@@ -9,4 +9,6 @@ export interface AlertsTableProps {
     showType?: boolean;
     /** Sortable headers (`useTableView().headerProps`); omitted for a fixed newest-first list. */
     headerProps?: (key: string) => TableHeaderProps;
+    /** The page's list (a `ta-fit-scroll` region); a group's nested table leaves it off. */
+    fit?: boolean;
 }

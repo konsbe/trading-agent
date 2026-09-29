@@ -136,15 +136,18 @@ describe('CandidateDetailPage', () => {
             expect(screen.getByTestId('watchlist-button')).toHaveTextContent('Add to watchlist');
         });
 
-        it('deep link: "← All candidates" at the top and the bottom, to /candidates', async () => {
+        it('deep link: the header arrow and the footer link both go to /candidates', async () => {
             mockHook({ data: makeSymbolResponse() });
             renderAt();
 
-            const links = screen.getAllByRole('link', { name: '← All candidates' });
-            expect(links).toHaveLength(2);
-            links.forEach(link => expect(link).toHaveAttribute('href', '/candidates'));
-            expect(within(screen.getByRole('navigation', { name: 'Breadcrumb' })).getByRole('link')).toBe(links[0]);
-            await userEvent.click(links[0]);
+            const arrow = within(screen.getByRole('navigation', { name: 'Breadcrumb' })).getByRole('link');
+            expect(arrow).toHaveAccessibleName('All candidates');
+            expect(arrow).toHaveAttribute('href', '/candidates');
+            expect(arrow).not.toHaveTextContent(/candidates/i); // icon-only
+            const footer = screen.getAllByRole('link', { name: '← All candidates' });
+            expect(footer).toHaveLength(1);
+            expect(footer[0]).toHaveAttribute('href', '/candidates');
+            await userEvent.click(arrow);
             expect(screen.getByTestId('location')).toHaveTextContent(/^\/candidates$/);
         });
 
@@ -165,10 +168,10 @@ describe('CandidateDetailPage', () => {
                 renderAt(fromCandidates);
 
                 const back = within(screen.getByRole('navigation', { name: 'Breadcrumb' })).getByRole('link');
-                expect(back).toHaveTextContent('← Back to Candidates');
+                expect(back).toHaveAccessibleName('Back to Candidates');
                 expect(back).toHaveAttribute('href', FROM);
-                expect(screen.getAllByRole('link', { name: '← Back to Candidates' })).toHaveLength(2);
-                expect(screen.queryByRole('link', { name: '← All candidates' })).not.toBeInTheDocument();
+                expect(screen.getAllByRole('link', { name: '← Back to Candidates' })).toHaveLength(1);
+                expect(screen.queryByRole('link', { name: /All candidates/ })).not.toBeInTheDocument();
 
                 await userEvent.click(back);
                 expect(screen.getByTestId('location')).toHaveTextContent(FROM);
@@ -215,14 +218,15 @@ describe('CandidateDetailPage', () => {
                 // Re-opened from another list while mounted: the newer origin wins, and sticks.
                 await userEvent.click(screen.getByRole('button', { name: 'reopen' }));
                 await userEvent.click(screen.getByRole('button', { name: 'jump' }));
-                expect(back()).toHaveTextContent('← Back to Watchlist');
+                expect(back()).toHaveAccessibleName('Back to Watchlist');
                 expect(back()).toHaveAttribute('href', '/watchlist');
             });
 
             it('ignores router state that is not a Stock Detail origin', () => {
                 mockHook({ data: makeSymbolResponse() });
                 renderAt({ pathname: '/candidates/VGZ', state: { from: 'https://elsewhere.example', fromLabel: 'X' } });
-                expect(screen.getAllByRole('link', { name: '← All candidates' })).toHaveLength(2);
+                expect(within(screen.getByRole('navigation', { name: 'Breadcrumb' })).getByRole('link')).toHaveAccessibleName('All candidates');
+                expect(screen.getAllByRole('link', { name: '← All candidates' })).toHaveLength(1);
             });
         });
 

@@ -1,11 +1,9 @@
 import { ReactNode } from 'react';
 
 export interface PageLayoutProps {
-    /** Rendered as the page's h1; omit when the shell already titles the page. */
+    /** The header bar's h1, e.g. with a live count; without it no header bar renders. */
     title?: ReactNode;
     subtitle?: ReactNode;
     actions?: ReactNode;
-    /** Navigation shown above the header (e.g. a back link). */
-    backLink?: ReactNode;
     children: ReactNode;
 }

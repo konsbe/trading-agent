@@ -44,10 +44,11 @@ const CandidatesTable = ({ id, caption, rows, headerProps }: CandidatesTableProp
 
     return (
         // Focusable, labelled scroll region so keyboard users can scroll when the table overflows.
+        // ta-fit-scroll: rows scroll under the sticky header; the page itself does not.
         <div
-            className="scanner-table__wrap"
+            className="scanner-table__wrap ta-fit-scroll"
             role="region"
-            aria-label={`${caption}, scrolls horizontally`}
+            aria-label={`${caption}, scrolls`}
             tabIndex={0}
             data-testid={`${id}-scroll`}
         >

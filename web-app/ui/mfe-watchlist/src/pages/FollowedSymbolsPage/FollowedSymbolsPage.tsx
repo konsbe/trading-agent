@@ -42,6 +42,7 @@ const FollowedScreen = () => {
             <CollapsibleCard
                 id="followed-list"
                 persistKey="watchlist.followed.list"
+                fit
                 data-testid="followed-list"
                 title="Followed symbols"
                 meta={

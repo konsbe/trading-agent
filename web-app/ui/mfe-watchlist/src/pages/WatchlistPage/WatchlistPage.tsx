@@ -66,6 +66,7 @@ const WatchlistScreen = () => {
                     <CollapsibleCard
                         id="watchlist-list"
                         persistKey="watchlist.list"
+                        fit
                         className="watchlist-list"
                         data-testid="watchlist-list"
                         title="Watched symbols"

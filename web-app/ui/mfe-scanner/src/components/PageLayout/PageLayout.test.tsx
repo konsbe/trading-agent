@@ -1,19 +1,17 @@
-import { readFileSync } from 'fs';
-import { join } from 'path';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { HostModeProvider } from '@/providers/HostModeContext';
 import PageLayout from './PageLayout';
 
 describe('PageLayout', () => {
-    it('shows the title, subtitle, actions, back link and the disclaimer pill standalone', () => {
+    it('shows the title, subtitle, actions, back arrow, badges and the disclaimer pill in the header bar standalone', () => {
         render(
             <MemoryRouter>
                 <PageLayout
                     title="Title"
                     subtitle="Sub"
                     actions={<button type="button">Act</button>}
-                    back={{ label: 'Back', to: '/candidates' }}
+                    back={{ label: 'All candidates', to: '/candidates', iconOnly: true }}
                     badges={[<span key="b">Badge</span>]}
                 >
                     body
@@ -21,27 +19,21 @@ describe('PageLayout', () => {
             </MemoryRouter>
         );
 
+        const header = screen.getByTestId('page-header');
+        expect(header).toHaveClass('ta-page-header--bar');
         expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Title');
-        expect(screen.getByText('Sub')).toBeInTheDocument();
+        expect(header).toHaveTextContent('Sub');
         expect(screen.getByRole('button', { name: 'Act' })).toBeInTheDocument();
-        expect(screen.getByRole('link', { name: 'Back' })).toHaveAttribute('href', '/candidates');
-        expect(screen.getByRole('navigation', { name: 'Breadcrumb' })).toHaveTextContent('Back');
+        expect(screen.getByRole('link', { name: 'All candidates' })).toHaveAttribute('href', '/candidates');
         expect(screen.getByRole('listitem')).toHaveTextContent('Badge');
-        expect(screen.getByTestId('page-header')).toContainElement(screen.getByTestId('disclaimer-pill'));
+        expect(header).toContainElement(screen.getByTestId('disclaimer-pill'));
         expect(screen.getByTestId('disclaimer-pill')).toHaveTextContent('Screener — not a forecast');
-        expect(screen.getByText('body')).toBeInTheDocument();
+        expect(screen.getByTestId('scanner-page-body')).toHaveTextContent('body');
+        expect(screen.getByTestId('scanner-page')).toHaveClass('ta-page-frame');
         expect(screen.getByTestId('scanner-page')).not.toHaveClass('scanner-page--hosted');
     });
 
-    it('is a positioned scroll container, so absolutely positioned descendants scroll with it', () => {
-        const css = readFileSync(join(__dirname, 'PageLayout-styles.css'), 'utf8');
-        const rule = /\.scanner-page\s*\{([^}]*)\}/.exec(css)![1];
-        expect(rule).toMatch(/position:\s*relative/);
-        expect(rule).toMatch(/overflow:\s*auto/);
-        expect(css).not.toMatch(/contain:\s*size/);
-    });
-
-    it('omits the pill when hosted (the shell header shows it) and the header when empty', () => {
+    it('omits the pill when hosted (the shell top bar shows it) and the header bar without a title', () => {
         render(
             <HostModeProvider hosted>
                 <PageLayout>body</PageLayout>

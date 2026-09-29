@@ -32,6 +32,7 @@ const ComputedScreen = () => {
             <CollapsibleCard
                 id="computed-list"
                 persistKey="watchlist.computed.list"
+                fit
                 data-testid="computed-list"
                 title="Symbols being computed"
                 meta={

@@ -50,6 +50,7 @@ const TrackedPanel = ({ variant, rows, openNotes, onToggleNote }: TrackedPanelPr
         <CollapsibleCard
             id={`tracked-${variant}`}
             persistKey={`tracked.positions.${variant}`}
+            fit
             data-testid={`tracked-${variant}-card`}
             title={title}
             meta={

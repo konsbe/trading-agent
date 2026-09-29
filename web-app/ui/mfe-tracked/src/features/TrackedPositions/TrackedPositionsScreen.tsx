@@ -31,7 +31,7 @@ const TrackedPositionsScreen = () => {
             {loadError && <ApiErrorState error={loadError} onRetry={reload} />}
 
             {positions && (
-                <div className="tracked-screen">
+                <div className="tracked-screen ta-fit">
                     {refreshError && (
                         <p className="tracked-screen__refresh-error" role="status" data-testid="refresh-error">
                             Couldn&apos;t check for updates: {getErrorMessage(refreshError)} The rows below are from the last load.
@@ -44,7 +44,7 @@ const TrackedPositionsScreen = () => {
                         counts={{ active: positions.summary.active_count, closed: positions.summary.closed_count }}
                         onSelect={setTab}
                     />
-                    <div role="tabpanel" id={panelId(ID_BASE, tab)} aria-labelledby={tabId(ID_BASE, tab)} data-testid={`panel-${tab}`}>
+                    <div className="ta-fit" role="tabpanel" id={panelId(ID_BASE, tab)} aria-labelledby={tabId(ID_BASE, tab)} data-testid={`panel-${tab}`}>
                         <TrackedPanel key={tab} variant={tab} rows={positions[tab]} openNotes={openNotes} onToggleNote={toggleNote} />
                     </div>
                 </div>

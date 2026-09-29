@@ -60,7 +60,7 @@ const renderCell = (key: string, item: ComputedSymbol, dataTimeoutMinutes: numbe
  * funds link to Stock Detail (hosted); crypto pairs don't.
  */
 const ComputedTable = ({ id, items, headerProps, dataTimeoutMinutes, requesting, errors, onStop }: ComputedTableProps) => (
-    <div className="tracking-table__wrap" role="region" aria-label="Computed symbols, scrolls horizontally" tabIndex={0}>
+    <div className="tracking-table__wrap ta-fit-scroll" role="region" aria-label="Computed symbols, scrolls" tabIndex={0}>
         <table className="tracking-table computed-table" id={id} data-testid="computed-table">
             <caption className="tracking-table__caption">Computed symbols</caption>
             <thead>

@@ -85,7 +85,7 @@ const AlarmHistoryScreen = ({ refreshIntervalMs, pageSize }: AlarmHistoryScreenP
 
     return (
         <TypeLabelsProvider labels={meta?.typeLabels ?? NO_LABELS}>
-            <div className="alarm-screen" data-testid="alarm-history-screen">
+            <div className="alarm-screen ta-fit" data-testid="alarm-history-screen">
                 {meta && <AlertNotes caveat={meta.caveat} recordsStart={meta.recordsStart} onsetsSince={meta.onsetsSince} />}
 
                 <AlarmFilters filters={filters} typeOptions={meta?.types ?? []} />
@@ -96,6 +96,7 @@ const AlarmHistoryScreen = ({ refreshIntervalMs, pageSize }: AlarmHistoryScreenP
                     meta={cardMeta}
                     persistKey="alarm-history.page.alerts"
                     data-testid="alarm-alerts-card"
+                    fit
                 >
                     <TableSearch
                         key={showAll ? 'raw' : 'grouped'}
@@ -122,6 +123,7 @@ const AlarmHistoryScreen = ({ refreshIntervalMs, pageSize }: AlarmHistoryScreenP
                                     caption={`Every alert, ${sortDescription(RAW_COLUMNS, rawView.sort)}`}
                                     alerts={raw.items}
                                     headerProps={rawView.headerProps}
+                                    fit
                                 />
                                 <ListFooter
                                     count={raw.items.length}

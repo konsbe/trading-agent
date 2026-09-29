@@ -9,7 +9,6 @@ import BucketSection from '@/features/Candidates/components/BucketSection';
 import CandidatesSkeleton from '@/features/Candidates/components/CandidatesSkeleton';
 import StaleScanBanner from '@/features/Candidates/components/StaleScanBanner';
 import useScannerToday from '@/hooks/scanner/useScannerToday';
-import { useIsHosted } from '@/providers/HostModeContext';
 import './CandidatesPage-styles.css';
 
 const ScanMetaLine = ({ scan }: { scan: ScanMeta }) => (
@@ -24,14 +23,17 @@ const ScanMetaLine = ({ scan }: { scan: ScanMeta }) => (
     </span>
 );
 
-/** Today's scan: both buckets, sortable and windowed, with every loading/error/stale state. */
+/**
+ * Today's scan: the header bar carries the scan summary and Refresh; both
+ * buckets below, sortable and windowed, each table scrolling inside its card
+ * (they share the page height) with every loading/error/stale state.
+ */
 const CandidatesPage = () => {
     const { data, error, isLoading, reload } = useScannerToday();
-    const isHosted = useIsHosted();
 
     return (
         <PageLayout
-            title={isHosted ? undefined : "Today's Candidates"}
+            title="Momentum Scanner"
             subtitle={data ? <ScanMetaLine scan={data.scan} /> : undefined}
             actions={
                 data && (
