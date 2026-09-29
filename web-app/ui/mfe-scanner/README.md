@@ -199,3 +199,15 @@ src/
   styles/         scanner-global.css (card, link, code classes)
   types/          MF remote declarations, constants
 ```
+
+## Known issues
+
+- **The stale-scan message reads like an error** (logged 2026-09-30). When the
+  latest scan is older than the session expected by now, the candidates page
+  says "Couldn't load today's results — showing the scan from {date}"
+  (`src/common/errors/errorMessages.ts`). Nothing failed to load: the newer
+  scan does not exist yet (e.g. 2026-09-28's chain gave up while the machine
+  slept). Reword to say the newer scan is not available yet, e.g. "The scan
+  for {expected session} isn't available yet — showing {date}.", neutral
+  styling; `scan.is_stale` already drives it.
+
