@@ -27,6 +27,11 @@
 //
 // Flags fall back to MOMENTUM_GATE_VERSION / MOMENTUM_PIT_MAX_FILING_AGE_MONTHS
 // (momentum-daily runs this with no arguments); an explicit flag wins.
+//
+// -session YYYY-MM-DD scans a past session point-in-time (momentum-daily's
+// catch-up): bars, fundamentals and catalysts stamped before the next UTC
+// midnight, share filings filed by the session. Universe eligibility is read as
+// it is now. Without the flag every query is the unattended one, unchanged.
 package main
 
 import (
@@ -54,7 +59,13 @@ func main() {
 	pitMaxAge := flag.Int("pit-max-age-months", envInt("MOMENTUM_PIT_MAX_FILING_AGE_MONTHS", momentum.DefaultGateConfig().PITMaxFilingAgeMonths),
 		"gate v2: a share count filed more than N months before the session counts as unavailable (market_cap_pit_unavailable); 0 = no limit. Env MOMENTUM_PIT_MAX_FILING_AGE_MONTHS")
 	explain := flag.String("explain", "", "comma-separated symbols whose gate verdict and market-cap inputs are printed")
+	sessionFlag := flag.String("session", "", "scan this past NYSE session (YYYY-MM-DD), point-in-time: bars, share filings, fundamentals and catalysts as of that date. Empty = the newest session in the bars")
 	flag.Parse()
+	asOf, err := store.ParseSessionFlag(*sessionFlag)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(2)
+	}
 	explainSet := map[string]bool{}
 	for _, s := range strings.Split(*explain, ",") {
 		if s = strings.TrimSpace(strings.ToUpper(s)); s != "" {
@@ -76,6 +87,9 @@ func main() {
 	gcfg.PITMaxFilingAgeMonths = *pitMaxAge
 	gateDesc := describeGate(gcfg)
 	fmt.Println("gate:", gateDesc)
+	if asOf != nil {
+		fmt.Println("point-in-time session:", asOf.Format(time.DateOnly))
+	}
 
 	ctx := context.Background()
 	pool, err := pgxpool.New(ctx, os.Getenv("DATABASE_URL"))
@@ -85,7 +99,7 @@ func main() {
 	}
 	defer pool.Close()
 
-	bars, err := loadBars(ctx, pool, *interval, *source)
+	bars, err := loadBars(ctx, pool, *interval, *source, asOf)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "load bars:", err)
 		os.Exit(1)
@@ -95,9 +109,9 @@ func main() {
 		return
 	}
 
-	marketCaps := loadMetric(ctx, pool, "market_cap")
-	sharesOut := loadMetric(ctx, pool, "shares_outstanding")
-	catalysts := loadCatalystTiers(ctx, pool)
+	marketCaps := loadMetric(ctx, pool, "market_cap", asOf)
+	sharesOut := loadMetric(ctx, pool, "shares_outstanding", asOf)
+	catalysts := loadCatalystTiers(ctx, pool, asOf)
 
 	var sharesPIT map[string]*store.SharesPIT
 	if gcfg.Version == momentum.GateV2 {
@@ -217,6 +231,11 @@ func main() {
 		fmt.Println("no symbol had a usable close; nothing to write")
 		return
 	}
+	if asOf != nil && !session.Equal(*asOf) {
+		fmt.Fprintf(os.Stderr, "-session %s: the bars up to that date make session %s (the requested session's bars have not landed); nothing written\n",
+			asOf.Format(time.DateOnly), session.Format(time.DateOnly))
+		os.Exit(1)
+	}
 	// One transaction for the whole scan, marker included: a scanner killed
 	// part-way leaves nothing, never a partial scan that looks fresh.
 	if !*dryRun {
@@ -254,7 +273,13 @@ func main() {
 	}
 }
 
-func loadBars(ctx context.Context, pool *pgxpool.Pool, interval, source string) (map[string][]compute.Bar, error) {
+func loadBars(ctx context.Context, pool *pgxpool.Pool, interval, source string, asOf *time.Time) (map[string][]compute.Bar, error) {
+	args := []any{interval, source}
+	cutoff := ""
+	if asOf != nil {
+		cutoff = " AND o.ts < $3"
+		args = append(args, store.PITCutoff(*asOf))
+	}
 	rows, err := pool.Query(ctx, `
 SELECT o.symbol, o.ts, o.open, o.high, o.low, o.close, o.volume, o.raw_close
 FROM equity_ohlcv o
@@ -264,8 +289,8 @@ FROM equity_ohlcv o
 -- candidate indistinguishable from a live one. See migration 022.
 JOIN universe_symbols u ON u.symbol = o.symbol AND u.is_eligible
                        AND u.data_unavailable_reason IS NULL
-WHERE o.interval = $1 AND o.source = $2 AND o.close > 0
-ORDER BY o.symbol, o.ts`, interval, source)
+WHERE o.interval = $1 AND o.source = $2 AND o.close > 0`+cutoff+`
+ORDER BY o.symbol, o.ts`, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -282,18 +307,24 @@ ORDER BY o.symbol, o.ts`, interval, source)
 	return out, rows.Err()
 }
 
-func loadMetric(ctx context.Context, pool *pgxpool.Pool, metric string) map[string]float64 {
+func loadMetric(ctx context.Context, pool *pgxpool.Pool, metric string, asOf *time.Time) map[string]float64 {
 	out := map[string]float64{}
+	args := []any{metric}
+	cutoff := ""
+	if asOf != nil {
+		cutoff = " AND ts < $2"
+		args = append(args, store.PITCutoff(*asOf))
+	}
 	rows, err := pool.Query(ctx, `
 SELECT DISTINCT ON (symbol) symbol, value
 FROM equity_fundamentals
-WHERE metric = $1 AND value IS NOT NULL AND value > 0
+WHERE metric = $1 AND value IS NOT NULL AND value > 0`+cutoff+`
 -- The NOT NULL filter already prevents this picking a NULL, which is what
 -- saved the live scanner from the universe-loader bug. The source rank is
 -- still required for DETERMINISM: two sources can both report a non-null
 -- market_cap at the same ts, and without a tiebreak the gate input would
 -- depend on physical row order.
-ORDER BY symbol, ts DESC, fundamental_source_rank(source) DESC`, metric)
+ORDER BY symbol, ts DESC, fundamental_source_rank(source) DESC`, args...)
 	if err != nil {
 		return out
 	}
@@ -313,17 +344,26 @@ ORDER BY symbol, ts DESC, fundamental_source_rank(source) DESC`, metric)
 //
 // Highest rather than most recent: §3.11 classifies a window into its strongest
 // signal, so a window holding both an upgrade and an acquisition is tier A.
-func loadCatalystTiers(ctx context.Context, pool *pgxpool.Pool) map[string]string {
+func loadCatalystTiers(ctx context.Context, pool *pgxpool.Pool, asOf *time.Time) map[string]string {
 	out := map[string]string{}
+	// The unattended scan runs the evening of the session, so its window is
+	// the session and the two days before it; a past session gets that same
+	// window, ending at the session's cutoff.
+	window := "ts::date >= (now() - interval '2 days')::date"
+	var args []any
+	if asOf != nil {
+		window = "ts::date >= ($1::timestamptz - interval '3 days')::date AND ts < $1"
+		args = append(args, store.PITCutoff(*asOf))
+	}
 	rows, err := pool.Query(ctx, `
 SELECT DISTINCT ON (symbol) symbol, tier
 FROM catalyst_events
-WHERE ts::date >= (now() - interval '2 days')::date
+WHERE `+window+`
 -- Tier first (§3.11 takes the window's strongest signal), then ts and
 -- source so that two providers reporting the same tier resolve the same way
 -- on every run. catalyst_events has 4 writers and 3 colliding groups.
 ORDER BY symbol, CASE tier WHEN 'A' THEN 2 WHEN 'B' THEN 1 ELSE 0 END DESC,
-         ts DESC, source`)
+         ts DESC, source`, args...)
 	if err != nil {
 		return out
 	}

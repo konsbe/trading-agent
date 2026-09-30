@@ -23,7 +23,11 @@
 // closed row, plus EVERY condition that matched rather than only the one acted
 // on, so both the choice of conditions and their ordering become measurable.
 //
-//	DATABASE_URL=... go run ./cmd/momentum-tracker
+//	DATABASE_URL=... go run ./cmd/momentum-tracker [-session YYYY-MM-DD]
+//
+// -session tracks a past session point-in-time (momentum-daily's catch-up):
+// bars and fundamentals stamped before the next UTC midnight. Without it every
+// query is the unattended one, unchanged.
 package main
 
 import (
@@ -63,7 +67,17 @@ func main() {
 	replay := flag.Bool("replay", false, "replay §5 over stored history and report outcomes (writes nothing)")
 	minBars := flag.Int("min-bars", 252, "§3.1 history minimum")
 	scopeFlag := flag.String("scope", "eligible", "symbol scope: eligible (full §3.1 universe) or pilot (the frozen 450, in-sample for v2)")
+	sessionFlag := flag.String("session", "", "track this past NYSE session (YYYY-MM-DD), point-in-time: bars and fundamentals as of that date. Empty = the newest session in the bars")
 	flag.Parse()
+	asOf, err := store.ParseSessionFlag(*sessionFlag)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(2)
+	}
+	if asOf != nil && *replay {
+		fmt.Fprintln(os.Stderr, "-session and -replay do not combine: the replay walks the whole history")
+		os.Exit(2)
+	}
 
 	mode, err := parseOpenMode(*openModeFlag)
 	if err != nil {
@@ -85,7 +99,7 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(2)
 	}
-	bars, err := loadBars(ctx, pool, *interval, *source, sc)
+	bars, err := loadBars(ctx, pool, *interval, *source, sc, asOf)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "load bars:", err)
 		os.Exit(1)
@@ -93,6 +107,16 @@ func main() {
 	if len(bars) == 0 {
 		fmt.Printf("no bars for source=%s interval=%s\n", *source, *interval)
 		return
+	}
+	if asOf != nil {
+		// Checked before any write: evaluating against the wrong session's bars
+		// would advance every row past the session being caught up.
+		if session, ok := store.ScanSession(latestBars(bars)); !ok || !session.Equal(*asOf) {
+			fmt.Fprintf(os.Stderr, "-session %s: the bars up to that date make session %s (the requested session's bars have not landed); nothing written\n",
+				asOf.Format(time.DateOnly), session.Format(time.DateOnly))
+			os.Exit(1)
+		}
+		fmt.Println("point-in-time session:", asOf.Format(time.DateOnly))
 	}
 
 	// DENOMINATOR GUARD, before any position is opened. A replay that silently
@@ -134,7 +158,7 @@ func main() {
 	// of elapsed time.
 	closed, advanced, exitFailures := evaluateExits(ctx, pool, bars, fcfg, ecfg, *dryRun)
 
-	opened, openFailures := openNewPositions(ctx, pool, bars, fcfg, rule, *dryRun, sc)
+	opened, openFailures := openNewPositions(ctx, pool, bars, fcfg, rule, *dryRun, sc, asOf)
 
 	fmt.Printf("\n§5 tracker: %d opened, %d advanced, %d closed", opened, advanced, len(closed))
 	if *dryRun {
@@ -161,13 +185,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "tracker: %d write failures — session NOT marked complete; re-run to finish\n", failures)
 		os.Exit(1)
 	}
-	latest := make([]time.Time, 0, len(bars))
-	for _, series := range bars {
-		if len(series) > 0 {
-			latest = append(latest, series[len(series)-1].TS)
-		}
-	}
-	if session, ok := store.ScanSession(latest); ok {
+	if session, ok := store.ScanSession(latestBars(bars)); ok {
 		if err := store.MarkTrackerCompleted(ctx, pool, session); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
@@ -253,10 +271,11 @@ func openNewPositions(
 	rule openRule,
 	dry bool,
 	scope reportscope.Scope,
+	asOf *time.Time,
 ) (opened, failures int) {
 	gcfg := momentum.DefaultGateConfig()
-	marketCaps := loadMetric(ctx, pool, "market_cap", scope)
-	sharesOut := loadMetric(ctx, pool, "shares_outstanding", scope)
+	marketCaps := loadMetric(ctx, pool, "market_cap", scope, asOf)
+	sharesOut := loadMetric(ctx, pool, "shares_outstanding", scope, asOf)
 	reportscope.ReportMetricCoverage("market_cap", len(marketCaps), len(bars))
 	reportscope.ReportMetricCoverage("shares_outstanding", len(sharesOut), len(bars))
 
@@ -325,6 +344,17 @@ func openNewPositions(
 	return opened, failures
 }
 
+// latestBars is each symbol's newest bar date, the input to store.ScanSession.
+func latestBars(bars map[string][]compute.Bar) []time.Time {
+	latest := make([]time.Time, 0, len(bars))
+	for _, series := range bars {
+		if len(series) > 0 {
+			latest = append(latest, series[len(series)-1].TS)
+		}
+	}
+	return latest
+}
+
 // reportOutcomes prints the dataset §5's rules will eventually be judged on.
 func reportOutcomes(ctx context.Context, pool *pgxpool.Pool) {
 	stats, err := store.ExitOutcomes(ctx, pool)
@@ -354,13 +384,19 @@ func reportOutcomes(ctx context.Context, pool *pgxpool.Pool) {
 // data"; the widening it actually saw was ten years of history for the same
 // 450 symbols. Same bug as momentum-backtest, same invisibility: a position
 // that is never opened leaves no trace in the output.
-func loadBars(ctx context.Context, pool *pgxpool.Pool, interval, source string, scope reportscope.Scope) (map[string][]compute.Bar, error) {
+func loadBars(ctx context.Context, pool *pgxpool.Pool, interval, source string, scope reportscope.Scope, asOf *time.Time) (map[string][]compute.Bar, error) {
+	args := []any{interval, source}
+	cutoff := ""
+	if asOf != nil {
+		cutoff = " AND o.ts < $3"
+		args = append(args, store.PITCutoff(*asOf))
+	}
 	rows, err := pool.Query(ctx, `
 SELECT o.symbol, o.ts, o.open, o.high, o.low, o.close, o.volume
 FROM equity_ohlcv o
 `+scope.JoinOn("o")+`
-WHERE o.interval = $1 AND o.source = $2 AND o.close > 0
-ORDER BY o.symbol, o.ts`, interval, source)
+WHERE o.interval = $1 AND o.source = $2 AND o.close > 0`+cutoff+`
+ORDER BY o.symbol, o.ts`, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -379,16 +415,22 @@ ORDER BY o.symbol, o.ts`, interval, source)
 
 // loadMetric reads one fundamental metric per symbol, for the declared scope.
 // Takes the same Scope value as loadBars so the two cannot diverge.
-func loadMetric(ctx context.Context, pool *pgxpool.Pool, metric string, scope reportscope.Scope) map[string]float64 {
+func loadMetric(ctx context.Context, pool *pgxpool.Pool, metric string, scope reportscope.Scope, asOf *time.Time) map[string]float64 {
 	out := map[string]float64{}
+	args := []any{metric}
+	cutoff := ""
+	if asOf != nil {
+		cutoff = " AND f.ts < $2"
+		args = append(args, store.PITCutoff(*asOf))
+	}
 	rows, err := pool.Query(ctx, `
 SELECT DISTINCT ON (f.symbol) f.symbol, f.value
 FROM equity_fundamentals f
 `+scope.JoinOn("f")+`
-WHERE f.metric = $1 AND f.value IS NOT NULL AND f.value > 0
+WHERE f.metric = $1 AND f.value IS NOT NULL AND f.value > 0`+cutoff+`
 -- Source rank for determinism: the NOT NULL filter stops this picking a
 -- NULL, but two sources can report the same metric at the same ts.
-ORDER BY f.symbol, f.ts DESC, fundamental_source_rank(f.source) DESC`, metric)
+ORDER BY f.symbol, f.ts DESC, fundamental_source_rank(f.source) DESC`, args...)
 	if err != nil {
 		return out
 	}
@@ -433,8 +475,8 @@ func replayHistory(
 ) {
 	gcfg := momentum.DefaultGateConfig()
 	gcfg.MinBars = minBars
-	marketCaps := loadMetric(ctx, pool, "market_cap", scope)
-	sharesOut := loadMetric(ctx, pool, "shares_outstanding", scope)
+	marketCaps := loadMetric(ctx, pool, "market_cap", scope, nil)
+	sharesOut := loadMetric(ctx, pool, "shares_outstanding", scope, nil)
 	reportscope.ReportMetricCoverage("market_cap", len(marketCaps), len(bars))
 	reportscope.ReportMetricCoverage("shares_outstanding", len(sharesOut), len(bars))
 

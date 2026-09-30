@@ -1,4 +1,4 @@
-.PHONY: tidy build docker-build run-technical run-fundamental run-macro run-momentum-api run-momentum-daily test test-integration
+.PHONY: tidy build docker-build run-technical run-fundamental run-macro run-momentum-api run-momentum-daily test test-integration golden-momentum
 
 BIN := bin
 
@@ -45,3 +45,10 @@ test:
 # Real-Postgres tests. Fixtures run inside rolled-back transactions.
 test-integration:
 	TEST_DATABASE_URL=$${TEST_DATABASE_URL:-$$DATABASE_URL} go test -tags integration -count=1 ./internal/testdb/ ./internal/store/ ./internal/momentumapi/ ./cmd/fundamental-analysis/ ./internal/fundamental/ ./internal/technical/runner/
+
+# momentum-scanner + momentum-tracker golden check on a scratch database
+# (trading_golden on ta-phase1): the no-flag path must match BASE_REF (default
+# HEAD) and testdata/momentum_golden/golden.txt, and -session must read nothing
+# stamped after the session. UPDATE=1 rewrites golden.txt from BASE_REF.
+golden-momentum:
+	scripts/momentum_golden.sh
