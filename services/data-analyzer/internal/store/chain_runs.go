@@ -30,6 +30,9 @@ type ChainRun struct {
 	TrackerCompletedAt *time.Time
 	GaveUpAt           *time.Time
 	LastError          *string
+	// CatchUp: the chain ran after its window, by momentum-daily's catch-up
+	// pass or by hand (migration 032). Never a clean unattended session.
+	CatchUp bool
 }
 
 // ScanWrite is one symbol's scanner output. Score is nil when the symbol did
@@ -116,6 +119,21 @@ RETURNING attempts`, session).Scan(&n)
 	return n, nil
 }
 
+// BeginCatchUpAttempt is BeginChainAttempt for a catch-up run: it also marks
+// the session caught up, before anything runs, so a catch-up killed part-way
+// can never later read as an unattended run.
+func BeginCatchUpAttempt(ctx context.Context, q Querier, session time.Time) (int, error) {
+	var n int
+	err := q.QueryRow(ctx, `
+INSERT INTO momentum_chain_runs (session, attempts, catch_up, updated_at) VALUES ($1, 1, true, now())
+ON CONFLICT (session) DO UPDATE SET attempts = momentum_chain_runs.attempts + 1, catch_up = true, updated_at = now()
+RETURNING attempts`, session).Scan(&n)
+	if err != nil {
+		return 0, fmt.Errorf("begin catch-up attempt %s: %w", session.Format(time.DateOnly), err)
+	}
+	return n, nil
+}
+
 // RecordChainError stores why the last attempt failed.
 func RecordChainError(ctx context.Context, ex Execer, session time.Time, msg string) error {
 	if _, err := ex.Exec(ctx, fmt.Sprintf(upsertChainRunSQL, "last_error", "$2"), session, msg); err != nil {
@@ -124,7 +142,9 @@ func RecordChainError(ctx context.Context, ex Execer, session time.Time, msg str
 	return nil
 }
 
-// MarkChainGaveUp records a give-up and its reason; it is final for the session.
+// MarkChainGaveUp records a give-up and its reason. It ends the session's
+// in-window polling; momentum-daily's catch-up still runs a session given up
+// for missing bars once they land (only exhausted attempts are final).
 func MarkChainGaveUp(ctx context.Context, ex Execer, session time.Time, reason string) error {
 	_, err := ex.Exec(ctx, `
 INSERT INTO momentum_chain_runs (session, gave_up_at, last_error, updated_at) VALUES ($1, now(), $2, now())
@@ -140,9 +160,9 @@ ON CONFLICT (session) DO UPDATE SET gave_up_at = now(), last_error = EXCLUDED.la
 func LoadChainRun(ctx context.Context, q Querier, session time.Time) (ChainRun, bool, error) {
 	var r ChainRun
 	err := q.QueryRow(ctx, `
-SELECT session, attempts, scanner_completed_at, tracker_completed_at, gave_up_at, last_error
+SELECT session, attempts, scanner_completed_at, tracker_completed_at, gave_up_at, last_error, catch_up
 FROM momentum_chain_runs WHERE session = $1`, session).
-		Scan(&r.Session, &r.Attempts, &r.ScannerCompletedAt, &r.TrackerCompletedAt, &r.GaveUpAt, &r.LastError)
+		Scan(&r.Session, &r.Attempts, &r.ScannerCompletedAt, &r.TrackerCompletedAt, &r.GaveUpAt, &r.LastError, &r.CatchUp)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return ChainRun{}, false, nil
 	}
