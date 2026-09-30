@@ -1454,6 +1454,61 @@
           "terms": []
         }
       ]
+    },
+    {
+      "id": "claude-connector",
+      "title": "Claude connector",
+      "intro": "*What this is for:* the platform can be read from claude.ai through a custom connector (an MCP server, svc-mcp). Claude sees the same data as the app's pages, read-only, after you sign in with your GitHub account.",
+      "entries": [
+        {
+          "id": "claude-connector-what-claude-sees",
+          "title": "What Claude can see through the connector",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "The connector gives Claude ten read-only tools. Each one returns the same data as a page of this app, at the moment Claude asks:"
+            },
+            {
+              "type": "list",
+              "items": [
+                "**Daily market report**: the Daily Market Report page.",
+                "**Alerts**: the Alarm History page, as individual alerts or grouped by symbol and alert type, with the same filters (symbol, alert type, severity, date range).",
+                "**Today's candidates** and **one candidate**: the Today's Candidates page and a candidate's row.",
+                "**Symbol analysis**: the Stock Detail analysis, including the chart patterns, the BUY/TRIM action signal and the latest cash-flow statement. If the analysis is stale it is computed on demand, as when you open the page; Claude may be told it is still computing.",
+                "**Watchlist**: the Watchlist page. Claude can read it but cannot add or remove symbols.",
+                "**Tracked positions**: the Tracked Positions page (active, closed or all).",
+                "**Data-source status**: the Data Source page, including each session's chain status.",
+                "**Handbook**: the list of Handbook sections, and any one section or entry by id, so Claude can explain a screen in this Handbook's own words."
+              ]
+            },
+            {
+              "type": "paragraph",
+              "text": "Nothing Claude does through the connector can change the platform: every tool only reads, and the server that answers Claude cannot reach the app's add, remove or follow actions. Replies never include keys or passwords; anything that looks like one is removed before it leaves the server."
+            },
+            {
+              "type": "paragraph",
+              "text": "Claude is given the same claims the app makes, word for word, before it sees any data:"
+            },
+            {
+              "type": "caveat",
+              "key": "evidence_caveat"
+            },
+            {
+              "type": "caveat",
+              "key": "research_score_caveat"
+            },
+            {
+              "type": "caveat",
+              "key": "heuristic_ta_caveat"
+            },
+            {
+              "type": "paragraph",
+              "text": "Only your GitHub account can connect. The server records each request's time, source address and which tool was called, never what it returned."
+            }
+          ],
+          "terms": []
+        }
+      ]
     }
   ]
 }
