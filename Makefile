@@ -35,7 +35,7 @@ help:
 	@echo ""
 	@echo "━━━ Logs ━━━"
 	@echo "  log-services            All ingestion containers"
-	@echo "  log-analyzer            Analyzer workers (technical, fundamental, macro-analysis, market-operations)"
+	@echo "  log-analyzer            Analyzer workers (technical, fundamental, macro-analysis)"
 	@echo "  log-bot                 analyst-bot (Discord bot)"
 	@echo "  log-technical           data-technical (OHLCV bar fetcher)"
 	@echo "  log-fundamental         data-fundamental (Finnhub fundamentals fetcher)"
@@ -151,10 +151,10 @@ log-docker-compose:
 
 log-services:
 	$(COMPOSE) logs -f \
-	  data-crypto data-equity data-fundamental data-onchain data-sentiment data-technical data-macro-intel
+	  data-equity data-fundamental data-technical data-macro-intel
 
 log-analyzer:
-	$(COMPOSE) logs -f technical-analysis fundamental-analysis macro-analysis market-operations
+	$(COMPOSE) logs -f technical-analysis fundamental-analysis macro-analysis
 
 log-technical:
 	$(COMPOSE) logs -f data-technical

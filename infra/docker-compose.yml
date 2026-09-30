@@ -49,8 +49,9 @@ services:
     extra_hosts: *live-db-hosts
     environment:
       DATABASE_URL: *live-db-url
-    profiles: [ingestion]
-    restart: unless-stopped
+    # Dormant since 2026-04-16 (stale DATABASE_URL backlog row); each needs its own decision.
+    profiles: [dormant]
+    restart: on-failure
 
   data-equity:
     build:
@@ -81,8 +82,9 @@ services:
     extra_hosts: *live-db-hosts
     environment:
       DATABASE_URL: *live-db-url
-    profiles: [ingestion]
-    restart: unless-stopped
+    # Dormant since 2026-04-16 (stale DATABASE_URL backlog row); each needs its own decision.
+    profiles: [dormant]
+    restart: on-failure
 
   data-sentiment:
     build:
@@ -97,8 +99,9 @@ services:
       DATABASE_URL: *live-db-url
     volumes:
       - ${CORP_CA_PEM_PATH:-/dev/null}:/etc/ssl/extra/corp-ca.pem:ro
-    profiles: [ingestion]
-    restart: unless-stopped
+    # Dormant since 2026-04-16 (stale DATABASE_URL backlog row); each needs its own decision.
+    profiles: [dormant]
+    restart: on-failure
 
   data-fundamental:
     build:
@@ -241,8 +244,9 @@ services:
     extra_hosts: *live-db-hosts
     environment:
       DATABASE_URL: *live-db-url
-    profiles: [analyzer]
-    restart: unless-stopped
+    # Dormant since 2026-04-16 (stale DATABASE_URL backlog row); each needs its own decision.
+    profiles: [dormant]
+    restart: on-failure
 
   # ── momentum-daily ─────────────────────────────────────────────────────────
   # The momentum chain, once per NYSE session: waits until that session's daily
