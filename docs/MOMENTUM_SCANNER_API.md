@@ -796,7 +796,9 @@ wired up but stalled.
 daily-chain sessions counted from 2026-09-24, on top of the "completed live at
 least once" gate above, because two bugs surfaced in this subsystem in quick
 succession. Clean = one `momentum_chain_runs` row with `attempts = 1`, both
-markers set, no `last_error`, no `gave_up_at`. A session disrupted by operator
+markers set, no `last_error`, no `gave_up_at`, and `catch_up` false (a session
+run after its window, by momentum-daily's catch-up or by hand, is never clean;
+migration 032). A session disrupted by operator
 action or with the machine asleep is recorded as **paused** (neither clean nor a
 failure, the count holds); a failure while the machine was up resets it. The
 give-up window is not changed mid-count to rescue a session.
@@ -806,7 +808,9 @@ give-up window is not changed mid-count to rescue a session.
 | 2026-09-24 | clean | 1 |
 | 2026-09-25 | **paused, operator-disrupted**: data-universe was recreated at 22:07 UTC (Finnhub key rotation), which re-ran its ~2.5 h startup quote-pricing pass before arming the daily-bars timer; the machine then slept 23:24–07:44 UTC. Outcome: completed 2026-09-26 at 09:42 UTC (scanner 09:41), 1 attempt, no error, ~18 min before the 10:00 UTC give-up — technically clean, but it stays **paused** as decided before the outcome was known | 1 |
 | **2026-09-26 — day zero, count restarts at 0** | The live scanner switched from gate v1 (never opted into v2; see Phase 1 §3.2) to **gate v2 with a 15-month maximum filing age**, deployed into `momentum-daily` at 12:13 UTC and verified in the running container (dry run for 2026-09-25: JAGX and FFAI rejected as stale). This is functionally a new scanner, so 2026-09-24's clean run validated the old one only. The 2026-09-25 scan stays as committed (v1); the first session scanned under v2 is **2026-09-28** | 0 |
-| 2026-09-28 | **paused, machine asleep**: the machine slept from 17:55 UTC on 2026-09-28 to 09:38 UTC on 2026-09-29 (the analyst bot's 5-minute scans stop for 15h43m), across the 20:00 UTC close and data-universe's 22:30 UTC daily-bars timer. Go timers run on the monotonic clock, which stops while the host sleeps, so the refresh ran late: it completed at 14:55 UTC (4,972 of 4,999 symbols). momentum-daily polled from 09:38 UTC, saw 0% coverage and gave up at 10:08 UTC (14 h after the close, `attempts` 0, `last_error` "bars below 95% coverage 14h0m0s after the close"): the scanner and tracker never ran for this session, 4h47m before its bars landed. The give-up is final and no scan exists for 2026-09-28. Settled 2026-09-30. The first session scanned under gate v2 is now expected to be 2026-09-29 | 0 |
+| 2026-09-28 | **paused, machine asleep**: the machine slept from 17:55 UTC on 2026-09-28 to 09:38 UTC on 2026-09-29 (the analyst bot's 5-minute scans stop for 15h43m), across the 20:00 UTC close and data-universe's 22:30 UTC daily-bars timer. Go timers run on the monotonic clock, which stops while the host sleeps, so the refresh ran late: it completed at 14:55 UTC (4,972 of 4,999 symbols). momentum-daily polled from 09:38 UTC, saw 0% coverage and gave up at 10:08 UTC (14 h after the close, `attempts` 0, `last_error` "bars below 95% coverage 14h0m0s after the close"): the scanner and tracker never ran for this session, 4h47m before its bars landed. Settled 2026-09-30. Caught up by hand at 21:51 UTC on 2026-09-29 (scanner, then tracker; `catch_up = true`, migration 032): 5 candidates, and the bot posted no alerts for it. A catch-up never counts as a clean session. The first session scanned under gate v2 is now expected to be 2026-09-29 | 0 |
+| 2026-09-29 | **clean, not counted**: attempts 1, both markers (scanner 23:24 UTC, tracker 23:25 UTC), no error. It ran on the build before the scheduling fix below, so it does not count toward that build's gate | 0 |
+| **2026-09-30 02:27 Greek (23:27 UTC on 2026-09-29) — scheduling deploy, count restarts at 0** | momentum-daily and data-universe now schedule by wall clock (checked every minute), and momentum-daily catches up any of the last 5 sessions whose chain did not complete in its window, oldest first, point-in-time (`-session`), marked `catch_up` (never clean). A give-up for missing bars is deferred, no longer final. momentum-scanner and momentum-tracker gained `-session`; without it their output is proven identical to the previous build (`make golden-momentum`). The first session on this build is **2026-09-30** | 0 |
 
 This is **research instrumentation, not a portfolio or trading dashboard** — the
 system has never executed a trade. No "P&L", "your holdings", or portfolio-app
@@ -1292,7 +1296,9 @@ daily runner. Treat every field below as unconfirmed until checked.
   rows: the last 7 sessions whose close has passed, each joined to its row.
   A session the daemon never attempted is therefore **visible**, not absent.
 - **Statuses:** `clean` (1 attempt, both markers, no error) ·
-  `completed_after_retry` (both markers, more than one attempt) · `pending`
+  `completed_after_retry` (both markers, more than one attempt) · `caught_up`
+  (both markers, set by a catch-up run after the window: `catch_up`,
+  migration 032; never clean, whatever the attempt count) · `pending`
   (inside its window: close + `MOMENTUM_DAILY_GIVE_UP_AFTER`, the same
   variable momentum-daily reads) · `failed` (`gave_up_at` set; or attempted
   and never finished after the window, with a `note`) · `not_run` (no row,

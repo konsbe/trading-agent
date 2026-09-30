@@ -722,6 +722,9 @@ unexplained empty penny bucket later.
 | `UNIVERSE_DAILY_BARS_CATCHUP_SHARE` | `0.95` | At startup, refresh immediately if fewer than this share of backfilled symbols have the latest due session |
 | `UNIVERSE_DAILY_BARS_INTERVAL` | `24h` | Legacy cadence, only used with `UNIVERSE_DAILY_BARS_AT=interval`. It used to be the only schedule: the first pass came 24h after startup, so a worker restarted more often than daily never refreshed (2026-09-22/23 were missed that way) |
 | `UNIVERSE_DAILY_BARS_LOOKBACK_DAYS` | `7` | Window per symbol — wider than a day to repair missed runs and late corrections |
+| `UNIVERSE_DAILY_BARS_CHECK_EVERY` | `1m` | How often the wall clock is compared with `UNIVERSE_DAILY_BARS_AT`. Replaced a timer to the next run time, which counts on the monotonic clock and so stops while the host sleeps: on 2026-09-28 it fired about 16 h late. A woken machine now refreshes within one check |
+| `UNIVERSE_DAILY_BARS_RETRY_AFTER` | `30m` | Delay before retrying a pass that failed, was cancelled, or had most requests fail |
+| `UNIVERSE_DAILY_BARS_MAX_TRIES` | `3` | Passes per session before it is left until the next session is due (each pass is one request per symbol) |
 
 ---
 

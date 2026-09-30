@@ -1366,6 +1366,40 @@
       ]
     },
     {
+      "id": "data-source",
+      "title": "Data Source",
+      "intro": "*What this part of the app is for:* the Data Source page shows whether the app's data is arriving: how much of each provider's daily budget is used, and how the daily chain — bar ingestion, then the momentum scanner, then the tracker — ran for each recent NYSE session.",
+      "entries": [
+        {
+          "id": "data-source-chain-statuses",
+          "title": "Daily chain session statuses",
+          "blocks": [
+            {
+              "type": "paragraph",
+              "text": "Each row of the daily chain table is one closed NYSE session, newest first. Its **Status** is one of seven, in plain text with no colour:"
+            },
+            {
+              "type": "list",
+              "items": [
+                "**Clean** — the scanner and the tracker both finished for the session on the first attempt, with no error.",
+                "**Recovered (after N attempts)** — both finished, but only after one or more retries; the last error before recovery is shown beneath the row.",
+                "**Caught up late (not clean)** — both finished, but late: the session's window had passed (for example, the machine was asleep over the close), so momentum-daily ran it by catch-up once its bars had landed. The scan still uses only data up to that session. It never counts as a clean session, and the Discord bot does not post alerts from a catch-up scan. Beneath the row, **Deferred** says why it was put off (for example, the bars had not reached 95% coverage in time); if no reason was recorded, the last error before the catch-up is shown instead. **Attempts** counts the in-window and catch-up attempts together.",
+                "**In progress** — the session's window is still open and the chain has not finished it yet.",
+                "**Failed** — the chain gave up on the session, or started it and never finished; the reason is shown beneath the row.",
+                "**Not run — no attempt was recorded** — nothing ran for the session: momentum-daily was not running, or the machine was off.",
+                "**Not recorded (before tracking began)** — the session is older than the chain's own run records, so there is nothing to show."
+              ]
+            },
+            {
+              "type": "paragraph",
+              "text": "**Coverage now** is computed when the page asks, so it can differ from the coverage the run saw at the time."
+            }
+          ],
+          "terms": []
+        }
+      ]
+    },
+    {
       "id": "using-the-tables",
       "title": "Using the tables",
       "intro": "*What this part of the app is for:* every table in the app — Today's Candidates, Watchlist, Followed Symbols, Computed Symbols, Alarm History, Tracked Positions and the Data Source daily chain — sorts, searches and links the same way. Sorting only reorders rows; it never ranks them by how good they are.",
@@ -1387,7 +1421,7 @@
                 "**Alarm History** — newest first (the grouped view by when a group last fired).",
                 "**Tracked Positions** — the most recent alert first, on both tabs.",
                 "**Data Source daily chain** — the newest session first.",
-                "**Compute** and **State** columns sort by computation state: what needs attention first (failed, data hasn't arrived), then what is waiting or computing, then scheduled and computed. The daily chain's **Status** sorts the same way: not run and failed first, not recorded last."
+                "**Compute** and **State** columns sort by computation state: what needs attention first (failed, data hasn't arrived), then what is waiting or computing, then scheduled and computed. The daily chain's **Status** sorts the same way: not run and failed first, then in progress, recovered, caught up late and clean, and not recorded last."
               ]
             },
             {

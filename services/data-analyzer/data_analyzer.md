@@ -638,28 +638,61 @@ reset to their opening state and re-tracked.)
 
 ## `momentum-daily` — the scheduled chain
 
-> **Change freeze (from the 2026-09-27 deploy).** After the onset-alerts
-> deploy on Sunday 2026-09-27, 23:52 Greek time (20:52 UTC), make no changes to `momentum-daily`,
-> `momentum-scanner` or `momentum-tracker` until the clean-session gate clears
-> (Thursday 2026-10-01 at the earliest). That deploy rebuilds the image because
-> momentum-daily's computation pass calls `runner.ComputeAndStore`, which now
-> writes `alert_onsets`; the scanner and tracker binaries it runs are rebuilt
-> from code unchanged since 2026-09-26 14:46 (`cmd/momentum-scanner`,
-> `cmd/momentum-tracker`, `internal/momentum`, `internal/compute` and the store
-> files they call), so their behaviour is identical.
+> **Change freeze (restarted by the 2026-09-30 deploy).** The wall-clock
+> scheduling and catch-up deploy on Wednesday 2026-09-30, 02:27 Greek time
+> (23:27 UTC on 2026-09-29) rebuilt `momentum-daily`, `momentum-scanner` and
+> `momentum-tracker` (plus `momentum-api` and `data-universe`), so the
+> clean-session count restarts at 0 from it. Make no changes to those three
+> until three clean unattended sessions on this build: 2026-09-30, 2026-10-01
+> and 2026-10-02 at the earliest, clearing on Saturday 2026-10-03. The scanner's
+> and tracker's own logic is unchanged: without `-session` they run exactly the
+> unattended queries, which `make golden-momentum` proves against the
+> pre-deploy binaries. (Previous freeze: from the 2026-09-27 onset-alerts
+> deploy, superseded by this one.)
 
 Long-running daemon (Compose service `momentum-daily`, `analyzer` profile;
 locally `make run-momentum-daily`, or `ARGS=-once` for a single pass). For each
 NYSE session (same holiday calendar as momentum-api) it:
 
-1. waits `MOMENTUM_DAILY_GRACE` (2h) after the close, then polls every
-   `MOMENTUM_DAILY_POLL` (15m) until the session's `1Day` bars from
+1. waits `MOMENTUM_DAILY_GRACE` (2h) after the close, then checks every
+   `MOMENTUM_DAILY_POLL` (1m) until the session's `1Day` bars from
    `MOMENTUM_DAILY_BAR_SOURCE` (`tiingo`) cover `MOMENTUM_DAILY_MIN_COVERAGE`
-   (95%) of scannable universe symbols;
+   (95%) of scannable universe symbols. "Waiting for bars" is logged when
+   coverage moves, or every `MOMENTUM_DAILY_WAIT_LOG_EVERY` (15m);
 2. runs `momentum-scanner`, then `momentum-tracker` (binaries from
    `MOMENTUM_DAILY_BIN_DIR`, default: next to its own executable), up to
    `MOMENTUM_DAILY_MAX_ATTEMPTS` (3) times;
-3. gives up on the session after `MOMENTUM_DAILY_GIVE_UP_AFTER` (14h) and logs it.
+3. **defers** the session if its bars have not landed
+   `MOMENTUM_DAILY_GIVE_UP_AFTER` (14h) after the close: `gave_up_at` is set,
+   the in-window polling stops, and the catch-up below takes it over;
+4. **catches up**, on start and on every check, any of the last
+   `MOMENTUM_DAILY_CATCH_UP_SESSIONS` (5) NYSE sessions whose chain never
+   completed in its window (deferred, failed part-way, or never attempted
+   because the daemon or the machine was down) once its bars cover the
+   threshold: oldest first, scanner then tracker, each with `-session
+   YYYY-MM-DD`. The row is marked `catch_up = true` (migration 032) before
+   anything runs.
+
+Every check reads the wall clock. Nothing waits on a timer or a long sleep:
+Go measures those on the monotonic clock, which stops while the host sleeps,
+so a machine asleep over the close used to act only hours after waking (the
+2026-09-28 session, caught up by hand the next evening). Now it acts within a
+minute of waking.
+
+**Catch-up runs are point-in-time.** `-session` makes the scanner read bars,
+`market_cap` / `shares_outstanding` and catalysts stamped before the next UTC
+midnight, and share filings filed by the session (the backtest's `AsOf`
+path); the tracker reads bars and fundamentals the same way. Universe
+eligibility is read as it is now. Without the flag both run exactly the
+unattended queries: `make golden-momentum` proves that against the committed
+binaries and `testdata/momentum_golden/golden.txt`, and proves a `-session`
+run of a day reads nothing that landed after it.
+
+A catch-up **never counts as a clean session** for the gate, the analyst bot
+posts **no alerts** from it (it posts only for the session that just closed),
+and the Data Sources page shows it as `caught_up`. While a catch-up is failing,
+newer sessions wait, so the tracker never steps past a session whose
+candidates it has not opened.
 
 Progress is **durable**, in `momentum_chain_runs` (migration 025), never in
 memory — a restart or a kill mid-run cannot make a session look finished:
@@ -671,22 +704,34 @@ memory — a restart or a kill mid-run cannot make a session look finished:
 - `momentum-tracker` sets `tracker_completed_at` only after every write
   landed; any write failure exits non-zero with no marker. Its row writes are
   each one statement and idempotent, so a partial run is finished by re-running.
-- `momentum-daily` counts `attempts` **before** each run (a crash still uses
-  one up, so a step that always dies stops after 3) and records `gave_up_at` /
-  `last_error`. A session is done only when `tracker_completed_at` is set. A
+- `momentum-daily` counts `attempts` **before** each run, catch-up runs
+  included (a crash still uses one up, so a step that always dies stops after
+  3) and records `gave_up_at` / `last_error`. A session is done only when `tracker_completed_at` is set. A
   committed scan is not redone (it may already have been alerted).
 - analyst-bot's freshness gate reads `scanner_completed_at`, not the feature
   rows, so a partial scan can never be alerted.
 
-A give-up is final. To retry a session by hand, clear it first:
-`UPDATE momentum_chain_runs SET gave_up_at = NULL, attempts = 0 WHERE session = 'YYYY-MM-DD';`
+A session deferred for missing bars is not final: the catch-up runs it once
+they land. Only exhausted attempts are final. To retry such a session by hand,
+reset its attempts; the catch-up picks it up within a minute (still marked
+`catch_up`):
+`UPDATE momentum_chain_runs SET attempts = 0 WHERE session = 'YYYY-MM-DD';`
+
+A session older than the catch-up window is run by hand the same way the
+catch-up runs it, inside the `momentum-daily` container:
+
+```bash
+docker exec ta-phase1 psql -U postgres -d trading -c "INSERT INTO momentum_chain_runs (session, attempts, catch_up) VALUES ('YYYY-MM-DD', 1, true) ON CONFLICT (session) DO UPDATE SET attempts = momentum_chain_runs.attempts + 1, catch_up = true, updated_at = now()"
+docker exec infra-momentum-daily-1 /app/momentum-scanner -session YYYY-MM-DD
+docker exec infra-momentum-daily-1 /app/momentum-tracker -session YYYY-MM-DD
+```
 
 In Compose it runs next to `data-universe`, both `restart: unless-stopped`,
 against the live `ta-phase1` database.
 
 It does **not** ingest bars — data-ingestion's `data-universe` worker must be
-running — and it does **not** backfill missed sessions: a session skipped while
-it was down stays unscanned unless the scanner and tracker are run by hand.
+running. Missed sessions inside the catch-up window are caught up as above;
+older ones stay unscanned unless run by hand.
 The analyst-bot alerts only once the scan for the session that just closed
 exists, so the bot's alert time follows this chain, not a fixed clock.
 
