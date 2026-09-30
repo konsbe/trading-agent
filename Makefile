@@ -6,6 +6,7 @@ BOT     := $(ROOT)/services/analyst-bot
 
 .PHONY: help tidy build-ingestion build-analyzer db-up db-down up down deploy ensure-env ensure-corp-ca \
 	docker-build-timescaledb restart clean psql up-bot log-bot up-api log-api \
+	mcp-up mcp-up-local mcp-stop log-mcp mcp-rotate-key \
 	db-crypto-ohlcv db-crypto-global db-equity-ohlcv db-macro-fred db-onchain db-sentiment db-news db-tables \
 	db-technical db-technical-symbol db-fundamental db-fundamental-symbol \
 	log-docker-compose log-services log-analyzer \
@@ -18,6 +19,8 @@ help:
 	@echo "  make up-analyzer   Analyzer workers only (DB + ingestion must be running)"
 	@echo "  make up-bot        Discord analyst-bot only (DB + Redis must be running)"
 	@echo "  make up-api        momentum-api on 127.0.0.1:8090 (DB must be running; no auth)"
+	@echo "  make mcp-up        claude.ai connector: svc-mcp + cloudflared only (--no-deps; not 23:00-02:30 Greek)"
+	@echo "  make mcp-up-local  svc-mcp only, no tunnel;  make mcp-stop / log-mcp"
 	@echo "  make down          Stop everything (volumes kept)"
 	@echo "  make restart       down + up --build; database data preserved"
 	@echo "  make clean         Nuclear: remove containers, volumes (DB wiped), and local images"
@@ -100,6 +103,34 @@ up-api: ensure-env
 
 log-api:
 	docker compose -f $(ROOT)/infra/docker-compose.yml --profile api logs -f momentum-api
+
+# claude.ai connector: svc-mcp + cloudflared only, by name and --no-deps, so no
+# other container is recreated. Refused in the 23:00-02:30 Greek chain window.
+MCP_COMPOSE := docker compose -f $(ROOT)/infra/docker-compose.yml --env-file $(ROOT)/.env --profile mcp
+MCP_WINDOW_CHECK := t=$$(TZ=Europe/Athens date +%H%M); if [ "$$t" -ge 2300 ] || [ "$$t" -lt 230 ]; then \
+	echo "refusing: $$t Greek time is inside the 23:00-02:30 chain window"; exit 1; fi
+
+mcp-up: ensure-env
+	@$(MCP_WINDOW_CHECK)
+	$(MCP_COMPOSE) up -d --build --no-deps svc-mcp cloudflared
+
+# svc-mcp without the tunnel (nothing public), e.g. before the domain exists.
+mcp-up-local: ensure-env
+	@$(MCP_WINDOW_CHECK)
+	$(MCP_COMPOSE) up -d --build --no-deps svc-mcp
+
+mcp-stop:
+	$(MCP_COMPOSE) stop cloudflared svc-mcp
+
+# Replaces MCP_TOKEN_SIGNING_KEY in .env in place; prints only the variable name.
+mcp-rotate-key:
+	@python3 -c "import re,secrets,base64; p='$(ROOT)/.env'; s=open(p).read(); \
+	k='MCP_TOKEN_SIGNING_KEY='+base64.b64encode(secrets.token_bytes(32)).decode(); \
+	s,n=re.subn(r'(?m)^MCP_TOKEN_SIGNING_KEY=.*$$',lambda m:k,s); s=s if n else s.rstrip('\n')+'\n'+k+'\n'; \
+	open(p,'w').write(s); print('rotated MCP_TOKEN_SIGNING_KEY in .env')"
+
+log-mcp:
+	$(MCP_COMPOSE) logs -f svc-mcp cloudflared
 
 down:
 	$(MAKE) -C $(INFRA) down

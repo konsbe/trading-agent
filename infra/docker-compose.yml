@@ -331,5 +331,54 @@ services:
     profiles: [bot]
     restart: unless-stopped
 
+  # claude.ai connector (services/svc-mcp/README.md). Start only these two, by
+  # name and with --no-deps (make mcp-up), so no other container is recreated.
+  # svc-mcp gets its own variables only, never the whole .env; empty defaults
+  # keep other compose commands parsing, and svc-mcp refuses to start on them.
+  svc-mcp:
+    build:
+      context: ../services/svc-mcp
+      dockerfile: Dockerfile
+    environment:
+      MCP_PUBLIC_URL: ${MCP_PUBLIC_URL:-}
+      MCP_OAUTH_CLIENT_ID: ${MCP_OAUTH_CLIENT_ID:-}
+      MCP_OAUTH_CLIENT_SECRET: ${MCP_OAUTH_CLIENT_SECRET:-}
+      MCP_TOKEN_SIGNING_KEY: ${MCP_TOKEN_SIGNING_KEY:-}
+      GITHUB_OAUTH_CLIENT_ID: ${GITHUB_OAUTH_CLIENT_ID:-}
+      GITHUB_OAUTH_CLIENT_SECRET: ${GITHUB_OAUTH_CLIENT_SECRET:-}
+      GITHUB_ALLOWED_USER_ID: ${GITHUB_ALLOWED_USER_ID:-}
+      MCP_IP_ALLOWLIST_ENABLE: ${MCP_IP_ALLOWLIST_ENABLE:-true}
+      MCP_IP_ALLOWLIST: ${MCP_IP_ALLOWLIST:-160.79.104.0/21}
+      MCP_MOMENTUM_API_URL: http://momentum-api:8090
+      MCP_CAVEATS_PATH: /shared/content/momentum_caveats.json
+      # Only cloudflared's network may set CF-Connecting-IP.
+      MCP_TRUSTED_PROXIES: 172.31.250.0/29
+    volumes:
+      - ../shared/content:/shared/content:ro
+    networks: [default, mcp-edge]
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    profiles: [mcp]
+    restart: on-failure
+
+  cloudflared:
+    image: cloudflare/cloudflared:2026.9.3
+    command: ["tunnel", "--no-autoupdate", "run"]
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:-}
+    networks: [mcp-edge]
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    profiles: [mcp]
+    restart: on-failure
+
+networks:
+  mcp-edge:
+    ipam:
+      config:
+        - subnet: 172.31.250.0/29
+
 volumes:
   timescale_data:
