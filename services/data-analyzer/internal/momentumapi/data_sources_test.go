@@ -30,6 +30,8 @@ func TestSessionStatusOf(t *testing.T) {
 	}{
 		{"clean", "2026-09-17", store.ChainRun{Attempts: 1, ScannerCompletedAt: &set, TrackerCompletedAt: &set}, true, now, statusClean},
 		{"finished on a retry", "2026-09-17", store.ChainRun{Attempts: 2, ScannerCompletedAt: &set, TrackerCompletedAt: &set, LastError: &errMsg}, true, now, statusCompletedAfterRetry},
+		{"deferred, then caught up after its window", "2026-09-17", store.ChainRun{Attempts: 1, ScannerCompletedAt: &set, TrackerCompletedAt: &set, GaveUpAt: &set, CatchUp: true}, true, now, statusCaughtUp},
+		{"caught up with one attempt is still not clean", "2026-09-17", store.ChainRun{Attempts: 1, ScannerCompletedAt: &set, TrackerCompletedAt: &set, CatchUp: true}, true, now, statusCaughtUp},
 		{"gave up", "2026-09-17", store.ChainRun{Attempts: 3, GaveUpAt: &set, LastError: &errMsg}, true, now, statusFailed},
 		{"attempted, never finished, no give-up", "2026-09-17", store.ChainRun{Attempts: 1, ScannerCompletedAt: &set}, true, now, statusFailed},
 		{"in its window, nothing yet", "2026-09-17", store.ChainRun{}, false, ny("2026-09-17 19:00"), statusPending},

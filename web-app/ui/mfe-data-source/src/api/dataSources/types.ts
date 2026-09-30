@@ -46,11 +46,23 @@ export interface ProviderStatus {
 /** Keyed by provider; a provider with no budget row is missing (and named in `overall_reasons`). */
 export type ProvidersStatus = Partial<Record<ProviderKey, ProviderStatus>>;
 
-export type SessionRunStatus = 'clean' | 'completed_after_retry' | 'pending' | 'failed' | 'not_run' | 'not_recorded';
+/**
+ * `caught_up`: both markers set, but momentum-daily ran the session by catch-up
+ * after its window (momentum_chain_runs.catch_up) — never a clean session.
+ */
+export type SessionRunStatus =
+    | 'clean'
+    | 'completed_after_retry'
+    | 'caught_up'
+    | 'pending'
+    | 'failed'
+    | 'not_run'
+    | 'not_recorded';
 
 export const SESSION_RUN_STATUSES: readonly SessionRunStatus[] = [
     'clean',
     'completed_after_retry',
+    'caught_up',
     'pending',
     'failed',
     'not_run',
@@ -65,7 +77,7 @@ export interface SessionStatus {
     attempts: number;
     scanner_completed: boolean;
     tracker_completed: boolean;
-    /** `last_error`, set only when the run gave up. */
+    /** `last_error`, set only when the run gave up (on a `caught_up` row: why it was deferred). */
     gave_up_reason: string | null;
     last_error: string | null;
     status: SessionRunStatus;

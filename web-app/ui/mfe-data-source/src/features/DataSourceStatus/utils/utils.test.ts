@@ -40,6 +40,7 @@ describe('status', () => {
         expect(sessionStatusLabel(SESSION_ROWS.failed)).toBe('Failed');
         expect(sessionStatusLabel(SESSION_ROWS.not_run)).toBe('Not run — no attempt was recorded');
         expect(sessionStatusLabel(SESSION_ROWS.not_recorded)).toBe('Not recorded (before tracking began)');
+        expect(sessionStatusLabel(SESSION_ROWS.caught_up)).toBe('Caught up late (not clean)');
         expect(sessionStatusLabel({ ...SESSION_ROWS.clean, status: 'mystery' as never })).toBe('mystery');
     });
 
@@ -58,5 +59,18 @@ describe('status', () => {
         });
         expect(sessionDetail({ ...SESSION_ROWS.completed_after_retry, last_error: null })).toBeNull();
         expect(sessionDetail(SESSION_ROWS.clean)).toBeNull();
+    });
+
+    it('explains a caught-up row: why it was deferred, else the last error before catch-up', () => {
+        const caughtUp = SESSION_ROWS.caught_up;
+        expect(sessionDetail(caughtUp)).toEqual({
+            label: 'Deferred',
+            text: 'bars below 95% coverage 14h0m0s after the close — deferred; catch-up runs it once they land',
+        });
+        expect(sessionDetail({ ...caughtUp, gave_up_reason: null })).toEqual({
+            label: 'Last error before catch-up',
+            text: 'bars coverage 61.0% < 95%',
+        });
+        expect(sessionDetail({ ...caughtUp, gave_up_reason: null, last_error: null })).toBeNull();
     });
 });

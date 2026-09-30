@@ -14,14 +14,15 @@ export const doneText = (done: boolean) => (done ? 'Done' : 'Not done');
 
 /**
  * Status sort order, ascending: most concerning first (nothing ran, gave up),
- * then in progress, recovered, clean, and last "not recorded" (before
- * tracking existed) — the page's own weighting of the six statuses.
+ * then in progress, recovered, caught up late, clean, and last "not recorded"
+ * (before tracking existed) — the page's own weighting of the seven statuses.
  */
 export const SESSION_STATUS_ORDER: readonly SessionRunStatus[] = [
     'not_run',
     'failed',
     'pending',
     'completed_after_retry',
+    'caught_up',
     'clean',
     'not_recorded',
 ];

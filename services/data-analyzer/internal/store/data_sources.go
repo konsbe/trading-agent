@@ -67,7 +67,7 @@ func ChainRunsBetween(ctx context.Context, q Querier, from, to time.Time) (runs 
 		return nil, time.Time{}, false, fmt.Errorf("first chain run: %w", err)
 	}
 	rows, err := q.Query(ctx, `
-SELECT session, attempts, scanner_completed_at, tracker_completed_at, gave_up_at, last_error
+SELECT session, attempts, scanner_completed_at, tracker_completed_at, gave_up_at, last_error, catch_up
 FROM momentum_chain_runs
 WHERE session BETWEEN $1 AND $2`, from, to)
 	if err != nil {
@@ -77,7 +77,7 @@ WHERE session BETWEEN $1 AND $2`, from, to)
 	runs = map[string]ChainRun{}
 	for rows.Next() {
 		var r ChainRun
-		if err := rows.Scan(&r.Session, &r.Attempts, &r.ScannerCompletedAt, &r.TrackerCompletedAt, &r.GaveUpAt, &r.LastError); err != nil {
+		if err := rows.Scan(&r.Session, &r.Attempts, &r.ScannerCompletedAt, &r.TrackerCompletedAt, &r.GaveUpAt, &r.LastError, &r.CatchUp); err != nil {
 			return nil, time.Time{}, false, fmt.Errorf("scan chain run: %w", err)
 		}
 		runs[r.Session.Format(time.DateOnly)] = r
@@ -98,7 +98,7 @@ func LastCleanSession(ctx context.Context, q Querier) (*time.Time, error) {
 	err := q.QueryRow(ctx, `
 SELECT max(session) FROM momentum_chain_runs
 WHERE attempts = 1 AND scanner_completed_at IS NOT NULL AND tracker_completed_at IS NOT NULL
-  AND gave_up_at IS NULL AND last_error IS NULL`).Scan(&d)
+  AND gave_up_at IS NULL AND last_error IS NULL AND NOT catch_up`).Scan(&d)
 	if err != nil {
 		return nil, fmt.Errorf("last clean session: %w", err)
 	}

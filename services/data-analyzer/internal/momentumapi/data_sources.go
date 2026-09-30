@@ -28,6 +28,7 @@ var dataProviders = []struct{ key, role string }{
 const (
 	statusClean               = "clean"
 	statusCompletedAfterRetry = "completed_after_retry"
+	statusCaughtUp            = "caught_up"
 	statusPending             = "pending"
 	statusFailed              = "failed"
 	statusNotRun              = "not_run"
@@ -97,6 +98,9 @@ func sessionStatusOf(session time.Time, run store.ChainRun, found bool,
 	firstRecorded time.Time, hasFirst bool, now time.Time, giveUpAfter time.Duration) (string, *string) {
 	note := func(s string) *string { return &s }
 	if found && run.TrackerCompletedAt != nil && run.ScannerCompletedAt != nil {
+		if run.CatchUp {
+			return statusCaughtUp, nil
+		}
 		if run.Attempts == 1 && run.LastError == nil && run.GaveUpAt == nil {
 			return statusClean, nil
 		}

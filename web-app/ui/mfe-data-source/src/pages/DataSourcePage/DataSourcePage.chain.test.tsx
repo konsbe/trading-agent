@@ -45,7 +45,7 @@ beforeEach(() => window.sessionStorage.clear());
 describe('Daily chain table view', () => {
     it('defaults to the newest session first', () => {
         renderPage();
-        expect(sessions()).toEqual(['24', '23', '22', '21', '20', '19']);
+        expect(sessions()).toEqual(['24', '23', '22', '21', '20', '19', '18']);
         expect(screen.getByRole('columnheader', { name: 'Session' })).toHaveAttribute('aria-sort', 'descending');
     });
 
@@ -53,19 +53,20 @@ describe('Daily chain table view', () => {
         renderPage();
 
         await userEvent.click(header('Status'));
-        expect(sessions()).toEqual(['20', '21', '22', '23', '24', '19']);
+        // Caught up late (18) sits between recovered (23) and clean (24).
+        expect(sessions()).toEqual(['20', '21', '22', '23', '18', '24', '19']);
         expect(screen.getByTestId('location')).toHaveTextContent('/data-source?chain_sort=status%3Aasc');
         await userEvent.click(header('Status'));
-        expect(sessions()).toEqual(['19', '24', '23', '22', '21', '20']);
+        expect(sessions()).toEqual(['19', '24', '18', '23', '22', '21', '20']);
     });
 
     it('keeps "not computed" coverage last both ways; equal values stay newest first', async () => {
         renderPage();
 
         await userEvent.click(header('Coverage now'));
-        expect(sessions()).toEqual(['24', '23', '21', '19', '22', '20']);
+        expect(sessions()).toEqual(['24', '23', '21', '19', '18', '22', '20']);
         await userEvent.click(header('Coverage now'));
-        expect(sessions()).toEqual(['22', '24', '23', '21', '19', '20']);
+        expect(sessions()).toEqual(['22', '24', '23', '21', '19', '18', '20']);
     });
 
     it('searches the text shown, including a row’s detail line', async () => {
@@ -73,7 +74,7 @@ describe('Daily chain table view', () => {
 
         await userEvent.type(screen.getByTestId('chain-search-input'), 'gave up');
         await waitFor(() => expect(sessions()).toEqual(['21']));
-        expect(screen.getByTestId('chain-search-count')).toHaveTextContent('1 of 6 rows');
+        expect(screen.getByTestId('chain-search-count')).toHaveTextContent('1 of 7 rows');
     });
 
     it('restores sort and search from the URL', () => {

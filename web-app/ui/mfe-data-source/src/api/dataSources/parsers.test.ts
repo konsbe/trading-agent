@@ -40,8 +40,9 @@ describe('parseDataSourceStatus', () => {
             'failed',
             'not_run',
             'not_recorded',
+            'caught_up',
         ]);
-        expect(status.daily_chain.sessions.map(s => 'note' in s)).toEqual([false, false, false, false, true, true]);
+        expect(status.daily_chain.sessions.map(s => 'note' in s)).toEqual([false, false, false, false, true, true, false]);
         expect(status.daily_chain.sessions[3]).toMatchObject({ gave_up_reason: 'bars coverage 88.0% < 97%', status: 'failed' });
         expect(status.daily_chain.sessions[4].bars_coverage_now_pct).toBeNull();
         expect(status).toMatchObject({ overall: 'attention', overall_reasons: [expect.stringContaining('completed_after_retry')] });
@@ -54,6 +55,15 @@ describe('parseDataSourceStatus', () => {
         if (isSectionUnavailable(chain)) throw new Error('expected daily chain');
 
         expect(chain.sessions[0]).toMatchObject({ status: 'failed', gave_up_reason: null, note: 'did not finish and no give-up was recorded' });
+    });
+
+    it('accepts a caught_up row with both markers set, its deferral reason and last error', () => {
+        const body = makeStatusBody();
+        body.daily_chain.sessions[0] = { ...SESSION_ROWS.caught_up };
+        const chain = parseDataSourceStatus(body).daily_chain;
+        if (isSectionUnavailable(chain)) throw new Error('expected daily chain');
+
+        expect(chain.sessions[0]).toStrictEqual(SESSION_ROWS.caught_up);
     });
 
     it.each([

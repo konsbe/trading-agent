@@ -103,7 +103,8 @@
     font-size: var(--font-size-sm);
 }
 
-.data-source-chain__detail-row.is-completed_after_retry .data-source-chain__detail {
+.data-source-chain__detail-row.is-completed_after_retry .data-source-chain__detail,
+.data-source-chain__detail-row.is-caught_up .data-source-chain__detail {
     color: var(--color-on-surface-variant);
 }
 

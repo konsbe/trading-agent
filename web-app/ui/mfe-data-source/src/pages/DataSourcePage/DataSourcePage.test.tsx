@@ -270,9 +270,10 @@ describe('Section 3 — daily chain', () => {
         '2026-09-21': 'Failed',
         '2026-09-20': 'Not run — no attempt was recorded',
         '2026-09-19': 'Not recorded (before tracking began)',
+        '2026-09-18': 'Caught up late (not clean)',
     };
 
-    it('renders all six statuses with their exact text, newest first', () => {
+    it('renders all seven statuses with their exact text, newest first', () => {
         renderPage({ status: everyStatus() });
 
         Object.entries(EXACT).forEach(([session, text]) => {
@@ -305,6 +306,17 @@ describe('Section 3 — daily chain', () => {
             'Last error before recovery: bars coverage 91.2% < 97%'
         );
         expect(screen.queryByTestId('chain-detail-2026-09-24')).not.toBeInTheDocument();
+    });
+
+    it('shows why a caught-up row was deferred, muted like a recovered row', () => {
+        renderPage({ status: everyStatus() });
+
+        const detail = screen.getByTestId('chain-detail-2026-09-18');
+        expect(detail.textContent).toBe(
+            'Deferred: bars below 95% coverage 14h0m0s after the close — deferred; catch-up runs it once they land'
+        );
+        expect(detail).toHaveClass('is-caught_up');
+        expect(screen.getByTestId('chain-status-2026-09-18')).toHaveClass('data-source-chain__status--caught_up');
     });
 
     it('falls back to the note or last error for a failed row without gave_up_reason', () => {

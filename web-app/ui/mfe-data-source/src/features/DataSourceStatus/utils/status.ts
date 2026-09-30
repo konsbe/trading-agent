@@ -8,13 +8,15 @@ import { SessionStatus } from '@/api';
 export const isProviderOverBudget = (key: string, reasons: string[]): boolean =>
     reasons.some(reason => reason.startsWith(`${key} at `) && reason.includes('daily budget'));
 
-/** The chain status as plain text; each of the six reads differently. */
+/** The chain status as plain text; each of the seven reads differently. */
 export const sessionStatusLabel = ({ status, attempts }: SessionStatus): string => {
     switch (status) {
         case 'clean':
             return 'Clean';
         case 'completed_after_retry':
             return `Recovered (after ${attempts} attempts)`;
+        case 'caught_up':
+            return 'Caught up late (not clean)';
         case 'pending':
             return 'In progress';
         case 'failed':
@@ -38,6 +40,10 @@ export const sessionDetail = (session: SessionStatus): { label: string; text: st
     }
     if (session.status === 'completed_after_retry' && session.last_error) {
         return { label: 'Last error before recovery', text: session.last_error };
+    }
+    if (session.status === 'caught_up') {
+        if (session.gave_up_reason) return { label: 'Deferred', text: session.gave_up_reason };
+        if (session.last_error) return { label: 'Last error before catch-up', text: session.last_error };
     }
     return null;
 };

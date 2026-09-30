@@ -46,8 +46,11 @@ Types are in `src/api/dataSources/types.ts`.
 - Finnhub has no daily cap, so its `daily_limit` and `daily_used_pct` are `null`.
   `theoretical_daily_capacity` is capacity, never a quota or a denominator.
   `degraded_count_24h` is always `null` today.
-- Session `status` is one of `clean`, `completed_after_retry`, `pending`, `failed`,
-  `not_run` or `not_recorded`. `note` is omitted unless the status needs one.
+- Session `status` is one of `clean`, `completed_after_retry`, `caught_up`,
+  `pending`, `failed`, `not_run` or `not_recorded`. `caught_up` means both markers
+  are set but the session ran by catch-up after its window, so it is never clean;
+  its `gave_up_reason` says why it was deferred. `note` is omitted unless the
+  status needs one.
 
 `parseDataSourceStatus` is strict:
 

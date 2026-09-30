@@ -59,6 +59,13 @@ export const SESSION_ROWS: Record<SessionStatus['status'], SessionStatus> = {
         status: 'not_recorded',
         note: 'before the chain recorded its runs (momentum_chain_runs)',
     },
+    caught_up: {
+        ...CLEAN_SESSION,
+        attempts: 4,
+        gave_up_reason: 'bars below 95% coverage 14h0m0s after the close — deferred; catch-up runs it once they land',
+        last_error: 'bars coverage 61.0% < 95%',
+        status: 'caught_up',
+    },
 };
 
 /** Live body whose chain lists one row of every status, and `attention` with its reasons. */
