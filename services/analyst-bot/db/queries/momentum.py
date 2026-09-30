@@ -106,10 +106,14 @@ async def latest_scan_date(pool) -> "date | None":
     so a scanner killed part-way looked like a fresh scan to this gate, and a
     few freshly backfilled symbols with a newer bar could make an old scan look
     new.
+
+    Caught-up sessions (migration 032) are skipped: alerts post only for the
+    session that just closed, never for a scan run after its window.
     """
     async with pool.acquire() as conn:
         return await conn.fetchval(
-            "SELECT max(session) FROM momentum_chain_runs WHERE scanner_completed_at IS NOT NULL"
+            "SELECT max(session) FROM momentum_chain_runs"
+            " WHERE scanner_completed_at IS NOT NULL AND NOT catch_up"
         )
 
 
