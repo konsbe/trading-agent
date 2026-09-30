@@ -1352,8 +1352,8 @@
             {
               "type": "list",
               "items": [
-                "**No new scan** — \"No new scan for 2 trading sessions — the latest is Sep 25, 2026. Tracked figures below are as of that date.\" Shown when at least one expected session has no scan yet; it says \"1 trading session\" for one.",
-                "**Tracking behind** — \"The Sep 28, 2026 scan exists but tracking has not been updated since Sep 25, 2026.\" Shown when the latest scan finished more than 15 minutes ago without the tracker completing for it, or the chain gave up on that session."
+                "**No new scan** — \"No new scan for 2 trading sessions — the latest is Sep 25, 2026. Tracked figures below are as of that date.\" Shown when at least one expected session has no scan yet; it says \"1 trading session\" for one. If the machine was asleep over the close, the session is caught up automatically once its bars land (for sessions in the last five), and the note clears then; the Data Source page marks that session \"Caught up late (not clean)\".",
+                "**Tracking behind** — \"The Sep 28, 2026 scan exists but tracking has not been updated since Sep 25, 2026.\" Shown when the latest scan finished more than 15 minutes ago without the tracker completing for it, or the chain deferred that session because its bars had not landed in time."
               ]
             },
             {
