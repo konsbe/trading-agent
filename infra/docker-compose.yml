@@ -50,7 +50,7 @@ services:
     environment:
       DATABASE_URL: *live-db-url
     profiles: [ingestion]
-    restart: on-failure
+    restart: unless-stopped
 
   data-equity:
     build:
@@ -82,7 +82,7 @@ services:
     environment:
       DATABASE_URL: *live-db-url
     profiles: [ingestion]
-    restart: on-failure
+    restart: unless-stopped
 
   data-sentiment:
     build:
@@ -98,7 +98,7 @@ services:
     volumes:
       - ${CORP_CA_PEM_PATH:-/dev/null}:/etc/ssl/extra/corp-ca.pem:ro
     profiles: [ingestion]
-    restart: on-failure
+    restart: unless-stopped
 
   data-fundamental:
     build:
@@ -114,7 +114,7 @@ services:
     volumes:
       - ${CORP_CA_PEM_PATH:-/dev/null}:/etc/ssl/extra/corp-ca.pem:ro
     profiles: [ingestion]
-    restart: on-failure
+    restart: unless-stopped
 
   data-technical:
     build:
@@ -194,7 +194,7 @@ services:
       # when running --profile analyzer alone. Startup delay handles timing instead:
       # ANALYZER_STARTUP_DELAY_SECS (default 180) gives ingestion time to populate OHLCV.
     profiles: [analyzer]
-    restart: on-failure
+    restart: unless-stopped
 
   fundamental-analysis:
     build:
@@ -210,7 +210,7 @@ services:
       # Cross-profile depends_on (data-fundamental is in 'ingestion') is not supported
       # when running --profile analyzer alone. FUNDAMENTAL_STARTUP_DELAY_SECS handles timing.
     profiles: [analyzer]
-    restart: on-failure
+    restart: unless-stopped
 
   macro-analysis:
     build:
@@ -242,7 +242,7 @@ services:
     environment:
       DATABASE_URL: *live-db-url
     profiles: [analyzer]
-    restart: on-failure
+    restart: unless-stopped
 
   # ── momentum-daily ─────────────────────────────────────────────────────────
   # The momentum chain, once per NYSE session: waits until that session's daily
@@ -297,7 +297,7 @@ services:
     ports:
       - "127.0.0.1:8090:8090"
     profiles: [api]
-    restart: on-failure
+    restart: unless-stopped
 
   # ── analyst-bot ────────────────────────────────────────────────────────────
   # Discord bot + scheduler. Reads from TimescaleDB and Redis — no API calls.
