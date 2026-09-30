@@ -16,6 +16,13 @@ import (
 // refreshed at all (2026-09-22 and -23 were skipped that way), and the pass
 // time drifted to whenever the process was started rather than following the
 // close, which could land a session's bars too late for momentum-daily.
+//
+// The next fix replaced "a timer until the next 18:30" with a wall-clock check
+// every minute. A Go timer counts on the monotonic clock, which stops while
+// the host sleeps: on 2026-09-28 the machine slept across 18:30 and the timer
+// fired sixteen hours of wall time late, after momentum-daily had given up on
+// the session. The check instead asks "has the latest 18:30 passed, and has
+// its session been refreshed?", so a woken machine refreshes within a minute.
 
 // dailyClock is a wall-clock time of day in the schedule's location.
 type dailyClock struct{ hour, minute int }
@@ -95,40 +102,108 @@ func mustLoadLocation(name string) *time.Location {
 	return loc
 }
 
-// dailyBarsSchedule returns when the next refresh should fire. On the first
-// call (startup) it fires immediately if stored bars are behind the latest due
-// session; after that it follows the schedule.
-func (w *worker) dailyBarsSchedule(ctx context.Context) (func(now time.Time, startup bool) time.Time, error) {
+// dailyRefresh decides, on each wall-clock check, whether the refresh for the
+// latest due session still has to run. It holds only which session was last
+// refreshed; the startup check re-derives that from the stored bars.
+type dailyRefresh struct {
+	at       dailyClock
+	loc      *time.Location
+	done     time.Time // latest session refreshed, or abandoned after maxTries
+	tries    int       // failed passes for triesFor
+	triesFor time.Time
+	retryAt  time.Time
+	retry    time.Duration
+	maxTries int
+}
+
+// due returns the latest due session and whether a pass should run now.
+func (d *dailyRefresh) due(now time.Time) (time.Time, bool) {
+	session := latestDueSession(now, d.at, d.loc)
+	if !session.After(d.done) {
+		return session, false
+	}
+	if !session.Equal(d.triesFor) {
+		d.triesFor, d.tries, d.retryAt = session, 0, time.Time{}
+	}
+	return session, !now.Before(d.retryAt)
+}
+
+// finished records a pass for session. A failed pass is retried after retry;
+// the maxTries-th failure abandons the session until the next one is due, and
+// finished reports that.
+func (d *dailyRefresh) finished(session, now time.Time, ok bool) (abandoned bool) {
+	if ok {
+		d.done = session
+		return false
+	}
+	d.tries++
+	if d.tries >= d.maxTries {
+		d.done = session
+		return true
+	}
+	d.retryAt = now.Add(d.retry)
+	return false
+}
+
+// dailyBarsSchedule builds the wall-clock schedule, nil for the legacy
+// "interval" setting. At startup the latest due session counts as refreshed
+// only if the stored bars already cover it; otherwise the first check runs.
+func (w *worker) dailyBarsSchedule(ctx context.Context, now time.Time) (*dailyRefresh, error) {
 	if strings.TrimSpace(w.cfg.DailyBarsAt) == "interval" {
 		w.log.Info("daily bars: legacy interval schedule", "every", w.cfg.DailyBarsInterval.String())
-		return func(now time.Time, _ bool) time.Time { return now.Add(w.cfg.DailyBarsInterval) }, nil
+		return nil, nil
 	}
 	at, err := parseDailyClock(w.cfg.DailyBarsAt)
 	if err != nil {
 		return nil, fmt.Errorf("UNIVERSE_DAILY_BARS_AT: %w", err)
 	}
-	return func(now time.Time, startup bool) time.Time {
-		next := nextDailyRun(now, at, newYork)
-		if !startup || !w.cfg.EnableDailyBars {
-			w.log.Info("daily bars: next refresh", "at", next.Format(time.RFC3339))
-			return next
-		}
-		session := latestDueSession(now, at, newYork)
-		bounds, err := store.LoadBarBounds(ctx, w.pool, w.cfg.BarInterval, w.cfg.BarSource)
-		if err != nil {
-			w.log.Warn("daily bars: could not check coverage; catching up to be safe", "err", err)
-			return now
-		}
-		share := barsCurrentShare(bounds, session)
-		if share < w.cfg.DailyBarsCatchUpShare {
-			w.log.Info("daily bars: behind at startup — refreshing now",
-				"session", session.Format(time.DateOnly), "current_share", fmt.Sprintf("%.3f", share),
-				"then_at", next.Format(time.RFC3339))
-			return now
-		}
-		w.log.Info("daily bars: current at startup",
+	d := &dailyRefresh{at: at, loc: newYork, retry: w.cfg.DailyBarsRetryAfter, maxTries: max(1, w.cfg.DailyBarsMaxTries)}
+	if !w.cfg.EnableDailyBars {
+		return d, nil
+	}
+	session := latestDueSession(now, at, newYork)
+	next := nextDailyRun(now, at, newYork)
+	bounds, err := store.LoadBarBounds(ctx, w.pool, w.cfg.BarInterval, w.cfg.BarSource)
+	if err != nil {
+		w.log.Warn("daily bars: could not check coverage; catching up to be safe", "err", err)
+		return d, nil
+	}
+	share := barsCurrentShare(bounds, session)
+	if share < w.cfg.DailyBarsCatchUpShare {
+		w.log.Info("daily bars: behind at startup — refreshing now",
 			"session", session.Format(time.DateOnly), "current_share", fmt.Sprintf("%.3f", share),
-			"next_refresh", next.Format(time.RFC3339))
-		return next
-	}, nil
+			"then_at", next.Format(time.RFC3339))
+		return d, nil
+	}
+	d.done = session
+	w.log.Info("daily bars: current at startup",
+		"session", session.Format(time.DateOnly), "current_share", fmt.Sprintf("%.3f", share),
+		"next_refresh", next.Format(time.RFC3339))
+	return d, nil
+}
+
+// checkDailyBars runs the refresh when the schedule says it is due.
+func (w *worker) checkDailyBars(ctx context.Context, d *dailyRefresh, now time.Time) {
+	if !w.cfg.EnableDailyBars {
+		return
+	}
+	session, run := d.due(now)
+	if !run {
+		return
+	}
+	scheduled := d.at.on(session, d.loc)
+	w.log.Info("daily bars: refresh due", "session", session.Format(time.DateOnly),
+		"scheduled", scheduled.Format(time.RFC3339), "late_by", now.Sub(scheduled).Round(time.Minute).String())
+	ok := w.runDailyBars(ctx)
+	after := time.Now()
+	switch {
+	case d.finished(session, after, ok):
+		w.log.Error("daily bars: refresh failed on every try; not retrying until the next session is due",
+			"session", session.Format(time.DateOnly), "tries", d.maxTries)
+	case !ok:
+		w.log.Warn("daily bars: refresh incomplete; retrying", "session", session.Format(time.DateOnly),
+			"retry_at", d.retryAt.Format(time.RFC3339))
+	default:
+		w.log.Info("daily bars: next refresh", "at", nextDailyRun(after, d.at, d.loc).Format(time.RFC3339))
+	}
 }

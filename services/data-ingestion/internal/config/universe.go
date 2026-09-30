@@ -217,6 +217,17 @@ type Universe struct {
 	// day on purpose: it repairs gaps from a missed run or a late provider
 	// correction, and upserts make the overlap free.
 	DailyBarsLookbackDays int
+
+	// DailyBarsCheckEvery is how often the worker compares the wall clock with
+	// DailyBarsAt. A sleeping machine resumes within one check of waking.
+	DailyBarsCheckEvery time.Duration
+
+	// DailyBarsRetryAfter / DailyBarsMaxTries: a pass that fails (or most of
+	// whose requests fail) is retried after DailyBarsRetryAfter, at most
+	// DailyBarsMaxTries passes per session, since every pass costs one request
+	// per symbol.
+	DailyBarsRetryAfter time.Duration
+	DailyBarsMaxTries   int
 }
 
 func LoadUniverse() (Universe, error) {
@@ -298,6 +309,9 @@ func LoadUniverse() (Universe, error) {
 		DailyBarsInterval:     durationEnv("UNIVERSE_DAILY_BARS_INTERVAL", 24*time.Hour),
 		DailyBarsCatchUpShare: floatEnv("UNIVERSE_DAILY_BARS_CATCHUP_SHARE", 0.95),
 		DailyBarsLookbackDays: intEnv("UNIVERSE_DAILY_BARS_LOOKBACK_DAYS", 7),
+		DailyBarsCheckEvery:   durationEnv("UNIVERSE_DAILY_BARS_CHECK_EVERY", time.Minute),
+		DailyBarsRetryAfter:   durationEnv("UNIVERSE_DAILY_BARS_RETRY_AFTER", 30*time.Minute),
+		DailyBarsMaxTries:     intEnv("UNIVERSE_DAILY_BARS_MAX_TRIES", 3),
 	}, nil
 }
 

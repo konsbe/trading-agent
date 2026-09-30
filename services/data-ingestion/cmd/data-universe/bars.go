@@ -160,13 +160,16 @@ func (w *worker) fetchAndStore(ctx context.Context, symbol string, from, to time
 // Symbols that have never been backfilled are skipped rather than given a
 // 7-day window — a 7-day history would let the feature engine compute nothing
 // and would mark the symbol as having bars when it does not meaningfully.
-func (w *worker) runDailyBars(ctx context.Context) {
+//
+// It reports whether the pass completed: false when it could not start, was
+// cancelled, or most of its requests failed, so the schedule retries it.
+func (w *worker) runDailyBars(ctx context.Context) bool {
 	started := time.Now()
 
 	bounds, err := store.LoadBarBounds(ctx, w.pool, w.cfg.BarInterval, w.cfg.BarSource)
 	if err != nil {
 		w.log.Error("load bar bounds", "err", err)
-		return
+		return false
 	}
 	if w.cfg.SubsetEnable {
 		// Refresh only the pilot subset. Refreshing the full universe on the
@@ -175,7 +178,7 @@ func (w *worker) runDailyBars(ctx context.Context) {
 		sel, err := store.SelectedSubset(ctx, w.pool)
 		if err != nil {
 			w.log.Error("load selected subset", "err", err)
-			return
+			return false
 		}
 		keep := make(map[string]struct{}, len(sel))
 		for _, m := range sel {
@@ -189,7 +192,7 @@ func (w *worker) runDailyBars(ctx context.Context) {
 	}
 	if len(bounds) == 0 {
 		w.log.Info("daily bar refresh: no eligible symbols yet")
-		return
+		return true
 	}
 
 	to := time.Now().UTC()
@@ -289,7 +292,9 @@ func (w *worker) runDailyBars(ctx context.Context) {
 	if attempted := okCount + noDataCount + failCount; attempted > 0 && failCount*2 > attempted {
 		w.log.Warn("more than half of daily bar requests failed; check Yahoo throttling (UNIVERSE_YAHOO_REQUESTS_PER_SEC) before trusting today's scan",
 			"failed", failCount, "attempted", attempted)
+		return false
 	}
+	return ctx.Err() == nil
 }
 
 // reportSubsetConsistency re-reads the subset stats once real bars exist.

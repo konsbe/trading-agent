@@ -143,13 +143,25 @@ func main() {
 
 	tSymbols := time.NewTicker(cfg.PollSymbols)
 	defer tSymbols.Stop()
-	nextDaily, err := w.dailyBarsSchedule(ctx)
+	daily, err := w.dailyBarsSchedule(ctx, time.Now())
 	if err != nil {
 		log.Error("daily bars schedule", "err", err)
 		os.Exit(1)
 	}
-	tDailyBars := time.NewTimer(time.Until(nextDaily(time.Now(), true)))
-	defer tDailyBars.Stop()
+	// The wall-clock check (daily != nil) or the legacy interval timer; the
+	// other channel stays nil and never fires.
+	var dailyCheck, legacyDaily <-chan time.Time
+	var legacyTimer *time.Timer
+	if daily != nil {
+		tCheck := time.NewTicker(cfg.DailyBarsCheckEvery)
+		defer tCheck.Stop()
+		dailyCheck = tCheck.C
+		w.checkDailyBars(ctx, daily, time.Now())
+	} else {
+		legacyTimer = time.NewTimer(cfg.DailyBarsInterval)
+		defer legacyTimer.Stop()
+		legacyDaily = legacyTimer.C
+	}
 
 	// The backfill runs back-to-back batches while work remains, then idles. A
 	// timer rather than a ticker so the interval is measured from the end of the
@@ -197,11 +209,13 @@ func main() {
 			if cfg.EnableSymbols {
 				w.runSymbols(ctx)
 			}
-		case <-tDailyBars.C:
+		case <-dailyCheck:
+			w.checkDailyBars(ctx, daily, time.Now())
+		case <-legacyDaily:
 			if cfg.EnableDailyBars {
 				w.runDailyBars(ctx)
 			}
-			tDailyBars.Reset(time.Until(nextDaily(time.Now(), false)))
+			legacyTimer.Reset(cfg.DailyBarsInterval)
 		case <-backfillTimer.C:
 			processed := w.runBackfillRound(ctx)
 			// Immediately continue while there is work; idle once drained so a
